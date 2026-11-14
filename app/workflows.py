@@ -917,10 +917,11 @@ def action_graph(m, prompt, width, height, seconds, seed, images, audios, faithf
             "14": {"class_type": "SamplerCustomAdvanced", "inputs": {
                 "noise": ["11", 0], "guider": ["13", 0], "sampler": ["12", 0], "sigmas": ["9", 0], "latent_image": ["8", 1]}},
             "15": {"class_type": "LTXVSeparateAVLatent", "inputs": {"av_latent": ["14", 1]}},
-            "16": {"class_type": "MinimaxH3LatentUpscaler3D", "inputs": {
-                "latent": ["15", 0], "model_name": m["upscaler"], "mode": "scale by multiplier",
-                "mode.scale": round(1 / ACTION_LOWRES, 3), "align": 32, "enable_temporal_chunking": True,
-                "force_unload": True, "device": "cuda", "precision": "fp16"}},
+            "16": {"class_type": upscaler_node(m["upscaler"])[0], "inputs": dict(
+                {"latent": ["15", 0], "model_name": m["upscaler"], "mode": "scale by multiplier",
+                 "mode.scale": round(1 / ACTION_LOWRES, 3), "align": 32,
+                 "force_unload": True, "device": "cuda", "precision": "fp16"},
+                **upscaler_node(m["upscaler"])[1])},
             "17": {"class_type": "LTXVConcatAVLatent", "inputs": {"video_latent": ["16", 0], "audio_latent": ["15", 1]}},
             "18": {"class_type": "SamplerCustomAdvanced", "inputs": {
                 "noise": ["11", 0], "guider": ["13", 0], "sampler": ["12", 0], "sigmas": ["9", 1], "latent_image": ["17", 0]}},
@@ -951,6 +952,15 @@ def action_sizes(width, height):
     s = round(1 / ACTION_LOWRES, 3)
     lw, lh = r32(width * ACTION_LOWRES), r32(height * ACTION_LOWRES)
     return lw, lh, max(32, round(lw * s / 32) * 32), max(32, round(lh * s / 32) * 32)
+
+
+def upscaler_node(name):
+    """Which latent-upscaler node and which extra inputs a chosen weights file needs: the 2D pack
+       (2026-11-10) answers to a sharpness tier and names its chunking input differently."""
+    low = str(name or "").lower()
+    if "2d" in low:
+        return "MinimaxH3LatentUpscalerNode2D", {"sharpness": 2, "temporal_chunking": "on", "chunk_frames": 4}
+    return "MinimaxH3LatentUpscaler3D", {"enable_temporal_chunking": True}
 
 
 def action_part_graph(m, scenes, k, width, height, seed, images, loras, preview=None, state=None, fresh=(), faithful=False,
@@ -1058,9 +1068,10 @@ def action_part_graph(m, scenes, k, width, height, seed, images, loras, preview=
         guider = add("BasicGuider", model=mdl, conditioning=[ref, 0])
         smp1 = add("SamplerCustomAdvanced", noise=[noise, 0], guider=[guider, 0], sampler=["12", 0], sigmas=["9", 0], latent_image=[lat, 0])
         sep = add("LTXVSeparateAVLatent", av_latent=[smp1, 1])
-        up = add("MinimaxH3LatentUpscaler3D", latent=[sep, 0], model_name=m["upscaler"], mode="scale by multiplier",
-                 **{"mode.scale": round(1 / ACTION_LOWRES, 3)}, align=32, enable_temporal_chunking=True,
-                 force_unload=True, device="cuda", precision="fp16")
+        ucls, uextra = upscaler_node(m["upscaler"])
+        up = add(ucls, latent=[sep, 0], model_name=m["upscaler"], mode="scale by multiplier",
+                 **{"mode.scale": round(1 / ACTION_LOWRES, 3)}, align=32,
+                 force_unload=True, device="cuda", precision="fp16", **uextra)
     if faithful:
         final, smp_stages = [smp, 0], {smp: "sample", refiner: "encode"}
     elif single:
@@ -1176,11 +1187,11 @@ def lipsync_graph(m, prompt, width, height, seconds, seed, audio, ref_images, sc
             "sigmas": ["11", 0], "latent_image": ["9", 1]}},
         # pass 2: upscale the video latent, keep the audio latent, finish the low sigmas
         "16": {"class_type": "LTXVSeparateAVLatent", "inputs": {"av_latent": ["15", 1]}},
-        "17": {"class_type": "MinimaxH3LatentUpscaler3D", "inputs": {
-            "latent": ["16", 0], "model_name": m["upscaler"],
-            "mode": "scale by multiplier", "mode.scale": scale, "align": 32,
-            "enable_temporal_chunking": True, "force_unload": True,
-            "device": "cuda", "precision": "fp16"}},
+        "17": {"class_type": upscaler_node(m["upscaler"])[0], "inputs": dict(
+            {"latent": ["16", 0], "model_name": m["upscaler"],
+             "mode": "scale by multiplier", "mode.scale": scale, "align": 32,
+             "force_unload": True, "device": "cuda", "precision": "fp16"},
+            **upscaler_node(m["upscaler"])[1])},
         "18": {"class_type": "LTXVConcatAVLatent", "inputs": {"video_latent": ["17", 0], "audio_latent": ["16", 1]}},
         "19": {"class_type": "SamplerCustomAdvanced", "inputs": {
             "noise": ["12", 0], "guider": ["14", 0], "sampler": ["13", 0],

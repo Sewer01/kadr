@@ -91,6 +91,10 @@ FILE_ALIASES = {
     "minimax_h3_latent_upscaler_3d_bf16.safetensors": ("minimax_h3_latent_upscaler_3d_conv_v1_bf16.safetensors",),
     # the SelfLift upscaler of the action scheme also exists in full precision under another name
     "h3_upscaler_lms_v0.1.safetensors": ("h3_upscaler_lms_v0.1_fp32.safetensors",),
+    "minimax_h3_latent_upscaler_2d_conv_v1/minimax_h3_latent_upscaler_2d_conv_v1_fp16.safetensors":
+        ("minimax_h3_latent_upscaler_2d_conv_v1_fp16.safetensors",),
+    "minimax_h3_latent_upscaler_2d_conv_v1/minimax_h3_latent_upscaler_2d_conv_v1_bf16.safetensors":
+        ("minimax_h3_latent_upscaler_2d_conv_v1_bf16.safetensors",),
 }
 
 VARIANTS = {
@@ -126,12 +130,26 @@ VARIANTS = {
     "ref2v_turbo_lora": {
         "bf16": _m("Comfy-Org/MiniMax-H3", "loras/minimax_h3_ref2v_turbo_4step_v0.1_comfyui_bf16.safetensors",
                    1.96, "loras"),
+        # lightx2v refreshed its ref2v LoRAs (repo updated 2026-11-12); the 8-step one fits the 8 steps
+        # our reference sections really run, the shipped v0.1 is a 4-step accelerator
+        "v1.1_8step": _m("lightx2v/Minimax-h3-Turbo",
+                         "minimax_h3_ref2v_turbo_8step_v1.1_768p_comfyui_bf16.safetensors", 1.96, "loras"),
     },
     "upscaler": {
         # same file (same sha256) the original workflow knows as minimax_h3_latent_upscaler_3d_bf16
         "bf16": _m("LBH-123-AI/Minimax_h3_latent_Upscaler",
                    "minimax_h3_latent_upscaler_3d_conv_v1/minimax_h3_latent_upscaler_3d_conv_v1_bf16.safetensors",
                    0.69, "latent_upscale_models", name="minimax_h3_latent_upscaler_3d_bf16.safetensors", sub=None),
+        # 2D-свёртка (2026-11-10): по проверке автора на 2500 парах она бьёт 3D на 32 из 36 масштабов,
+        # меньше сдвигает цвет (16,4% против 17,9%) и отвечает на резкость 1-6: 1 = точность, 6 = детали
+        "2d_fp16": _m("LBH-123-AI/Minimax_h3_latent_Upscaler",
+                      "minimax_h3_latent_upscaler_2d_conv_v1/minimax_h3_latent_upscaler_2d_conv_v1_fp16.safetensors",
+                      0.36, "latent_upscale_models",
+                      name="minimax_h3_latent_upscaler_2d_conv_v1_fp16.safetensors", sub=None),
+        "2d_bf16": _m("LBH-123-AI/Minimax_h3_latent_Upscaler",
+                      "minimax_h3_latent_upscaler_2d_conv_v1/minimax_h3_latent_upscaler_2d_conv_v1_bf16.safetensors",
+                      0.36, "latent_upscale_models",
+                      name="minimax_h3_latent_upscaler_2d_conv_v1_bf16.safetensors", sub=None),
     },
     # Turbo-SLA (lightx2v): 4-step LoRA for the first/last frame model; used on top of FastH3 for the "fast" switch
     "sla_lora": {
@@ -165,6 +183,8 @@ VARIANTS = {
     },
     "motion_repair_lora": {
         "v1": _m("JOKER141/MiniMax-H3-General-Motion-Continuity-Repair", "Motion_Repair.safetensors", 0.16, "loras"),
+        # V2 of the same pack (2026-10-25): aimed at fast movement - jumps, turns, landings
+        "v2": _m("JOKER141/MiniMax-H3-General-Motion-Continuity-Repair", "Motion_Repair_V2.safetensors", 0.16, "loras"),
     },
     # four-step speed-up of the teacher: the "Черновик" of Видеостудия runs on it
     "dmad_lora": {
@@ -299,6 +319,10 @@ MODEL_SHA256 = {
     "lightx2v/Minimax-h3-Turbo-SLA|minimax_h3_fl2v_turbo_4step_v0.1_768p_sla_comfyui_bf16.safetensors": "5cae6df40a06ea825f85fc8876c9ea1c9692c833a9af07bb8b3bac9ce2a71bac",
     "smhfacct/Minimax-H3-fl2va-ref2va-hybrid-models|minimax_h3_hybrid_fl2va_ref2va_b25-49-int8.safetensors": "a629cfea8d89a071b140c6e1935dc9a23e72de6badc18975a2bb9e6d1423d76d",
     "uzumix/realism_engine_krea2_v2|realism_engine_krea2_v2.safetensors": "1815c6ac01216ad62f8dd17edab7c1fd31edf16c1b11434317123bae60e33257",
+    "Motion_Repair_V2.safetensors": "edfa0e2858caeba7be9108883f61da8525d3c58af998c94ac7a449d9603d7574",
+    "minimax_h3_latent_upscaler_2d_conv_v1_bf16.safetensors": "f35307b93a19415acf1ec544148592f2a9c76c67421db5ee41fdfbe6360ecf44",
+    "minimax_h3_latent_upscaler_2d_conv_v1_fp16.safetensors": "6e0f35692784ba2376704a48a90fb07f90aef76ef21200d5525d6627a54fe909",
+    "minimax_h3_ref2v_turbo_8step_v1.1_768p_comfyui_bf16.safetensors": "e56863a7524e0300729cbb7b64cc8b548d90698c1abbf7d83898b0122fbe1e81",
 }
 
 
@@ -444,6 +468,9 @@ ROLE_TITLES = {
     "audio_vae": "Аудио VAE",
     "ref2v_turbo_lora": "LoRA ускорения для Lipsync",
     "upscaler": "Апскейлер второго прохода",
+    "2d_fp16": "2D-свёртка (новее, мягче цвет, есть резкость)",
+    "2d_bf16": "2D-свёртка в bf16",
+    "v1.1_8step": "Ref2V Turbo 8 шагов v1.1 (светлее по шагам, свежее)",
     "preview": "Декодер живого превью",
     "action_unet": "Основная модель — Экшн-сцены (Hybrid FL2VA/Ref2VA)",
     "speed_slider_lora": "LoRA Speed Slider (экшн)",
@@ -517,9 +544,9 @@ ALL_ROLES = list(VARIANTS)
 
 # The user's original files, for connecting to an existing ComfyUI that already has them.
 DEFAULT_CHOICE = {"h3img_unet": "w4a8", "h3img_vae": "fp16", "fast_unet": "int8", "lipsync_unet": "full", "text_encoder": "nvfp4", "video_vae": "int8",
-                  "audio_vae": "fp32", "ref2v_turbo_lora": "bf16", "upscaler": "bf16", "preview": "taeh3",
+                  "audio_vae": "fp32", "ref2v_turbo_lora": "bf16", "upscaler": "2d_fp16", "preview": "taeh3",
                   "action_unet": "int8", "speed_slider_lora": "v1.1", "action_upscaler": "lms", "vocal_model": "fp16",
-                  "realism_lora": "v1", "motion_repair_lora": "v1", "pika_lora": "hd8", "dmad_lora": "v1", "swap_lora": "v15", "sla_lora": "bf16",
+                  "realism_lora": "v1", "motion_repair_lora": "v2", "pika_lora": "hd8", "dmad_lora": "v1", "swap_lora": "v15", "sla_lora": "bf16",
                   "krea_unet": "int8", "krea_clip": "fp8", "krea_vae": "bf16", "kreareal_unet": "fp8", "kreareal_lora": "v2",
                   "qwen_unet": "int8", "qwen_clip": "int8", "qwen_vae": "bf16",
                   "flux_unet": "fp8", "flux_clip": "bf16", "flux_vae": "bf16",
