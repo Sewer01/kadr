@@ -7262,8 +7262,33 @@ $('#agAudioBox').addEventListener('click', e => {
   AG.audio = (AG.audios || [])[0] || null;
   showAudioBox();
 });
+/* The person often loads a file with the agent's own button, and then nothing says where it came
+   from. We look the name up in the video studio: the film's background is <Audio 1>, a scene's own
+   audio sit in that scene's decade (scene 1 -> <Audio 10..12>, scene 2 -> <Audio 20..22>). */
+function audioTagFor(name) {
+  try {
+    const R = (typeof RM !== 'undefined' && RM.long && RM.long.root) ? RM.long.root : null;
+    if (!R) return '';
+    const norm = s => String(s || '').replace(/\.[a-z0-9]+$/i, '').toLowerCase();
+    const nm = norm(name);
+    if (!nm) return '';
+    const tr = R._trim;
+    if (tr && tr.name && norm(tr.name) === nm) return 'фон всего ролика, тег <Audio 1>';
+    const scs = $$('.sc', R);
+    for (let i = 0; i < scs.length; i++) {
+      const c = scs[i], base = c._base || 10 * (i + 1);
+      const src = c._audSrc || c._auds || [];
+      for (let j = 0; j < src.length; j++) {
+        const f = src[j];
+        if (f && norm(f.name) === nm) return 'сцена ' + (i + 1) + ', аудио ' + (j + 1) + ', тег <Audio ' + (base + j) + '>';
+      }
+    }
+  } catch (e) {}
+  return '';
+}
 async function setChatAudio(wavBlob, name, dur, where) {
   if (needSpeech()) return false;
+  where = where || audioTagFor(name);
   AG.audios = AG.audios || [];
   // the same file cut again replaces its own entry, a different one is added next to it
   const at = AG.audios.findIndex(x => x.name === name && Math.abs(x.dur - dur) < .1);
@@ -7367,7 +7392,9 @@ async function agSend() {
   if (!text && !AG.att.length && !AUD.length) return;
   if (!AG.status?.installed) { toast('Сначала скачайте модель агента — справа, в карточке «Модель»'); return; }
   if (AUD.length) {
-    text += '\n\n[Аудио в проекте: ' + AUD.length + (AUD.length === 1 ? '' : '. Каждое применяется там, где его тег назван в тексте сцены.') + ']';
+    text += '\n\n[Аудио в проекте: ' + AUD.length + '. Нумерация тегов: <Audio 1> - фон всего ролика, у сцены '
+      + 'свои номера десятками: сцена 1 - <Audio 10>, <Audio 11>, <Audio 12>, сцена 2 - <Audio 20> и т.д. '
+      + 'Аудио применяется там, где его тег назван в тексте сцены; без тега в этой сцене звук делает модель.]';
     AUD.forEach((au, i) => {
       text += `\n[Аудио ${i + 1}: ${au.name}, ${au.dur.toFixed(1)} с` + (au.where ? `, ${au.where}` : '') + '. ' + (au.text.trim()
         ? `Слова из аудио${au.langName ? ` (язык: ${au.langName})` : ''}: «${au.text.trim()}»]` : 'Слов в аудио нет (музыка или голос не распознан).]');
