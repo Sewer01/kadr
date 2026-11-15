@@ -3528,7 +3528,7 @@ class AudioTrimmer {
     this.q('.at-voc').onclick = async () => {
       if (!this.dur0 || this.busy) return;
       const fd = new FormData();
-      fd.append('audio', new File([wavSlice(this.buf, 0, this.dur0)], 'in.wav', { type: 'audio/wav' }));
+      fd.append('file', new File([wavSlice(this.buf, 0, this.dur0)], 'in.wav', { type: 'audio/wav' }));   // the endpoint reads 'file'
       this.busy = true; this.q('.at-voc').disabled = true; this.q('.at-voc').textContent = 'Отделяю…';
       try {
         const r = await fetch('/api/audio/separate', { method: 'POST', body: fd });
@@ -3561,7 +3561,14 @@ class AudioTrimmer {
       this._peaks(); this._sync(); this.out();
       this.q('.at-und').disabled = !this.undo.length;
     };
-    const setZoom = v => { this.zoom = Math.min(40, Math.max(1, v)); this.q('.at-zr').value = this.zoom; this._sync(); };
+    const setZoom = v => {
+      this.zoom = Math.min(40, Math.max(1, v));
+      const sl = this.q('.at-zr');
+      sl.value = this.zoom;
+      sl.setAttribute('value', this.zoom);   // in the app's own window the thumb sometimes keeps its old place
+      void sl.offsetWidth;                   // without a reflow it is not always redrawn
+      this._sync();
+    };
     this.q('.at-zr').oninput = e => setZoom(+e.target.value);
     this.q('.at-zm').onclick = () => setZoom(Math.max(1, Math.round(this.zoom / 1.6)));
     this.q('.at-zp').onclick = () => setZoom(Math.min(40, Math.max(2, Math.round(this.zoom * 1.6))));
@@ -5764,6 +5771,7 @@ function makeRefMode(cfg) {
       $('.sc-tests', c).onclick = e => { const b = e.target.closest('.sc-tt'); const t = b && c._tests[+b.dataset.j]; if (!t) return; root._sel = $$('.sc', root).indexOf(c); const v = $('.tl-vid', root); v.src = t.url; v.hidden = false; $('.tl-empty', root).hidden = true; v.play().catch(() => {}); };
       $('.sc-tbtn', c).onclick = () => { root._test = { q: $('.sc-tq', c).value }; root._chainPart = null; root._target = $$('.sc', root).indexOf(c); $('.go', $('.rm-preview', root)).click(); };
       c._files = new Array(9).fill(null);   // nine places of their own, an empty one keeps its number
+      const ownBase = () => { const all = $$('.sc', root); const ix = all.indexOf(c); return 10 * ((ix < 0 ? all.length : ix) + 1); };
       const paintRefs = c._paint = () => {
         (c._ownTiles || []).forEach((lb, j) => {
           const f = c._files[j], im0 = $('img', lb), plus = $('.plus', lb), tag = $('.tag', lb);
@@ -5780,11 +5788,12 @@ function makeRefMode(cfg) {
         const last = c._files.reduce((a, f, j) => (f ? j : a), -1), shown = Math.min(9, last + 2);
         (c._ownTiles || []).forEach((lb, j) => { lb.hidden = j >= shown; });   // лишние пустые места не светятся
         const tk = $('.sc-tokens', c);
-        if (tk) tk.innerHTML = c._files.slice(0, shown).map((f, j) => `<button class="token" type="button" data-ins="&lt;Picture ${10 + j}&gt;"${f ? '' : ' disabled'} title="${f ? 'Вставить в текст тег <Picture ' + (10 + j) + '> - ваше фото в месте ' + (j + 1) : 'Место ' + (j + 1) + ' свободно - номер ' + (10 + j) + ' оживёт, когда туда что-нибудь положат'}">&lt;Pic ${10 + j}&gt;</button>`).join('')
-          + (c._auds || []).map((f, j) => f ? `<button class="token" type="button" data-ins="&lt;Audio ${j + 2}&gt;" data-audio="1" title="Вставить в текст тег <Audio ${j + 2}> - аудио этой сцены номер ${j + 1}; звук применяется там, где вы его упомянули">&lt;Audio ${j + 2}&gt;</button>` : '').join('');
-        c._counter?.();
+        const bs = ownBase();
+        if (tk) tk.innerHTML = c._files.slice(0, shown).map((f, j) => `<button class="token" type="button" data-ins="&lt;Picture ${bs + j}&gt;"${f ? '' : ' disabled'} title="${f ? 'Вставить в текст тег <Picture ' + (bs + j) + '> - ваше фото номер ' + (j + 1) + ' этой сцены' : 'Место ' + (j + 1) + ' свободно - номер ' + (bs + j) + ' оживёт, когда туда что-нибудь положат'}">&lt;Pic ${bs + j}&gt;</button>`).join('')
+          + (c._auds || []).map((f, j) => f ? `<button class="token" type="button" data-ins="&lt;Audio ${bs + j}&gt;" data-audio="1" title="Вставить в текст тег <Audio ${bs + j}> - аудио номер ${j + 1} этой сцены; звук применяется там, где вы его упомянули">&lt;Audio ${bs + j}&gt;</button>` : '').join('');
+        c._base = bs; c._counter?.();
         const n = c._files.filter(Boolean).length;
-        $('.sc-rhint', c).textContent = n ? `Своих фото в этой сцене: ${n} (мест до девяти). В тексте они зовутся <Picture 10>, <Picture 11>... - отдельный ряд чисел, чтобы не путать с общими изображениями (<Picture 1>…). Программа подставит их в расчёт после общих.` : 'Своих фото нет: сцена возьмёт общие. У своих мест номера не меняются, даже если убрать другое фото.';
+        $('.sc-rhint', c).textContent = n ? `Своих фото в этой сцене: ${n} (мест до девяти). Номера идут десятками по сценам: в первой <Picture 10>, <Picture 11>, во второй <Picture 20>, <Picture 21> - поэтому в Агенте число сразу говорит, о какой сцене речь. Аудио этой сцены зовётся так же: <Audio 10>, <Audio 20>... Общие изображения остаются <Picture 1…5>, фон всего ролика - <Audio 1>.` : 'Своих фото нет: сцена возьмёт общие. У своих мест номера не меняются, даже если убрать другое фото.';
       };
       // (the places take pictures themselves: click a tile or drop a photo into it)
       paintRefs();
@@ -5843,7 +5852,7 @@ function makeRefMode(cfg) {
         const full = c._auds.filter(Boolean).length >= 3;
         row.innerHTML = '<button class="btn mini" type="button" data-a="add"' + (full ? ' disabled' : '') +
           ' title="Аудио отдельной сцены: до трёх файлов. Модель получает их как ссылки и применяет там, где вы упомянули файл тегом в тексте сцены; не упомянули - звук делает сама. Обрезать можно до 15 секунд.">Загрузить аудио сцены</button>' +
-          c._auds.map((f, j) => f ? `<span class="token" style="display:inline-flex;gap:6px;align-items:center">&lt;Audio ${j + 2}&gt; ${esc2(f.name.slice(0, 18))}${c._audSel[j] ? ' <small style="opacity:.75">с ' + c._audSel[j].start.toFixed(1).replace('.', ',') + ' по ' + c._audSel[j].end.toFixed(1).replace('.', ',') + ' с</small>' : ''} <button class="btn mini" type="button" data-a="trim" data-j="${j}" title="Послушать и обрезать: прибор под строкой">Обрезать</button><button class="btn mini" type="button" data-a="del" data-j="${j}" title="Убрать этот файл из сцены">×</button></span>` : '').join('') +
+          c._auds.map((f, j) => f ? `<span class="token" style="display:inline-flex;gap:6px;align-items:center">&lt;Audio ${(c._base || 10) + j}&gt; ${esc2(f.name.slice(0, 18))}${c._audSel[j] ? ' <small style="opacity:.75">с ' + c._audSel[j].start.toFixed(1).replace('.', ',') + ' по ' + c._audSel[j].end.toFixed(1).replace('.', ',') + ' с</small>' : ''} <button class="btn mini" type="button" data-a="trim" data-j="${j}" title="Послушать и обрезать: прибор под строкой">Обрезать</button><button class="btn mini" type="button" data-a="del" data-j="${j}" title="Убрать этот файл из сцены">×</button></span>` : '').join('') +
           (full ? '<span class="hint" style="font-size:12px">три аудио в сцене - максимум</span>' : '');
       };
       ainp.onchange = () => {
@@ -5855,7 +5864,7 @@ function makeRefMode(cfg) {
         if (j < 0) { toast('Больше трёх аудио в одной сцене нельзя'); return; }
         c._auds[j] = f; c._audSrc[j] = f; c._audSel[j] = null; c._paintAuds(); paintRefs();
         if (root._save) root._save();
-        toast('Аудио ' + (j + 2) + ' в сцене: ' + f.name + ' - при желании обрежьте (до 15 с)');
+        toast('Аудио <Audio ' + ((c._base || 10) + j) + '> в сцене: ' + f.name + ' - при желании обрежьте (до 15 с)');
       };
       if (!$('.sc-auds', c)) {
         $('textarea', c).insertAdjacentHTML('afterend', '<div class="sc-auds" style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:6px"></div><div class="sc-trimhost" hidden style="margin-top:8px"></div>');
@@ -5889,7 +5898,8 @@ function makeRefMode(cfg) {
         const used = new Set();
         ($('textarea', c).value.match(/<\s*Picture\s*(\d+)\s*>/g) || []).forEach(x => {
           const k = +x.replace(/\D+/g, '');
-          if (k < 10 ? !!places[k - 1] : !!ownPlaces[k - 10]) used.add(k);   // a place with no photo does not count
+          const bs0 = c._base || 10;
+          if (k < 10 ? !!places[k - 1] : (k >= bs0 && k < bs0 + 10 && !!ownPlaces[k - bs0])) used.add(k);   // свои номера - своя декада
         });
         c._used = used; c._cap = cap; c._frame = frame;
         const n = used.size, left = cap - n;
@@ -5908,7 +5918,8 @@ function makeRefMode(cfg) {
           if (b.dataset.audio) { b.disabled = false; b.style.opacity = ''; b.style.cursor = ''; return; }   // the audio tag is not one of the nine places
           const k = +(b.textContent.match(/\d+/) || [0])[0];
           if (!b.dataset.otitle) b.dataset.otitle = b.title;
-          const filled = k < 10 ? !!places[k - 1] : !!ownPlaces[k - 10];
+          const bs1 = c._base || 10;
+          const filled = k < 10 ? !!places[k - 1] : (k >= bs1 && k < bs1 + 10 ? !!ownPlaces[k - bs1] : false);
           const free = filled && (used.has(k) || left > 0);   // a place without a picture never wakes up
           b.disabled = !free;
           b.style.opacity = free ? '' : '.38';
@@ -6412,7 +6423,7 @@ function makeRefMode(cfg) {
         const items = [];
         const tr0 = root._trim;
         if (tr0 && tr0.dur0 && tr0.buf) items.push({ buf: tr0.buf, s: tr0.start, e: tr0.end, name: tr0.name, where: 'фон всего ролика, тег <Audio 1>' });
-        $$('.sc', root).forEach((cc, i) => (cc._auds || []).forEach((f, j) => { if (f) items.push({ file: f, name: f.name, where: 'сцена ' + (i + 1) + ', тег <Audio ' + (j + 2) + '>' }); }));
+        $$('.sc', root).forEach((cc, i) => (cc._auds || []).forEach((f, j) => { if (f) items.push({ file: f, name: f.name, where: 'сцена ' + (i + 1) + ', тег <Audio ' + (10 * (i + 1) + j) + '>' }); }));
         if (!items.length) { toast('Готового аудио нет: сначала загрузите файл'); return; }
         if (!AG.status || !AG.status.speech_ready) { try { await agStatus(); } catch (e) {} }
         goTo('agent');

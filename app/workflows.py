@@ -104,9 +104,12 @@ def video_graph(m, prompt, width, height, seconds, seed, first=None, last=None, 
     return g, stages
 
 
-def scene_prompt(prompt, images, own, frame=None):
-    """Numbers in the interface are PLACES: <Picture 1..5> are the common places, <Picture 10..14> the
-    scene's own, and a place without a picture keeps its number, so deleting one never moves the others.
+def scene_prompt(prompt, images, own, frame=None, base=10, auds=()):
+    """Numbers in the interface are PLACES: <Picture 1..5> are the common places, and a scene's own media
+    are numbered by decades - scene 1 gets 10..18, scene 2 gets 20..28 - so the same number always means
+    the same scene, in the agent's text as well as here. A place without a picture keeps its number, so
+    deleting one never moves the others. <Audio 1> is the sound of the whole film; a scene's own audio are
+    <Audio 10..12>, <Audio 20..22> and so on, and they are applied where the text names them.
     The node takes the pictures without gaps, so every number in the text is moved onto the place its
     picture really takes. The frame of a continued video rides in front of all of them and has no
     number of its own."""
@@ -126,18 +129,32 @@ def scene_prompt(prompt, images, own, frame=None):
             if i >= len(images) or not images[i]:
                 return m.group(0)                     # an empty place: the text is left alone
             n = place(images, i, 0)
-        else:
-            j = k - 10
+        elif k < base + 10:
+            j = k - base
             if j >= len(own) or not own[j]:
                 return m.group(0)
             n = place(own, j, filled_common)
+        else:
+            return m.group(0)   # a number from another scene's decade is left as written
         return m.group(0) if n > total else f"<Picture {n}>"
 
     # <Frame> is how the agent may point at the last frame of the video being continued: that frame is
     # the first picture in the node's list. The marker is put in AFTER the places have been recounted,
     # so that its own number is not shifted a second time. Without a frame the marker would be a lie,
     # so it turns into plain words instead of a wrong number.
+    def rep_a(m):
+        """<Audio 1> is the film's track and never moves. A scene's own audio are numbered in its
+        decade and counted densely here, the same way the node receives them."""
+        k = int(m.group(1))
+        if k < base or k >= base + 10:
+            return m.group(0)
+        j = k - base
+        if j >= len(auds) or not auds[j]:
+            return m.group(0)
+        return f"<Audio {sum(1 for x in auds[:j] if x) + 1}>"
+
     out = re.sub(r"<\s*Picture\s*(\d+)\s*>", rep, prompt or "")
+    out = re.sub(r"<\s*Audio\s*(\d+)\s*>", rep_a, out)
     return re.sub(r"<\s*Frame\s*>", "<Picture 1>" if frame else "the previous shot", out)
 
 
@@ -706,7 +723,8 @@ def long_graph(m, scenes, width, height, seed, images, audio=None, start=0.0, pi
         own = list(sc[2]) if len(sc) > 2 and sc[2] else []  # this scene's own places, counted from <Picture 10>
         # the node gets a gapless list; scene_prompt moves the numbers of the text onto it
         refs = [x for x in ([frame] if frame else []) + list(images) + own if x][:9]
-        prompt = scene_prompt(sc[0], images, own, frame)
+        scene_aud = [x for x in (scene_audios[i] if i < len(scene_audios) else ()) if x][:3]
+        prompt = scene_prompt(sc[0], images, own, frame, base=10 * (i + 1), auds=scene_aud)
         total, ov = p["total"], p["ov"]
         ref = add("MiniMaxH3ReferenceToVideo", clip=["5", 0], vae=["6", 0], audio_vae=["7", 0], prompt=prompt,
                   width=width, height=height, length=total, ref_image_size=ref_size)
@@ -822,10 +840,13 @@ def long_part_graph(m, scenes, k, width, height, seed, images, audio=None, start
         g[str(nid[0])] = {"class_type": cls, "inputs": inputs}
         return str(nid[0])
 
-    ref = add("MiniMaxH3ReferenceToVideo", clip=["5", 0], vae=["6", 0], audio_vae=["7", 0], prompt=sc[0],
-              width=width, height=height, length=total, ref_image_size=ref_size)
     own = list(sc[2]) if len(sc) > 2 and sc[2] else []   # this scene's own references; none: the common ones are used
     own_a = [x for x in (scene_audios[k] if k < len(scene_audios) else ()) if x][:3]
+    # the text speaks in this scene's decade, the node gets a gapless list: move the numbers onto it,
+    # exactly as the whole-film path does - otherwise one-by-one rendering ignored the tags
+    ref = add("MiniMaxH3ReferenceToVideo", clip=["5", 0], vae=["6", 0], audio_vae=["7", 0],
+              prompt=scene_prompt(sc[0], images, own, None, base=10 * (k + 1), auds=own_a),
+              width=width, height=height, length=total, ref_image_size=ref_size)
     _refs(g, ref, own or images, audios=own_a, base=100, abase=5000)
     new = add("LTXVSeparateAVLatent", av_latent=[ref, 1])
     if audio:
