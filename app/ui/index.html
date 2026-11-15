@@ -3334,7 +3334,7 @@ class AudioTrimmer {
     catch { this.say('Не удалось прочитать этот аудиофайл'); return; }
     this.name = f.name; this.dur0 = this.buf.duration;
     this.start = 0; this.end = this.limit > 0 ? Math.min(this.dur0, this.limit) : this.dur0; this.cut = null; this.undo = [];
-    this.zoom = 1; this.q('.at-zr').value = 1;
+    this.zoom = 1; this.q('.at-zr').value = 1; paintRange(this.q('.at-zr'));
     this._loaded = { start: this.start, end: this.end };   // closing must apply only what the person changed
     this.busy = !!silent;
     this._peaks(); this._paint(); this._sync();
@@ -3565,8 +3565,7 @@ class AudioTrimmer {
       this.zoom = Math.min(40, Math.max(1, v));
       const sl = this.q('.at-zr');
       sl.value = this.zoom;
-      sl.setAttribute('value', this.zoom);   // in the app's own window the thumb sometimes keeps its old place
-      void sl.offsetWidth;                   // without a reflow it is not always redrawn
+      paintRange(sl);   // the blue part is a CSS variable: a programmatic value does not wake the listener
       this._sync();
     };
     this.q('.at-zr').oninput = e => setZoom(+e.target.value);
