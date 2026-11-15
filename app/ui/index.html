@@ -5796,6 +5796,8 @@ function makeRefMode(cfg) {
       // - - - audio of THIS scene: up to three files, trimmed with the same instrument as the
       // shared track. They reach the model as references; the text decides where one is used.
       c._auds = c._auds || [null, null, null];
+      c._audSrc = c._audSrc || [null, null, null];   // the file as it was loaded - never overwritten
+      c._audSel = c._audSel || [null, null, null];   // what was cut out of it, so the next edit starts from the full wave
       const esc2 = s => String(s).replace(/[<>&]/g, ch => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[ch]));
       const ainp = document.createElement('input');
       ainp.type = 'file'; ainp.accept = 'audio/*,.wav,.mp3,.ogg,.flac,.m4a'; ainp.hidden = true; c.append(ainp);
@@ -5804,9 +5806,9 @@ function makeRefMode(cfg) {
       const openTrim = j => {
         const host = $('.sc-trimhost', c);
         // «Обрезать» ещё раз по тому же файлу = закрыть; что выделили - то и применили
-        if (!host.hidden && c._trim && c._trim._slot === j) {   // закрытие не зависит от того, прочитан файл
-          const L = c._trim._loaded || { start: c._trim.start, end: c._trim.end };
-          if (Math.abs(c._trim.start - L.start) > .05 || Math.abs(c._trim.end - L.end) > .05) applyTrim();
+        if (!host.hidden && c._trim && c._trim._slot === j) {   // повторное нажатие закрывает
+          const keep = c._audSel[j] || c._trim._loaded || { start: 0, end: c._trim.dur0 };
+          if (c._trim.dur0 && (Math.abs(c._trim.start - keep.start) > .05 || Math.abs(c._trim.end - keep.end) > .05)) applyTrim();
           host.hidden = true;
           return;
         }
@@ -5815,16 +5817,25 @@ function makeRefMode(cfg) {
           c._trim = new AudioTrimmer({
             mount: host, limit: 15, agentTarget: cfg.mode,
             onFile: f => {
-              c._auds[c._trim._slot] = f; c._paintAuds(); paintRefs();
+              const j2 = c._trim._slot, src = c._audSrc[j2] || f;
+              // the name stays the person's own: a cut of the file is still the same song
+              c._auds[j2] = new File([f], src.name.replace(/\.[a-z0-9]+$/i, '') + '.wav', { type: 'audio/wav' });
+              c._audSel[j2] = { start: c._trim.start, end: c._trim.end, of: src.name };
+              c._paintAuds(); paintRefs();
               if (root._save) root._save();
-              toast('Фрагмент подставлен вместо файла: играет только он');
             },
             onState: () => {}
           });
         }
-        if (c._trim._slot !== j || !c._trim.dur0) {
+        const src = c._audSrc[j] || c._auds[j];
+        if (src && (c._trim._slot !== j || !c._trim.dur0)) {
           c._trim._slot = j;
-          c._trim.setFile(c._auds[j], true);   // silent: open must not rewrite the file
+          c._trim.setFile(src, true);   // the ORIGINAL always opens, so a second cut is possible
+          const sel = c._audSel[j];
+          if (sel && src === c._audSrc[j] && sel.end <= c._trim.dur0 + .2) {
+            c._trim.start = sel.start; c._trim.end = Math.min(sel.end, c._trim.dur0); c._trim._loaded = { start: sel.start, end: c._trim.end };
+            c._trim._sync();
+          }
         }
       };
       c._paintAuds = () => {
@@ -5832,7 +5843,7 @@ function makeRefMode(cfg) {
         const full = c._auds.filter(Boolean).length >= 3;
         row.innerHTML = '<button class="btn mini" type="button" data-a="add"' + (full ? ' disabled' : '') +
           ' title="Аудио отдельной сцены: до трёх файлов. Модель получает их как ссылки и применяет там, где вы упомянули файл тегом в тексте сцены; не упомянули - звук делает сама. Обрезать можно до 15 секунд.">Загрузить аудио сцены</button>' +
-          c._auds.map((f, j) => f ? `<span class="token" style="display:inline-flex;gap:6px;align-items:center">&lt;Audio ${j + 2}&gt; ${esc2(f.name.slice(0, 18))} <button class="btn mini" type="button" data-a="trim" data-j="${j}" title="Послушать и обрезать: прибор под строкой">Обрезать</button><button class="btn mini" type="button" data-a="del" data-j="${j}" title="Убрать этот файл из сцены">×</button></span>` : '').join('') +
+          c._auds.map((f, j) => f ? `<span class="token" style="display:inline-flex;gap:6px;align-items:center">&lt;Audio ${j + 2}&gt; ${esc2(f.name.slice(0, 18))}${c._audSel[j] ? ' <small style="opacity:.75">с ' + c._audSel[j].start.toFixed(1).replace('.', ',') + ' по ' + c._audSel[j].end.toFixed(1).replace('.', ',') + ' с</small>' : ''} <button class="btn mini" type="button" data-a="trim" data-j="${j}" title="Послушать и обрезать: прибор под строкой">Обрезать</button><button class="btn mini" type="button" data-a="del" data-j="${j}" title="Убрать этот файл из сцены">×</button></span>` : '').join('') +
           (full ? '<span class="hint" style="font-size:12px">три аудио в сцене - максимум</span>' : '');
       };
       ainp.onchange = () => {
@@ -5842,7 +5853,7 @@ function makeRefMode(cfg) {
         if (!f) return;
         if (j < 0) j = c._auds.findIndex(x => !x);   // a file may arrive without the button (drag, restore)
         if (j < 0) { toast('Больше трёх аудио в одной сцене нельзя'); return; }
-        c._auds[j] = f; c._paintAuds(); paintRefs();
+        c._auds[j] = f; c._audSrc[j] = f; c._audSel[j] = null; c._paintAuds(); paintRefs();
         if (root._save) root._save();
         toast('Аудио ' + (j + 2) + ' в сцене: ' + f.name + ' - при желании обрежьте (до 15 с)');
       };
@@ -5860,7 +5871,7 @@ function makeRefMode(cfg) {
           if (apick < 0) { toast('Больше трёх аудио в одной сцене нельзя'); return; }
           ainp.click();
         } else if (b.dataset.a === 'del') {
-          c._auds[j] = null;
+          c._auds[j] = null; c._audSrc[j] = null; c._audSel[j] = null;
           if (c._trim && c._trim._slot === j) { c._trim.clear(); c._trim._slot = -1; $('.sc-trimhost', c).hidden = true; }
           c._paintAuds(); paintRefs();
           if (root._save) root._save();
@@ -6307,6 +6318,7 @@ function makeRefMode(cfg) {
       pick.innerHTML = '<div class="at-pickrow"><button class="btn pri at-pickb" type="button">Загрузить аудио</button>' +
         '<button class="btn at-pickx" type="button" hidden>Убрать</button>' +
         '<span class="at-who hint">или перетащите файл на эту строку</span></div>' +
+        '<button class="btn mini at-all" type="button" hidden title="Отправить в Агент сразу всё готовое: фон ролика и аудио всех сцен - Агент увидит их списком, а не одно вместо другого">🤖 Все аудио в агент</button>' +
         '<label class="at-loop" hidden style="display:flex;gap:8px;align-items:flex-start;font-size:12.5px;color:var(--muted);cursor:pointer;margin:0"><input type="checkbox" class="at-loopb" checked> Пустой фон по кругу: если трек короче ролика, он начнётся сначала, а не оборвётся</label>';
       wrap.append(pick);
       mus.append(wrap);
@@ -6343,6 +6355,8 @@ function makeRefMode(cfg) {
           pickb.textContent = x ? 'Заменить аудио' : 'Загрузить аудио';
           pickx.hidden = !x;
           const lp = pick.querySelector('.at-loop');
+          const ab = pick.querySelector('.at-all');
+          if (ab) ab.hidden = !x;
           if (lp) { lp.hidden = !x; lp.querySelector('input').checked = root._loop = (root._loop === undefined ? true : root._loop); }
         },
         onFile: f => {
@@ -6394,6 +6408,33 @@ function makeRefMode(cfg) {
       root._trimWatch = setInterval(() => { tuck(); sync(); }, 700);
       sync();
       pickb.onclick = () => { const x = liveInp(); if (x) x.click(); };
+      $('.at-all', pick).onclick = async () => {
+        const items = [];
+        const tr0 = root._trim;
+        if (tr0 && tr0.dur0 && tr0.buf) items.push({ buf: tr0.buf, s: tr0.start, e: tr0.end, name: tr0.name, where: 'фон всего ролика, тег <Audio 1>' });
+        $$('.sc', root).forEach((cc, i) => (cc._auds || []).forEach((f, j) => { if (f) items.push({ file: f, name: f.name, where: 'сцена ' + (i + 1) + ', тег <Audio ' + (j + 2) + '>' }); }));
+        if (!items.length) { toast('Готового аудио нет: сначала загрузите файл'); return; }
+        if (!AG.status || !AG.status.speech_ready) { try { await agStatus(); } catch (e) {} }
+        goTo('agent');
+        const host = $('#agTarget [data-t="' + (cfg.mode || 'long') + '"]');
+        if (host) host.click();
+        let ok = 0;
+        for (const it of items) {
+          try {
+            let buf = it.buf, s = it.s || 0, e = it.e;
+            if (!buf) {
+              const ac = actx = actx || new AudioContext();
+              buf = await ac.decodeAudioData(await it.file.arrayBuffer());
+              s = 0; e = Math.min(buf.duration, 15);
+              if (buf.duration > 15) it.where += ' (обрезку не делали - берём первые 15 с)';
+            }
+            const piece = wavSlice(buf, s, Math.min(e, buf.duration));
+            const done = await setChatAudio(piece, it.name, Math.min(e, buf.duration) - s, it.where);
+            if (done) ok++;
+          } catch (err) { toast('Не удалось передать «' + it.name + '»: ' + err.message); }
+        }
+        toast(ok ? ('В Агент передано аудио: ' + ok + ' из ' + items.length) : 'Агент не принял аудио - проверьте распознавание речи');
+      };
       {   // the loop flag must follow the box, otherwise the film is promised a repeat that was refused
         const lb = pick.querySelector('.at-loopb');
         if (lb) lb.onchange = () => { root._loop = lb.checked; if (root._save) root._save(); };
@@ -7186,18 +7227,42 @@ function needSpeech() {
   toast('Распознавание речи ещё не скачано — карточка «Модель» справа, кнопка «Докачать»'); return true;
 }
 function showAudioBox() {
-  const a = AG.audio; $('#agAudioBox').hidden = !a; if (!a) return;
-  $('#agAudioName').textContent = a.name; $('#agAudioDur').textContent = a.dur.toFixed(1) + ' с';
-  $('#agAudioText').value = a.text; $('#agAudioText').placeholder = a.busy ? 'Распознаём слова…' : 'Слов не найдено — впишите их сами или оставьте пустым (музыка)';
-  $('#agAudioText').disabled = a.busy;
+  const list = AG.audios || [];
+  const box = $('#agAudioBox');
+  box.hidden = !list.length;
+  if (!list.length) { AG.audio = null; return; }
+  const esc3 = s => String(s).replace(/[<>&"]/g, ch => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[ch]));
+  box.innerHTML = list.map((a, i) => `<div class="ag-audio-item" style="padding:6px 0;border-top:1px solid rgba(255,255,255,.08)">
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><b>${i + 1}. ${esc3(a.name)}</b>
+        <span style="opacity:.8">${a.dur.toFixed(1)} с</span>${a.where ? `<span style="opacity:.7">${esc3(a.where)}</span>` : ''}
+        <button class="btn mini" type="button" data-k="${i}" title="Убрать это аудио из сообщения">×</button></div>
+      <textarea data-t="${i}" style="width:100%;margin-top:4px" ${a.busy ? 'disabled' : ''}
+        placeholder="${a.busy ? 'Распознаём слова…' : 'Слов не найдено — впишите сами или оставьте пустым (музыка)'}">${esc3(a.text)}</textarea>
+    </div>`).join('');
+  AG.audio = list[0];
 }
-async function setChatAudio(wavBlob, name, dur) {
-  if (needSpeech()) return;
-  const a = AG.audio = { name, dur, text: '', busy: true, lang: '', langName: '', file: new File([wavBlob], name.replace(/\.[^.]+$/, '') + '.wav', { type: 'audio/wav' }) };
+$('#agAudioBox').addEventListener('input', e => {
+  const ta = e.target.closest('[data-t]'); if (!ta) return;
+  const a = (AG.audios || [])[+ta.dataset.t]; if (a) a.text = ta.value;
+});
+$('#agAudioBox').addEventListener('click', e => {
+  const b = e.target.closest('[data-k]'); if (!b) return;
+  (AG.audios || []).splice(+b.dataset.k, 1);
+  AG.audio = (AG.audios || [])[0] || null;
   showAudioBox();
-  try { const j = await transcribeWav(wavBlob); if (AG.audio === a) { a.text = j.text; a.lang = j.lang; a.langName = j.lang_name; } }
+});
+async function setChatAudio(wavBlob, name, dur, where) {
+  if (needSpeech()) return false;
+  AG.audios = AG.audios || [];
+  // the same file cut again replaces its own entry, a different one is added next to it
+  const at = AG.audios.findIndex(x => x.name === name && Math.abs(x.dur - dur) < .1);
+  const a = { name, dur, where: where || '', text: '', busy: true, lang: '', langName: '', file: new File([wavBlob], name.replace(/\.[^.]+$/, '') + '.wav', { type: 'audio/wav' }) };
+  if (at >= 0) AG.audios.splice(at, 1, a); else AG.audios.push(a);
+  showAudioBox();
+  try { const j = await transcribeWav(wavBlob); a.text = j.text; a.lang = j.lang; a.langName = j.lang_name; }
   catch (e) { toast(e.message); }
-  if (AG.audio === a) { a.busy = false; showAudioBox(); }
+  a.busy = false; showAudioBox();
+  return true;
 }
 $('#agAudioFile').onchange = async e => {
   const f = e.target.files[0]; e.target.value = ''; if (!f) return;
@@ -7286,13 +7351,16 @@ $('#agMic').onclick = async () => {
 async function agSend() {
   let text = $('#agIn').value.trim();
   if (AG.busy) { AG.ctrl?.abort(); return; }
-  const au = AG.audio;
-  if (au?.busy) { toast('Подождите, слова из аудио ещё распознаются'); return; }
-  if (!text && !AG.att.length && !au) return;
+  const AUD = AG.audios || (AG.audio ? [AG.audio] : []);
+  if (AUD.some(a => a.busy)) { toast('Подождите, слова из аудио ещё распознаются'); return; }
+  if (!text && !AG.att.length && !AUD.length) return;
   if (!AG.status?.installed) { toast('Сначала скачайте модель агента — справа, в карточке «Модель»'); return; }
-  if (au) {
-    text += `\n\n[Аудио для клипа: ${au.name}, ${au.dur.toFixed(1)} с. ` + (au.text.trim()
-      ? `Слова из аудио${au.langName ? ` (язык: ${au.langName})` : ''}: «${au.text.trim()}»]` : 'Слов в аудио нет (музыка или голос не распознан).]');
+  if (AUD.length) {
+    text += '\n\n[Аудио в проекте: ' + AUD.length + (AUD.length === 1 ? '' : '. Каждое применяется там, где его тег назван в тексте сцены.') + ']';
+    AUD.forEach((au, i) => {
+      text += `\n[Аудио ${i + 1}: ${au.name}, ${au.dur.toFixed(1)} с` + (au.where ? `, ${au.where}` : '') + '. ' + (au.text.trim()
+        ? `Слова из аудио${au.langName ? ` (язык: ${au.langName})` : ''}: «${au.text.trim()}»]` : 'Слов в аудио нет (музыка или голос не распознан).]');
+    });
     text = text.trim();
   }
   const pics = AG.att.filter(a => !a.frame), frs = AG.att.filter(a => a.frame);   // frames go last, so Picture 1, 2… stay the heroes
@@ -7308,9 +7376,9 @@ async function agSend() {
     text = text.trim();
   }
   // the files themselves travel with the message: a section takes the video, not its frames
-  AG.msgs.push({ role: 'user', content: text, images: [...pics, ...frs].map(a => a.url), files: pics.map(a => a.file), nframes: frs.length, videos: byVid.map(g => g.file).filter(Boolean), videoFile: byVid[0]?.file || null, vimg: frs[0]?.url || null, vname: byVid[0]?.name || '', vdur: byVid[0]?.dur ? byVid[0].dur.toFixed(1) : '', audioFile: au?.file });
+  AG.msgs.push({ role: 'user', content: text, images: [...pics, ...frs].map(a => a.url), files: pics.map(a => a.file), nframes: frs.length, videos: byVid.map(g => g.file).filter(Boolean), videoFile: byVid[0]?.file || null, vimg: frs[0]?.url || null, vname: byVid[0]?.name || '', vdur: byVid[0]?.dur ? byVid[0].dur.toFixed(1) : '', audioFile: AUD[0]?.file });
   // the tray keeps the pictures and the video on purpose: the next question often needs the same hero
-  $('#agIn').value = ''; AG.audio = null; showAudioBox();
+  $('#agIn').value = ''; AG.audios = []; AG.audio = null; showAudioBox();
   const reply = { role: 'assistant', content: '', status: 'Отправляем…', edit: AG.edit, to: AG.target };   // перенос в раздел потом поступит по тому же смыслу
   AG.msgs.push(reply); renderMsgs();
   const el = $('#agMsgs .msg:last-child');
@@ -7368,7 +7436,7 @@ async function loadChats() {
 }
 function newChat() {
   if (AG.busy) AG.ctrl?.abort();
-  AG.id = null; AG.msgs = []; AG.att = []; AG.audio = null; renderAtt(); showAudioBox(); renderMsgs(); agCtx(); loadChats(); $('#agIn').focus();
+  AG.id = null; AG.msgs = []; AG.att = []; AG.audios = []; AG.audio = null; renderAtt(); showAudioBox(); renderMsgs(); agCtx(); loadChats(); $('#agIn').focus();
 }
 async function openChat(id) {
   if (AG.busy) AG.ctrl?.abort();
