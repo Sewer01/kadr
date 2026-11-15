@@ -5856,11 +5856,29 @@ function makeRefMode(cfg) {
   };
   changed();
 
+  /* the sharpness slider keeps its own value between sessions and paints its number */
+  (function () {
+    const sl = $('#usSharp', root), out = $('#usSharpV', root);
+    if (!sl) return;
+    const set = v => { sl.value = v; if (out) out.textContent = v; };
+    const saved = localStorage.getItem('h3-usarp');
+    if (saved) set(Math.max(1, Math.min(6, +saved || 2)));
+    sl.addEventListener('input', () => { if (out) out.textContent = sl.value; localStorage.setItem('h3-usarp', sl.value); changed(); });
+  })();
+
   const prev = previewPanel($('.rm-preview', root), S, {
     singleScene: () => cfg.scenes && root._mode === 'parts' && root._chainPart == null,
     goLabel: () => !cfg.scenes ? 'Сгенерировать' : root._mode === 'parts'
       ? `Сделать сцену ${root._sel + 1}` : 'Сгенерировать видеоролик',   // the number follows the scene you picked
     extraLabel: cfg.mode === 'refs' || cfg.mode === 'actor' || cfg.swap || cfg.scenes ? 'Шаги' : 'Схема',
+    extraRow: (cfg.mode === 'action' || cfg.mode === 'actionsc') ? `
+      <div class="row">
+        <div class="row-l">Резкость второго прохода <b id="usSharpV">2</b></div>
+        <input type="range" id="usSharp" min="1" max="6" step="1" value="2">
+        <div class="ticks"><span>1 точнее</span><span>3</span><span>6 детали</span></div>
+        <div class="hint">Работает, когда во втором проходе стоит 2D-апскейлер (сейчас он выбран по умолчанию):
+          1 — максимально близко к оригиналу, 6 — максимум деталей, но дальше от исходной картинки.</div>
+      </div>` : '',
     extra: () => cfg.scenes ? (root._paintQ?.(), root._mode === 'parts' ? (root._q === 'draft' ? '4 шага · черновик' : (cfg.mode === 'actionsc' ? '8 + 4 шага · гибрид' : '8 шагов · Pika')) : (root._q === 'draft' ? '4 шага · черновик' : '8 шагов · Pika')) : cfg.mode === 'actor' || cfg.swap ? '10 · 1 проход' : cfg.mode === 'refs' ? `${S.steps} · 1 проход` : (S.faithful ? 'точная копия' : '8 + 4 шага'),
     passes: () => cfg.scenes ? $$('.sc', root).map(() => root._q === 'draft' ? 4 : 8) : cfg.mode === 'actor' || cfg.swap ? [10] : cfg.mode === 'refs' ? [S.steps] : S.faithful ? [13] : [8, 4],
     get twoPass() { return (cfg.mode === 'action' || cfg.mode === 'actionsc') && !S.faithful; },
@@ -5900,6 +5918,10 @@ function makeRefMode(cfg) {
         sizeForm(S, fd); fd.append('aspect', S.aspect); fd.append('quality', S.q); fd.append('duration', S.dur);
         fd.append('steps', S.steps); fd.append('ref_size', S.refSize); if (cfg.mode === 'refs' || cfg.swap) fd.append('accel', S.accel);
         if (cfg.swap) { fd.append('sound', S.sound); fd.append('small_ref', S.smallRef ? '1' : '0'); }
+        if (cfg.mode === 'action' || cfg.mode === 'actionsc') {
+          const us = $('#usSharp', root);
+          fd.append('usarp', String(us ? +us.value : 2));
+        }
         if (cfg.scenes && root._mode === 'parts') {
           const all = $$('.sc', root);
           if (root._target == null) root._chainPart = null;   // the big button alone makes one scene, never a chain

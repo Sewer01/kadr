@@ -864,7 +864,7 @@ def long_part_graph(m, scenes, k, width, height, seed, images, audio=None, start
 ACTION_LOWRES = 0.6  # SelfLift lowres_scale in the original
 
 
-def action_graph(m, prompt, width, height, seconds, seed, images, audios, faithful, loras):
+def action_graph(m, prompt, width, height, seconds, seed, images, audios, faithful, loras, usarp=2):
     """PM Minimax H3 Best Action Workflow (Prompt Mastery): hybrid model, sol-attn, 8 low-res + 4 high-res steps.
 
     faithful=True runs the original SelfLiftH3Sampler + H3SigmaRefiner; otherwise the same schedule is
@@ -917,11 +917,11 @@ def action_graph(m, prompt, width, height, seconds, seed, images, audios, faithf
             "14": {"class_type": "SamplerCustomAdvanced", "inputs": {
                 "noise": ["11", 0], "guider": ["13", 0], "sampler": ["12", 0], "sigmas": ["9", 0], "latent_image": ["8", 1]}},
             "15": {"class_type": "LTXVSeparateAVLatent", "inputs": {"av_latent": ["14", 1]}},
-            "16": {"class_type": upscaler_node(m["upscaler"])[0], "inputs": dict(
+            "16": {"class_type": upscaler_node(m["upscaler"], usarp)[0], "inputs": dict(
                 {"latent": ["15", 0], "model_name": m["upscaler"], "mode": "scale by multiplier",
                  "mode.scale": round(1 / ACTION_LOWRES, 3), "align": 32,
                  "force_unload": True, "device": "cuda", "precision": "fp16"},
-                **upscaler_node(m["upscaler"])[1])},
+                **upscaler_node(m["upscaler"], usarp)[1])},
             "17": {"class_type": "LTXVConcatAVLatent", "inputs": {"video_latent": ["16", 0], "audio_latent": ["15", 1]}},
             "18": {"class_type": "SamplerCustomAdvanced", "inputs": {
                 "noise": ["11", 0], "guider": ["13", 0], "sampler": ["12", 0], "sigmas": ["9", 1], "latent_image": ["17", 0]}},
@@ -954,18 +954,20 @@ def action_sizes(width, height):
     return lw, lh, max(32, round(lw * s / 32) * 32), max(32, round(lh * s / 32) * 32)
 
 
-def upscaler_node(name):
+def upscaler_node(name, usarp=2):
     """Which latent-upscaler node and which extra inputs a chosen weights file needs: the 2D pack
-       (2026-11-10) answers to a sharpness tier and names its chunking input differently."""
+       (2026-11-10) answers to a sharpness tier and names its chunking input differently.
+       usarp = that tier, 1 (closest to the original, softest) .. 6 (most detail, furthest)."""
     low = str(name or "").lower()
     if "2d" in low:
-        return "MinimaxH3LatentUpscalerNode2D", {"sharpness": 2, "temporal_chunking": "on", "chunk_frames": 4}
+        return "MinimaxH3LatentUpscalerNode2D", {"sharpness": max(1, min(6, int(usarp or 2))),
+                                                 "temporal_chunking": "on", "chunk_frames": 4}
     return "MinimaxH3LatentUpscaler3D", {"enable_temporal_chunking": True}
 
 
 def action_part_graph(m, scenes, k, width, height, seed, images, loras, preview=None, state=None, fresh=(), faithful=False,
                       ltxv=True,
-                      refiner_args=None, single=False, sing=False, steps=12):
+                      refiner_args=None, single=False, sing=False, steps=12, usarp=2):
     """ACTION scene number `k` (0-based) of a scene-by-scene video, the same idea as long_part_graph (scene k continues the saved
     latent tail of scene k-1, the clip is cut off at the overlap) but with the action model: hybrid, DMAD + Speed Slider,
     8 steps at 0.6x size, learned latent upscale, 4 steps at full size. The sound is made by the model.
@@ -1068,7 +1070,7 @@ def action_part_graph(m, scenes, k, width, height, seed, images, loras, preview=
         guider = add("BasicGuider", model=mdl, conditioning=[ref, 0])
         smp1 = add("SamplerCustomAdvanced", noise=[noise, 0], guider=[guider, 0], sampler=["12", 0], sigmas=["9", 0], latent_image=[lat, 0])
         sep = add("LTXVSeparateAVLatent", av_latent=[smp1, 1])
-        ucls, uextra = upscaler_node(m["upscaler"])
+        ucls, uextra = upscaler_node(m["upscaler"], usarp)
         up = add(ucls, latent=[sep, 0], model_name=m["upscaler"], mode="scale by multiplier",
                  **{"mode.scale": round(1 / ACTION_LOWRES, 3)}, align=32,
                  force_unload=True, device="cuda", precision="fp16", **uextra)
@@ -1459,17 +1461,29 @@ def h3img_frames_graph(m, refs, prompts, seed, size=H3IMG_FRAME_SIZE, line="whit
     return g, stages, titles
 
 
+def is_flux3(name):
+    """FLUX.3 klein needs its text encoder loaded as «flux3» and runs 16 steps without guidance."""
+    return "flux3" in str(name or "").lower()
+
+
+def flux_steps(m):
+    """Both klein checkpoints are distilled, but for different step counts: FLUX.2 was distilled to 4,
+       the author of FLUX.3 says its distilled checkpoint wants 16. Hard-coding 4 for both gave the new
+       model a washed, unfinished picture, so the chosen weights decide here."""
+    return 16 if is_flux3(m.get("flux_unet", "")) else 4
+
+
 def flux_t2i_graph(m, prompt, width, height, seed):
     """FLUX.2 klein 4B (distilled), picture by text: 4 steps, CFG 1, no negative prompt."""
     g = {
         "1": {"class_type": "UNETLoader", "inputs": {"unet_name": m["flux_unet"], "weight_dtype": "default"}},
-        "2": {"class_type": "CLIPLoader", "inputs": {"clip_name": m["flux_clip"], "type": "flux2", "device": "default"}},
+        "2": {"class_type": "CLIPLoader", "inputs": {"clip_name": m["flux_clip3"] if is_flux3(m["flux_unet"]) else m["flux_clip"], "type": "flux3" if is_flux3(m["flux_unet"]) else "flux2", "device": "default"}},
         "3": {"class_type": "VAELoader", "inputs": {"vae_name": m["flux_vae"]}},
         "4": {"class_type": "CLIPTextEncode", "inputs": {"text": prompt, "clip": ["2", 0]}},
         "5": {"class_type": "ConditioningZeroOut", "inputs": {"conditioning": ["4", 0]}},
         "6": {"class_type": "CFGGuider", "inputs": {"model": ["1", 0], "positive": ["4", 0], "negative": ["5", 0], "cfg": 1}},
         "7": {"class_type": "EmptyFlux2LatentImage", "inputs": {"width": width, "height": height, "batch_size": 1}},
-        "8": {"class_type": "Flux2Scheduler", "inputs": {"steps": 4, "width": width, "height": height}},
+        "8": {"class_type": "Flux2Scheduler", "inputs": {"steps": flux_steps(m), "width": width, "height": height}},
         "9": {"class_type": "KSamplerSelect", "inputs": {"sampler_name": "euler"}},
         "10": {"class_type": "RandomNoise", "inputs": {"noise_seed": seed}},
         "11": {"class_type": "SamplerCustomAdvanced", "inputs": {
@@ -1573,10 +1587,10 @@ def flux_frames_graph(m, refs, prompts, seed, size=FRAME_SIZE, line="white"):
     n = len(prompts)
     g = {
         "1": {"class_type": "UNETLoader", "inputs": {"unet_name": m["flux_unet"], "weight_dtype": "default"}},
-        "2": {"class_type": "CLIPLoader", "inputs": {"clip_name": m["flux_clip"], "type": "flux2", "device": "default"}},
+        "2": {"class_type": "CLIPLoader", "inputs": {"clip_name": m["flux_clip3"] if is_flux3(m["flux_unet"]) else m["flux_clip"], "type": "flux3" if is_flux3(m["flux_unet"]) else "flux2", "device": "default"}},
         "3": {"class_type": "VAELoader", "inputs": {"vae_name": m["flux_vae"]}},
         "13": {"class_type": "EmptyFlux2LatentImage", "inputs": {"width": size[0], "height": size[1], "batch_size": 1}},
-        "14": {"class_type": "Flux2Scheduler", "inputs": {"steps": 4, "width": size[0], "height": size[1]}},
+        "14": {"class_type": "Flux2Scheduler", "inputs": {"steps": flux_steps(m), "width": size[0], "height": size[1]}},
         "15": {"class_type": "KSamplerSelect", "inputs": {"sampler_name": "euler"}},
         "8": {"class_type": "CLIPTextEncode", "inputs": {"text": "", "clip": ["2", 0]}},
     }
@@ -1667,7 +1681,7 @@ def flux_story_graph(m, images, prompt, seed, size=STORY_SIZE):
     """Storyboard from 1-3 pictures on FLUX.2 klein: every picture is one more ReferenceLatent (image 1, image 2 ...)."""
     g = {
         "1": {"class_type": "UNETLoader", "inputs": {"unet_name": m["flux_unet"], "weight_dtype": "default"}},
-        "2": {"class_type": "CLIPLoader", "inputs": {"clip_name": m["flux_clip"], "type": "flux2", "device": "default"}},
+        "2": {"class_type": "CLIPLoader", "inputs": {"clip_name": m["flux_clip3"] if is_flux3(m["flux_unet"]) else m["flux_clip"], "type": "flux3" if is_flux3(m["flux_unet"]) else "flux2", "device": "default"}},
         "3": {"class_type": "VAELoader", "inputs": {"vae_name": m["flux_vae"]}},
         "7": {"class_type": "CLIPTextEncode", "inputs": {"text": prompt, "clip": ["2", 0]}},
         "8": {"class_type": "ConditioningZeroOut", "inputs": {"conditioning": ["7", 0]}},
@@ -1687,7 +1701,7 @@ def flux_story_graph(m, images, prompt, seed, size=STORY_SIZE):
             stages[k] = "encode"
     g["12"] = {"class_type": "CFGGuider", "inputs": {"model": ["1", 0], "positive": pos, "negative": neg, "cfg": 1}}
     g["13"] = {"class_type": "EmptyFlux2LatentImage", "inputs": {"width": size[0], "height": size[1], "batch_size": 1}}
-    g["14"] = {"class_type": "Flux2Scheduler", "inputs": {"steps": 4, "width": size[0], "height": size[1]}}
+    g["14"] = {"class_type": "Flux2Scheduler", "inputs": {"steps": flux_steps(m), "width": size[0], "height": size[1]}}
     g["15"] = {"class_type": "KSamplerSelect", "inputs": {"sampler_name": "euler"}}
     g["16"] = {"class_type": "RandomNoise", "inputs": {"noise_seed": seed}}
     g["17"] = {"class_type": "SamplerCustomAdvanced", "inputs": {
@@ -1704,7 +1718,7 @@ def flux_edit_graph(m, prompt, image, megapixels, seed, extras=(), size=None):
     The result keeps the shape of the picture (sides in steps of 16)."""
     g = {
         "1": {"class_type": "UNETLoader", "inputs": {"unet_name": m["flux_unet"], "weight_dtype": "default"}},
-        "2": {"class_type": "CLIPLoader", "inputs": {"clip_name": m["flux_clip"], "type": "flux2", "device": "default"}},
+        "2": {"class_type": "CLIPLoader", "inputs": {"clip_name": m["flux_clip3"] if is_flux3(m["flux_unet"]) else m["flux_clip"], "type": "flux3" if is_flux3(m["flux_unet"]) else "flux2", "device": "default"}},
         "3": {"class_type": "VAELoader", "inputs": {"vae_name": m["flux_vae"]}},
         "4": {"class_type": "LoadImage", "inputs": {"image": image}},
         "5": {"class_type": "ImageScaleToTotalPixels", "inputs": {
@@ -1729,7 +1743,7 @@ def flux_edit_graph(m, prompt, image, megapixels, seed, extras=(), size=None):
     g.update({
         "12": {"class_type": "CFGGuider", "inputs": {"model": ["1", 0], "positive": pos, "negative": neg, "cfg": 1}},
         "13": {"class_type": "EmptyFlux2LatentImage", "inputs": {"width": ["6", 0], "height": ["6", 1], "batch_size": 1}},
-        "14": {"class_type": "Flux2Scheduler", "inputs": {"steps": 4, "width": ["6", 0], "height": ["6", 1]}},
+        "14": {"class_type": "Flux2Scheduler", "inputs": {"steps": flux_steps(m), "width": ["6", 0], "height": ["6", 1]}},
         "15": {"class_type": "KSamplerSelect", "inputs": {"sampler_name": "euler"}},
         "16": {"class_type": "RandomNoise", "inputs": {"noise_seed": seed}},
         "17": {"class_type": "SamplerCustomAdvanced", "inputs": {

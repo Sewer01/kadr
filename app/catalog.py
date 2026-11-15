@@ -260,10 +260,23 @@ VARIANTS = {
     "flux_unet": {
         "fp8": _m("black-forest-labs/FLUX.2-klein-4b-fp8", "flux-2-klein-4b-fp8.safetensors", 4.07,
                   "diffusion_models", sub=IMG_SUB),
+        # FLUX.3 klein (2026-11-02, лицензия flux-kommunity - читать перед коммерческим использованием).
+        # Те же ноды, что у FLUX.2; энкодер грузится как flux3, шагов 16: чекпойнт дистиллированный
+        "flux3_int8": _m("black-forest-labs/flux-3-image-klein-comfy",
+                         "diffusion_models/flux3-image-klein-int8-convrot.safetensors", 5.83, "diffusion_models",
+                         name="flux3-image-klein-int8-convrot.safetensors", sub=None),
+        "flux3_nvfp4": _m("black-forest-labs/flux-3-image-klein-comfy",
+                          "diffusion_models/flux3-image-klein-nvfp4.safetensors", 5.28, "diffusion_models",
+                          name="flux3-image-klein-nvfp4.safetensors", sub=None),
     },
     "flux_clip": {
         "bf16": _m("Comfy-Org/z_image_turbo", "split_files/text_encoders/qwen_3_4b.safetensors", 8.04,
                    "text_encoders", sub=IMG_SUB),
+        # FLUX.3 klein не принимает прежний энкодер: ядро падает на размере текстовых эмбеддингов,
+        # у этой модели свой Qwen3-VL-4B из того же репозитория
+        "flux3_qwen": _m("black-forest-labs/flux-3-image-klein-comfy",
+                         "text_encoders/qwen3vl_4b_int8_convrot.safetensors", 4.86, "text_encoders",
+                         name="qwen3vl_4b_flux3_int8_convrot.safetensors", sub=None),
     },
     "flux_vae": {
         "bf16": _m("Comfy-Org/flux2-dev", "split_files/vae/flux2-vae.safetensors", 0.34, "vae", sub=IMG_SUB),
@@ -323,6 +336,9 @@ MODEL_SHA256 = {
     "minimax_h3_latent_upscaler_2d_conv_v1_bf16.safetensors": "f35307b93a19415acf1ec544148592f2a9c76c67421db5ee41fdfbe6360ecf44",
     "minimax_h3_latent_upscaler_2d_conv_v1_fp16.safetensors": "6e0f35692784ba2376704a48a90fb07f90aef76ef21200d5525d6627a54fe909",
     "minimax_h3_ref2v_turbo_8step_v1.1_768p_comfyui_bf16.safetensors": "e56863a7524e0300729cbb7b64cc8b548d90698c1abbf7d83898b0122fbe1e81",
+    "flux3-image-klein-int8-convrot.safetensors": "847d8933548afd93df4af2cac2498e70891bf28d9dae06d695f536992e168fe2",
+    "flux3-image-klein-nvfp4.safetensors": "15d421e2558443fcf83ba46f3cd884d9d181c2c7a0a7bdcd2974af234a2d4f5c",
+    "qwen3vl_4b_flux3_int8_convrot.safetensors": "32de113cbf8282b02cbff0794b637b9d6676da09314a1db5a30bcea9bf4ee01c",
 }
 
 
@@ -399,11 +415,21 @@ def marks_text(role):
 
 # Plain words for the "another version" choice in the Models section (only versions of the same model replace each other)
 VARIANT_LABELS = {
-    "h3img_unet": {"w4a8": "лёгкая W4A8 (12,5 ГБ)", "int8": "обычная int8 (21 ГБ)"},
-    "fast_unet": {"int8": "обычная (int8)", "nvfp4": "лёгкая NVFP4 — только для видеокарт RTX 50-й серии"},
-    "lipsync_unet": {"full": "v1.3 полная (самая тяжёлая)", "pruned": "v1.3 облегчённая", "lite": "v1.3 лёгкая (слабее качество)",
-                     "v2": "v2 облегчённая — по отзывам, звук лучше", "v2_full": "v2 полная"},
-    "action_unet": {"int8": "обычная (int8)", "lite": "лёгкая (меньше памяти, чуть слабее)"},
+    "upscaler": {"bf16": "3D-свёртка · прежняя",
+                 "2d_fp16": "2D-свёртка fp16 · качество (резче на замере, есть шкала резкости)",
+                 "2d_bf16": "2D-свёртка bf16 · качество"},
+    "motion_repair_lora": {"v1": "Исправление движения v1 · прежняя",
+                           "v2": "Исправление движения v2 · качество (быстрые движения)"},
+    "ref2v_turbo_lora": {"bf16": "Ref2V Turbo 4 шага v0.1 · быстрая",
+                         "v1.1_8step": "Ref2V Turbo 8 шагов v1.1 · качество (свежее, 12.11)"},
+    "flux_unet": {"fp8": "FLUX.2 klein 4B fp8 · прежняя",
+                  "flux3_int8": "FLUX.3 klein int8 · качество",
+                  "flux3_nvfp4": "FLUX.3 klein NVFP4 · быстрая"},
+    "h3img_unet": {"w4a8": "лёгкая W4A8 · быстрая (12,5 ГБ)", "int8": "обычная int8 · качество (21 ГБ)"},
+    "fast_unet": {"int8": "обычная int8 · качество", "nvfp4": "лёгкая NVFP4 · быстрая — только для видеокарт RTX 50-й серии"},
+    "lipsync_unet": {"full": "v1.3 полная · качество (самая тяжёлая)", "pruned": "v1.3 облегчённая", "lite": "v1.3 лёгкая · быстрая (качество ниже)",
+                     "v2": "v2 облегчённая — по отзывам, звук лучше", "v2_full": "v2 полная · качество"},
+    "action_unet": {"int8": "обычная (int8)", "lite": "лёгкая · быстрая (меньше памяти, качество чуть ниже)"},
 }
 
 # LoRA from the original action workflow that has no public download; used when the user has it

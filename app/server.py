@@ -1469,6 +1469,9 @@ class App:
     # (comfyui-SelfLift reads mask.shape straight away). Continuation scenes therefore run on the plain
     # sampler, which the core does support with nested masks; the first scene keeps the exact scheme.
 
+    # the number of steps of the FLUX modes is decided in workflows.flux_steps: it follows the weights
+    # chosen in Settings, so the server does not carry a second copy of that rule
+
     async def has_node(self, cls):
         """Does this ComfyUI know the node class? Used to keep the exact action scheme working on a core
            without the LTXVideo pack: without that node the scene is still made, just with one mask for
@@ -1996,6 +1999,9 @@ class App:
             if not self.model_names:
                 self.model_names = {r: catalog.VARIANTS[r][v]["name"] for r, v in self.choice().items()}
             return
+        # FLUX.3 klein brings its own text encoder: the one the FLUX.2 mode uses gives embeddings of a
+        # different width, and the core fails on the very first matrix multiply
+        self.model_names["flux_clip3"] = catalog.VARIANTS["flux_clip"]["flux3_qwen"]["name"]
         if mode not in self.modes():
             raise web.HTTPBadRequest(text="Этот режим не установлен. Добавьте его в разделе «Настройки».")
         if not self.model_names:
@@ -2802,9 +2808,10 @@ class App:
                         aloras.append((name, v))
                 aloras += self.custom_loras("action")
                 faithful = bool(s.get("faithful")) and form.get("faithful") != "0"
+                usarp = min(6, max(1, int(form.get("usarp") or 2)))   # sharpness of the second pass (2D upscaler)
                 graph, stages = wf.action_part_graph(self.model_names, scenes, k, width, height, seed, images, aloras,
                                                      preview=await self.preview_opts(), state=state, fresh=fresh,
-                                                     faithful=faithful and k == 0,
+                                                     faithful=faithful and k == 0, usarp=usarp,
                 ltxv=await self.has_node("LTXVSetVideoLatentNoiseMasks"))
                 if faithful and s.get("refiner_def"):
                     # the refiner's input names come from the installed node; values as in the original workflow
@@ -3103,7 +3110,7 @@ class App:
         names = dict(self.model_names)
         width, height = wf.resolution(aspect, quality, form)
         graph, stages = wf.action_graph(names, wf.lipsync_prompt(prompt, len(images)), width, height, seconds, seed, images, audios,
-                                        s["faithful"], loras)
+                                        s["faithful"], loras, min(6, max(1, int(form.get("usarp") or 2))))
         if s["faithful"]:
             # the refiner's input names come from the installed node; values as in the original workflow
             req_inputs = [k for k in (s["refiner_def"]["input"].get("required") or {}) if k != "sigmas"]
