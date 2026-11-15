@@ -1099,20 +1099,21 @@ body.dropping::after{content:'Отпустите — программа разл
 
     /* reference audio in Референсы / Актёр / Экшн-видео: windows like in the studio, one height for
        everything in the row, and the loading button filled - the bare tiles only showed a file name */
-    .rm-auds .slot.ra-off{display:none!important}
-    .ra-list{display:grid;gap:8px;margin-top:9px}
+    /* the audio block of these modes lives in its own card now: the tiles stay in the old place
+       as storage only - a hidden input can still be clicked programmatically */
+    .ra-tiles{display:none}
     .ra-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:7px 10px;border:1px solid var(--line-2);
       border-radius:10px;background:var(--surface-2)}
     .ra-row.over{border-color:var(--accent)}
     .ra-row>.btn.mini,.ra-row>.token{height:30px;padding:0 11px;font-size:12px;line-height:1;border-radius:8px;
       display:inline-flex;align-items:center}
-    .ra-row>.ra-load{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:700}
-    .ra-row>.ra-edit{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:700}
-    .ra-name{font-size:12.5px;font-weight:600;max-width:40ch;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-    .ra-row:not(.has) .ra-name{font-weight:400;opacity:.55}
-    .ra-dur{font-size:12px;opacity:.7}
-    .ra-dur.over{color:var(--pink);opacity:1;font-weight:700}
     .ra-host{padding-top:3px}
+
+    .ra-row{min-height:30px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+    .ra-row>.btn.mini[data-a="add"]{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:700}
+    .ra-row>.btn.mini[data-a="add"]:disabled{background:var(--surface-2);border-color:var(--line-2);color:var(--ink);opacity:.55;font-weight:400}
+    .ra-row>.token{cursor:pointer}
+    .ra-row .token .btn.mini{height:22px;padding:0 8px;font-size:11.5px;margin-left:2px}
 </style>
 </head>
 <body>
@@ -5205,48 +5206,63 @@ function makeRefMode(cfg) {
   // Reference audio in Референсы, Актёр and Экшн-видео: the same window the studio uses, instead of a bare
   // tile. The tiles stay in the page - the run collects them by selector - they only stop showing, and
   // whatever the window does is written back into the tile, so the calculation cannot tell the difference.
-  if (!cfg.scenes && !cfg.swap) refAudioWindows();
-  function refAudioWindows() {
+  // Reference audio in Референсы, Актёр and Экшн-видео: its own numbered card, and the files are ADDED
+  // one by one the way a scene adds them - three empty planks at once only made people load something
+  // they did not need. The tiles stay in the page: the run collects them by selector, so the card writes
+  // into them and the calculation cannot tell the difference.
+  if (!cfg.scenes && !cfg.swap) refAudioCard();
+  function refAudioCard() {
     const slots = [...$$('.slot', audsEl)];
     if (!slots.length || typeof AudioTrimmer !== 'function') return;
-    const newEl = cls => { const e = document.createElement('div'); if (cls) e.className = cls; return e; };
-    slots.forEach(s => s.classList.add('ra-off'));
-    const list = newEl('ra-list');
-    audsEl.parentElement.insertBefore(list, audsEl.nextSibling);
-    const host = newEl('ra-host'); host.hidden = true;
-    let tr = null, cur = -1;
-    const paint = (s, i, r) => {
-      const f = s._file, d = s._dur || 0;
-      $('.ra-name', r).textContent = f ? f.name : 'аудио не загружено';
-      r.classList.toggle('has', !!f);
-      $('.ra-edit', r).hidden = !f;
-      $('.ra-x', r).hidden = !f;
-      const dq = $('.ra-dur', r);
-      dq.textContent = f ? (d ? Math.round(d) + ' с' : '…') + (s._sel ? ' · вырезано' : '') : '';
-      dq.classList.toggle('over', d > 15.2);
-      dq.title = d > 15.2 ? 'Дольше 15 секунд: модель возьмёт начало - обрежьте' : '';
+    const refCard = audsEl.closest('.card');
+    if (!refCard) return;
+    const newEl = (cls) => { const e = document.createElement('div'); if (cls) e.className = cls; return e; };
+    const esc = s => String(s).replace(/[<>&]/g, ch => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[ch]));
+    audsEl.parentElement.classList.add('ra-tiles');   // the old block with its caption: storage only
+    const card = newEl('card');
+    card.innerHTML = '<div class="card-h"><h3><span class="n">2</span>Аудио</h3></div>' +
+      '<div class="hint" style="margin-bottom:9px">Модель получает ваши аудио как <b>ссылки</b> и берёт их там, где вы упомянули файл тегом в тексте. Не упомянули - звук она делает сама. До трёх файлов, каждый можно обрезать до 15 секунд.</div>' +
+      '<div class="ra-row"></div>';
+    refCard.after(card);
+    const row = $('.ra-row', card), host = newEl('ra-host'); host.hidden = true;
+    card.append(host);
+    const inp = document.createElement('input');
+    inp.type = 'file'; inp.accept = 'audio/*,.wav,.mp3,.ogg,.flac,.m4a'; inp.hidden = true; card.append(inp);
+    let tr = null, cur = -1, pick = -1;               // pick: the chip whose button opened the dialog
+    const paint = () => {
+      const full = slots.filter(s => s._file).length >= slots.length;
+      row.innerHTML = '<button class="btn mini" type="button" data-a="add"' + (full ? ' disabled' : '') +
+        ' title="Голос, ритм, атмосфера: до ' + slots.length + ' файлов. Обрезать можно до 15 секунд.">Загрузить аудио</button>' +
+        slots.map((s, i) => s._file
+          ? `<span class="token" data-j="${i}" title="Тег вставится в текст по нажатию">&lt;Audio ${i + 1}&gt; ${esc(s._file.name.slice(0, 22))}` +
+            (s._dur ? ' <small style="opacity:.75">' + (Math.round(s._dur * 10) / 10 + '').replace('.', ',') + ' с' + (s._sel ? ' · вырезано' : '') + '</small>' : '') +
+            ` <button class="btn mini" type="button" data-a="trim" data-j="${i}" title="Послушать и обрезать: окно под строкой">Обрезать</button>` +
+            `<button class="btn mini" type="button" data-a="del" data-j="${i}" title="Убрать этот файл">✕</button></span>`
+          : '').join('') +
+        (full ? '<span class="hint" style="font-size:12px">' + slots.length + ' аудио - максимум</span>' : '') +
+        (slots.some(s => s._file && s._dur > 15.2) ? '<span class="hint" style="font-size:12px;color:var(--pink)">есть длиннее 15 с - обрежьте, иначе модель возьмёт начало</span>' : '');
     };
-    const close = () => { host.hidden = true; cur = -1; };
-    const onFile = f => {                      // the editor hands over the cut; the tile is what the run reads
+    const closeWin = () => { host.hidden = true; cur = -1; };
+    const onFile = f => {                             // the editor hands over the cut; the tile is what the run reads
       const i = tr._slot, s = slots[i]; if (!s) return;
       const src = s._src || s._file;
-      s._src = src;                            // the original stays, so a second cut is possible
+      s._src = src;                                   // the original stays, so a second cut is possible
       s._file = new File([f], src.name.replace(/\.[a-z0-9]+$/i, '') + '.wav', { type: 'audio/wav' });
       s._sel = { start: tr.start, end: tr.end, of: src.name };
       s._dur = tr.len();
       $('span', s).textContent = s._file.name;
       $('small', s).textContent = Math.round(s._dur) + ' с';
-      paint(s, i, rows[i]);
+      paint();
       try { changed(); } catch (e) {}
       if (root._save) root._save();
     };
-    const openEdit = i => {
+    const openTrim = i => {
       const s = slots[i];
-      if (!s._file) { $('input', s).click(); return; }
-      if (!host.hidden && cur === i) {         // the same button closes it: what you highlighted is what you get
+      if (!s._file) return;
+      if (!host.hidden && cur === i) {                // the same button closes it: what you highlighted is what you get
         const keep = s._sel || (tr && tr._loaded) || { start: 0, end: (tr && tr.dur0) || 0 };
         if (tr && tr.dur0 && (Math.abs(tr.start - keep.start) > .05 || Math.abs(tr.end - keep.end) > .05)) tr.out();
-        close();
+        closeWin();
         return;
       }
       host.hidden = false;
@@ -5254,7 +5270,7 @@ function makeRefMode(cfg) {
       const src = s._src || s._file;
       if (tr._slot !== i || !tr.dur0) {
         tr._slot = i;
-        tr.setFile(src, true);                 // the ORIGINAL always opens
+        tr.setFile(src, true);                        // the ORIGINAL always opens
         const sel = s._sel;
         if (sel && src === s._src && sel.end <= tr.dur0 + .2) {
           tr.start = sel.start; tr.end = Math.min(sel.end, tr.dur0);
@@ -5262,60 +5278,77 @@ function makeRefMode(cfg) {
         }
       }
       cur = i;
-      list.scrollIntoView({ block: 'nearest' });
+      host.scrollIntoView({ block: 'nearest' });
     };
-    const rows = slots.map((s, i) => {
-      const r = newEl('ra-row');
-      r.innerHTML = '<button class="btn mini ra-load" type="button" title="Взять аудио с диска">Загрузить аудио</button>' +
-        '<span class="ra-name">аудио не загружено</span>' +
-        '<button class="token ra-tag" type="button" title="Поставить тег в текст">&lt;Audio ' + (i + 1) + '&gt;</button>' +
-        '<span class="ra-dur"></span>' +
-        '<button class="btn mini ra-edit" type="button" hidden>Обрезать</button>' +
-        '<button class="btn mini ra-x" type="button" hidden title="Убрать аудио">✕</button>';
-      list.append(r);
-      $('input', s).addEventListener('change', () => {   // a new file: the old cut no longer belongs to it
+    const put = (f, i) => {                           // the tile is filled through its own input: its handlers stay in charge
+      const s = slots[i < 0 ? slots.findIndex(x => !x._file) : i];
+      if (!s) { toast('Больше ' + slots.length + ' аудио нельзя'); return; }
+      const e2 = new DataTransfer(); e2.items.add(f);
+      const input = $('input', s);
+      input.files = e2.files; input.dispatchEvent(new Event('change'));
+    };
+    row.onclick = e => {
+      const b = e.target.closest('button');
+      const j = e.target.closest('.token');
+      if (b && b.dataset.a === 'add') { pick = -1; inp.click(); return; }
+      if (b && b.dataset.a === 'trim') { openTrim(+b.dataset.j); return; }
+      if (b && b.dataset.a === 'del') {
+        const s = slots[+b.dataset.j], x = $('.x', s);
+        if (x) x.click();
         s._src = null; s._sel = null;
-        if (cur === i) close();
-        paint(s, i, r);
-        const f = s._file;
-        if (f && !s._dur) {                 // the tile learns the length from a media element a moment later;
-          const m = new Audio(URL.createObjectURL(f));   // the row waits for it, otherwise it shows «…» forever
-          m.preload = 'metadata';
-          m.onloadedmetadata = () => {
-            if (s._file === f) { s._dur = m.duration || 0; paint(s, i, r); }
-            URL.revokeObjectURL(m.src);
-          };
-        }
-      });
-      $('.ra-load', r).onclick = () => $('input', s).click();
-      $('.ra-edit', r).onclick = () => openEdit(i);
-      $('.ra-x', r).onclick = () => {                    // the tile's own cross does the cleaning it always did
-        const x = $('.x', s); if (x) x.click();
-        s._src = null; s._sel = null;
-        if (cur === i) close();
-        paint(s, i, r);
+        if (cur === +b.dataset.j) closeWin();
+        paint();
         if (root._save) root._save();
-      };
-      $('.ra-tag', r).onclick = () => {
-        const tag = '<Audio ' + (i + 1) + '>', ta = $('textarea', root);
+        return;
+      }
+      if (j && !b) {                                  // a click on the chip itself puts the tag into the text
+        const ta = $('textarea', root), tag = '<Audio ' + (+j.dataset.j + 1) + '>';
         if (!ta) { toast('Тег ' + tag + ' - в этом режиме текста нет'); return; }
         const p = ta.selectionStart || 0;
         ta.value = ta.value.slice(0, p) + tag + ta.value.slice(p);
         ta.focus(); ta.selectionStart = ta.selectionEnd = p + tag.length;
         if (root._save) root._save();
-      };
-      r.addEventListener('dragover', e => { e.preventDefault(); r.classList.add('over'); });
-      r.addEventListener('dragleave', () => r.classList.remove('over'));
-      r.addEventListener('drop', e => {
-        e.preventDefault(); r.classList.remove('over');
-        const f = e.dataTransfer.files[0]; if (!f) return;
-        const inp = $('input', s), dt = new DataTransfer();
-        dt.items.add(f); inp.files = dt.files; inp.dispatchEvent(new Event('change'));
-      });
-      return r;
+      }
+    };
+    inp.onchange = () => {
+      const f = inp.files && inp.files[0], i = pick; pick = -1;
+      inp.value = '';
+      if (!f) return;
+      put(f, i);
+    };
+    // a file may arrive without the button: dropped on the row, or put back from a saved project
+    slots.forEach((s, i) => $('input', s).addEventListener('change', () => {
+      s._src = null; s._sel = null;
+      if (cur === i) closeWin();
+      paint();
+      const f = s._file;
+      if (f && !s._dur) {                 // the tile learns the length from a media element a moment later;
+        const m = new Audio(URL.createObjectURL(f));   // the chip waits for it, otherwise it shows no length
+        m.preload = 'metadata';
+        m.onloadedmetadata = () => { if (s._file === f) { s._dur = m.duration || 0; paint(); } URL.revokeObjectURL(m.src); };
+      }
+    }));
+    row.addEventListener('dragover', e => { e.preventDefault(); row.classList.add('over'); });
+    row.addEventListener('dragleave', () => row.classList.remove('over'));
+    row.addEventListener('drop', e => {
+      e.preventDefault(); row.classList.remove('over');
+      const f = e.dataTransfer.files[0]; if (f) put(f, -1);
     });
-    list.append(host);
-    slots.forEach((s, i) => paint(s, i, rows[i]));
+    // the cards after the new one used to be «2», «3» and so on: they all move one step. The whole
+    // section is walked, not only this column - «Параметры» stands in another one and stayed a «3»
+    // «Параметры» is built later than this point, so renumbering once here is not enough: the section
+    // keeps the job as a function and calls it again when everything stands in place
+    const renumber = () => {
+      let num = 0;
+      [...(root.closest('.view') || root).querySelectorAll('.card')].forEach(c2 => {
+        const nn = c2.querySelector('.card-h .n'); if (!nn) return;   // a card without a number takes no place
+        const want = String(++num);
+        if (nn.textContent !== want) nn.textContent = want;           // touch it only when it really differs
+      });
+    };
+    renumber();
+    (root.closest('.view') || root)._h3Renumber = renumber;
+    paint();
   }
   if (cfg.swap) $('.rm-vids input', root).addEventListener('change', async e => {
     const f = e.target.files[0]; if (!f) return;
@@ -6324,7 +6357,8 @@ function makeRefMode(cfg) {
             () => '<div class="hint" style="font-size:12.5px;line-height:1.55"><b>Работа со звуком (карточка «Аудио»).</b> Файл берётся кнопкой «Загрузить аудио» или перетаскиванием на строку. Ниже - прибор как в LipSync: прослушать выделенное, волна, <b>рамка выделения с ручками по краям</b> (края тянутся независимо), приближение для точной резки, два режима - «что оставить в клипе» и «что вырезать», кнопки «Оставить выделенное», «Убрать паузы», «Отделить голос», «Отменить», поля «Начало» и «Конец» с длиной и предупреждением про 15 секунд. Готовый фрагмент подставляется вместо файла: расчёт видит обычный загруженный файл.</div>',
             () => '<div class="hint" style="font-size:12.5px;line-height:1.55"><b>Тег &lt;Audio 1&gt;.</b> Когда аудио лежит, под текстом сцены появляется плашка &lt;Audio 1&gt; - клик вставляет тег туда, где стоит курсор. Он не выбирает, брать ли ваш файл (файл уже взят), а объясняет модели, что этот звук - фон данной сцены. Плашка не занимает ни одного из девяти мест под картинки; аудио в проекте одно, поэтому тег - всегда &lt;Audio 1&gt;.</div>',
             () => '<div class="hint" style="font-size:12.5px;line-height:1.55"><b>Длина фонового звука.</b> Обычное правило «не больше 15 секунд» к общему треку больше не применяется: ролик длиннее сцены, и весь трек выделяется целиком. Если трек короче ролика, включите «пустой фон по кругу» - тогда звук начнётся сначала и дойдёт до конца; с выключенной галкой музыка оборвётся там, где кончился файл. Для аудио отдельной сцены 15 секунд останутся в силе: сцена сама не длиннее.</div>',
-            () => '<div class="hint" style="font-size:12.5px;line-height:1.55"><b>Аудио отдельной сцены.</b> Под плашками референсов сцены есть кнопка «Загрузить аудио сцены» - до трёх файлов. Каждый подписан &lt;Audio 2&gt;, &lt;Audio 3&gt;, &lt;Audio 4&gt; (первый номер оставлен фону всего ролика). Модель получает их как ссылки, а применяет там, где вы упомянули файл тегом в тексте сцены: не упомянули - звук в сцене делает модель. Кнопка «Обрезать» открывает тот же прибор, что и в карточке «Аудио», но с правилом 15 секунд - сцена длиннее всё равно не будет. Файлы хранятся вместе с проектом.</div>',
+            () => '<div class="hint" style="font-size:12.5px;line-height:1.55"><b>Аудио отдельной сцены.</b> Под текстом сцены есть кнопка «Загрузить аудио сцены» - до трёх файлов. У каждой сцены свои номера десятками: во второй сцене это &lt;Audio 20&gt;, &lt;Audio 21&gt;, &lt;Audio 22&gt;, в третьей - от 30; первый номер &lt;Audio 1&gt; оставлен фону всего ролика. Модель получает их как ссылки, а применяет там, где вы упомянули файл тегом в тексте сцены: не упомянули - звук в сцене делает модель. Кнопка «Обрезать» открывает тот же прибор, что и в карточке «Аудио», но с правилом 15 секунд - сцена длиннее всё равно не будет. Файлы хранятся вместе с проектом.</div>',
+            () => '<div class="hint" style="font-size:12.5px;line-height:1.55"><b>Аудио в Референсах, Актёре и Экшн-видео.</b> Здесь у звука своя карточка «Аудио». Файлы не выкладываются тремя пустыми плашками: нажимаете «Загрузить аудио» - и файл становится отдельной меткой с названием, длиной и тегом &lt;Audio 1&gt;, &lt;Audio 2&gt;, &lt;Audio 3&gt;. Нажатие на метку ставит тег в текст, «Обрезать» открывает тот же прибор, что и в Видеостудии: волна, перетаскивание, прослушивание, до 15 секунд. Второе нажатие закрывает окно и применяет выделенное, а открывается снова целый файл - резать можно сколько раз угодно, файл на диске при этом не портится. Больше трёх аудио нельзя: кнопка гаснет сама.</div>',
             () => '<div class="hint" style="font-size:12.5px;line-height:1.55"><b>«🤖 В агент».</b> Отправляет выделенный кусок в раздел «Агент»: он распознаёт слова и пишет промпт уже зная, что говорится. Перед отправкой Агент сам переключается на Видеостудию, чтобы не писать в чужой раздел. Если распознавание речи ещё не скачано, кнопка об этом скажет - карточка «Модель», «Докачать».</div>',
             () => {
               const mp = root.querySelector('.mdl-pick'); if (!mp) return '';
@@ -7108,7 +7142,12 @@ function foldOnOpen() { FOLD_ON_OPEN.forEach(id => document.getElementById(id)?.
       if (!c.classList.contains('collapsed')) setTimeout(() => dispatchEvent(new Event('resize')), 90);
     });
   };
-  const scan = () => $$('.card').forEach(mark);
+  const scan = () => {
+    // a section keeps gaining cards after its own build - the settings card comes last - so numbers are
+    // put right first: otherwise two cards share one key in the saved fold state and fold together
+    $$('.view').forEach(v => { try { if (typeof v._h3Renumber === 'function') v._h3Renumber(); } catch (e) {} });
+    $$('.card').forEach(mark);
+  };
   scan();
   let timer = 0;
   new MutationObserver(() => { clearTimeout(timer); timer = setTimeout(scan, 250); }).observe(document.body, { childList: true, subtree: true });
