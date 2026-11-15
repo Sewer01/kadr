@@ -154,6 +154,16 @@
 .atrim .at-sel{position:absolute;top:0;bottom:0;background:rgba(var(--accent-rgb),.16);border-left:2px solid var(--accent);border-right:2px solid var(--accent);pointer-events:none}
 .atrim .at-cut{position:absolute;top:0;bottom:0;background:rgba(255,120,120,.20);border-left:2px dashed #f08080;border-right:2px dashed #f08080;pointer-events:none}
 .atrim .at-ph{position:absolute;top:0;bottom:0;width:2px;background:#fff;pointer-events:none}
+.atrim .at-wave{touch-action:none}
+.atrim .at-h{position:absolute;top:-2px;bottom:-2px;width:14px;cursor:ew-resize;display:grid;place-items:center;background:none;border:0;padding:0}
+.atrim .at-h::after{content:'';display:block;width:4px;height:26px;border-radius:3px;background:var(--accent);box-shadow:0 0 0 1px rgba(0,0,0,.35)}
+.atrim .at-h:hover::after,.atrim .at-h:active::after{background:#fff}
+.atrim .at-sel > .at-h:first-child{left:-8px}
+.atrim .at-sel > .at-h:last-child{right:-8px}
+.atrim .at-cut > .at-h:first-child{left:-8px}
+.atrim .at-cut > .at-h:last-child{right:-8px}
+.atrim .at-body{display:grid;gap:10px}
+.atrim .at-empty{border:1px dashed var(--line-2);border-radius:12px;padding:14px;color:var(--dim);font-size:12.5px;text-align:center}
 .atrim .at-modes{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);gap:4px;background:var(--bg-2);border:1px solid var(--line);border-radius:12px;padding:4px}
 .atrim .at-modes button{padding:8px 6px;border-radius:9px;font-weight:700;font-size:13px;color:var(--muted);text-align:center}
 .atrim .at-modes button small{display:block;font-weight:500;font-size:11px;color:var(--dim)}
@@ -3270,7 +3280,11 @@ class AudioTrimmer {
       '<button class="btn mini at-load" type="button" title="Взять аудиофайл с компьютера">Загрузить аудио</button>' +
       '<input type="file" class="at-fi" accept="audio/*,.mp3,.wav,.m4a,.ogg,.flac" hidden>' +
       '<div class="at-name">аудио не загружено</div><div class="at-len">—</div></div>' +
-      '<div class="at-wave"><canvas class="at-cv" height="86"></canvas><div class="at-sel" hidden></div><div class="at-cut" hidden></div><div class="at-ph" hidden></div></div>' +
+      '<div class="at-body" hidden>' +
+      '<div class="at-wave"><canvas class="at-cv" height="86"></canvas>' +
+      '<div class="at-sel" hidden><i class="at-h" data-h="l"></i><i class="at-h" data-h="r"></i></div>' +
+      '<div class="at-cut" hidden><i class="at-h" data-h="cl"></i><i class="at-h" data-h="cr"></i></div>' +
+      '<div class="at-ph" hidden></div></div>' +
       '<div class="at-modes"><button class="on" type="button" data-m="clip">Выбор фрагмента<small>что пойдёт в клип</small></button>' +
       '<button type="button" data-m="cut">Вырезание<small>убрать кусок из аудио</small></button></div>' +
       '<div class="at-hint"></div>' +
@@ -3281,10 +3295,12 @@ class AudioTrimmer {
       '<div class="at-zoom"><span>Резать удобнее с приближением:</span><button class="btn mini at-zm" type="button">−</button>' +
       '<input type="range" class="at-zr" min="1" max="40" step="1" value="1"><button class="btn mini at-zp" type="button">+</button>' +
       '<span class="at-zl">весь фрагмент</span><button class="btn mini at-z0" type="button">Весь фрагмент</button></div>' +
-      '<div class="at-nums"><label>Начало, с<input type="number" class="at-a" step="0.1" min="0" disabled></label>' +
-      '<label>Конец, с<input type="number" class="at-b" step="0.1" min="0" disabled></label>' +
+      '<div class="at-nums"><label>Начало, с<input type="text" inputmode="decimal" class="at-a" placeholder="0,0" disabled></label>' +
+      '<label>Конец, с<input type="text" inputmode="decimal" class="at-b" placeholder="15,0" disabled></label>' +
       '<div class="at-box"><span class="at-cap">Длина аудио</span><b class="at-dur">—</b></div></div>' +
-      '<div class="at-warn" hidden></div>';
+      '<div class="at-warn" hidden></div>' +
+      '</div>' +
+      '<div class="at-empty">Загрузите аудио - и здесь появится редактор: волна, выделение, паузы, голос.</div>';
     (o.mount || document.body).append(this.el);
     this.q = s => this.el.querySelector(s);
     this.peaks = [];
@@ -3362,6 +3378,9 @@ class AudioTrimmer {
     this.q('.at-paus').disabled = this.q('.at-voc').disabled = !on;
     this.q('.at-und').disabled = !this.undo.length;
     this.q('.at-zl').textContent = this.zoom > 1.02 ? this.view()[1] - this.view()[0] > 0 ? Math.round(this.view()[1] - this.view()[0]) + ' с' : '—' : 'весь фрагмент';
+    const body = this.q('.at-body'), empty = this.q('.at-empty');
+    if (body) body.hidden = !on;
+    if (empty) empty.hidden = !!on;
     const warn = this.q('.at-warn');
     if (on && this.len() > this.limit + .05) {
       warn.hidden = false;
@@ -3422,14 +3441,41 @@ class AudioTrimmer {
     const el = this.q('.at-wave');
     this._sync();
     this._anchor = null;
+    const at = e => Math.min(this.dur0, Math.max(0, this.tAt(Math.min(1, Math.max(0, (e.clientX - el.getBoundingClientRect().left) / el.getBoundingClientRect().width)))));
+    // a handle is grabbed on its own: without this a press on the edge started a brand new selection,
+    // and the markers could not be moved at all (that is how the LipSync panel does it too)
+    this.el.querySelectorAll('.at-h').forEach(h => {
+      h.addEventListener('pointerdown', e => {
+        if (!this.dur0) return;
+        e.stopPropagation(); e.preventDefault();
+        this._grab = h.dataset.h;
+        h.setPointerCapture(e.pointerId);
+      });
+      h.addEventListener('pointermove', e => {
+        const g = this._grab; if (!g) return;
+        const v = at(e);
+        if (g === 'l') this.start = Math.min(v, this.end - .1);
+        else if (g === 'r') this.end = Math.max(v, this.start + .1);
+        else if (g === 'cl' && this.cut) this.cut = { a: Math.min(v, this.cut.b - .05), b: this.cut.b };
+        else if (g === 'cr' && this.cut) this.cut = { a: this.cut.a, b: Math.max(v, this.cut.a + .05) };
+        this._sync();
+      });
+      h.addEventListener('pointerup', e => {
+        if (!this._grab) return;
+        this._grab = null;
+        this.out();
+      });
+      h.addEventListener('pointercancel', () => { this._grab = null; });
+    });
     el.addEventListener('pointerdown', e => {
-      if (!this.dur0) return;
-      const r = el.getBoundingClientRect(), t = this.tAt(Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)));
+      if (!this.dur0 || this._grab) return;
+      const t = at(e);
       if (this.mode === 'cut') { this._t0 = t; this.cut = { a: t, b: t }; } else this._anchor = t;
       el.setPointerCapture(e.pointerId); this._drag(e);
     });
     el.addEventListener('pointermove', e => { if (this._anchor !== null || this._t0 !== undefined) this._drag(e); });
     el.addEventListener('pointerup', e => {
+      if (this._grab) return;
       this._drag(e); this._anchor = null; this._t0 = undefined;
       if (this.mode === 'clip') this.out();
     });
@@ -6168,6 +6214,10 @@ function makeRefMode(cfg) {
       root._trimWatch = setInterval(sync, 700);
       sync();
       const vb = $('#lmVoice', root); if (vb) vb.hidden = true;   // the same action lives in the panel now
+      // the row «Начать с …» and «Отделить голос от музыки» repeated the editor below it: the editor
+      // cuts the file itself, so the offset field would only confuse
+      const hideDup = () => { const x = $('.lm-start', root), d = x && x.closest('div[style]'); if (d) d.style.display = 'none'; return !!d; };
+      if (!hideDup()) { let k = 0; const iv = setInterval(() => { if (hideDup() || ++k > 20) clearInterval(iv); }, 200); }
         } catch (e) { toast('Панель работы со звуком не встроилась: ' + e.message); }
 
     c1.after(mus);
