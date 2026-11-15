@@ -3282,8 +3282,6 @@ class AudioTrimmer {
     this.el = document.createElement('div'); this.el.className = 'atrim';
     this.el.innerHTML =
       '<div class="at-top"><button class="btn mini at-play" type="button" title="Прослушать выделенное">&#9654;</button>' +
-      '<button class="btn mini at-load" type="button" title="Взять аудиофайл с компьютера">Загрузить аудио</button>' +
-      '<input type="file" class="at-fi" accept="audio/*,.mp3,.wav,.m4a,.ogg,.flac" hidden>' +
       '<div class="at-name">аудио не загружено</div><div class="at-len">—</div></div>' +
       '<div class="at-body" hidden>' +
       '<div class="at-wave"><canvas class="at-cv" height="86"></canvas>' +
@@ -3296,7 +3294,8 @@ class AudioTrimmer {
       '<div class="at-acts"><button class="btn pri at-keep" type="button" disabled>Оставить выделенное</button>' +
       '<button class="btn at-paus" type="button" disabled>Убрать паузы</button>' +
       '<button class="btn at-voc" type="button" disabled>Отделить голос</button>' +
-      '<button class="btn at-und" type="button" disabled>Отменить</button></div>' +
+      '<button class="btn at-und" type="button" disabled>Отменить</button>' +
+      '<button class="btn at-ag" type="button" disabled title="Выделенный кусок уйдёт в Агент: он послушает слова и ответит с учётом них">🤖 В агент</button></div>' +
       '<div class="at-zoom"><span>Резать удобнее с приближением:</span><button class="btn mini at-zm" type="button">−</button>' +
       '<input type="range" class="at-zr" min="1" max="40" step="1" value="1"><button class="btn mini at-zp" type="button">+</button>' +
       '<span class="at-zl">весь фрагмент</span><button class="btn mini at-z0" type="button">Весь фрагмент</button></div>' +
@@ -3383,6 +3382,7 @@ class AudioTrimmer {
       ? (this.cut ? '✂ Удалить выделенное - ' + (this.cut.b - this.cut.a).toFixed(1).replace('.', ',') + ' с' : '✂ Удалить выделенное')
       : (whole ? '✂ Оставить выделенное' : '✂ Оставить выделенное - убрать ' + away.toFixed(1).replace('.', ','));
     this.q('.at-paus').disabled = this.q('.at-voc').disabled = !on;
+    this.q('.at-ag').disabled = !on;
     this.q('.at-und').disabled = !this.undo.length;
     this.q('.at-zl').textContent = this.zoom > 1.02 ? this.view()[1] - this.view()[0] > 0 ? Math.round(this.view()[1] - this.view()[0]) + ' с' : '—' : 'весь фрагмент';
     const body = this.q('.at-body'), empty = this.q('.at-empty');
@@ -3494,8 +3494,6 @@ class AudioTrimmer {
       this._hint(); this._sync();
     };
     this.q('.at-play').onclick = () => this.src ? this.stop() : this.play();
-    this.q('.at-load').onclick = () => { if (o.pick) o.pick(); else this.q('.at-fi').click(); };
-    this.q('.at-fi').onchange = e => { const f = e.target.files && e.target.files[0]; if (f) this.setFile(f); };
     this.q('.at-keep').onclick = () => {
       if (!this.dur0) return;
       if (this.mode !== 'cut') {
@@ -3536,6 +3534,13 @@ class AudioTrimmer {
         this.say('Голос отделён · музыка убрана из аудио');
       } catch (e) { this.say(e.message); }
       this.busy = false; this.q('.at-voc').textContent = 'Отделить голос'; this._sync();
+    };
+    this.q('.at-ag').onclick = async () => {
+      if (!this.dur0) { this.say('Сначала загрузите аудио'); return; }
+      try {
+        goTo('agent');
+        await setChatAudio(wavSlice(this.buf, this.start, this.end), (this.name || 'фрагмент').replace(/\.[^.]+$/, ''), this.len());
+      } catch (e) { this.say((e && e.message) || 'Не удалось передать аудио в Агент'); }
     };
     this.q('.at-und').onclick = () => {
       const s = this.undo.pop(); if (!s) return;
@@ -6328,7 +6333,7 @@ function makeRefMode(cfg) {
     if (cfg.scenes && root._save && !root._restoring) root._save();
     $('.rm-count', root).style.color = total > 12 ? 'var(--pink)' : '';
     // all places are listed from the start; a chip wakes up when its place gets a photo
-    $('.rm-tokens', root).innerHTML = slots.map((r, i) => `<button class="token" type="button" data-slot="${i}"${r._file ? '' : ' disabled'} title="${r._file ? 'Вставить в текст сцены' : 'В это место ещё не загружено фото - плашка оживёт, когда оно появится'}">&lt;Picture ${i + 1}&gt;</button>`).join('');
+    $('.rm-tokens', root).innerHTML = slots.map((r, i) => `<button class="token" type="button" data-slot="${i}"${r._file ? '' : ' disabled'} title="${r._file ? 'Вставить в текст сцены' : 'В это место ещё не загружено фото - плашка оживёт, когда оно появится'}">&lt;Picture ${i + 1}&gt;</button>`).join('')
     $$('.sc', root).forEach(x => x._counter?.());   // after the row was rebuilt, or the lock it puts on the chips is wiped
     if (cfg.swap) { const w2 = $('.rm-who[data-i="1"]', root); if (w2) w2.hidden = imgs.length < 2; }
     if (cfg.swap && S.autoLen !== false) { const v = files('.rm-vids .slot')[0]; if (v && v._dur) { S.dur = Math.min(15, Math.max(3, Math.round(v._dur))); root._upd?.(); } }
