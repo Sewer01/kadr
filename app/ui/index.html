@@ -5786,6 +5786,11 @@ function makeRefMode(cfg) {
       };
       // (the places take pictures themselves: click a tile or drop a photo into it)
       paintRefs();
+
+      $('.sc-m', c).onclick = () => { const r = $('input[type=range]', c); r.value = Math.max(3, +r.value - 1); r.dispatchEvent(new Event('input')); };
+      $('.sc-p', c).onclick = () => { const r = $('input[type=range]', c); r.value = Math.min(15, +r.value + 1); r.dispatchEvent(new Event('input')); };
+      $('textarea', c).value = txt;
+      $('textarea', c).insertAdjacentHTML('afterend', '<div class="sc-tokens" style="display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 0"></div><div class="sc-auds" style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:6px"></div><div class="sc-trimhost" hidden style="margin-top:8px"></div>');
       // - - - audio of THIS scene: up to three files, trimmed with the same instrument as the
       // shared track. They reach the model as references; the text decides where one is used.
       c._auds = c._auds || [null, null, null];
@@ -5826,6 +5831,12 @@ function makeRefMode(cfg) {
         if (root._save) root._save();
         toast('Аудио ' + (j + 2) + ' в сцене: ' + f.name + ' - при желании обрежьте (до 15 с)');
       };
+      if (!$('.sc-auds', c)) {
+        $('textarea', c).insertAdjacentHTML('afterend', '<div class="sc-auds" style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:6px"></div><div class="sc-trimhost" hidden style="margin-top:8px"></div>');
+      }
+      if (!$('.sc-trimhost', c)) {
+        $('.sc-auds', c).insertAdjacentHTML('afterend', '<div class="sc-trimhost" hidden style="margin-top:8px"></div>');
+      }
       $('.sc-auds', c).onclick = e => {
         const b = e.target.closest('[data-a]'); if (!b) return;
         const j = +b.dataset.j;
@@ -5841,11 +5852,7 @@ function makeRefMode(cfg) {
         } else if (b.dataset.a === 'trim') openTrim(j);
       };
       c._paintAuds(); c._paintRefs = paintRefs;
-
-      $('.sc-m', c).onclick = () => { const r = $('input[type=range]', c); r.value = Math.max(3, +r.value - 1); r.dispatchEvent(new Event('input')); };
-      $('.sc-p', c).onclick = () => { const r = $('input[type=range]', c); r.value = Math.min(15, +r.value + 1); r.dispatchEvent(new Event('input')); };
-      $('textarea', c).value = txt;
-      $('textarea', c).insertAdjacentHTML('afterend', '<div class="sc-tokens" style="display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 0"></div>');
+      paintRefs();   // the chips row now knows about restored scene audio
       box.append(c); attachRu($('textarea', c));
       $('.ru-wrap', c)?.insertAdjacentHTML('beforeend', '<span class="sc-left hint" style="font-size:12px;margin-left:10px"></span>');
       c._counter = () => {   // what counts is what the text calls; the frame of your video holds <Picture 1>
