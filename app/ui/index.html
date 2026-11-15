@@ -6206,7 +6206,7 @@ function makeRefMode(cfg) {
       // all stand in the open, like everywhere else
       if (qual && own) qual.after(own);
       // pictures right after the settings, then the scenes
-      $('h3', refsCard).innerHTML = '<span class="n">1</span>Изображения героя и места <span class="hint" style="font-weight:400">(необязательно)</span>';
+      $('h3', refsCard).innerHTML = '<span class="n">1</span>Изображения героя и места';
       $('h3', musCard).innerHTML = '<span class="n">2</span>Аудио';
       // in the action studio there is no music at all, so the audio card must not stand empty
       // the audio card is always there now: a file in it means "play this", an empty one means
@@ -6926,6 +6926,45 @@ function foldOnOpen() { FOLD_ON_OPEN.forEach(id => document.getElementById(id)?.
     });
   });
 })();
+/* Every numbered card folds: a triangle in its heading, folded by default. Without this the program is a
+   wall of controls, while a person usually works with one or two of them at a time. The choice is kept per
+   card; when a card opens we tell the window about the resize - a waveform or a slider drawn while hidden
+   got a zero width and would stay blank otherwise. */
+(function () {
+  const KEY = 'h3-fold-all'; let st = {};
+  try { st = JSON.parse(localStorage.getItem(KEY) || '{}'); } catch (e) {}
+  const keyOf = c => {
+    const v = c.closest('[id^="view-"]'), n = c.querySelector(':scope > .card-h .n');
+    return (v ? v.id : 'app') + ':' + (n ? n.textContent.trim() : '?');
+  };
+  const mark = c => {
+    if (c._foldAll || c.classList.contains('fold')) return;      // the settings cards fold by their own rules
+    const h = c.querySelector(':scope > .card-h'); if (!h || !h.querySelector('.n')) return;
+    c._foldAll = true; c.classList.add('fold');
+    const k = keyOf(c);
+    // hidden with an inline !important: some sections dress their card bodies with id-rules that beat a
+    // plain stylesheet rule, and then a folded card kept showing everything
+    const hide = on => [...c.children].forEach(x => {
+      if (x === h) return;
+      if (on) x.style.setProperty('display', 'none', 'important'); else x.style.removeProperty('display');
+    });
+    if (!(k in st) || st[k]) c.classList.add('collapsed');       // folded by default, until a person says otherwise
+    hide(c.classList.contains('collapsed'));
+    new MutationObserver(() => hide(c.classList.contains('collapsed'))).observe(c, { attributes: true, attributeFilter: ['class'] });
+    h.addEventListener('click', e => {
+      if (e.target.closest('button,input,a,label,select,textarea')) return;
+      c.classList.toggle('collapsed');
+      st[k] = c.classList.contains('collapsed') ? 1 : 0;
+      try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (err) {}
+      if (!c.classList.contains('collapsed')) setTimeout(() => dispatchEvent(new Event('resize')), 90);
+    });
+  };
+  const scan = () => $$('.card').forEach(mark);
+  scan();
+  let timer = 0;
+  new MutationObserver(() => { clearTimeout(timer); timer = setTimeout(scan, 250); }).observe(document.body, { childList: true, subtree: true });
+})();
+
 /* rent a powerful computer: a short explanation for beginners + the way to connect */
 function connectRent() {
   goTo('models');
