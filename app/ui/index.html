@@ -155,11 +155,12 @@
 .atrim .at-cut{position:absolute;top:0;bottom:0;background:rgba(255,120,120,.20);border-left:2px dashed #f08080;border-right:2px dashed #f08080;pointer-events:none}
 .atrim .at-ph{position:absolute;top:0;bottom:0;width:2px;background:#fff;pointer-events:none}
 .atrim .at-wave{touch-action:none}
-.atrim .at-h{position:absolute;top:-2px;bottom:-2px;width:14px;cursor:ew-resize;display:grid;place-items:center;background:none;border:0;padding:0}
-.atrim .at-h::after{content:'';display:block;width:4px;height:26px;border-radius:3px;background:var(--accent);box-shadow:0 0 0 1px rgba(0,0,0,.35)}
+.atrim .at-h{position:absolute;top:-4px;bottom:-4px;width:20px;cursor:ew-resize;display:grid;place-items:center;background:none;border:0;padding:0;pointer-events:auto;z-index:3}
+.atrim .at-h::before{content:'';position:absolute;top:0;bottom:0;left:50%;width:14px;transform:translateX(-50%)}
+.atrim .at-h::after{content:'';display:block;width:5px;height:44px;border-radius:3px;background:var(--accent);box-shadow:0 0 0 1px rgba(0,0,0,.45)}
 .atrim .at-h:hover::after,.atrim .at-h:active::after{background:#fff}
-.atrim .at-sel > .at-h:first-child{left:-8px}
-.atrim .at-sel > .at-h:last-child{right:-8px}
+.atrim .at-sel > .at-h:first-child{left:-10px}
+.atrim .at-sel > .at-h:last-child{right:-10px}
 .atrim .at-cut > .at-h:first-child{left:-8px}
 .atrim .at-cut > .at-h:last-child{right:-8px}
 .atrim .at-body{display:grid;gap:10px}
@@ -3436,7 +3437,7 @@ class AudioTrimmer {
     cancelAnimationFrame(this.raf); this.q('.at-ph').hidden = true; this.q('.at-play').textContent = '▶';
   }
   _drag(e) {
-    if (!this.dur0) return;
+    if (!this.dur0 || this._grab) return;   // while a handle is held, the wave must not restart the selection
     const r = this.q('.at-wave').getBoundingClientRect(), px = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width));
     const t = this.tAt(px);
     if (this.mode === 'cut') { this.cut = { a: Math.min(this._t0, t), b: Math.max(this._t0, t) }; }
@@ -3537,10 +3538,15 @@ class AudioTrimmer {
     };
     this.q('.at-ag').onclick = async () => {
       if (!this.dur0) { this.say('Сначала загрузите аудио'); return; }
-      try {
-        goTo('agent');
-        await setChatAudio(wavSlice(this.buf, this.start, this.end), (this.name || 'фрагмент').replace(/\.[^.]+$/, ''), this.len());
-      } catch (e) { this.say((e && e.message) || 'Не удалось передать аудио в Агент'); }
+      // the agent writes where its target says: choose our section first, the way the section itself
+      // does it - opening the agent alone left the previous target (for example Lipsync) in place
+      const tg = document.querySelector('#agTarget [data-t="' + (this.o.agentTarget || 'long') + '"]');
+      if (tg) tg.click();
+      goTo('agent');
+      try { await setChatAudio(wavSlice(this.buf, this.start, this.end), (this.name || 'фрагмент').replace(/\.[^.]+$/, ''), this.len()); }
+      catch (e) { this.say((e && e.message) || 'Не удалось передать аудио в Агент'); }
+      const box = document.querySelector('#agAudioBox');
+      if (box && box.hidden) this.say('Аудио не принято: Агент не смог его взять (проверьте распознавание речи в карточке «Модель»)');
     };
     this.q('.at-und').onclick = () => {
       const s = this.undo.pop(); if (!s) return;
@@ -6211,6 +6217,7 @@ function makeRefMode(cfg) {
       const tr = root._trim = new AudioTrimmer({
         mount: wrap, limit: 15,
         pick: () => { const x = liveInp(); if (x) x.click(); },
+        agentTarget: cfg.mode,          // what the agent must write into: this studio, not the last used
         onState: tr2 => {
           const s = $('.rm-auds .slot', root), x = s && s._file;
           who.textContent = x ? x.name + ' · ' + (x.size / 1048576).toFixed(2) + ' МБ' : 'или перетащите файл на эту строку';
