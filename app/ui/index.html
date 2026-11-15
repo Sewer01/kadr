@@ -6062,7 +6062,12 @@ function makeRefMode(cfg) {
           m.innerHTML = '<div class="box" style="padding:22px;max-width:740px;max-height:calc(var(--vh,1vh)*86);overflow:auto"><div class="card-h"><h3>Как работает студия</h3><button class="btn" data-x type="button">Закрыть</button></div><div class="lm-guide"></div></div>';
           const body = $('.lm-guide', m);
           // --- what the window tells: add a section here, one block per topic ---
+          // Всё новое, что мы добавляем в студию, описываем здесь - одним блоком в этом списке.
           const EXTRA = [
+            () => '<div class="hint" style="font-size:12.5px;line-height:1.55"><b>Звук.</b> Переключателя больше нет - решает сам файл. <b>Аудио лежит</b>: видео подстраивается под него, каждая сцена берёт свой кусок по порядку (он подписан в карточке сцены), а в ролике играет ваш трек целиком. <b>Аудио нет</b>: модель сочиняет звук сама по описаниям сцен, и на стыках придуманный звук продолжается, чтобы не было щелчка. Что герои говорят и какая музыка за кадром - пишите в тексте сцен.</div>',
+            () => '<div class="hint" style="font-size:12.5px;line-height:1.55"><b>Работа со звуком (карточка «Аудио»).</b> Файл берётся кнопкой «Загрузить аудио» или перетаскиванием на строку. Ниже - прибор как в LipSync: прослушать выделенное, волна, <b>рамка выделения с ручками по краям</b> (края тянутся независимо), приближение для точной резки, два режима - «что оставить в клипе» и «что вырезать», кнопки «Оставить выделенное», «Убрать паузы», «Отделить голос», «Отменить», поля «Начало» и «Конец» с длиной и предупреждением про 15 секунд. Готовый фрагмент подставляется вместо файла: расчёт видит обычный загруженный файл.</div>',
+            () => '<div class="hint" style="font-size:12.5px;line-height:1.55"><b>Тег &lt;Audio 1&gt;.</b> Когда аудио лежит, под текстом сцены появляется плашка &lt;Audio 1&gt; - клик вставляет тег туда, где стоит курсор. Он не выбирает, брать ли ваш файл (файл уже взят), а объясняет модели, что этот звук - фон данной сцены. Плашка не занимает ни одного из девяти мест под картинки; аудио в проекте одно, поэтому тег - всегда &lt;Audio 1&gt;.</div>',
+            () => '<div class="hint" style="font-size:12.5px;line-height:1.55"><b>«🤖 В агент».</b> Отправляет выделенный кусок в раздел «Агент»: он распознаёт слова и пишет промпт уже зная, что говорится. Перед отправкой Агент сам переключается на Видеостудию, чтобы не писать в чужой раздел. Если распознавание речи ещё не скачано, кнопка об этом скажет - карточка «Модель», «Докачать».</div>',
             () => {
               const mp = root.querySelector('.mdl-pick'); if (!mp) return '';
               const cur = ($('.mp-cur', mp) || {}).textContent || '—';
@@ -6089,7 +6094,9 @@ function makeRefMode(cfg) {
       $('h3', refsCard).innerHTML = '<span class="n">1</span>Изображения героя и места <span class="hint" style="font-weight:400">(необязательно)</span>';
       $('h3', musCard).innerHTML = '<span class="n">2</span>Аудио';
       // in the action studio there is no music at all, so the audio card must not stand empty
-      const syncMus = () => { musCard.hidden = cfg.mode === 'actionsc' ? true : $('.lm-own', root).hidden; };
+      // the audio card is always there now: a file in it means "play this", an empty one means
+      // "let the model invent the sound", so nothing about the card itself has to be hidden
+      const syncMus = () => { musCard.hidden = cfg.mode === 'actionsc'; };
       new MutationObserver(syncMus).observe($('.lm-own', root), { attributes: true, attributeFilter: ['hidden'] }); syncMus();
       $('h3', scCard).innerHTML = '<span class="n">3</span>Сцены';
       // under the open scene: the big buttons, the tags; the rest is folded
@@ -6192,9 +6199,10 @@ function makeRefMode(cfg) {
     const mus = document.createElement('div'); mus.className = 'card';
     root._snd = 'none';
     mus.innerHTML = `<div class="card-h"><h3><span class="n">3</span>Звук</h3></div>
-      <div class="seg lm-snd" style="grid-template-columns:minmax(0,1fr) minmax(0,1fr)"><button type="button" data-s="none">Без аудио<small>звук придумает модель</small></button><button type="button" data-s="own">Своё аудио<small>песня или голос</small></button></div>
-      <div class="hint lm-snd-hint" style="margin:8px 0"></div>
-      <div class="lm-own" hidden>
+      <div class="seg lm-snd" hidden></div>
+      <div class="hint lm-snd-hint" hidden></div>
+      <div class="hint lm-sndstate" style="margin:2px 0 8px"></div>
+      <div class="lm-own">
         <div class="mus-slot"></div>
         <div class="note warn lm-warn" hidden style="margin:8px 0"><span></span></div>
         <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin-top:8px"><label>Начать с <input class="lm-start" inputmode="numeric" value="0" style="width:60px"> секунды</label>
@@ -6266,6 +6274,10 @@ function makeRefMode(cfg) {
       const sync = () => {
         if (tr._writing || !document.body.contains(mus)) return;
         const s = $('.rm-auds .slot', root), x = s && s._file;
+        // the switch is gone, so the file is the only truth: a restored project could still carry the
+        // old choice with no file in it, which would make the program promise your music and have none
+        const want = x ? 'own' : 'none';
+        if (root._snd !== want) { try { setSnd(want); } catch (e) {} }
         const same = x && tr._last && x.name === tr._last.name && x.size === tr._last.size;
         if (x && !same) { tr._last = x; tr.setFile(x, true); }
         else if (!x && tr.dur0) { tr._last = null; tr.clear(); }
@@ -6316,10 +6328,11 @@ function makeRefMode(cfg) {
     c1.after(mus);
     queueMicrotask(() => { const pc = $('.rm-params', root), hw = $('details.agvar', pc); if (hw) $('.card-h', pc).after(hw); const nt = document.createElement('div'); nt.className = 'note lm-qnote'; nt.style.margin = '10px 0'; $('.card-h', pc).after(nt); root._paintQ?.(); });   // "how it works" goes to the top of the parameters
     c1.after($('.rm-params', root));   // size and quality first: they are chosen before the scenes are written
-    const HINT = { none: 'Выберите это для обычного ролика. Что говорят герои и какая музыка играет за кадром, напишите в описании сцен.', own: 'Видео подстроится под аудио: каждая сцена получает свой кусок по порядку (он подписан в карточке сцены). Звук итогового ролика — ваше аудио.' };
+    const HINT = { none: 'Аудио нет: модель сочинит звук сама по описаниям сцен - что говорят герои и какая музыка за кадром, пишите в тексте сцен. На стыках придуманный звук продолжается, чтобы не было щелчка.', own: 'Аудио есть: видео подстроится под него, каждая сцена получает свой кусок по порядку (он подписан в карточке сцены). Звук итогового ролика — ваше аудио. Тег <Audio 1> в тексте сцены говорит модели, что это фоновый звук именно этой сцены.' };
+    const setSndState = v => { const el = $('.lm-sndstate', root); if (el) el.textContent = HINT[v]; };
     const setSnd = v => {
       root._snd = v; $$('.lm-snd button', root).forEach(b => b.classList.toggle('on', b.dataset.s === v));
-      $('.lm-own', root).hidden = v !== 'own'; $('.lm-snd-hint', root).textContent = HINT[v]; recount();
+      setSndState(v); recount();
     };
     $('.lm-snd', root).onclick = e => { const b = e.target.closest('button'); if (b) setSnd(b.dataset.s); };
     $('.lm-start', root).oninput = () => recount();
