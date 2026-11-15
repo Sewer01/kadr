@@ -135,16 +135,14 @@
 @media (max-width:1100px){#view-long .st-grid{grid-template-columns:1fr}}
 /* the base row of the studios, now above the first card: caption, two small buttons in one line,
    the guide behind a button at the right - it used to be two tall buttons over two rows */
-.col>.row:has(.lm-base){display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 12px;padding:10px 12px;border:1px solid var(--line-2);border-radius:12px;background:var(--surface-2)}
-.col>.row:has(.lm-base)>.row-l{flex:none;font-size:13px;font-weight:700;color:var(--muted)}
-.col>.row:has(.lm-base) .lm-base{flex:1 1 300px;min-width:0;margin:0!important;padding:3px;grid-auto-flow:column!important;grid-auto-columns:minmax(0,1fr)!important;gap:4px}
-.col>.row:has(.lm-base) .lm-base button{padding:7px 10px;font-size:13px;white-space:normal;text-align:center;border-radius:9px}
-.col>.row:has(.lm-base) .lm-base button small{display:block;font-size:10.5px;opacity:.72;margin-top:1px}
+.col>.row:has(.lm-base){display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 12px;padding:8px 10px;border:1px solid var(--line-2);border-radius:12px;background:var(--surface-2)}
+.col>.row:has(.lm-base) .lm-base{flex:0 1 auto;min-width:0;margin:0!important;padding:3px;display:flex!important;gap:4px}
+/* the two choices are as small as the ordinary buttons of the cards: .seg makes them two-line and lets
+   the words break anywhere, which is what made the line look swollen */
+.col>.row:has(.lm-base) .lm-base button{display:inline-flex;align-items:center;justify-content:center;padding:5px 12px;font-size:12.5px;font-weight:700;
+  white-space:nowrap;overflow-wrap:normal;text-align:center;border-radius:9px;min-height:0}
 .col>.row:has(.lm-base) .lm-srcpick{flex:1 1 100%;margin:0!important}
 .lm-howb{flex:none;margin-left:auto}
-.col>.row:has(.lm-base){padding:8px 10px}
-.col>.row:has(.lm-base) .lm-base{flex:0 1 auto!important;max-width:min(100%,540px)}
-.col>.row:has(.lm-base) .lm-base button{flex:0 1 auto;min-width:150px;padding:7px 12px}
 .lm-guide{display:grid;gap:9px}
 .st-more{margin-top:12px;border:1px solid var(--line-2);border-radius:12px;padding:8px 12px}.st-more>summary{cursor:pointer;font-weight:700;font-size:13.5px;color:var(--muted)}
 .st-more[open]>summary{margin-bottom:10px}
@@ -4860,7 +4858,7 @@ function makeRefMode(cfg) {
       <div class="hint lm-q-hint" style="margin-bottom:10px"></div>
       <div class="seg lm-mode" style="grid-template-columns:minmax(0,1fr) minmax(0,1fr);margin-bottom:6px"><button type="button" data-m="parts">По частям<small>сцена за сценой</small></button><button type="button" data-m="all">Весь ролик<small>одним файлом</small></button></div>
       <div class="hint lm-mode-hint" style="margin-bottom:10px"></div>
-      <div class="seg lm-base" style="grid-template-columns:minmax(0,1fr) minmax(0,1fr);margin-bottom:6px"><button type="button" data-b="own" class="on">Новые сцены<small>с нуля по описаниям</small></button><button type="button" data-b="cont">Продолжить своё видео<small>берём конец вашего файла</small></button></div>
+      <div class="seg lm-base" style="margin-bottom:6px"><button type="button" data-b="own" class="on" title="Новые сцены - считать всё с нуля по вашим описаниям">Новые сцены</button><button type="button" data-b="cont" title="Продолжить своё видео - берём конец вашего файла, и сцена идёт дальше от него">Продолжить видео</button></div>
       <div class="hint lm-base-hint" style="margin-bottom:10px"></div>
       <button class="btn pri lm-chain" type="button" style="margin-bottom:12px;width:100%;padding:12px" title="Сцены считаются одна за другой сами: следующая запускается, когда предыдущая готова. Можно оставить компьютер на ночь: каждая сцена сохраняется в Библиотеку отдельным клипом.">Сделать все сцены</button>
       <button class="btn pri lm-final" type="button" hidden style="margin-bottom:12px;width:100%;padding:12px" title="Все сцены считаются заново с теми же текстами и тем же seed, но на 8 шагах: детали станут лучше. Один в один они не будут.">✨ Всё готово? Сделать всё в хорошем качестве</button>
@@ -5675,7 +5673,7 @@ function makeRefMode(cfg) {
         baseSeg.style.marginBottom = '0';
         baseSeg.style.gridTemplateColumns = '';   // the inline halves made the buttons as wide as the strip
         baseRow.append(baseSeg);
-        if (ownBox) { ownBox.style.marginTop = '8px'; baseRow.append(ownBox); }
+        if (ownBox) ownBox.style.marginTop = '8px';   // appended after the guide button, see below
         root._baseHost = baseRow;   // put above the first card once the whole set-up is done
       // the video you continue is part of this choice, so the note with «Убрать» stands right here
       const srcNote = $('.lm-src', root);
@@ -5692,6 +5690,8 @@ function makeRefMode(cfg) {
       const rmNote = [...refsCard.children].filter(x => x.classList.contains('note')).pop();
       [baseHint, scNote, rmNote].filter(Boolean).forEach(n => { n.style.margin = '0'; box.append(n); });
       box.insertAdjacentHTML('beforeend', '<div class="hint" style="font-size:12.5px"><b>Места для фото.</b> Сцена несёт девять картинок: сначала общие (<Picture 1>, <Picture 2>…), потом её собственные (<Picture 10>, <Picture 11>…) - программа сама ставит их в расчёт после общих. Когда вы продолжаете своё видео, его последний кадр идёт отдельной плиткой сверх этих девяти, и ваших мест остаётся восемь. Плашки с номерами стоят под текстом сцены; занятые места гасят те, что текст не вызывает.</div>');
+      // the labels and their tooltips live in the markup of the switch itself: these
+      // buttons are built later than this point, so code here never reached them
       const gsum = guide.querySelector('summary');
       if (gsum) {
         const gb = document.createElement('button'); gb.type = 'button'; gb.className = 'btn mini lm-howb';
@@ -5727,6 +5727,7 @@ function makeRefMode(cfg) {
           body.append(gwrap);
         };
       }
+      if (ownBox) baseRow.append(ownBox);   // under the buttons: the guide button never moves sideways
       // (the run buttons are placed further down, once the scenes card stopped claiming them)
         // the choice's own words already sit in the guide inside the fold
       }
