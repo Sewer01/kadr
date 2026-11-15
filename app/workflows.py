@@ -1113,9 +1113,13 @@ def action_part_graph(m, scenes, k, width, height, seed, images, loras, preview=
         g[str(nid[0])] = {"class_type": cls, "inputs": inputs}
         return str(nid[0])
 
-    ref = add("MiniMaxH3ReferenceToVideo", clip=["4", 0], vae=["5", 0], audio_vae=["6", 0], prompt=sc[0],
-              width=lw, height=lh, length=total, ref_image_size="max")
     own = list(sc[2]) if len(sc) > 2 and sc[2] else []
+    # the action studio shares the scene cards of the video studio, and those number their own media by
+    # decades (scene 2 = 20..): the text has to be moved onto the gapless list the node receives, as in
+    # long_part_graph - before this the action scenes took the tags as written and misread them
+    ref = add("MiniMaxH3ReferenceToVideo", clip=["4", 0], vae=["5", 0], audio_vae=["6", 0],
+              prompt=scene_prompt(sc[0], images, own, None, base=10 * (k + 1)),
+              width=lw, height=lh, length=total, ref_image_size="max")
     _refs(g, ref, own or images, base=100)
     new = add("LTXVSeparateAVLatent", av_latent=[ref, 1])
     stages = {}
