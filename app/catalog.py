@@ -484,7 +484,13 @@ def is_action_dmad(name):
     base = re.split(r"[\\/]", name or "")[-1].lower()   # ComfyUI writes subfolders with a backslash, browsers with a slash
     names = {n.lower() for n in ACTION_DMAD_FILES}
     names |= {n.replace(".safetensors", "") + " (1).safetensors" for n in names}   # a browser adds "(1)" on a repeat
-    return base in names or base.replace(".safetensors", "") in {n.replace(".safetensors", "") for n in names}
+    if base in names or base.replace(".safetensors", "") in {n.replace(".safetensors", "") for n in names}:
+        return True
+    # the file this app downloads itself (dmad_lora in VARIANTS) is not one of the historic names, so
+    # the action route silently ran without it; any name of that family counts, and the family marker
+    # is the same one the LoRA rows use
+    own = {v["file"].lower() for v in VARIANTS.get("dmad_lora", {}).values()}
+    return base in own or "dmad" in base
 
 ROLE_TITLES = {
     "h3img_unet": "Основная модель — Изображения MiniMax H3 Image (по тексту и правка по референсам)",

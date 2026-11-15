@@ -1110,6 +1110,23 @@ class App:
         loras = [{"role": r, "title": catalog.ROLE_TITLES.get(r, r), "name": self.model_names.get(r, ""), "have": r not in missing,
                   "must": r in catalog.MODE_ROLES.get(mode, []), "mine": r in picked}
                  for r in catalog.MODE_ROLES.get(mode, []) + catalog.MODE_OPTIONAL.get(mode, []) if r.endswith("_lora") and r in self.model_names]
+        if any(not l["have"] for l in loras):
+            # the list of files is scanned once at start, and while the core is loading a model that
+            # scan is skipped to keep the answer fast: a chip then kept offering to download a LoRA
+            # that had long been on the disk. Asked about a LoRA we believe is missing, look again -
+            # with a real timeout and by file name, so a subfolder does not hide it
+            _, seen = await self.comfy_json("GET", "/models/loras", timeout=aiohttp.ClientTimeout(total=25))
+            names = {str(x).replace("/", "\\").split("\\")[-1].lower() for x in (seen or [])}
+            gone = set()
+            for l in loras:
+                e = None
+                if l.get("role") and l["role"] in catalog.VARIANTS:
+                    e = catalog.model_entry(l["role"], self.choice().get(l["role"]) or next(iter(catalog.VARIANTS[l["role"]])))
+                if not l["have"] and e and {e["file"].lower(), *catalog.FILE_ALIASES.get(e["file"], ())} & names:
+                    l["have"] = True
+                    gone.add(l["role"])
+            if gone:
+                self.missing = [m for m in self.missing if m["role"] not in gone]
         loras += [{"title": "Своя LoRA", "name": x["file"], "have": True, "must": False, "mine": True, "custom": True,
                    "fits": mode in (x.get("also") or []) or catalog.lora_fits_mode(x["file"], mode),
                    "family": catalog.lora_family(x["file"]) or "неизвестная",
