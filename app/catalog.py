@@ -429,7 +429,7 @@ VARIANT_LABELS = {
     "fast_unet": {"int8": "обычная int8 · качество", "nvfp4": "лёгкая NVFP4 · быстрая — только для видеокарт RTX 50-й серии"},
     "lipsync_unet": {"full": "v1.3 полная · качество (самая тяжёлая)", "pruned": "v1.3 облегчённая", "lite": "v1.3 лёгкая · быстрая (качество ниже)",
                      "v2": "v2 облегчённая — по отзывам, звук лучше", "v2_full": "v2 полная · качество"},
-    "action_unet": {"int8": "обычная (int8)", "lite": "лёгкая · быстрая (меньше памяти, качество чуть ниже)"},
+    "action_unet": {"int8": "обычная int8 · качество", "lite": "лёгкая · быстрая (меньше памяти, качество чуть ниже)"}
 }
 
 # LoRA from the original action workflow that has no public download; used when the user has it
