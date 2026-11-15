@@ -3314,6 +3314,7 @@ class AudioTrimmer {
     // limit 0 means "no cap": the background of a whole film is longer than one scene
     this.limit = o.limit === 0 ? 0 : (o.limit || 15);
     this.onFile = o.onFile || (() => {});
+    this.whereLabel = o.whereLabel || null;   // where this file lives: the place is known here, not by name
     this.say = o.onNotice || (m => toast(m));
     this.dur0 = 0; this.start = 0; this.end = 0; this.cut = null;
     this.zoom = 1; this.undo = []; this.buf = null; this.name = '';
@@ -3448,6 +3449,7 @@ class AudioTrimmer {
   /* the file the rest of the program should use: the audio as it stands now, cut to the selection */
   out() {
     if (!this.dur0) return null;
+    if (this.end - this.start < 1) { this.say('Слишком короткий кусок: меньше секунды модель не разберёт'); return null; }
     const stem = this.name.replace(/\.[a-z0-9]+$/i, '').replace(/(-фрагмент)+$/g, '');   // loading twice must not stack suffixes
     const f = new File([wavSlice(this.buf, this.start, this.end)], stem + '-фрагмент.wav', { type: 'audio/wav' });
     this.onFile(f, this);
@@ -3587,7 +3589,9 @@ class AudioTrimmer {
       // in a fresh session that status was not fetched yet, and the button looked dead
       try { if (!AG.status || !AG.status.speech_ready) await agStatus(); } catch (e) {}
       if (!AG.status || !AG.status.speech_ready) { this.say('Агент ещё не может слушать аудио: распознавание речи не готово - карточка «Модель», «Докачать»'); return; }
-      try { await setChatAudio(wavSlice(this.buf, this.start, this.end), (this.name || 'фрагмент').replace(/\.[^.]+$/, ''), this.len()); }
+      if (this.len() < 1) { this.say('Кусок короче секунды: Агент и модель всё равно его не разберут - выделите полторы-две секунды'); return; }
+      try { await setChatAudio(wavSlice(this.buf, this.start, this.end), (this.name || 'фрагмент').replace(/\.[^.]+$/, ''), this.len(),
+                              this.whereLabel ? this.whereLabel(this) : ''); }
       catch (e) { this.say((e && e.message) || 'Не удалось передать аудио в Агент'); }
       const box = document.querySelector('#agAudioBox');
       if (box && box.hidden) this.say('Аудио не принято: Агент не смог его взять'); else this.say('Фрагмент отправлен в Агент: ' + this.len().toFixed(1).replace('.', ',') + ' с');
@@ -5240,7 +5244,7 @@ function makeRefMode(cfg) {
         '<span class="counter" title="Сколько аудио допускается в этом режиме">' + slots.filter(s => s._file).length + ' / ' + slots.length + '</span>' +
         slots.map((s, i) => s._file
           ? `<span class="token" data-j="${i}" title="Тег вставится в текст по нажатию">&lt;Audio ${i + 1}&gt; ${esc(s._file.name.slice(0, 22))}` +
-            (s._dur ? ' <small style="opacity:.75">' + (Math.round(s._dur * 10) / 10 + '').replace('.', ',') + ' с' + (s._sel ? ' · вырезано' : '') + '</small>' : '') +
+            (s._dur ? ' · <small style="opacity:.75">' + (Math.round(s._dur * 10) / 10 + '').replace('.', ',') + ' с' + (s._sel ? ' · вырезано' : '') + '</small>' : '') +
             ` <button class="btn mini" type="button" data-a="trim" data-j="${i}" title="Послушать и обрезать: окно под строкой">Обрезать</button>` +
             `<button class="btn mini" type="button" data-a="del" data-j="${i}" title="Убрать этот файл">✕</button></span>`
           : '').join('') +
@@ -5271,7 +5275,9 @@ function makeRefMode(cfg) {
         return;
       }
       host.hidden = false;
-      if (!tr) tr = root._raTrim = new AudioTrimmer({ mount: host, limit: 15, agentTarget: cfg.mode, onFile });
+      const MODE_NAME = { refs: 'Референсы', actor: 'Актёрская игра', action: 'Экшн-видео', long: 'Видеостудия', actionsc: 'Экшн-студия' }[cfg.mode] || cfg.mode;
+      if (!tr) tr = root._raTrim = new AudioTrimmer({ mount: host, limit: 15, agentTarget: cfg.mode, onFile,
+        whereLabel: q => 'раздел «' + MODE_NAME + '», аудио ' + (q._slot + 1) + ', тег <Audio ' + (q._slot + 1) + '>, ' + slots.length + ' места в разделе' });
       const src = s._src || s._file;
       if (tr._slot !== i || !tr.dur0) {
         tr._slot = i;
@@ -6009,6 +6015,11 @@ function makeRefMode(cfg) {
         if (!c._trim) {
           c._trim = new AudioTrimmer({
             mount: host, limit: 15, agentTarget: cfg.mode,
+            whereLabel: q => {                    // in this scope the scenes hang off root, not off R
+              const all = $$('.sc', root), at = all.indexOf(c);
+              const bs = c._base || 10 * ((at < 0 ? all.length : at) + 1);
+              return 'сцена ' + (at < 0 ? '?' : at + 1) + ', аудио ' + (q._slot + 1) + ', тег <Audio ' + (bs + q._slot) + '>';
+            },
             onFile: f => {
               const j2 = c._trim._slot, src = c._audSrc[j2] || f;
               (c._audDur = c._audDur || [])[j2] = c._trim.len();   // what the model will actually get
@@ -6536,7 +6547,8 @@ function makeRefMode(cfg) {
       // programmatic click opens the dialog even from a hidden tile
       const liveInp = () => ($('.rm-auds .slot input', root) || $('.rm-auds input', root) || inp);
       const tr = root._trim = new AudioTrimmer({
-        mount: wrap, limit: 0,          // the soundtrack of the whole film: no fifteen-second cap here
+        mount: wrap, limit: 0,
+        whereLabel: () => 'фон всего ролика, тег <Audio 1> - одно аудио на весь ролик',          // the soundtrack of the whole film: no fifteen-second cap here
         pick: () => { const x = liveInp(); if (x) x.click(); },
         agentTarget: cfg.mode,          // what the agent must write into: this studio, not the last used
         onState: tr2 => {
@@ -7514,34 +7526,51 @@ $('#agAudioBox').addEventListener('click', e => {
    from. We look the name up in the video studio: the film's background is <Audio 1>, a scene's own
    audio sit in that scene's decade (scene 1 -> <Audio 10..12>, scene 2 -> <Audio 20..22>). */
 function audioTagFor(name, dur) {
-  // One song often lies in several places at once (the film's background and a scene), so a name is not
-  // an address: we gather every place it sits and, if the length is known, keep the places that match it.
-  // When the places still disagree, we say so instead of naming the first one - the agent must not be
-  // told a tag that might belong to another scene.
+  // Only the agent's own file button has to guess: it gets a name and nothing else. The guess depends on
+  // the section that stands open - audio in Референсы lives in that mode and is <Audio 1..3> there, and
+  // is not the background of a film at all. The studio's buttons pass the label themselves.
   try {
-    const R = (typeof RM !== 'undefined' && RM.long && RM.long.root) ? RM.long.root : null;
-    if (!R) return '';
     const norm = s => String(s || '').replace(/\.[a-z0-9]+$/i, '').toLowerCase();
     const nm = norm(name);
     if (!nm) return '';
-    const near = d => !(d > 0) || Math.abs(d - dur) < 0.4;
+    const near = d => !(d > 0) || !(dur > 0) || Math.abs(d - dur) < 0.4;
     const found = [];
-    const scs = $$('.sc', R);
-    scs.forEach((c, i) => {
-      const base = c._base || 10 * (i + 1);
-      const src = c._audSrc || c._auds || [];
-      src.forEach((f, j) => {
-        if (f && norm(f.name) === nm) found.push({ label: 'сцена ' + (i + 1) + ', аудио ' + (j + 1) + ', тег <Audio ' + (base + j) + '>', d: (c._audDur || [])[j] });
+    const view = (document.querySelector('.view.active') || {}).id || '';
+    const PLAIN = { 'view-refs': ['refs', 'Референсы'], 'view-actor': ['actor', 'Актёрская игра'], 'view-action': ['action', 'Экшн-видео'] };
+    if (PLAIN[view]) {
+      const key = PLAIN[view][0], R = (typeof RM !== 'undefined' && RM[key]) ? RM[key].root : null;
+      if (R) {
+        const slots = $$('.rm-auds .slot', R);
+        slots.forEach((s, i) => {
+          if (s._file && norm(s._file.name) === nm) found.push({ label: 'раздел «' + PLAIN[view][1] + '», аудио ' + (i + 1) + ', тег <Audio ' + (i + 1) + '>', d: s._dur });
+        });
+      }
+    } else {
+      // both studios share this card: the picture studio and the action one
+      const roots = [];
+      ['long', 'actionsc'].forEach(k => {
+        const r = (typeof RM !== 'undefined' && RM[k] && RM[k].root) || null;
+        if (r && roots.indexOf(r) < 0) roots.push(r);
       });
-    });
-    const tr = R._trim;
-    if (tr && tr.name && norm(tr.name) === nm) found.push({ label: 'фон всего ролика, тег <Audio 1>', d: tr.dur0 });
+      roots.forEach(R => {
+        $$('.sc', R).forEach((c, i) => {
+          const base = c._base || 10 * (i + 1);
+          (c._audSrc || c._auds || []).forEach((f, j) => {
+            if (f && norm(f.name) === nm) found.push({ label: 'сцена ' + (i + 1) + ', аудио ' + (j + 1) + ', тег <Audio ' + (base + j) + '>', d: (c._audDur || [])[j] });
+          });
+        });
+        const tr = R._trim;
+        if (tr && tr.name && norm(tr.name) === nm) found.push({ label: 'фон всего ролика, тег <Audio 1>', d: tr.cut ? (tr.end - tr.start) : tr.dur0 });
+        $$('.rm-auds .slot', R).forEach(s => {   // and the file itself: the instrument may not have read it yet
+          if (s._file && norm(s._file.name) === nm) found.push({ label: 'фон всего ролика, тег <Audio 1>', d: s._dur });
+        });
+      });
+    }
     if (!found.length) return '';
     const fit = (typeof dur === 'number' && dur > 0) ? found.filter(x => near(x.d)) : found;
-    const list = (fit.length ? fit : found).map(x => x.label);
-    const uniq = [...new Set(list)];
-    if (uniq.length === 1) return uniq[0];
-    return 'лежит в нескольких местах: ' + uniq.join('; ');
+    const list = [...new Set((fit.length ? fit : found).map(x => x.label))];
+    if (list.length === 1) return list[0];
+    return 'лежит в нескольких местах: ' + list.join('; ');
   } catch (e) {}
   return '';
 }
