@@ -659,8 +659,21 @@ def _audio_continue(add, old_audio, new_audio, ov, total):
     mask = add("MaskComposite", destination=[ones, 0], source=[keep, 0], x=0, y=0, operation="multiply")
     return [add("SetLatentNoiseMask", samples=[cut2, 0], mask=[mask, 0]), 0]
 
+def _loop_track(add, src, have, need):
+    """The background track is often shorter than the film: repeat it instead of letting the sound
+    die halfway. `src` is an AUDIO output, `have` its usable seconds, `need` what the film lasts."""
+    if not have or have <= 0.4 or need <= have + 0.2:
+        return None
+    copies = min(60, -(-int(need * 1000) // int(have * 1000) or 1))
+    acc = [add("TrimAudioDuration", audio=src, start_index=0.0, duration=round(have, 3)), 0]
+    for _ in range(copies - 1):
+        again = [add("TrimAudioDuration", audio=src, start_index=0.0, duration=round(have, 3)), 0]
+        acc = [add("AudioConcat", audio1=acc, audio2=again, direction="after"), 0]
+    return acc
 
-def long_graph(m, scenes, width, height, seed, images, audio=None, start=0.0, pika=None, extra_loras=(), ref_size="match", vocals=None, preview=None, fresh=(), audio_cont=False, draft=False, frame=None):
+
+
+def long_graph(m, scenes, width, height, seed, images, audio=None, start=0.0, pika=None, extra_loras=(), ref_size="match", vocals=None, preview=None, fresh=(), audio_cont=False, draft=False, frame=None, loop=False, audio_dur=0.0):
     """Scenes [(prompt, seconds), ...] rendered one after another; every next scene continues the last second of the
     previous one (latent cut + noise mask), with the same reference pictures, and optionally follows a music track.
 
@@ -750,8 +763,17 @@ def long_graph(m, scenes, width, height, seed, images, audio=None, start=0.0, pi
         scene_of[smp] = i
         prev_lat, prev_img = [smp, 1], all_img
     if audio:
-        final_a = add("TrimAudioDuration", audio=["11", 0], start_index=float(start), duration=round(plan[-1]["acc"] / FPS, 3))
-        final_a = [final_a, 0]
+        need = round(plan[-1]["acc"] / FPS, 3)
+        left = max(0.0, float(audio_dur or 0) - float(start))
+        final_a = None
+        if loop and left > 0.4:
+            # the same background, repeated until the film ends: a three-minute clip must not
+            # lose its music after the first thirty seconds
+            looped = _loop_track(add, ["11", 0], left, need)
+            if looped:
+                final_a = [add("TrimAudioDuration", audio=looped, start_index=0.0, duration=need), 0]
+        if final_a is None:
+            final_a = [add("TrimAudioDuration", audio=["11", 0], start_index=float(start), duration=need), 0]
     else:
         final_a = prev_aud
     vid = add("CreateVideo", images=prev_img, audio=final_a, fps=float(FPS), bit_depth="auto", color_space="sRGB", codec="none")
@@ -769,7 +791,7 @@ LONG_STATE_TOKENS = 17   # latent tokens of the last second(s) of a scene that t
 
 
 def long_part_graph(m, scenes, k, width, height, seed, images, audio=None, start=0.0, pika=None, extra_loras=(),
-                    ref_size="match", vocals=None, state=None, preview=None, src=None, cont_plan=False, fresh=(), draft=False):
+                    ref_size="match", vocals=None, state=None, preview=None, src=None, cont_plan=False, fresh=(), draft=False, loop=False, audio_dur=0.0):
     """Scene number `k` (0-based) of the long video as its own job. Scene 0 starts fresh; scene k > 0 continues from the saved
     latent tail of scene k-1 (`state`, a .latent file in ComfyUI's input folder). The clip it saves has the overlap with the
     previous scene cut off, so the clips join end to end. Also saves the tail of its own latent for scene k+1."""
@@ -843,7 +865,13 @@ def long_part_graph(m, scenes, k, width, height, seed, images, audio=None, start
     frames_out = [img, 0] if ((not k and not cont) or new_shot) else [add("ImageFromBatch", image=[img, 0], batch_index=ov, length=clip_len), 0]
     if audio:
         a0 = start + (p["acc_before"] / FPS if k else 0)
-        aud = [add("TrimAudioDuration", audio=["11", 0], start_index=round(a0, 3), duration=round(clip_len / FPS, 3)), 0]
+        if loop and audio_dur and a0 > float(audio_dur) - 0.4:
+            # this scene sits past the end of the track: take its place inside the repeated copy
+            src11 = _loop_track(add, ["11", 0], float(audio_dur), a0 + 20.0) or ["11", 0]
+            a0 = a0 % float(audio_dur)
+        else:
+            src11 = ["11", 0]
+        aud = [add("TrimAudioDuration", audio=src11, start_index=round(a0, 3), duration=round(clip_len / FPS, 3)), 0]
     else:
         dec = add("VAEDecodeAudio", samples=[smp, 1], vae=["7", 0])
         stages[dec] = "decode"

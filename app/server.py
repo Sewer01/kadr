@@ -2839,7 +2839,8 @@ class App:
             else:
                 graph, stages = wf.long_part_graph(self.model_names, scenes, k, width, height, seed, images, audio, start,
                                                    dmad if draft else self.model_names["pika_lora"], self.custom_loras("long"), "match", vocals, state,
-                                                   await self.preview_opts(), cont, form.get("src_project") == "1", fresh, draft)
+                                                   await self.preview_opts(), cont, form.get("src_project") == "1", fresh, draft,
+                                                   loop=form.get("music_loop") == "1", audio_dur=float(form.get("audio_dur") or 0))
             plan = wf.long_plan([sc[1] for sc in scenes], cont_first=bool(cont) or form.get("src_project") == "1", fresh=fresh)
             sub = f"сцена {k + 1} из {len(scenes)}" + (" · музыка" if audio else " · звук от модели")
             return await self.queue(graph, stages, {
@@ -2848,7 +2849,7 @@ class App:
                 "long": {"run": run, "part": k, "n": len(scenes), "draft": draft, "test": test}})
         graph, stages = wf.long_graph(self.model_names, scenes, width, height, seed, images, audio, start,
                                       dmad if draft else self.model_names["pika_lora"], self.custom_loras("long"), "match", vocals, await self.preview_opts(), fresh, False, draft,
-                                      frame=files.get("srcframe"))   # the continued video's last frame: a picture of its own
+                                      frame=files.get("srcframe"), loop=form.get("music_loop") == "1", audio_dur=float(form.get("audio_dur") or 0))   # the continued video's last frame: a picture of its own
         run = re.sub(r"[^A-Za-z0-9]", "", form.get("run", ""))[:32]
         self._long_run = run
         total = wf.long_plan([sc[1] for sc in scenes], fresh=fresh)[-1]["acc"] / wf.FPS

@@ -3274,7 +3274,8 @@ aDrop.addEventListener('drop', e => { e.preventDefault(); aDrop.classList.remove
 class AudioTrimmer {
   constructor(o = {}) {
     this.o = o;
-    this.limit = o.limit || 15;
+    // limit 0 means "no cap": the background of a whole film is longer than one scene
+    this.limit = o.limit === 0 ? 0 : (o.limit || 15);
     this.onFile = o.onFile || (() => {});
     this.say = o.onNotice || (m => toast(m));
     this.dur0 = 0; this.start = 0; this.end = 0; this.cut = null;
@@ -3332,7 +3333,7 @@ class AudioTrimmer {
     try { this.buf = await (actx = actx || new AudioContext()).decodeAudioData(await f.arrayBuffer()); }
     catch { this.say('Не удалось прочитать этот аудиофайл'); return; }
     this.name = f.name; this.dur0 = this.buf.duration;
-    this.start = 0; this.end = Math.min(this.dur0, this.limit); this.cut = null; this.undo = [];
+    this.start = 0; this.end = this.limit > 0 ? Math.min(this.dur0, this.limit) : this.dur0; this.cut = null; this.undo = [];
     this.zoom = 1; this.q('.at-zr').value = 1;
     this.busy = !!silent;
     this._peaks(); this._paint(); this._sync();
@@ -3390,7 +3391,7 @@ class AudioTrimmer {
     if (body) body.hidden = !on;
     if (empty) empty.hidden = !!on;
     const warn = this.q('.at-warn');
-    if (on && this.len() > this.limit + .05) {
+    if (on && this.limit > 0 && this.len() > this.limit + .05) {
       warn.hidden = false;
       warn.textContent = 'Максимум ' + this.limit + ' секунд — укоротите фрагмент.';
     } else if (on && this.undo.length && !whole) { warn.hidden = false; warn.textContent = 'Аудио изменено: убрано ' + away.toFixed(1).replace('.', ',') + ' с. «Отменить» вернёт как было.'; }
@@ -5617,7 +5618,7 @@ function makeRefMode(cfg) {
     function saveNow() {
       try {
         const run = root._run, slotA = $('.rm-auds .slot', root);
-        const proj = { run, t: Date.now(), sec: cfg.mode, mode: root._mode, qm: root._q, qBy: { ...(root._qBy || {}), [root._q]: S.q }, snd: root._snd, start: $('.lm-start', root).value, vocals: $('.lm-vocals', root).checked,
+        const proj = { run, t: Date.now(), sec: cfg.mode, mode: root._mode, qm: root._q, qBy: { ...(root._qBy || {}), [root._q]: S.q }, snd: root._snd, loop: root._loop !== false, start: $('.lm-start', root).value, vocals: $('.lm-vocals', root).checked,
           aspect: S.aspect, q: S.q, cw: S.cw || 0, ch: S.ch || 0, src: root._src ? { id: root._src.id || '', name: root._src.name } : null,
           scenes: $$('.sc', root).map(c => ({ prompt: $('textarea', c).value, sec: +$('input[type=range]', c).value, fresh: !!$('.sc-fresh', c)?.checked, nimg: 9, var: c._var || 0,
             done: c._dn.final ? { sig: c._dn.final.sig, url: c._dn.final.url, id: c._dn.final.id, text: c._dn.final.text } : null,
@@ -5661,7 +5662,7 @@ function makeRefMode(cfg) {
       for (let i = 0; i < 5; i++) await putInto($$('.ref input', imgsEl)[i], await getRef('img' + i));
       const slotA = $('.rm-auds .slot', root); $('.x', slotA)?.click();
       const aud = await getRef('aud0'); if (aud instanceof File) await putInto($('input', slotA), aud);
-      setSnd(p.snd || 'none'); $('.lm-start', root).value = p.start || '0'; $('.lm-vocals', root).checked = !!p.vocals;
+      root._loop = p.loop !== false; setSnd(p.snd || 'none'); $('.lm-start', root).value = p.start || '0'; $('.lm-vocals', root).checked = !!p.vocals;
       $$('.sc', root).forEach(c => c.remove());
       for (const x of p.scenes) addScene(x.prompt, x.sec, !!x.fresh);
       $$('.sc', root).forEach((c, i) => { c._var = (p.scenes[i] || {}).var || 0; });
@@ -6067,6 +6068,7 @@ function makeRefMode(cfg) {
             () => '<div class="hint" style="font-size:12.5px;line-height:1.55"><b>Звук.</b> Переключателя больше нет - решает сам файл. <b>Аудио лежит</b>: видео подстраивается под него, каждая сцена берёт свой кусок по порядку (он подписан в карточке сцены), а в ролике играет ваш трек целиком. <b>Аудио нет</b>: модель сочиняет звук сама по описаниям сцен, и на стыках придуманный звук продолжается, чтобы не было щелчка. Что герои говорят и какая музыка за кадром - пишите в тексте сцен.</div>',
             () => '<div class="hint" style="font-size:12.5px;line-height:1.55"><b>Работа со звуком (карточка «Аудио»).</b> Файл берётся кнопкой «Загрузить аудио» или перетаскиванием на строку. Ниже - прибор как в LipSync: прослушать выделенное, волна, <b>рамка выделения с ручками по краям</b> (края тянутся независимо), приближение для точной резки, два режима - «что оставить в клипе» и «что вырезать», кнопки «Оставить выделенное», «Убрать паузы», «Отделить голос», «Отменить», поля «Начало» и «Конец» с длиной и предупреждением про 15 секунд. Готовый фрагмент подставляется вместо файла: расчёт видит обычный загруженный файл.</div>',
             () => '<div class="hint" style="font-size:12.5px;line-height:1.55"><b>Тег &lt;Audio 1&gt;.</b> Когда аудио лежит, под текстом сцены появляется плашка &lt;Audio 1&gt; - клик вставляет тег туда, где стоит курсор. Он не выбирает, брать ли ваш файл (файл уже взят), а объясняет модели, что этот звук - фон данной сцены. Плашка не занимает ни одного из девяти мест под картинки; аудио в проекте одно, поэтому тег - всегда &lt;Audio 1&gt;.</div>',
+            () => '<div class="hint" style="font-size:12.5px;line-height:1.55"><b>Длина фонового звука.</b> Обычное правило «не больше 15 секунд» к общему треку больше не применяется: ролик длиннее сцены, и весь трек выделяется целиком. Если трек короче ролика, включите «пустой фон по кругу» - тогда звук начнётся сначала и дойдёт до конца; с выключенной галкой музыка оборвётся там, где кончился файл. Для аудио отдельной сцены 15 секунд останутся в силе: сцена сама не длиннее.</div>',
             () => '<div class="hint" style="font-size:12.5px;line-height:1.55"><b>«🤖 В агент».</b> Отправляет выделенный кусок в раздел «Агент»: он распознаёт слова и пишет промпт уже зная, что говорится. Перед отправкой Агент сам переключается на Видеостудию, чтобы не писать в чужой раздел. Если распознавание речи ещё не скачано, кнопка об этом скажет - карточка «Модель», «Докачать».</div>',
             () => {
               const mp = root.querySelector('.mdl-pick'); if (!mp) return '';
@@ -6220,7 +6222,8 @@ function makeRefMode(cfg) {
       const pick = document.createElement('div'); pick.className = 'at-pick';
       pick.innerHTML = '<div class="at-pickrow"><button class="btn pri at-pickb" type="button">Загрузить аудио</button>' +
         '<button class="btn at-pickx" type="button" hidden>Убрать</button>' +
-        '<span class="at-who hint">или перетащите файл на эту строку</span></div>';
+        '<span class="at-who hint">или перетащите файл на эту строку</span></div>' +
+        '<label class="at-loop" hidden style="display:flex;gap:8px;align-items:flex-start;font-size:12.5px;color:var(--muted);cursor:pointer;margin:0"><input type="checkbox" class="at-loopb" checked> Пустой фон по кругу: если трек короче ролика, он начнётся сначала, а не оборвётся</label>';
       wrap.append(pick);
       mus.append(wrap);
       const who = pick.querySelector('.at-who'), pickb = pick.querySelector('.at-pickb'), pickx = pick.querySelector('.at-pickx');
@@ -6228,7 +6231,7 @@ function makeRefMode(cfg) {
       // programmatic click opens the dialog even from a hidden tile
       const liveInp = () => ($('.rm-auds .slot input', root) || $('.rm-auds input', root) || inp);
       const tr = root._trim = new AudioTrimmer({
-        mount: wrap, limit: 15,
+        mount: wrap, limit: 0,          // the soundtrack of the whole film: no fifteen-second cap here
         pick: () => { const x = liveInp(); if (x) x.click(); },
         agentTarget: cfg.mode,          // what the agent must write into: this studio, not the last used
         onState: tr2 => {
@@ -6255,6 +6258,8 @@ function makeRefMode(cfg) {
           who.textContent = x ? x.name + ' · ' + (x.size / 1048576).toFixed(2) + ' МБ' : 'или перетащите файл на эту строку';
           pickb.textContent = x ? 'Заменить аудио' : 'Загрузить аудио';
           pickx.hidden = !x;
+          const lp = pick.querySelector('.at-loop');
+          if (lp) { lp.hidden = !x; lp.querySelector('input').checked = root._loop = (root._loop === undefined ? true : root._loop); }
         },
         onFile: f => {
           if (tr._writing) return;
@@ -6305,6 +6310,10 @@ function makeRefMode(cfg) {
       root._trimWatch = setInterval(() => { tuck(); sync(); }, 700);
       sync();
       pickb.onclick = () => { const x = liveInp(); if (x) x.click(); };
+      {   // the loop flag must follow the box, otherwise the film is promised a repeat that was refused
+        const lb = pick.querySelector('.at-loopb');
+        if (lb) lb.onchange = () => { root._loop = lb.checked; if (root._save) root._save(); };
+      }
       pickx.onclick = () => { const x = $('.rm-auds .slot .x', root); if (x) x.click(); else sync(); };
       pick.addEventListener('dragover', e => { e.preventDefault(); pick.classList.add('over'); });
       pick.addEventListener('dragleave', () => pick.classList.remove('over'));
@@ -6489,7 +6498,7 @@ function makeRefMode(cfg) {
           }
         }
         if (cfg.scenes && root._mode !== 'parts') { fd.append('run', root._run); if (root._q === 'draft') fd.append('draft', '1'); }
-        if (cfg.scenes) { fd.append('scenes', JSON.stringify(sceneList())); $$('.sc', root).forEach((c, i) => c._files.forEach((f, j) => { if (f) fd.append(`simg${i}_${j}`, f); })); fd.append('start', $('.lm-start', root).value || '0'); fd.append('vocals', root._snd === 'own' && $('.lm-vocals', root).checked ? '1' : '0'); if (cfg.mode === 'actionsc') loraForm(S, fd); }
+        if (cfg.scenes) { fd.append('scenes', JSON.stringify(sceneList())); $$('.sc', root).forEach((c, i) => c._files.forEach((f, j) => { if (f) fd.append(`simg${i}_${j}`, f); })); fd.append('start', $('.lm-start', root).value || '0'); if (root._loop !== false) fd.append('music_loop', '1'); if (root._adur) fd.append('audio_dur', String(Math.round(root._adur * 1000) / 1000)); fd.append('vocals', root._snd === 'own' && $('.lm-vocals', root).checked ? '1' : '0'); if (cfg.mode === 'actionsc') loraForm(S, fd); }
         else loraForm(S, fd);
         seedForm(S, fd);
         $$('.ref', imgsEl).filter(r => r._file).forEach((r, i) => fd.append('img' + i, r._file));
@@ -7225,7 +7234,8 @@ async function agSend() {
   const qwBtn = $('.qw-eng button.on', $('#view-qwen'));
   const ctx = { cont: AG.target === 'long' && (AG.att.some(a => a.frame) || !!RM.long.root._src) ? 1 : 0, model: AG.target === 'qwen' ? ((qwBtn && qwBtn.dataset.e) || 'qwen') : (AG.storyFrames && AG.storyModel === 'krea' ? 'flux' : AG.storyModel), frames: AG.target === 'story' && AG.storyFrames, duration: AG_IMG.includes(AG.target) ? null : AG.target === 'video' ? V.dur : AG.target === 'lipsync' ? (L.dur0 ? L.len() : null) : RM[AG.target].S.dur };
   if (AG.target === 'actor') ctx.voice = RM.actor.voice() ? 1 : 0;
-  if (AG.target === 'long') ctx.long = { sound: RM.long.root._snd, secs: $$('.sc input[type=range]', RM.long.root).map(r => +r.value) };
+  if (AG.target === 'long') { const lr = RM.long.root; ctx.long = { sound: lr._snd, secs: $$('.sc input[type=range]', RM.long.root).map(r => +r.value),
+      music: lr._snd === 'own' ? { loop: lr._loop !== false, sec: Math.round((lr._adur || 0) * 10) / 10 } : null }; }
   try {
     const r = await fetch('/api/agent/chat', {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: AG.ctrl.signal,
@@ -9771,3 +9781,4 @@ applyZoom();
 </script>
 </body>
 </html>
+            () => '<div class="hint" style="font-size:12.5px;line-height:1.55"><b>Длина фонового звука.</b> Обычное ограничение в 15 секунд к общему треку больше не применяется: ролик длиннее сцены. Если трек короче ролика, включите «по кругу» - звук начнётся сначала и дойдёт до конца; без этого музыка оборвётся там, где кончился файл. Для аудио внутри отдельной сцены 15 секунд остаются в силе: сцена сама не длиннее.</div>',
