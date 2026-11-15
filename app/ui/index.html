@@ -1089,6 +1089,11 @@ body.dropping::after{content:'Отпустите — программа разл
 .mdl-pick .pm .pm-q{flex:1 1 160px;min-width:0;background:var(--bg-2);border:1px solid var(--line);border-radius:9px;padding:8px 10px;font-size:12.5px;outline:none}
 .mdl-pick .pm select{flex:2 1 260px;min-width:0;background:var(--bg-2);border:1px solid var(--line);border-radius:9px;padding:8px 10px;color:var(--text);font-family:var(--mono);font-size:12px}
 .mdl-pick .mp-notes{flex-basis:100%;display:grid;gap:4px;font-size:12.5px}.mdl-pick .mp-notes .bad{color:#e5484d}.mdl-pick .mp-notes .warn{color:#d6a13a}.mdl-pick .mp-notes .info{opacity:.8}
+
+    /* a folded card hides everything but its heading; the selector carries the section id on purpose:
+       sections like the video studio dress their card bodies with id-rules of their own, and a
+       weaker rule here would lose and leave the card open */
+    :is(#view-action,#view-actionsc,#view-actor,#view-agent,#view-custom,#view-krea,#view-library,#view-lipsync,#view-long,#view-models,#view-montage,#view-presets,#view-queue,#view-qwen,#view-refs,#view-swap,#view-upfile,#view-video) .card.fold.collapsed>:not(.card-h){display:none!important}
 </style>
 </head>
 <body>
@@ -6473,7 +6478,18 @@ function makeRefMode(cfg) {
       });
       // the row «Начать с …» and «Отделить голос от музыки» repeated the editor below it: the editor
       // cuts the file itself, so the offset field would only confuse
-      const hideDup = () => { const x = $('.lm-start', root), d = x && x.closest('div[style]'); if (d) d.style.display = 'none'; return !!d; };
+      const hideDup = () => {
+        const x = $('.lm-start', root); if (!x) return false;
+        let d = x.closest('div[style]');
+        // never swallow the strip with «Новые сцены / Продолжить видео»: it carries an inline style of
+        // its own, and once the offset field stood near it the whole choice disappeared with it
+        while (d && (d.classList.contains('lm-base') || d.querySelector('.lm-base'))) {
+          d = d.parentElement ? d.parentElement.closest('div[style]') : null;
+        }
+        if (!d) return false;
+        d.style.display = 'none';
+        return true;
+      };
       if (!hideDup()) { let k = 0; const iv = setInterval(() => { if (hideDup() || ++k > 20) clearInterval(iv); }, 200); }
         } catch (e) { toast('Панель работы со звуком не встроилась: ' + e.message); }
 
@@ -6942,15 +6958,10 @@ function foldOnOpen() { FOLD_ON_OPEN.forEach(id => document.getElementById(id)?.
     const h = c.querySelector(':scope > .card-h'); if (!h || !h.querySelector('.n')) return;
     c._foldAll = true; c.classList.add('fold');
     const k = keyOf(c);
-    // hidden with an inline !important: some sections dress their card bodies with id-rules that beat a
-    // plain stylesheet rule, and then a folded card kept showing everything
-    const hide = on => [...c.children].forEach(x => {
-      if (x === h) return;
-      if (on) x.style.setProperty('display', 'none', 'important'); else x.style.removeProperty('display');
-    });
+    // the hiding is done by a class and one strong stylesheet rule (see .card.fold.collapsed below):
+    // inline styles stuck to the controls that the setup later MOVES - the «Новые сцены / Продолжить
+    // видео» strip was folded away for good because it had been a child of a settings card
     if (!(k in st) || st[k]) c.classList.add('collapsed');       // folded by default, until a person says otherwise
-    hide(c.classList.contains('collapsed'));
-    new MutationObserver(() => hide(c.classList.contains('collapsed'))).observe(c, { attributes: true, attributeFilter: ['class'] });
     h.addEventListener('click', e => {
       if (e.target.closest('button,input,a,label,select,textarea')) return;
       c.classList.toggle('collapsed');
