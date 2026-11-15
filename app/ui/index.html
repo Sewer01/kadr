@@ -1096,6 +1096,23 @@ body.dropping::after{content:'Отпустите — программа разл
        sections like the video studio dress their card bodies with id-rules of their own, and a
        weaker rule here would lose and leave the card open */
     :is(#view-action,#view-actionsc,#view-actor,#view-agent,#view-custom,#view-krea,#view-library,#view-lipsync,#view-long,#view-models,#view-montage,#view-presets,#view-queue,#view-qwen,#view-refs,#view-swap,#view-upfile,#view-video) .card.fold.collapsed>:not(.card-h){display:none!important}
+
+    /* reference audio in Референсы / Актёр / Экшн-видео: windows like in the studio, one height for
+       everything in the row, and the loading button filled - the bare tiles only showed a file name */
+    .rm-auds .slot.ra-off{display:none!important}
+    .ra-list{display:grid;gap:8px;margin-top:9px}
+    .ra-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:7px 10px;border:1px solid var(--line-2);
+      border-radius:10px;background:var(--surface-2)}
+    .ra-row.over{border-color:var(--accent)}
+    .ra-row>.btn.mini,.ra-row>.token{height:30px;padding:0 11px;font-size:12px;line-height:1;border-radius:8px;
+      display:inline-flex;align-items:center}
+    .ra-row>.ra-load{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:700}
+    .ra-row>.ra-edit{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:700}
+    .ra-name{font-size:12.5px;font-weight:600;max-width:40ch;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .ra-row:not(.has) .ra-name{font-weight:400;opacity:.55}
+    .ra-dur{font-size:12px;opacity:.7}
+    .ra-dur.over{color:var(--pink);opacity:1;font-weight:700}
+    .ra-host{padding-top:3px}
 </style>
 </head>
 <body>
@@ -5185,6 +5202,121 @@ function makeRefMode(cfg) {
   mkSlots(audsEl, cfg.scenes ? 1 : 3, 'audio/*', ICON_AUD, cfg.scenes ? 'Музыка' : 'Аудио');
   // twelve empty plates are noise: only the filled ones and one free slot stay visible
   [imgsEl, vidsEl, audsEl].forEach(b => { watchSlots(b); foldSlots(b); });
+  // Reference audio in Референсы, Актёр and Экшн-видео: the same window the studio uses, instead of a bare
+  // tile. The tiles stay in the page - the run collects them by selector - they only stop showing, and
+  // whatever the window does is written back into the tile, so the calculation cannot tell the difference.
+  if (!cfg.scenes && !cfg.swap) refAudioWindows();
+  function refAudioWindows() {
+    const slots = [...$$('.slot', audsEl)];
+    if (!slots.length || typeof AudioTrimmer !== 'function') return;
+    const newEl = cls => { const e = document.createElement('div'); if (cls) e.className = cls; return e; };
+    slots.forEach(s => s.classList.add('ra-off'));
+    const list = newEl('ra-list');
+    audsEl.parentElement.insertBefore(list, audsEl.nextSibling);
+    const host = newEl('ra-host'); host.hidden = true;
+    let tr = null, cur = -1;
+    const paint = (s, i, r) => {
+      const f = s._file, d = s._dur || 0;
+      $('.ra-name', r).textContent = f ? f.name : 'аудио не загружено';
+      r.classList.toggle('has', !!f);
+      $('.ra-edit', r).hidden = !f;
+      $('.ra-x', r).hidden = !f;
+      const dq = $('.ra-dur', r);
+      dq.textContent = f ? (d ? Math.round(d) + ' с' : '…') + (s._sel ? ' · вырезано' : '') : '';
+      dq.classList.toggle('over', d > 15.2);
+      dq.title = d > 15.2 ? 'Дольше 15 секунд: модель возьмёт начало - обрежьте' : '';
+    };
+    const close = () => { host.hidden = true; cur = -1; };
+    const onFile = f => {                      // the editor hands over the cut; the tile is what the run reads
+      const i = tr._slot, s = slots[i]; if (!s) return;
+      const src = s._src || s._file;
+      s._src = src;                            // the original stays, so a second cut is possible
+      s._file = new File([f], src.name.replace(/\.[a-z0-9]+$/i, '') + '.wav', { type: 'audio/wav' });
+      s._sel = { start: tr.start, end: tr.end, of: src.name };
+      s._dur = tr.len();
+      $('span', s).textContent = s._file.name;
+      $('small', s).textContent = Math.round(s._dur) + ' с';
+      paint(s, i, rows[i]);
+      try { changed(); } catch (e) {}
+      if (root._save) root._save();
+    };
+    const openEdit = i => {
+      const s = slots[i];
+      if (!s._file) { $('input', s).click(); return; }
+      if (!host.hidden && cur === i) {         // the same button closes it: what you highlighted is what you get
+        const keep = s._sel || (tr && tr._loaded) || { start: 0, end: (tr && tr.dur0) || 0 };
+        if (tr && tr.dur0 && (Math.abs(tr.start - keep.start) > .05 || Math.abs(tr.end - keep.end) > .05)) tr.out();
+        close();
+        return;
+      }
+      host.hidden = false;
+      if (!tr) tr = root._raTrim = new AudioTrimmer({ mount: host, limit: 15, agentTarget: cfg.mode, onFile });
+      const src = s._src || s._file;
+      if (tr._slot !== i || !tr.dur0) {
+        tr._slot = i;
+        tr.setFile(src, true);                 // the ORIGINAL always opens
+        const sel = s._sel;
+        if (sel && src === s._src && sel.end <= tr.dur0 + .2) {
+          tr.start = sel.start; tr.end = Math.min(sel.end, tr.dur0);
+          tr._loaded = { start: sel.start, end: tr.end }; tr._sync();
+        }
+      }
+      cur = i;
+      list.scrollIntoView({ block: 'nearest' });
+    };
+    const rows = slots.map((s, i) => {
+      const r = newEl('ra-row');
+      r.innerHTML = '<button class="btn mini ra-load" type="button" title="Взять аудио с диска">Загрузить аудио</button>' +
+        '<span class="ra-name">аудио не загружено</span>' +
+        '<button class="token ra-tag" type="button" title="Поставить тег в текст">&lt;Audio ' + (i + 1) + '&gt;</button>' +
+        '<span class="ra-dur"></span>' +
+        '<button class="btn mini ra-edit" type="button" hidden>Обрезать</button>' +
+        '<button class="btn mini ra-x" type="button" hidden title="Убрать аудио">✕</button>';
+      list.append(r);
+      $('input', s).addEventListener('change', () => {   // a new file: the old cut no longer belongs to it
+        s._src = null; s._sel = null;
+        if (cur === i) close();
+        paint(s, i, r);
+        const f = s._file;
+        if (f && !s._dur) {                 // the tile learns the length from a media element a moment later;
+          const m = new Audio(URL.createObjectURL(f));   // the row waits for it, otherwise it shows «…» forever
+          m.preload = 'metadata';
+          m.onloadedmetadata = () => {
+            if (s._file === f) { s._dur = m.duration || 0; paint(s, i, r); }
+            URL.revokeObjectURL(m.src);
+          };
+        }
+      });
+      $('.ra-load', r).onclick = () => $('input', s).click();
+      $('.ra-edit', r).onclick = () => openEdit(i);
+      $('.ra-x', r).onclick = () => {                    // the tile's own cross does the cleaning it always did
+        const x = $('.x', s); if (x) x.click();
+        s._src = null; s._sel = null;
+        if (cur === i) close();
+        paint(s, i, r);
+        if (root._save) root._save();
+      };
+      $('.ra-tag', r).onclick = () => {
+        const tag = '<Audio ' + (i + 1) + '>', ta = $('textarea', root);
+        if (!ta) { toast('Тег ' + tag + ' - в этом режиме текста нет'); return; }
+        const p = ta.selectionStart || 0;
+        ta.value = ta.value.slice(0, p) + tag + ta.value.slice(p);
+        ta.focus(); ta.selectionStart = ta.selectionEnd = p + tag.length;
+        if (root._save) root._save();
+      };
+      r.addEventListener('dragover', e => { e.preventDefault(); r.classList.add('over'); });
+      r.addEventListener('dragleave', () => r.classList.remove('over'));
+      r.addEventListener('drop', e => {
+        e.preventDefault(); r.classList.remove('over');
+        const f = e.dataTransfer.files[0]; if (!f) return;
+        const inp = $('input', s), dt = new DataTransfer();
+        dt.items.add(f); inp.files = dt.files; inp.dispatchEvent(new Event('change'));
+      });
+      return r;
+    });
+    list.append(host);
+    slots.forEach((s, i) => paint(s, i, rows[i]));
+  }
   if (cfg.swap) $('.rm-vids input', root).addEventListener('change', async e => {
     const f = e.target.files[0]; if (!f) return;
     const box = $('.sw-cuts', root), hint = $('.sw-cuts-hint', root); box.value = '';
