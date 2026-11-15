@@ -3543,10 +3543,14 @@ class AudioTrimmer {
       const tg = document.querySelector('#agTarget [data-t="' + (this.o.agentTarget || 'long') + '"]');
       if (tg) tg.click();
       goTo('agent');
+      // the agent refuses audio while it does not know whether recognition is ready: on the first press
+      // in a fresh session that status was not fetched yet, and the button looked dead
+      try { if (!AG.status || !AG.status.speech_ready) await agStatus(); } catch (e) {}
+      if (!AG.status || !AG.status.speech_ready) { this.say('Агент ещё не может слушать аудио: распознавание речи не готово - карточка «Модель», «Докачать»'); return; }
       try { await setChatAudio(wavSlice(this.buf, this.start, this.end), (this.name || 'фрагмент').replace(/\.[^.]+$/, ''), this.len()); }
       catch (e) { this.say((e && e.message) || 'Не удалось передать аудио в Агент'); }
       const box = document.querySelector('#agAudioBox');
-      if (box && box.hidden) this.say('Аудио не принято: Агент не смог его взять (проверьте распознавание речи в карточке «Модель»)');
+      if (box && box.hidden) this.say('Аудио не принято: Агент не смог его взять'); else this.say('Фрагмент отправлен в Агент: ' + this.len().toFixed(1).replace('.', ',') + ' с');
     };
     this.q('.at-und').onclick = () => {
       const s = this.undo.pop(); if (!s) return;
