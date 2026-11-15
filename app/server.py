@@ -2625,7 +2625,7 @@ class App:
         d = LONG_DIR / run / "refs"
         d.mkdir(parents=True, exist_ok=True)
         for key, (ext, raw) in captured.items():
-            if key.startswith(("img", "aud", "simg")) and len(raw) < 80_000_000:
+            if key.startswith(("img", "aud", "simg", "saudio")) and len(raw) < 80_000_000:
                 for old in d.glob(key + ".*"):
                     old.unlink(missing_ok=True)
                 (d / (key + ext)).write_bytes(raw)
@@ -2734,13 +2734,14 @@ class App:
                 self._long_run = None
 
     async def generate_long(self, req):
-        form, files, prompt, aspect, quality, seed = await self.read_form(req, ("img0", "img1", "img2", "img3", "img4", "aud0", "srcvid", "srcframe") + tuple(f"simg{i}_{j}" for i in range(12) for j in range(9)), need_prompt=False)   # the texts are in the scenes, there is no single prompt
+        form, files, prompt, aspect, quality, seed = await self.read_form(req, ("img0", "img1", "img2", "img3", "img4", "aud0", "srcvid", "srcframe") + tuple(f"simg{i}_{j}" for i in range(12) for j in range(9)) + tuple(f"saudio{i}_{j}" for i in range(12) for j in range(3)), need_prompt=False)   # the texts are in the scenes, there is no single prompt
         act = getattr(self, "_studio_mode", "long") == "actionsc"
         self._long_run = re.sub(r"[^A-Za-z0-9]", "", form.get("run", ""))[:32]   # the references are kept even if the request is refused later
         try:
             scenes = [(str(x.get("prompt", "")).strip(), float(x.get("sec", 10)), bool(x.get("fresh"))) for x in json.loads(form.get("scenes") or "[]")]
         except (ValueError, TypeError, AttributeError):
             scenes = []
+        sc_audios = [[files.get(f"saudio{i}_{j}") for j in range(3)] for i in range(len(scenes))]   # по сценам, места не сдвигаются
         scenes = [(p, min(wf.LONG_MAX_SCENE, max(3.0, sec)), [files.get(f"simg{i}_{j}") for j in range(9)], fr)
                   # the places are kept: an empty place stays empty and does not shift the numbers
                   for i, (p, sec, fr) in enumerate(scenes) if p][:catalog.LONG_MAX_SCENES]
@@ -2840,7 +2841,8 @@ class App:
                 graph, stages = wf.long_part_graph(self.model_names, scenes, k, width, height, seed, images, audio, start,
                                                    dmad if draft else self.model_names["pika_lora"], self.custom_loras("long"), "match", vocals, state,
                                                    await self.preview_opts(), cont, form.get("src_project") == "1", fresh, draft,
-                                                   loop=form.get("music_loop") == "1", audio_dur=float(form.get("audio_dur") or 0))
+                                                   loop=form.get("music_loop") == "1", audio_dur=float(form.get("audio_dur") or 0),
+                                                   scene_audios=sc_audios)
             plan = wf.long_plan([sc[1] for sc in scenes], cont_first=bool(cont) or form.get("src_project") == "1", fresh=fresh)
             sub = f"сцена {k + 1} из {len(scenes)}" + (" · музыка" if audio else " · звук от модели")
             return await self.queue(graph, stages, {
@@ -2849,7 +2851,8 @@ class App:
                 "long": {"run": run, "part": k, "n": len(scenes), "draft": draft, "test": test}})
         graph, stages = wf.long_graph(self.model_names, scenes, width, height, seed, images, audio, start,
                                       dmad if draft else self.model_names["pika_lora"], self.custom_loras("long"), "match", vocals, await self.preview_opts(), fresh, False, draft,
-                                      frame=files.get("srcframe"), loop=form.get("music_loop") == "1", audio_dur=float(form.get("audio_dur") or 0))   # the continued video's last frame: a picture of its own
+                                      frame=files.get("srcframe"), loop=form.get("music_loop") == "1", audio_dur=float(form.get("audio_dur") or 0),
+                                                   scene_audios=sc_audios)   # the continued video's last frame: a picture of its own
         run = re.sub(r"[^A-Za-z0-9]", "", form.get("run", ""))[:32]
         self._long_run = run
         total = wf.long_plan([sc[1] for sc in scenes], fresh=fresh)[-1]["acc"] / wf.FPS

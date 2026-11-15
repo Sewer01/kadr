@@ -141,7 +141,7 @@ def scene_prompt(prompt, images, own, frame=None):
     return re.sub(r"<\s*Frame\s*>", "<Picture 1>" if frame else "the previous shot", out)
 
 
-def _refs(g, cond_node, images, videos=(), audios=(), base=100, vsize=None):
+def _refs(g, cond_node, images, videos=(), audios=(), base=100, vsize=None, abase=None):
     """LoadImage / VHS_LoadVideo (24 fps) / LoadAudio nodes wired into MiniMaxH3ReferenceToVideo."""
     inputs = g[cond_node]["inputs"]
     for i, name in enumerate([x for x in images[:9] if x]):
@@ -155,7 +155,7 @@ def _refs(g, cond_node, images, videos=(), audios=(), base=100, vsize=None):
             "frame_load_cap": 360, "skip_first_frames": 0, "select_every_nth": 1, "format": "None"}}
         inputs[f"ref_videos.ref_video_{i}"] = [nid, 0]
     for i, name in enumerate(audios[:3]):
-        nid = str(base + 20 + i)
+        nid = str((abase if abase is not None else base + 20) + i)   # per-scene audio must not land on the next scene's nodes
         g[nid] = {"class_type": "LoadAudio", "inputs": {"audio": name}}
         inputs[f"ref_audios.ref_audio_{i}"] = [nid, 0]
     return [str(base + i) for i in range(len([x for x in images[:9] if x]))] \
@@ -673,7 +673,7 @@ def _loop_track(add, src, have, need):
 
 
 
-def long_graph(m, scenes, width, height, seed, images, audio=None, start=0.0, pika=None, extra_loras=(), ref_size="match", vocals=None, preview=None, fresh=(), audio_cont=False, draft=False, frame=None, loop=False, audio_dur=0.0):
+def long_graph(m, scenes, width, height, seed, images, audio=None, start=0.0, pika=None, extra_loras=(), ref_size="match", vocals=None, preview=None, fresh=(), audio_cont=False, draft=False, frame=None, loop=False, audio_dur=0.0, scene_audios=()):
     """Scenes [(prompt, seconds), ...] rendered one after another; every next scene continues the last second of the
     previous one (latent cut + noise mask), with the same reference pictures, and optionally follows a music track.
 
@@ -710,7 +710,10 @@ def long_graph(m, scenes, width, height, seed, images, audio=None, start=0.0, pi
         total, ov = p["total"], p["ov"]
         ref = add("MiniMaxH3ReferenceToVideo", clip=["5", 0], vae=["6", 0], audio_vae=["7", 0], prompt=prompt,
                   width=width, height=height, length=total, ref_image_size=ref_size)
-        _refs(g, ref, refs, base=1000 + 10 * i)
+        # files whose tag is absent from the text are still only references: the model applies a
+        # reference where the prompt names it, and the numbering stays by place (2, 3, 4)
+        own_a = [x for x in (scene_audios[i] if i < len(scene_audios) else ()) if x][:3]
+        _refs(g, ref, refs, audios=own_a, base=1000 + 10 * i, abase=5000 + 4 * i)
         new = add("LTXVSeparateAVLatent", av_latent=[ref, 1])
         if audio:
             ptr = start + (p["acc_before"] - ov) / FPS if i else start
@@ -791,7 +794,7 @@ LONG_STATE_TOKENS = 17   # latent tokens of the last second(s) of a scene that t
 
 
 def long_part_graph(m, scenes, k, width, height, seed, images, audio=None, start=0.0, pika=None, extra_loras=(),
-                    ref_size="match", vocals=None, state=None, preview=None, src=None, cont_plan=False, fresh=(), draft=False, loop=False, audio_dur=0.0):
+                    ref_size="match", vocals=None, state=None, preview=None, src=None, cont_plan=False, fresh=(), draft=False, loop=False, audio_dur=0.0, scene_audios=()):
     """Scene number `k` (0-based) of the long video as its own job. Scene 0 starts fresh; scene k > 0 continues from the saved
     latent tail of scene k-1 (`state`, a .latent file in ComfyUI's input folder). The clip it saves has the overlap with the
     previous scene cut off, so the clips join end to end. Also saves the tail of its own latent for scene k+1."""
@@ -822,7 +825,8 @@ def long_part_graph(m, scenes, k, width, height, seed, images, audio=None, start
     ref = add("MiniMaxH3ReferenceToVideo", clip=["5", 0], vae=["6", 0], audio_vae=["7", 0], prompt=sc[0],
               width=width, height=height, length=total, ref_image_size=ref_size)
     own = list(sc[2]) if len(sc) > 2 and sc[2] else []   # this scene's own references; none: the common ones are used
-    _refs(g, ref, own or images, base=100)
+    own_a = [x for x in (scene_audios[k] if k < len(scene_audios) else ()) if x][:3]
+    _refs(g, ref, own or images, audios=own_a, base=100, abase=5000)
     new = add("LTXVSeparateAVLatent", av_latent=[ref, 1])
     if audio:
         ptr = max(0.0, start - ov / FPS) if cont else start + ((p["acc_before"] - ov) / FPS if k else 0)

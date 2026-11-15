@@ -5631,6 +5631,7 @@ function makeRefMode(cfg) {
         putFile(`long/${run}/aud0`, slotA ? slotA._file : null);
         putFile(`long/${run}/src`, root._src && root._src.file ? root._src.file : null);
         $$('.sc', root).forEach((c, i) => { for (let j = 0; j < 9; j++) putFile(`long/${run}/simg${i}_${j}`, c._files[j] || null); });
+          $$('.sc', root).forEach((c, i) => { for (let j = 0; j < 3; j++) putFile(`long/${run}/saudio${i}_${j}`, (c._auds || [])[j] || null); });
       } catch {}
     }
     root._save = () => { clearTimeout(saveT); saveT = setTimeout(saveNow, 700); };
@@ -5672,6 +5673,9 @@ function makeRefMode(cfg) {
         const n = x.nimg || (x.img ? 1 : 0);   // an old project kept one picture per scene under another name
         for (let j = 0; j < 9; j++) { const f = await getRef(x.nimg ? `simg${i}_${j}` : 'simg' + i); if (f instanceof File) cards[i]._files[j] = f; }   // back to the same place
         cards[i]._paint();
+        for (let j = 0; j < 3; j++) { const f = await getRef(`saudio${i}_${j}`); if (f instanceof File) cards[i]._auds[j] = f; }
+        cards[i]._paintAuds && cards[i]._paintAuds();
+        cards[i]._paintRefs && cards[i]._paintRefs();
       }
       let srcLost = false;
       if (p.src) {
@@ -5774,13 +5778,70 @@ function makeRefMode(cfg) {
         const last = c._files.reduce((a, f, j) => (f ? j : a), -1), shown = Math.min(9, last + 2);
         (c._ownTiles || []).forEach((lb, j) => { lb.hidden = j >= shown; });   // лишние пустые места не светятся
         const tk = $('.sc-tokens', c);
-        if (tk) tk.innerHTML = c._files.slice(0, shown).map((f, j) => `<button class="token" type="button" data-ins="&lt;Picture ${10 + j}&gt;"${f ? '' : ' disabled'} title="${f ? 'Вставить в текст тег <Picture ' + (10 + j) + '> - ваше фото в месте ' + (j + 1) : 'Место ' + (j + 1) + ' свободно - номер ' + (10 + j) + ' оживёт, когда туда что-нибудь положат'}">&lt;Pic ${10 + j}&gt;</button>`).join('');
+        if (tk) tk.innerHTML = c._files.slice(0, shown).map((f, j) => `<button class="token" type="button" data-ins="&lt;Picture ${10 + j}&gt;"${f ? '' : ' disabled'} title="${f ? 'Вставить в текст тег <Picture ' + (10 + j) + '> - ваше фото в месте ' + (j + 1) : 'Место ' + (j + 1) + ' свободно - номер ' + (10 + j) + ' оживёт, когда туда что-нибудь положат'}">&lt;Pic ${10 + j}&gt;</button>`).join('')
+          + (c._auds || []).map((f, j) => f ? `<button class="token" type="button" data-ins="&lt;Audio ${j + 2}&gt;" data-audio="1" title="Вставить в текст тег <Audio ${j + 2}> - аудио этой сцены номер ${j + 1}; звук применяется там, где вы его упомянули">&lt;Audio ${j + 2}&gt;</button>` : '').join('');
         c._counter?.();
         const n = c._files.filter(Boolean).length;
         $('.sc-rhint', c).textContent = n ? `Своих фото в этой сцене: ${n} (мест до девяти). В тексте они зовутся <Picture 10>, <Picture 11>... - отдельный ряд чисел, чтобы не путать с общими изображениями (<Picture 1>…). Программа подставит их в расчёт после общих.` : 'Своих фото нет: сцена возьмёт общие. У своих мест номера не меняются, даже если убрать другое фото.';
       };
       // (the places take pictures themselves: click a tile or drop a photo into it)
       paintRefs();
+      // - - - audio of THIS scene: up to three files, trimmed with the same instrument as the
+      // shared track. They reach the model as references; the text decides where one is used.
+      c._auds = c._auds || [null, null, null];
+      const esc2 = s => String(s).replace(/[<>&]/g, ch => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[ch]));
+      const ainp = document.createElement('input');
+      ainp.type = 'file'; ainp.accept = 'audio/*,.wav,.mp3,.ogg,.flac,.m4a'; ainp.hidden = true; c.append(ainp);
+      let apick = -1;                       // which free slot the file dialog should fill
+      const openTrim = j => {
+        const host = $('.sc-trimhost', c);
+        host.hidden = false;
+        if (!c._trim) {
+          c._trim = new AudioTrimmer({
+            mount: host, limit: 15, agentTarget: cfg.mode,
+            onFile: f => {
+              c._auds[c._trim._slot] = f; c._paintAuds(); paintRefs();
+              if (root._save) root._save();
+              toast('Фрагмент подставлен вместо файла: играет только он');
+            },
+            onState: () => {}
+          });
+        }
+        c._trim._slot = j;
+        c._trim.setFile(c._auds[j]);
+      };
+      c._paintAuds = () => {
+        const row = $('.sc-auds', c); if (!row) return;
+        const full = c._auds.filter(Boolean).length >= 3;
+        row.innerHTML = '<button class="btn mini" type="button" data-a="add"' + (full ? ' disabled' : '') +
+          ' title="Аудио отдельной сцены: до трёх файлов. Модель получает их как ссылки и применяет там, где вы упомянули файл тегом в тексте сцены; не упомянули - звук делает сама. Обрезать можно до 15 секунд.">Загрузить аудио сцены</button>' +
+          c._auds.map((f, j) => f ? `<span class="token" style="display:inline-flex;gap:6px;align-items:center">&lt;Audio ${j + 2}&gt; ${esc2(f.name.slice(0, 18))} <button class="btn mini" type="button" data-a="trim" data-j="${j}" title="Послушать и обрезать: прибор под строкой">Обрезать</button><button class="btn mini" type="button" data-a="del" data-j="${j}" title="Убрать этот файл из сцены">×</button></span>` : '').join('') +
+          (full ? '<span class="hint" style="font-size:12px">три аудио в сцене - максимум</span>' : '');
+      };
+      ainp.onchange = () => {
+        const f = ainp.files && ainp.files[0], j = apick;
+        ainp.value = ''; apick = -1;
+        if (!f || j < 0) return;
+        c._auds[j] = f; c._paintAuds(); paintRefs();
+        if (root._save) root._save();
+        toast('Аудио ' + (j + 2) + ' в сцене: ' + f.name + ' - при желании обрежьте (до 15 с)');
+      };
+      $('.sc-auds', c).onclick = e => {
+        const b = e.target.closest('[data-a]'); if (!b) return;
+        const j = +b.dataset.j;
+        if (b.dataset.a === 'add') {
+          apick = c._auds.findIndex(x => !x);
+          if (apick < 0) { toast('Больше трёх аудио в одной сцене нельзя'); return; }
+          ainp.click();
+        } else if (b.dataset.a === 'del') {
+          c._auds[j] = null;
+          if (c._trim && c._trim._slot === j) { c._trim.clear(); $('.sc-trimhost', c).hidden = true; }
+          c._paintAuds(); paintRefs();
+          if (root._save) root._save();
+        } else if (b.dataset.a === 'trim') openTrim(j);
+      };
+      c._paintAuds(); c._paintRefs = paintRefs;
+
       $('.sc-m', c).onclick = () => { const r = $('input[type=range]', c); r.value = Math.max(3, +r.value - 1); r.dispatchEvent(new Event('input')); };
       $('.sc-p', c).onclick = () => { const r = $('input[type=range]', c); r.value = Math.min(15, +r.value + 1); r.dispatchEvent(new Event('input')); };
       $('textarea', c).value = txt;
@@ -5827,7 +5888,7 @@ function makeRefMode(cfg) {
       $('.sc-tokens', c).onclick = e => {   // a chip puts its tag where the cursor stands
         const b = e.target.closest('[data-ins]'); if (!b) return;
         if (b.disabled) { toast('В это место ещё не загружено своё фото'); return; }
-        if (root._free && !root._free(+b.dataset.ins.replace(/\D+/g, ''), c)) return;
+        if (!b.dataset.audio && root._free && !root._free(+b.dataset.ins.replace(/\D+/g, ''), c)) return;   // an audio tag owns no picture place
         const ta = $('textarea', c), at = ta.selectionStart == null ? ta.value.length : ta.selectionStart, add = b.dataset.ins + ' ';
         ta.value = ta.value.slice(0, at) + add + ta.value.slice(at);
         ta.focus(); ta.selectionStart = ta.selectionEnd = at + add.length; recount(); c._counter?.();
@@ -6069,6 +6130,7 @@ function makeRefMode(cfg) {
             () => '<div class="hint" style="font-size:12.5px;line-height:1.55"><b>Работа со звуком (карточка «Аудио»).</b> Файл берётся кнопкой «Загрузить аудио» или перетаскиванием на строку. Ниже - прибор как в LipSync: прослушать выделенное, волна, <b>рамка выделения с ручками по краям</b> (края тянутся независимо), приближение для точной резки, два режима - «что оставить в клипе» и «что вырезать», кнопки «Оставить выделенное», «Убрать паузы», «Отделить голос», «Отменить», поля «Начало» и «Конец» с длиной и предупреждением про 15 секунд. Готовый фрагмент подставляется вместо файла: расчёт видит обычный загруженный файл.</div>',
             () => '<div class="hint" style="font-size:12.5px;line-height:1.55"><b>Тег &lt;Audio 1&gt;.</b> Когда аудио лежит, под текстом сцены появляется плашка &lt;Audio 1&gt; - клик вставляет тег туда, где стоит курсор. Он не выбирает, брать ли ваш файл (файл уже взят), а объясняет модели, что этот звук - фон данной сцены. Плашка не занимает ни одного из девяти мест под картинки; аудио в проекте одно, поэтому тег - всегда &lt;Audio 1&gt;.</div>',
             () => '<div class="hint" style="font-size:12.5px;line-height:1.55"><b>Длина фонового звука.</b> Обычное правило «не больше 15 секунд» к общему треку больше не применяется: ролик длиннее сцены, и весь трек выделяется целиком. Если трек короче ролика, включите «пустой фон по кругу» - тогда звук начнётся сначала и дойдёт до конца; с выключенной галкой музыка оборвётся там, где кончился файл. Для аудио отдельной сцены 15 секунд останутся в силе: сцена сама не длиннее.</div>',
+            () => '<div class="hint" style="font-size:12.5px;line-height:1.55"><b>Аудио отдельной сцены.</b> Под плашками референсов сцены есть кнопка «Загрузить аудио сцены» - до трёх файлов. Каждый подписан &lt;Audio 2&gt;, &lt;Audio 3&gt;, &lt;Audio 4&gt; (первый номер оставлен фону всего ролика). Модель получает их как ссылки, а применяет там, где вы упомянули файл тегом в тексте сцены: не упомянули - звук в сцене делает модель. Кнопка «Обрезать» открывает тот же прибор, что и в карточке «Аудио», но с правилом 15 секунд - сцена длиннее всё равно не будет. Файлы хранятся вместе с проектом.</div>',
             () => '<div class="hint" style="font-size:12.5px;line-height:1.55"><b>«🤖 В агент».</b> Отправляет выделенный кусок в раздел «Агент»: он распознаёт слова и пишет промпт уже зная, что говорится. Перед отправкой Агент сам переключается на Видеостудию, чтобы не писать в чужой раздел. Если распознавание речи ещё не скачано, кнопка об этом скажет - карточка «Модель», «Докачать».</div>',
             () => {
               const mp = root.querySelector('.mdl-pick'); if (!mp) return '';
@@ -6498,7 +6560,8 @@ function makeRefMode(cfg) {
           }
         }
         if (cfg.scenes && root._mode !== 'parts') { fd.append('run', root._run); if (root._q === 'draft') fd.append('draft', '1'); }
-        if (cfg.scenes) { fd.append('scenes', JSON.stringify(sceneList())); $$('.sc', root).forEach((c, i) => c._files.forEach((f, j) => { if (f) fd.append(`simg${i}_${j}`, f); })); fd.append('start', $('.lm-start', root).value || '0'); if (root._loop !== false) fd.append('music_loop', '1'); if (root._adur) fd.append('audio_dur', String(Math.round(root._adur * 1000) / 1000)); fd.append('vocals', root._snd === 'own' && $('.lm-vocals', root).checked ? '1' : '0'); if (cfg.mode === 'actionsc') loraForm(S, fd); }
+        if (cfg.scenes) { fd.append('scenes', JSON.stringify(sceneList())); $$('.sc', root).forEach((c, i) => c._files.forEach((f, j) => { if (f) fd.append(`simg${i}_${j}`, f); }));
+          $$('.sc', root).forEach((c, i) => (c._auds || []).forEach((f, j) => { if (f) fd.append(`saudio${i}_${j}`, f); })); fd.append('start', $('.lm-start', root).value || '0'); if (root._loop !== false) fd.append('music_loop', '1'); if (root._adur) fd.append('audio_dur', String(Math.round(root._adur * 1000) / 1000)); fd.append('vocals', root._snd === 'own' && $('.lm-vocals', root).checked ? '1' : '0'); if (cfg.mode === 'actionsc') loraForm(S, fd); }
         else loraForm(S, fd);
         seedForm(S, fd);
         $$('.ref', imgsEl).filter(r => r._file).forEach((r, i) => fd.append('img' + i, r._file));
