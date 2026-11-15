@@ -123,7 +123,7 @@
 #view-actionsc .slots{--refh:104px;--refw:104px}
 #view-long .rm-imgs{display:flex!important;gap:10px;flex-wrap:wrap}.srf{position:relative;flex:0 0 104px;width:104px;height:104px;border-radius:10px;overflow:hidden;border:1.5px dashed rgba(232,38,79,.7)}.srf img{width:100%;height:100%;object-fit:cover;display:block}.srfl{position:absolute;left:4px;bottom:4px;font-style:normal;font-size:10px;padding:2px 6px;border-radius:6px;background:rgba(232,38,79,.92);color:#fff}#view-long .rm-imgs .ref{width:104px!important;height:104px!important;aspect-ratio:auto;flex:0 0 104px}
 #view-long .slots{--refh:104px;--refw:104px}   // the studio keeps its small squares: its audio place must not tower over them
-#view-long .rm-params .row>.hint,#view-long .rm-params .row>.cw-hint{display:none}
+/* the hints of the settings card are shown here as in the other sections */
 #view-long .st-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px 34px;align-items:start;margin-top:8px}
 #view-long .st-l,#view-long .st-r{min-width:0}
 #view-long .st-grid .row{margin:0 0 12px}
@@ -5624,7 +5624,7 @@ function makeRefMode(cfg) {
     queueMicrotask(() => queueMicrotask(() => {   /* the order of the page: main settings, pictures, scenes; the rare things are folded */
       const col = $('.col', root), top = $('.rm-params', root), refsCard = $('.rm-imgs', root).closest('.card'), musCard = $('.lm-snd', root).closest('.card'), scCard = $('.lm-scenes', root).parentElement;
       const hdr = $('.card-h', top), mk = (cls, html) => { const d = document.createElement('div'); d.className = cls; d.innerHTML = html; return d; };
-      $('h3', hdr).innerHTML = '<span class="n">1</span>Главные настройки';
+      $('h3', hdr).innerHTML = '<span class="n">3</span>Параметры';
       $('.lm-qnote', root)?.remove();
       const how = $('details.agvar', top); if (how) how.open = false;
       // mode first, then format, quality, sound
@@ -5632,14 +5632,14 @@ function makeRefMode(cfg) {
       qh.style.margin = '0 0 4px';
       const rows = $$(':scope > .row', top), fmt = rows[0], qual = rows[1], own = rows[2];
       const snd = $('.lm-snd', root), sh = $('.lm-snd-hint', root);
-      // two compact columns: on the left the mode and the sound, on the right the format and the size
-      const modeRow = mk('row', '<div class="row-l">Режим</div>'); modeRow.append(q);
+      // one column, the way every other section shows its settings: the two-column grid of the studio
+      // (mode and sound on the left, format and quality on the right) is what made this card look
+      // foreign, so the rows simply stand under each other in the usual order
+      const modeRow = mk('row', '<div class="row-l">Режим</div>'); modeRow.append(q, qh);
       const sndRow = mk('row', '<div class="row-l">Звук</div>'); sndRow.append(snd, sh);
-      const grid = mk('st-grid', ''), colL = mk('st-l', ''), colR = mk('st-r', '');
       const modeSeg = $('.lm-mode', root), modeHint = $('.lm-mode-hint', root);
       const how2 = mk('row', '<div class="row-l">Как считать</div>'); how2.append(modeSeg, modeHint);
-      colL.append(modeRow, how2, sndRow); colR.append(fmt, qual); grid.append(colL, colR);
-      (how || hdr).after(grid); grid.after(qh);
+      (how || hdr).after(modeRow, how2, fmt, qual, sndRow);
       // what the work stands on is decided first of all, before the settings it changes
       const baseSeg = $('.lm-base', root), baseHint = $('.lm-base-hint', root), ownBox = $('.lm-srcpick', root);
       if (baseSeg) {
@@ -5676,12 +5676,11 @@ function makeRefMode(cfg) {
       [own, $('.vwarn', top), ...$$(':scope > details:not(.agvar)', top)].filter(Boolean).forEach(n => more.append(n));
       top.append(more);
       // pictures right after the settings, then the scenes
-      $('h3', refsCard).innerHTML = '<span class="n">2</span>Изображения героя и места <span class="hint" style="font-weight:400">(необязательно)</span>';
-      top.after(refsCard);
+      $('h3', refsCard).innerHTML = '<span class="n">1</span>Изображения героя и места <span class="hint" style="font-weight:400">(необязательно)</span>';
       $('h3', musCard).textContent = 'Своё аудио';
       const syncMus = () => { musCard.hidden = $('.lm-own', root).hidden; };
       new MutationObserver(syncMus).observe($('.lm-own', root), { attributes: true, attributeFilter: ['hidden'] }); syncMus();
-      $('h3', scCard).innerHTML = '<span class="n">3</span>Сцены';
+      $('h3', scCard).innerHTML = '<span class="n">2</span>Сцены';
       // under the open scene: the big buttons, the tags; the rest is folded
       const sceneBox = $('.lm-scenes', root), chain = $('.lm-chain', root), fin = $('.lm-final', root), src = $('.lm-src', root), foot = $('.ta-foot', scCard);
       // the prompt of the open scene comes first, then the ribbon of fragments, then the player
@@ -5727,6 +5726,10 @@ function makeRefMode(cfg) {
         bar.append(memo); bar.append(plate);   // the reminder stands right above the run buttons
         root._memo();
       }
+      // the order of the section, the same as everywhere else: media, text, settings
+      col.prepend(refsCard);
+      refsCard.after(scCard);
+      col.append(top);
       /* undo: what was cleared or deleted can be brought back (button «Отменить действие» or Ctrl+Z) */
       root._undo = [];
       const refsFiles = () => $$('.ref', imgsEl).map(r => r._file || null);
@@ -5871,14 +5874,6 @@ function makeRefMode(cfg) {
     goLabel: () => !cfg.scenes ? 'Сгенерировать' : root._mode === 'parts'
       ? `Сделать сцену ${root._sel + 1}` : 'Сгенерировать видеоролик',   // the number follows the scene you picked
     extraLabel: cfg.mode === 'refs' || cfg.mode === 'actor' || cfg.swap || cfg.scenes ? 'Шаги' : 'Схема',
-    extraRow: (cfg.mode === 'action' || cfg.mode === 'actionsc') ? `
-      <div class="row">
-        <div class="row-l">Резкость второго прохода <b id="usSharpV">2</b></div>
-        <input type="range" id="usSharp" min="1" max="6" step="1" value="2">
-        <div class="ticks"><span>1 точнее</span><span>3</span><span>6 детали</span></div>
-        <div class="hint">Работает, когда во втором проходе стоит 2D-апскейлер (сейчас он выбран по умолчанию):
-          1 — максимально близко к оригиналу, 6 — максимум деталей, но дальше от исходной картинки.</div>
-      </div>` : '',
     extra: () => cfg.scenes ? (root._paintQ?.(), root._mode === 'parts' ? (root._q === 'draft' ? '4 шага · черновик' : (cfg.mode === 'actionsc' ? '8 + 4 шага · гибрид' : '8 шагов · Pika')) : (root._q === 'draft' ? '4 шага · черновик' : '8 шагов · Pika')) : cfg.mode === 'actor' || cfg.swap ? '10 · 1 проход' : cfg.mode === 'refs' ? `${S.steps} · 1 проход` : (S.faithful ? 'точная копия' : '8 + 4 шага'),
     passes: () => cfg.scenes ? $$('.sc', root).map(() => root._q === 'draft' ? 4 : 8) : cfg.mode === 'actor' || cfg.swap ? [10] : cfg.mode === 'refs' ? [S.steps] : S.faithful ? [13] : [8, 4],
     get twoPass() { return (cfg.mode === 'action' || cfg.mode === 'actionsc') && !S.faithful; },
@@ -5993,7 +5988,15 @@ function makeRefMode(cfg) {
     : `<div class="row"><div class="row-l">Как запускается</div><div class="status-box rm-act"><span class="hint">Проверяем ComfyUI…</span></div></div>
     <div class="rm-loras"></div>`;
   const upd = paramsCard($('.rm-params', root), S, {
-    n: cfg.scenes ? 2 : 3, duration: !cfg.scenes, extraRow,
+    n: cfg.scenes ? 2 : 3, duration: !cfg.scenes,
+    extraRow: (cfg.mode === 'action' || cfg.mode === 'actionsc' ? `
+      <div class="row">
+        <div class="row-l">Резкость второго прохода <b id="usSharpV">2</b></div>
+        <input type="range" id="usSharp" min="1" max="6" step="1" value="2">
+        <div class="ticks"><span>1 точнее</span><span>3</span><span>6 детали</span></div>
+        <div class="hint">Работает, пока во втором проходе стоит 2D-апскейлер (он выбран по умолчанию):
+          1 — ближе к оригиналу, 6 — больше деталей, но дальше от исходной картинки.</div>
+      </div>` : '') + extraRow,
     onChange: () => {
       prev();
       $$('.rm-steps button', root).forEach(b => b.classList.toggle('on', +b.dataset.s === S.steps));
