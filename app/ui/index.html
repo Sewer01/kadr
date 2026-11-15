@@ -5508,7 +5508,7 @@ function makeRefMode(cfg) {
     };
 
     $('#lmAdd', root).onclick = () => { if ($$('.sc', root).length >= 20) { toast('Не больше 20 сцен — это уже полчаса расчёта'); return; } root._sel = $$('.sc', root).length; addScene('', 10); };
-    queueMicrotask(() => { addScene('', 10); addScene('', 10); });  // after the rest of the set-up is done
+    queueMicrotask(() => { addScene('', 10); });   // a blank start holds ONE scene; «+» in the ribbon makes the next  // after the rest of the set-up is done
     root._addScene = addScene;
     /* --- video studio: a ribbon of fragments, one fragment is open for settings, a player, draft / finished quality --- */
     root._sel = 0; root._q = 'final'; root._dmad = null;
@@ -5811,12 +5811,12 @@ function makeRefMode(cfg) {
       clrSc.style.cssText = 'margin:0 0 10px';
       clrSc.title = 'Стирает тексты сцен и их собственные фото. Общие изображения героя и места остаются на месте';
       clrSc.onclick = () => confirmBox('Очистить сцены?',
-        'Тексты всех сцен и их собственные фото будут стёрты, останутся две пустые сцены. Общие изображения, звук и готовые видео не трогаются.', 'Очистить', () => {
+        'Тексты всех сцен и их собственные фото будут стёрты, останется одна пустая сцена. Общие изображения, звук и готовые видео не трогаются.', 'Очистить', () => {
           root._pushUndo?.();
           $$('.sc', root).forEach(x => x.remove());
           root._run = Math.random().toString(36).slice(2, 12); root._sel = 0;
-          addScene('', 10); addScene('', 10); recount(); refreshStates(); renderTL(); showClip();
-          toast('Сцены очищены: общие фото на месте');
+          addScene('', 10); recount(); refreshStates(); renderTL(); showClip();
+          toast('Сцены очищены: осталась одна пустая, общие фото на месте');
         });
       const chips = $('.rm-tokens', root)?.closest('.ta-foot'), ta0 = $('.col textarea', root);
       // the names you can insert belong where you write: put them under the card that holds the text
@@ -5828,7 +5828,7 @@ function makeRefMode(cfg) {
       // the base choice and its file button were placed in the settings card above
     }));
     $('#lmAdd', root).onclick = () => { if ($$('.sc', root).length >= 20) { toast('Не больше 20 сцен — это уже полчаса расчёта'); return; } addScene('', 10); };
-    queueMicrotask(() => { addScene('', 10); addScene('', 10); });  // after the rest of the set-up is done
+    queueMicrotask(() => { addScene('', 10); });   // a blank start holds ONE scene; «+» in the ribbon makes the next  // after the rest of the set-up is done
     // the «Очистить» button of the section: in this mode the scenes are the text
     root._hasText = () => $$('.sc textarea', root).some(t => t.value.trim());
     root._clearScenes = () => {
