@@ -5640,7 +5640,7 @@ function makeRefMode(cfg) {
     queueMicrotask(() => queueMicrotask(() => {   /* the order of the page: main settings, pictures, scenes; the rare things are folded */
       const col = $('.col', root), top = $('.rm-params', root), refsCard = $('.rm-imgs', root).closest('.card'), musCard = $('.lm-snd', root).closest('.card'), scCard = $('.lm-scenes', root).parentElement;
       const hdr = $('.card-h', top), mk = (cls, html) => { const d = document.createElement('div'); d.className = cls; d.innerHTML = html; return d; };
-      $('h3', hdr).innerHTML = '<span class="n">3</span>Параметры';
+      $('h3', hdr).innerHTML = '<span class="n">4</span>Параметры';
       $('.lm-qnote', root)?.remove();
       const how = $('details.agvar', top); if (how) how.open = false;
       // mode first, then format, quality, sound
@@ -5736,10 +5736,11 @@ function makeRefMode(cfg) {
       if (qual && own) qual.after(own);
       // pictures right after the settings, then the scenes
       $('h3', refsCard).innerHTML = '<span class="n">1</span>Изображения героя и места <span class="hint" style="font-weight:400">(необязательно)</span>';
-      $('h3', musCard).textContent = 'Своё аудио';
-      const syncMus = () => { musCard.hidden = $('.lm-own', root).hidden; };
+      $('h3', musCard).innerHTML = '<span class="n">2</span>Аудио';
+      // in the action studio there is no music at all, so the audio card must not stand empty
+      const syncMus = () => { musCard.hidden = cfg.mode === 'actionsc' ? true : $('.lm-own', root).hidden; };
       new MutationObserver(syncMus).observe($('.lm-own', root), { attributes: true, attributeFilter: ['hidden'] }); syncMus();
-      $('h3', scCard).innerHTML = '<span class="n">2</span>Сцены';
+      $('h3', scCard).innerHTML = '<span class="n">3</span>Сцены';
       // under the open scene: the big buttons, the tags; the rest is folded
       const sceneBox = $('.lm-scenes', root), chain = $('.lm-chain', root), fin = $('.lm-final', root), src = $('.lm-src', root), foot = $('.ta-foot', scCard);
       // the prompt of the open scene comes first, then the ribbon of fragments, then the player
@@ -5787,7 +5788,7 @@ function makeRefMode(cfg) {
       }
       // the order of the section, the same as everywhere else: media, text, settings
       col.prepend(refsCard);
-      refsCard.after(scCard);
+      refsCard.after(musCard); musCard.after(scCard);   // pictures, audio, scenes - audio used to fall under the scenes
       col.append(top);
       if (root._baseHost) col.prepend(root._baseHost);   // the switch, the file and the button, above card one
       /* undo: what was cleared or deleted can be brought back (button «Отменить действие» or Ctrl+Z) */
