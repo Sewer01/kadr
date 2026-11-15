@@ -2827,7 +2827,11 @@ class App:
                 aloras += self.custom_loras("action")
                 faithful = bool(s.get("faithful")) and form.get("faithful") != "0"
                 usarp = min(6, max(1, int(form.get("usarp") or 2)))   # sharpness of the second pass (2D upscaler)
+                plan_a = wf.long_plan([sc[1] for sc in scenes], fresh=fresh)   # where this scene sits on the track
+                audio_at = round(max(0.0, (plan_a[k]["acc_before"] - plan_a[k]["ov"]) / wf.FPS), 3) if audio else 0.0
                 graph, stages = wf.action_part_graph(self.model_names, scenes, k, width, height, seed, images, aloras,
+                                                     audio=audio, audio_at=audio_at, audio_dur=float(form.get("audio_dur") or 0),
+                                                     loop=form.get("music_loop") == "1", vocals=vocals, scene_audios=sc_audios,
                                                      preview=await self.preview_opts(), state=state, fresh=fresh,
                                                      faithful=faithful and k == 0, usarp=usarp,
                 ltxv=await self.has_node("LTXVSetVideoLatentNoiseMasks"))

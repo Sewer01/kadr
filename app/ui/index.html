@@ -109,7 +109,9 @@
 .lm-scenes .sc:not(.sel){display:none}
 /* the action studio has no song of its own (the model makes the sound) and no base video yet:
    those rows would only promise what the graph does not do */
-#view-actionsc .rm-media,#view-actionsc .lm-snd,#view-actionsc .lm-snd-hint,#view-actionsc .lm-own,#view-actionsc .lm-base,#view-actionsc .lm-base-hint,#view-actionsc .lm-srcpick,#view-actionsc .lm-src{display:none!important}
+/* the action studio takes a sound of its own now, like the video studio; only the base video,
+   which its model does not use, stays hidden */
+    #view-actionsc .lm-snd,#view-actionsc .lm-snd-hint,#view-actionsc .lm-base,#view-actionsc .lm-base-hint,#view-actionsc .lm-srcpick,#view-actionsc .lm-src{display:none!important}
 #view-actionsc .no-base,#view-actionsc .no-base+details,#view-actionsc .agvar{display:none!important}
 /* скрыли переключатели - но их строки с названиями стояли отдельно и висели пустыми ярлыками;
    теперь вместе с переключателем скрывается вся строка */
@@ -5839,13 +5841,17 @@ function makeRefMode(cfg) {
             mount: host, limit: 15, agentTarget: cfg.mode,
             onFile: f => {
               const j2 = c._trim._slot, src = c._audSrc[j2] || f;
+              (c._audDur = c._audDur || [])[j2] = c._trim.len();   // what the model will actually get
               // the name stays the person's own: a cut of the file is still the same song
               c._auds[j2] = new File([f], src.name.replace(/\.[a-z0-9]+$/i, '') + '.wav', { type: 'audio/wav' });
               c._audSel[j2] = { start: c._trim.start, end: c._trim.end, of: src.name };
               c._paintAuds(); paintRefs();
               if (root._save) root._save();
             },
-            onState: () => {}
+            onState: tr2 => {
+              const j3 = tr2._slot;
+              if (j3 >= 0 && tr2.dur0 && !c._audSel[j3]) (c._audDur = c._audDur || [])[j3] = tr2.dur0;   // full length of an untouched file
+            }
           });
         }
         const src = c._audSrc[j] || c._auds[j];
@@ -5874,7 +5880,7 @@ function makeRefMode(cfg) {
         if (!f) return;
         if (j < 0) j = c._auds.findIndex(x => !x);   // a file may arrive without the button (drag, restore)
         if (j < 0) { toast('Больше трёх аудио в одной сцене нельзя'); return; }
-        c._auds[j] = f; c._audSrc[j] = f; c._audSel[j] = null; c._paintAuds(); paintRefs();
+        c._auds[j] = f; c._audSrc[j] = f; c._audSel[j] = null; if (c._audDur) c._audDur[j] = null; c._paintAuds(); paintRefs();
         if (root._save) root._save();
         toast('Аудио <Audio ' + ((c._base || 10) + j) + '> в сцене: ' + f.name + ' - при желании обрежьте (до 15 с)');
       };
@@ -5892,7 +5898,7 @@ function makeRefMode(cfg) {
           if (apick < 0) { toast('Больше трёх аудио в одной сцене нельзя'); return; }
           ainp.click();
         } else if (b.dataset.a === 'del') {
-          c._auds[j] = null; c._audSrc[j] = null; c._audSel[j] = null;
+          c._auds[j] = null; c._audSrc[j] = null; c._audSel[j] = null; if (c._audDur) c._audDur[j] = null;
           if (c._trim && c._trim._slot === j) { c._trim.clear(); c._trim._slot = -1; $('.sc-trimhost', c).hidden = true; }
           c._paintAuds(); paintRefs();
           if (root._save) root._save();
@@ -6216,7 +6222,7 @@ function makeRefMode(cfg) {
       // in the action studio there is no music at all, so the audio card must not stand empty
       // the audio card is always there now: a file in it means "play this", an empty one means
       // "let the model invent the sound", so nothing about the card itself has to be hidden
-      const syncMus = () => { musCard.hidden = cfg.mode === 'actionsc'; };
+      const syncMus = () => { musCard.hidden = false; };   // the action studio has a soundtrack of its own now
       new MutationObserver(syncMus).observe($('.lm-own', root), { attributes: true, attributeFilter: ['hidden'] }); syncMus();
       $('h3', scCard).innerHTML = '<span class="n">3</span>Сцены';
       // under the open scene: the big buttons, the tags; the rest is folded
@@ -7322,30 +7328,41 @@ $('#agAudioBox').addEventListener('click', e => {
 /* The person often loads a file with the agent's own button, and then nothing says where it came
    from. We look the name up in the video studio: the film's background is <Audio 1>, a scene's own
    audio sit in that scene's decade (scene 1 -> <Audio 10..12>, scene 2 -> <Audio 20..22>). */
-function audioTagFor(name) {
+function audioTagFor(name, dur) {
+  // One song often lies in several places at once (the film's background and a scene), so a name is not
+  // an address: we gather every place it sits and, if the length is known, keep the places that match it.
+  // When the places still disagree, we say so instead of naming the first one - the agent must not be
+  // told a tag that might belong to another scene.
   try {
     const R = (typeof RM !== 'undefined' && RM.long && RM.long.root) ? RM.long.root : null;
     if (!R) return '';
     const norm = s => String(s || '').replace(/\.[a-z0-9]+$/i, '').toLowerCase();
     const nm = norm(name);
     if (!nm) return '';
-    const tr = R._trim;
-    if (tr && tr.name && norm(tr.name) === nm) return 'фон всего ролика, тег <Audio 1>';
+    const near = d => !(d > 0) || Math.abs(d - dur) < 0.4;
+    const found = [];
     const scs = $$('.sc', R);
-    for (let i = 0; i < scs.length; i++) {
-      const c = scs[i], base = c._base || 10 * (i + 1);
+    scs.forEach((c, i) => {
+      const base = c._base || 10 * (i + 1);
       const src = c._audSrc || c._auds || [];
-      for (let j = 0; j < src.length; j++) {
-        const f = src[j];
-        if (f && norm(f.name) === nm) return 'сцена ' + (i + 1) + ', аудио ' + (j + 1) + ', тег <Audio ' + (base + j) + '>';
-      }
-    }
+      src.forEach((f, j) => {
+        if (f && norm(f.name) === nm) found.push({ label: 'сцена ' + (i + 1) + ', аудио ' + (j + 1) + ', тег <Audio ' + (base + j) + '>', d: (c._audDur || [])[j] });
+      });
+    });
+    const tr = R._trim;
+    if (tr && tr.name && norm(tr.name) === nm) found.push({ label: 'фон всего ролика, тег <Audio 1>', d: tr.dur0 });
+    if (!found.length) return '';
+    const fit = (typeof dur === 'number' && dur > 0) ? found.filter(x => near(x.d)) : found;
+    const list = (fit.length ? fit : found).map(x => x.label);
+    const uniq = [...new Set(list)];
+    if (uniq.length === 1) return uniq[0];
+    return 'лежит в нескольких местах: ' + uniq.join('; ');
   } catch (e) {}
   return '';
 }
 async function setChatAudio(wavBlob, name, dur, where) {
   if (needSpeech()) return false;
-  where = where || audioTagFor(name);
+  where = where || audioTagFor(name, dur);
   AG.audios = AG.audios || [];
   // the same file cut again replaces its own entry, a different one is added next to it
   const at = AG.audios.findIndex(x => x.name === name && Math.abs(x.dur - dur) < .1);

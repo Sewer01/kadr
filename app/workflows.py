@@ -1061,7 +1061,8 @@ def upscaler_node(name, usarp=2, target=None):
 
 def action_part_graph(m, scenes, k, width, height, seed, images, loras, preview=None, state=None, fresh=(), faithful=False,
                       ltxv=True,
-                      refiner_args=None, single=False, sing=False, steps=12, usarp=2):
+                      refiner_args=None, single=False, sing=False, steps=12, usarp=2,
+                      audio=None, audio_at=0.0, audio_dur=0.0, loop=False, vocals=None, scene_audios=()):
     """ACTION scene number `k` (0-based) of a scene-by-scene video, the same idea as long_part_graph (scene k continues the saved
     latent tail of scene k-1, the clip is cut off at the overlap) but with the action model: hybrid, DMAD + Speed Slider,
     8 steps at 0.6x size, learned latent upscale, 4 steps at full size. The sound is made by the model.
@@ -1120,8 +1121,30 @@ def action_part_graph(m, scenes, k, width, height, seed, images, loras, preview=
     ref = add("MiniMaxH3ReferenceToVideo", clip=["4", 0], vae=["5", 0], audio_vae=["6", 0],
               prompt=scene_prompt(sc[0], images, own, None, base=10 * (k + 1)),
               width=lw, height=lh, length=total, ref_image_size="max")
-    _refs(g, ref, own or images, base=100)
+    own_a = [x for x in (scene_audios[k] if k < len(scene_audios) else ()) if x][:3]
+    _refs(g, ref, own or images, audios=own_a, base=100, abase=5000)
     new = add("LTXVSeparateAVLatent", av_latent=[ref, 1])
+    # what the model hears: the same recipe as in the video studio - the piece of the track that
+    # belongs to THIS scene is encoded and gets a zero noise mask, so the sampler keeps it as it is
+    if audio:
+        g["14"] = {"class_type": "LoadAudio", "inputs": {"audio": audio}}
+        heard = ["14", 0]
+        if vocals:
+            g["15"] = {"class_type": "MelBandRoFormerModelLoader", "inputs": {"model_name": vocals}}
+            g["16"] = {"class_type": "MelBandRoFormerSampler", "inputs": {"model": ["15", 0], "audio": ["14", 0]}}
+            heard = ["16", 0]
+        src, at = heard, float(audio_at)
+        need = round(total / FPS, 3)
+        if loop and float(audio_dur or 0) > 0.4 and max(0.0, float(audio_dur) - at) < need - 0.2:
+            repeated = _loop_track(add, heard, float(audio_dur), at + need)
+            if repeated:
+                src, at = repeated, at % float(audio_dur)
+        a_trim = add("TrimAudioDuration", audio=src, start_index=round(at, 3), duration=need)
+        a_enc = add("VAEEncodeAudio", audio=[a_trim, 0], vae=["6", 0])
+        a_mask = add("SolidMask", value=0.0, width=round(total * 5 / 3), height=2)
+        a_lat = [add("SetLatentNoiseMask", samples=[a_enc, 0], mask=[a_mask, 0]), 0]
+    else:
+        a_lat = [new, 1]
     stages = {}
     old_full = None
     if not cont:
@@ -1152,7 +1175,7 @@ def action_part_graph(m, scenes, k, width, height, seed, images, loras, preview=
         else:
             v_lat = [add("SetLatentNoiseMask", samples=[cut2, 0], mask=[vmask, 0]), 0]
         stages.update({n: "encode" for n in (old_full, old_low)})
-    lat = add("LTXVConcatAVLatent", video_latent=v_lat, audio_latent=[new, 1])
+    lat = add("LTXVConcatAVLatent", video_latent=v_lat, audio_latent=a_lat)
     noise = add("RandomNoise", noise_seed=seed + 100 * k)
     if faithful:
         neg = add("ConditioningZeroOut", conditioning=[ref, 0])
@@ -1210,7 +1233,8 @@ def action_part_graph(m, scenes, k, width, height, seed, images, loras, preview=
     dec_a = add("VAEDecodeAudio", samples=final, vae=["6", 0])
     aud = [dec_a, 0] if not cont else [add("TrimAudioDuration", audio=[dec_a, 0], start_index=round(ov / FPS, 3),
                                               duration=round(clip_len / FPS, 3)), 0]
-    aud = _audio_fade(add, aud, round(clip_len / FPS, 3), head=cont, tail=True)
+    if not audio:   # a fade is for the sound the model invents; a track of the person must not dip at every join
+        aud = _audio_fade(add, aud, round(clip_len / FPS, 3), head=cont, tail=True)
     vid = add("CreateVideo", images=frames_out, audio=aud, fps=float(FPS), bit_depth="auto", color_space="sRGB", codec="none")
     save = add("SaveVideo", video=[vid, 0], filename_prefix="H3Workspace/long_part", format="auto", **{"format.codec": "auto"})
     sep2 = add("LTXVSeparateAVLatent", av_latent=final)
