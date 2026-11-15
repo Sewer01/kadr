@@ -2451,7 +2451,15 @@ function paramsCard(el, st, opts) {
     $$('.seg button[data-q]', el).forEach(c => c.classList.toggle('on', c.dataset.q === st.q));
     $$('.seg button[data-r]', el).forEach(c => c.classList.toggle('on', c.dataset.r === st.refSize));
     const [w, h] = st.cw && st.ch ? [st.cw, st.ch] : resFor(st.aspect, st.q);
-    $('.resv', el).textContent = `${w}×${h}` + (st.cw && st.ch ? ' · свой' : '');
+    const rsv = $('.resv', el);
+    // the quality button you picked already carries this number and the right-hand panel repeats it,
+    // so written always it was only noise; it stays for the one case where nothing else shows the
+    // real size - when a width and height of your own were typed in
+    if (rsv) {
+      const own = !!(st.cw && st.ch);
+      rsv.hidden = !own;
+      rsv.textContent = own ? `${w}×${h} · свой размер` : '';
+    }
     /* кнопки качества раньше всегда показывали горизонтальный кадр: при вертикали или квадрате
        цифры не менялись и не совпадали с тем, что справа. Теперь пересчитываются на каждый формат */
     $$('.seg button[data-q]', el).forEach(c => { const s = resFor(st.aspect, c.dataset.q).join('×'); const qt = $('.qt', c); if (qt && qt.textContent !== s) qt.textContent = s; });
@@ -5630,7 +5638,12 @@ function makeRefMode(cfg) {
       // mode first, then format, quality, sound
       const q = $('.lm-q', root), qh = $('.lm-q-hint', root);
       qh.style.margin = '0 0 4px';
-      const rows = $$(':scope > .row', top), fmt = rows[0], qual = rows[1], own = rows[2];
+      const rows = $$(':scope > .row', top);
+      // found by their caption, not by position: the extra row of the section (the sharpness slider in
+      // the action studio) is inserted first, and counting from zero silently shifted every one of
+      // these three onto the wrong row - format became the slider, quality became the format
+      const byCaption = rx => rows.find(x => rx.test((x.querySelector('.row-l') || {}).textContent || ''));
+      const fmt = byCaption(/Формат/), qual = byCaption(/Качество/), own = byCaption(/Свой размер/);
       const snd = $('.lm-snd', root), sh = $('.lm-snd-hint', root);
       // one column, the way every other section shows its settings: the two-column grid of the studio
       // (mode and sound on the left, format and quality on the right) is what made this card look
@@ -5639,7 +5652,7 @@ function makeRefMode(cfg) {
       const sndRow = mk('row', '<div class="row-l">Звук</div>'); sndRow.append(snd, sh);
       const modeSeg = $('.lm-mode', root), modeHint = $('.lm-mode-hint', root);
       const how2 = mk('row', '<div class="row-l">Как считать</div>'); how2.append(modeSeg, modeHint);
-      (how || hdr).after(modeRow, how2, fmt, qual, sndRow);
+      (how || hdr).after(...[fmt, qual, modeRow, how2, sndRow].filter(Boolean));   // format and quality first, as elsewhere
       // what the work stands on is decided first of all, before the settings it changes
       const baseSeg = $('.lm-base', root), baseHint = $('.lm-base-hint', root), ownBox = $('.lm-srcpick', root);
       if (baseSeg) {
@@ -5672,8 +5685,11 @@ function makeRefMode(cfg) {
         // the choice's own words already sit in the guide inside the fold
       }
       // the rare things go into one fold
-      const more = document.createElement('details'); more.className = 'st-more'; more.innerHTML = '<summary>Ещё: свой размер, seed</summary>';
-      [own, $('.vwarn', top), ...$$(':scope > details:not(.agvar)', top)].filter(Boolean).forEach(n => more.append(n));
+      const more = document.createElement('details'); more.className = 'st-more'; more.innerHTML = '<summary>Ещё: seed и остальное</summary>';
+      [$('.vwarn', top), ...$$(':scope > details:not(.agvar)', top)].filter(Boolean).forEach(n => more.append(n));
+      // a size of your own is not a rare thing to hide: in every other section it stands right under
+      // the quality, so the studio keeps it there too and the fold keeps only what is really seldom
+      if (qual && own) qual.after(own);
       top.append(more);
       // pictures right after the settings, then the scenes
       $('h3', refsCard).innerHTML = '<span class="n">1</span>Изображения героя и места <span class="hint" style="font-weight:400">(необязательно)</span>';
@@ -7977,7 +7993,7 @@ const imgSeedForm = (S, fd) => { if (S.seedFixed && S.seed) fd.append('seed', S.
           <div class="hint kr-realhint" hidden></div></div>
         <div class="row kr-scale" hidden><div class="row-l">Размер результата</div>
           <div class="seg" style="grid-template-columns:minmax(0,1fr) minmax(0,1fr)"><button data-sc="2k">Около 2K<small>быстрее</small></button><button data-sc="4k">4K<small>дольше и нужно больше видеопамяти</small></button></div></div>
-        <div class="row"><div class="row-l">Формат <span class="resv"></span></div><div class="chips kr-asp"></div></div>
+        <div class="row"><div class="row-l">Формат</div><div class="chips kr-asp"></div></div>
         ${SZ_ROW}
         ${imgSeedBox()}</div>
     </div><div class="preview kr-prev"></div></div>`;
@@ -7996,7 +8012,7 @@ const imgSeedForm = (S, fd) => { if (S.seedFixed && S.seed) fd.append('seed', S.
     $$('.kr-asp .chip', root).forEach(c => c.classList.toggle('on', c.dataset.a === S.aspect));
     const h3 = S.engine === 'h3img';
     const [w, h] = S.cw && S.ch ? [S.cw, S.ch] : h3 ? h3Size(S.aspect, +S.mp) : IMG_SIZES[S.aspect], k = !h3 && S.style === 'real' ? (S.scale === '4k' ? 2.5 : 1.5) : 1;
-    $('.resv', root).textContent = `${Math.round(w * k)}×${Math.round(h * k)}`; P.ratio(w, h);
+    ''  /* the size stands in the buttons; repeating it under «Формат» was a duplicate */; P.ratio(w, h);
     $$('[data-st]', root).forEach(b => b.classList.toggle('on', b.dataset.st === S.style));
     $$('[data-sc]', root).forEach(b => b.classList.toggle('on', b.dataset.sc === S.scale));
     $('.kr-scale', root).hidden = !(S.engine === 'krea' && S.style === 'real');
