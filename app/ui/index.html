@@ -2430,9 +2430,7 @@ function paramsCard(el, st, opts) {
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3 2 21h20L12 3Z"/><path d="M12 10v5M12 18h0"/></svg>
       <span>1080p на длинном ролике может не поместиться в видеопамять. Если генерация упадёт — выберите 720p или сократите длительность.</span>
     </div>
-    <details style="margin-top:16px">
-      <summary>Дополнительно</summary>
-      <div class="row" style="margin-top:14px">
+    <div class="row" style="margin-top:16px">
         <div class="row-l">Seed — «номер варианта»</div>
         <div class="seg seed-seg" style="grid-template-columns:minmax(0,1fr) minmax(0,1fr)">
           <button data-sf="0">Случайный<small>каждый раз новое видео</small></button>
@@ -2444,8 +2442,7 @@ function paramsCard(el, st, opts) {
           <button class="btn seed-copy" type="button">Копировать</button>
         </div>
         <div class="hint seed-hint"></div>
-      </div>
-    </details>`;
+    </div>`;
   const upd = () => {
     $$('.chip', el).forEach(c => c.classList.toggle('on', c.dataset.a === st.aspect));
     $$('.seg button[data-q]', el).forEach(c => c.classList.toggle('on', c.dataset.q === st.q));
@@ -5684,13 +5681,9 @@ function makeRefMode(cfg) {
       // (the run buttons are placed further down, once the scenes card stopped claiming them)
         // the choice's own words already sit in the guide inside the fold
       }
-      // the rare things go into one fold
-      const more = document.createElement('details'); more.className = 'st-more'; more.innerHTML = '<summary>Ещё: seed и остальное</summary>';
-      [$('.vwarn', top), ...$$(':scope > details:not(.agvar)', top)].filter(Boolean).forEach(n => more.append(n));
-      // a size of your own is not a rare thing to hide: in every other section it stands right under
-      // the quality, so the studio keeps it there too and the fold keeps only what is really seldom
+      // nothing is folded away in the studios: the seed, the size of your own and the memory warning
+      // all stand in the open, like everywhere else
       if (qual && own) qual.after(own);
-      top.append(more);
       // pictures right after the settings, then the scenes
       $('h3', refsCard).innerHTML = '<span class="n">1</span>Изображения героя и места <span class="hint" style="font-weight:400">(необязательно)</span>';
       $('h3', musCard).textContent = 'Своё аудио';
@@ -7944,11 +7937,10 @@ function imgPanel(el, o) {
 }
 
 function imgSeedBox(S) {
-  return `<details style="margin-top:16px"><summary>Дополнительно</summary>
-    <div class="row" style="margin-top:14px"><div class="row-l">Seed — «номер варианта»</div>
+  return `<div class="row" style="margin-top:16px"><div class="row-l">Seed — «номер варианта»</div>
       <div class="seg" style="grid-template-columns:minmax(0,1fr) minmax(0,1fr)"><button data-sf="0">Случайный<small>каждый раз новое изображение</small></button><button data-sf="1">Фиксированный<small>тот же вариант снова</small></button></div>
       <div class="path on" data-seedrow hidden><input data-seedin inputmode="numeric" spellcheck="false" placeholder="число, например 123456789"></div>
-    </div></details>`;
+    </div>`;
 }
 function imgSeedWire(root, S) {
   const paint = () => { $$('[data-sf]', root).forEach(b => b.classList.toggle('on', (b.dataset.sf === '1') === !!S.seedFixed)); $('[data-seedrow]', root).hidden = !S.seedFixed; };
