@@ -3335,6 +3335,7 @@ class AudioTrimmer {
     this.name = f.name; this.dur0 = this.buf.duration;
     this.start = 0; this.end = this.limit > 0 ? Math.min(this.dur0, this.limit) : this.dur0; this.cut = null; this.undo = [];
     this.zoom = 1; this.q('.at-zr').value = 1;
+    this._loaded = { start: this.start, end: this.end };   // closing must apply only what the person changed
     this.busy = !!silent;
     this._peaks(); this._paint(); this._sync();
     if (!silent) this.out();
@@ -3410,7 +3411,8 @@ class AudioTrimmer {
   /* the file the rest of the program should use: the audio as it stands now, cut to the selection */
   out() {
     if (!this.dur0) return null;
-    const f = new File([wavSlice(this.buf, this.start, this.end)], this.name.replace(/\.[a-z0-9]+$/i, '') + '-фрагмент.wav', { type: 'audio/wav' });
+    const stem = this.name.replace(/\.[a-z0-9]+$/i, '').replace(/(-фрагмент)+$/g, '');   // loading twice must not stack suffixes
+    const f = new File([wavSlice(this.buf, this.start, this.end)], stem + '-фрагмент.wav', { type: 'audio/wav' });
     this.onFile(f, this);
     return f;
   }
@@ -5798,8 +5800,16 @@ function makeRefMode(cfg) {
       const ainp = document.createElement('input');
       ainp.type = 'file'; ainp.accept = 'audio/*,.wav,.mp3,.ogg,.flac,.m4a'; ainp.hidden = true; c.append(ainp);
       let apick = -1;                       // which free slot the file dialog should fill
+      const applyTrim = () => { if (c._trim && c._trim.dur0) c._trim.out(); };
       const openTrim = j => {
         const host = $('.sc-trimhost', c);
+        // «Обрезать» ещё раз по тому же файлу = закрыть; что выделили - то и применили
+        if (!host.hidden && c._trim && c._trim._slot === j) {   // закрытие не зависит от того, прочитан файл
+          const L = c._trim._loaded || { start: c._trim.start, end: c._trim.end };
+          if (Math.abs(c._trim.start - L.start) > .05 || Math.abs(c._trim.end - L.end) > .05) applyTrim();
+          host.hidden = true;
+          return;
+        }
         host.hidden = false;
         if (!c._trim) {
           c._trim = new AudioTrimmer({
@@ -5812,8 +5822,10 @@ function makeRefMode(cfg) {
             onState: () => {}
           });
         }
-        c._trim._slot = j;
-        c._trim.setFile(c._auds[j]);
+        if (c._trim._slot !== j || !c._trim.dur0) {
+          c._trim._slot = j;
+          c._trim.setFile(c._auds[j], true);   // silent: open must not rewrite the file
+        }
       };
       c._paintAuds = () => {
         const row = $('.sc-auds', c); if (!row) return;
@@ -5824,9 +5836,12 @@ function makeRefMode(cfg) {
           (full ? '<span class="hint" style="font-size:12px">три аудио в сцене - максимум</span>' : '');
       };
       ainp.onchange = () => {
-        const f = ainp.files && ainp.files[0], j = apick;
-        ainp.value = ''; apick = -1;
-        if (!f || j < 0) return;
+        const f = ainp.files && ainp.files[0];
+        let j = apick; apick = -1;
+        ainp.value = '';
+        if (!f) return;
+        if (j < 0) j = c._auds.findIndex(x => !x);   // a file may arrive without the button (drag, restore)
+        if (j < 0) { toast('Больше трёх аудио в одной сцене нельзя'); return; }
         c._auds[j] = f; c._paintAuds(); paintRefs();
         if (root._save) root._save();
         toast('Аудио ' + (j + 2) + ' в сцене: ' + f.name + ' - при желании обрежьте (до 15 с)');
@@ -5846,7 +5861,7 @@ function makeRefMode(cfg) {
           ainp.click();
         } else if (b.dataset.a === 'del') {
           c._auds[j] = null;
-          if (c._trim && c._trim._slot === j) { c._trim.clear(); $('.sc-trimhost', c).hidden = true; }
+          if (c._trim && c._trim._slot === j) { c._trim.clear(); c._trim._slot = -1; $('.sc-trimhost', c).hidden = true; }
           c._paintAuds(); paintRefs();
           if (root._save) root._save();
         } else if (b.dataset.a === 'trim') openTrim(j);
