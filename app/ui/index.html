@@ -1114,6 +1114,10 @@ body.dropping::after{content:'Отпустите — программа разл
     .ra-row>.btn.mini[data-a="add"]:disabled{background:var(--surface-2);border-color:var(--line-2);color:var(--ink);opacity:.55;font-weight:400}
     .ra-row>.token{cursor:pointer}
     .ra-row .token .btn.mini{height:22px;padding:0 8px;font-size:11.5px;margin-left:2px}
+
+    /* the small counter that tells how many audio pieces a place allows */
+    .ra-row>.counter{font-size:12px;opacity:.75;padding:0 2px}
+    .sc-auds>.counter{font-size:12px;opacity:.75;padding:0 2px}
 </style>
 </head>
 <body>
@@ -5233,6 +5237,7 @@ function makeRefMode(cfg) {
       const full = slots.filter(s => s._file).length >= slots.length;
       row.innerHTML = '<button class="btn mini" type="button" data-a="add"' + (full ? ' disabled' : '') +
         ' title="Голос, ритм, атмосфера: до ' + slots.length + ' файлов. Обрезать можно до 15 секунд.">Загрузить аудио</button>' +
+        '<span class="counter" title="Сколько аудио допускается в этом режиме">' + slots.filter(s => s._file).length + ' / ' + slots.length + '</span>' +
         slots.map((s, i) => s._file
           ? `<span class="token" data-j="${i}" title="Тег вставится в текст по нажатию">&lt;Audio ${i + 1}&gt; ${esc(s._file.name.slice(0, 22))}` +
             (s._dur ? ' <small style="opacity:.75">' + (Math.round(s._dur * 10) / 10 + '').replace('.', ',') + ' с' + (s._sel ? ' · вырезано' : '') + '</small>' : '') +
@@ -6035,6 +6040,7 @@ function makeRefMode(cfg) {
         const full = c._auds.filter(Boolean).length >= 3;
         row.innerHTML = '<button class="btn mini" type="button" data-a="add"' + (full ? ' disabled' : '') +
           ' title="Аудио отдельной сцены: до трёх файлов. Модель получает их как ссылки и применяет там, где вы упомянули файл тегом в тексте сцены; не упомянули - звук делает сама. Обрезать можно до 15 секунд.">Загрузить аудио сцены</button>' +
+          '<span class="counter" title="Аудио в этой сцене: не больше трёх">' + c._auds.filter(Boolean).length + ' / 3</span>' +
           c._auds.map((f, j) => f ? `<span class="token" style="display:inline-flex;gap:6px;align-items:center">&lt;Audio ${(c._base || 10) + j}&gt; ${esc2(f.name.slice(0, 18))}${c._audSel[j] ? ' <small style="opacity:.75">с ' + c._audSel[j].start.toFixed(1).replace('.', ',') + ' по ' + c._audSel[j].end.toFixed(1).replace('.', ',') + ' с</small>' : ''} <button class="btn mini" type="button" data-a="trim" data-j="${j}" title="Послушать и обрезать: прибор под строкой">Обрезать</button><button class="btn mini" type="button" data-a="del" data-j="${j}" title="Убрать этот файл из сцены">×</button></span>` : '').join('') +
           (full ? '<span class="hint" style="font-size:12px">три аудио в сцене - максимум</span>' : '');
       };
@@ -6385,6 +6391,14 @@ function makeRefMode(cfg) {
       // pictures right after the settings, then the scenes
       $('h3', refsCard).innerHTML = '<span class="n">1</span>Изображения героя и места';
       $('h3', musCard).innerHTML = '<span class="n">2</span>Аудио';
+      if (!$('.mus-cap', musCard)) {   // how many pieces of audio this place allows, said once and in words
+        const cap = document.createElement('div'); cap.className = 'hint mus-cap';
+        cap.style.margin = '0 0 8px';
+        cap.innerHTML = 'Фон ролика - <b>один файл</b> на весь ролик. Аудио отдельной сцены - <b>до трёх</b> на сцену,' +
+          ' их номера идут десятками. На фон правило 15 секунд не действует: трек может быть длиннее сцены,' +
+          ' а если он короче ролика - включите «пустой фон по кругу».';
+        $('.card-h', musCard).insertAdjacentElement('afterend', cap);
+      }
       // in the action studio there is no music at all, so the audio card must not stand empty
       // the audio card is always there now: a file in it means "play this", an empty one means
       // "let the model invent the sound", so nothing about the card itself has to be hidden
@@ -7639,7 +7653,8 @@ async function agSend() {
   if (AUD.length) {
     text += '\n\n[Аудио в проекте: ' + AUD.length + '. Нумерация тегов: <Audio 1> - фон всего ролика, у сцены '
       + 'свои номера десятками: сцена 1 - <Audio 10>, <Audio 11>, <Audio 12>, сцена 2 - <Audio 20> и т.д. '
-      + 'Аудио применяется там, где его тег назван в тексте сцены; без тега в этой сцене звук делает модель.]';
+      + 'Аудио применяется там, где его тег назван в тексте сцены; без тега в этой сцене звук делает модель. '
+      + 'Сколько можно: фон - один файл на весь ролик, в сцене - не больше трёх аудио.]';
     AUD.forEach((au, i) => {
       text += `\n[Аудио ${i + 1}: ${au.name}, ${au.dur.toFixed(1)} с` + (au.where ? `, ${au.where}` : '') + '. ' + (au.text.trim()
         ? `Слова из аудио${au.langName ? ` (язык: ${au.langName})` : ''}: «${au.text.trim()}»]` : 'Слов в аудио нет (музыка или голос не распознан).]');
