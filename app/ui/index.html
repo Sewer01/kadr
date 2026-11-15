@@ -6743,8 +6743,13 @@ function makeRefMode(cfg) {
     if (cfg.scenes && root._save && !root._restoring) root._save();
     $('.rm-count', root).style.color = total > 12 ? 'var(--pink)' : '';
     // all places are listed from the start; a chip wakes up when its place gets a photo
-    $('.rm-tokens', root).innerHTML = slots.map((r, i) => `<button class="token" type="button" data-slot="${i}"${r._file ? '' : ' disabled'} title="${r._file ? 'Вставить в текст сцены' : 'В это место ещё не загружено фото - плашка оживёт, когда оно появится'}">&lt;Picture ${i + 1}&gt;</button>`).join('');
-      + (files('.rm-auds .slot').some(x => x._file) ? `<button class="token tok-aud" type="button" data-audio="1" title="&lt;Audio 1&gt; - ссылка на ваше аудио: модель возьмёт его как фоновый звук сцены">&lt;Audio 1&gt;</button>` : '');
+    $('.rm-tokens', root).innerHTML = slots.map((r, i) => `<button class="token" type="button" data-slot="${i}"${r._file ? '' : ' disabled'} title="${r._file ? 'Вставить в текст сцены' : 'В это место ещё не загружено фото - плашка оживёт, когда оно появится'}">&lt;Picture ${i + 1}&gt;</button>`).join('')
+      // the audio chips belong to the same row. They used to stand AFTER the semicolon, which made the
+      // second line a separate statement that threw its result away - so the audio chip never appeared
+      // anywhere, in any mode, and no syntax check could see anything wrong with it.
+      + $$('.rm-auds .slot', root).map((s, i) => s._file
+        ? `<button class="token tok-aud" type="button" data-audio="${i + 1}" title="&lt;Audio ${i + 1}&gt; - ссылка на это аудио: вставьте тег туда, где звук должен пригодиться">&lt;Audio ${i + 1}&gt;</button>`
+        : '').join('');
     $$('.sc', root).forEach(x => x._counter?.());   // after the row was rebuilt, or the lock it puts on the chips is wiped
     if (cfg.swap) { const w2 = $('.rm-who[data-i="1"]', root); if (w2) w2.hidden = imgs.length < 2; }
     if (cfg.swap && S.autoLen !== false) { const v = files('.rm-vids .slot')[0]; if (v && v._dur) { S.dur = Math.min(15, Math.max(3, Math.round(v._dur))); root._upd?.(); } }
@@ -6762,12 +6767,13 @@ function makeRefMode(cfg) {
       const own = (root._ta && root._ta.closest && root._ta.closest('.sc')) || $$('.sc', root)[root._sel] || $$('.sc', root).find(x => x.offsetParent !== null);
       const box = (own && $('textarea', own)) || promptEl();
       if (!box) { toast('Откройте сцену, куда вставить тег'); return; }
-      const at = box.selectionStart == null ? box.value.length : box.selectionStart, tag = '<Audio 1> ';
+      const at = box.selectionStart == null ? box.value.length : box.selectionStart;
+      const an = +b.dataset.audio || 1, tag = '<Audio ' + an + '> ';   // the chip carries its own number
       box.value = box.value.slice(0, at) + tag + box.value.slice(box.selectionEnd || at);
       box.focus(); box.selectionStart = box.selectionEnd = at + tag.length;
       box.dispatchEvent(new Event('input'));
       if (root._save) root._save();
-      toast('Тег <Audio 1> вставлен: модель возьмёт ваше аудио как фоновый звук сцены');
+      toast('Тег <Audio ' + an + '> вставлен: звук применится там, где его тег назван в тексте');
     }, true);
     $('.rm-tokens', root).onclick = e => {
     const t = e.target.closest('.token'); if (!t) return;
