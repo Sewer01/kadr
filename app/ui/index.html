@@ -133,6 +133,16 @@
 #view-long .st-grid .seg-q{flex-wrap:wrap;max-width:100%}
 #view-long .st-grid .seg-q button{padding:7px 10px}
 @media (max-width:1100px){#view-long .st-grid{grid-template-columns:1fr}}
+/* the base row of the studios, now above the first card: caption, two small buttons in one line,
+   the guide behind a button at the right - it used to be two tall buttons over two rows */
+.col>.row:has(.lm-base){display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 12px;padding:10px 12px;border:1px solid var(--line-2);border-radius:12px;background:var(--surface-2)}
+.col>.row:has(.lm-base)>.row-l{flex:none;font-size:13px;font-weight:700;color:var(--muted)}
+.col>.row:has(.lm-base) .lm-base{flex:1 1 300px;min-width:0;margin:0!important;padding:3px;grid-auto-flow:column!important;grid-auto-columns:minmax(0,1fr)!important;gap:4px}
+.col>.row:has(.lm-base) .lm-base button{padding:7px 10px;font-size:13px;white-space:normal;text-align:center;border-radius:9px}
+.col>.row:has(.lm-base) .lm-base button small{display:block;font-size:10.5px;opacity:.72;margin-top:1px}
+.col>.row:has(.lm-base) .lm-srcpick{flex:1 1 100%;margin:0!important}
+.lm-howb{flex:none;margin-left:auto}
+.lm-guide{display:grid;gap:9px}
 .st-more{margin-top:12px;border:1px solid var(--line-2);border-radius:12px;padding:8px 12px}.st-more>summary{cursor:pointer;font-weight:700;font-size:13.5px;color:var(--muted)}
 .st-more[open]>summary{margin-bottom:10px}
 .q-row.ok .q-s{color:var(--ok)}.q-row.err .q-s{color:var(--pink)}
@@ -5662,7 +5672,7 @@ function makeRefMode(cfg) {
         baseSeg.style.marginBottom = '0';
         baseRow.append(baseSeg);
         if (ownBox) { ownBox.style.marginTop = '8px'; baseRow.append(ownBox); }
-        hdr.after(baseRow);
+        root._baseHost = baseRow;   // put above the first card once the whole set-up is done
       // the video you continue is part of this choice, so the note with «Убрать» stands right here
       const srcNote = $('.lm-src', root);
       // the button that takes the video off stands with the buttons that put it on
@@ -5670,14 +5680,28 @@ function makeRefMode(cfg) {
       if (unBtn && srcRow) { unBtn.style.margin = '0'; srcRow.append(unBtn); }
       if (srcNote) { srcNote.classList.remove('note'); srcNote.classList.add('hint'); srcNote.style.cssText = 'margin:8px 0 0;font-size:12.5px;display:block'; }
       // one mini instruction instead of notes spread over the page: the fold in the settings card
-      const guide = how || (() => { const d = document.createElement('details'); d.className = 'agvar'; d.innerHTML = '<summary>Как работает</summary>'; baseRow.after(d); return d; })();
+      const guide = how || (() => { const d = document.createElement('details'); d.className = 'agvar'; d.innerHTML = '<summary>Как работает</summary>'; baseRow.append(d); return d; })();
       const box = document.createElement('div'); box.className = 'lm-guide'; box.style.cssText = 'display:flex;flex-direction:column;gap:8px;margin-top:8px';
       (guide.querySelector('summary') || guide).insertAdjacentElement('afterend', box);
       const scNote = [...scCard.children].filter(x => x.classList.contains('note')).pop();
       const rmNote = [...refsCard.children].filter(x => x.classList.contains('note')).pop();
       [baseHint, scNote, rmNote].filter(Boolean).forEach(n => { n.style.margin = '0'; box.append(n); });
       box.insertAdjacentHTML('beforeend', '<div class="hint" style="font-size:12.5px"><b>Места для фото.</b> Сцена несёт девять картинок: сначала общие (<Picture 1>, <Picture 2>…), потом её собственные (<Picture 10>, <Picture 11>…) - программа сама ставит их в расчёт после общих. Когда вы продолжаете своё видео, его последний кадр идёт отдельной плиткой сверх этих девяти, и ваших мест остаётся восемь. Плашки с номерами стоят под текстом сцены; занятые места гасят те, что текст не вызывает.</div>');
-      if ($('p, div', guide) && guide.querySelectorAll('p, .hint').length) { /* the old words stay above the guide */ }
+      const gsum = guide.querySelector('summary');
+      if (gsum) {
+        const gb = document.createElement('button'); gb.type = 'button'; gb.className = 'btn mini lm-howb';
+        gb.textContent = 'Как работает'; gb.title = 'Открыть объяснение в отдельном окне';
+        const gwrap = document.createElement('div'); gwrap.className = 'lm-guidewrap';
+        [...guide.childNodes].forEach(x => { if (x !== gsum) gwrap.append(x); });
+        guide.replaceWith(gb);
+        gb.onclick = () => {
+          let m = document.getElementById('lmHowM');
+          if (!m) { m = document.createElement('div'); m.className = 'modal'; m.id = 'lmHowM'; document.body.append(m); }
+          m.hidden = false;
+          m.innerHTML = '<div class="box" style="padding:22px;max-width:660px;max-height:calc(var(--vh,1vh)*84);overflow:auto"><div class="card-h"><h3>Как работает студия</h3><button class="btn" data-x type="button">Закрыть</button></div><div class="lm-guide"></div></div>';
+          $('.lm-guide', m).append(gwrap);
+        };
+      }
       // (the run buttons are placed further down, once the scenes card stopped claiming them)
         // the choice's own words already sit in the guide inside the fold
       }
@@ -5739,6 +5763,7 @@ function makeRefMode(cfg) {
       col.prepend(refsCard);
       refsCard.after(scCard);
       col.append(top);
+      if (root._baseHost) col.prepend(root._baseHost);   // the switch, the file and the button, above card one
       /* undo: what was cleared or deleted can be brought back (button «Отменить действие» or Ctrl+Z) */
       root._undo = [];
       const refsFiles = () => $$('.ref', imgsEl).map(r => r._file || null);
