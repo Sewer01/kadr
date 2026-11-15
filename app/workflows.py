@@ -917,11 +917,11 @@ def action_graph(m, prompt, width, height, seconds, seed, images, audios, faithf
             "14": {"class_type": "SamplerCustomAdvanced", "inputs": {
                 "noise": ["11", 0], "guider": ["13", 0], "sampler": ["12", 0], "sigmas": ["9", 0], "latent_image": ["8", 1]}},
             "15": {"class_type": "LTXVSeparateAVLatent", "inputs": {"av_latent": ["14", 1]}},
-            "16": {"class_type": upscaler_node(m["upscaler"], usarp)[0], "inputs": dict(
-                {"latent": ["15", 0], "model_name": m["upscaler"], "mode": "scale by multiplier",
-                 "mode.scale": round(1 / ACTION_LOWRES, 3), "align": 32,
-                 "force_unload": True, "device": "cuda", "precision": "fp16"},
-                **upscaler_node(m["upscaler"], usarp)[1])},
+            "16": {"class_type": upscaler_node(m["upscaler"], usarp, (width, height))[0], "inputs": dict(
+                {"latent": ["15", 0], "model_name": m["upscaler"], "mode": upscaler_mode(m["upscaler"]),
+                 "align": 32, "force_unload": True, "device": "cuda", "precision": "fp16"},
+                **upscaler_size(m["upscaler"], round(1 / ACTION_LOWRES, 3), (width, height)),
+                **upscaler_node(m["upscaler"], usarp, (width, height))[1])},
             "17": {"class_type": "LTXVConcatAVLatent", "inputs": {"video_latent": ["16", 0], "audio_latent": ["15", 1]}},
             "18": {"class_type": "SamplerCustomAdvanced", "inputs": {
                 "noise": ["11", 0], "guider": ["13", 0], "sampler": ["12", 0], "sigmas": ["9", 1], "latent_image": ["17", 0]}},
@@ -954,10 +954,51 @@ def action_sizes(width, height):
     return lw, lh, max(32, round(lw * s / 32) * 32), max(32, round(lh * s / 32) * 32)
 
 
-def upscaler_node(name, usarp=2):
+def latent_fit(add, src, got_w, got_h, want_w, want_h):
+    """The learned upscaler cannot land on an arbitrary size: it averages the scale over the two sides
+       and rounds to 32, so at 1568x672 it returns 1568x704 while the tail of the previous scene is 672
+       tall. Whatever it gave too much of is cut off - the concatenation of a continuation then always
+       has identical sides, whatever size the user picked."""
+    src2 = src
+    if got_w > want_w:
+        src2 = add("LatentCut", samples=[src2, 0], dim="x", index=0, amount=max(1, want_w))
+    if got_h > want_h:
+        src2 = add("LatentCut", samples=[src2, 0], dim="y", index=0, amount=max(1, want_h))
+    return src2
+
+
+def action_full(width, height):
+    """The size the action route can really end up at. The upscaler comes back from 0.6x and then rounds
+       to 32, and 16:9 is the case where that does not return to the asked size: 1376x768 becomes 1376x736
+       (768 * 0.6 = 460.8 -> 448 -> back -> 736). The full-size pass and the tail of the previous scene
+       are made at the asked size, so the concatenation of a continuation died with «Sizes of tensors must
+       match ... Expected size 48 but got size 46». Working at the size the upscaler reproduces keeps the
+       low pass, the full pass and the upscaled part the same shape - and the size stays 16:9 to within
+       4 %."""
+    return action_sizes(width, height)[2:]
+
+
+def upscaler_mode(name):
+    """How the size is handed to the chosen upscaler: the 3D node is driven by a scale factor, the 2D
+       one by exact pixels (see upscaler_node), so the pair of inputs differs."""
+    return "target dimensions" if "2d" in str(name or "").lower() else "scale by multiplier"
+
+
+def upscaler_size(name, scale, target):
+    if upscaler_mode(name) == "target dimensions":
+        return {"mode.width": int(target[0]), "mode.height": int(target[1])}
+    return {"mode.scale": scale}
+
+
+def upscaler_node(name, usarp=2, target=None):
     """Which latent-upscaler node and which extra inputs a chosen weights file needs: the 2D pack
        (2026-11-10) answers to a sharpness tier and names its chunking input differently.
-       usarp = that tier, 1 (closest to the original, softest) .. 6 (most detail, furthest)."""
+       usarp = that tier, 1 (closest to the original, softest) .. 6 (most detail, furthest).
+
+       target=(w,h) - the exact size the picture must come out at. The 2D node rounds the result of a
+       scale factor differently from the 3D one: at 1184x896 it returned 1184x864, and gluing the tail
+       of the previous scene (896) to that failed inside LatentConcat. Where the output is concatenated,
+       the size is therefore given in pixels instead of a multiplier."""
     low = str(name or "").lower()
     if "2d" in low:
         return "MinimaxH3LatentUpscalerNode2D", {"sharpness": max(1, min(6, int(usarp or 2))),
@@ -1047,9 +1088,9 @@ def action_part_graph(m, scenes, k, width, height, seed, images, loras, preview=
         white = add("EmptyImage", width=round(lw / 16), height=round(lh / 16), batch_size=max(1, t_tot - t_ov), color=16777215)
         both = add("ImageBatch", image1=[black, 0], image2=[white, 0])
         vmask = add("ImageToMask", image=[both, 0], channel="red")
-        if ltxv:   # which latent frames are new must be said per frame: one mask per frame, and the node
-        # for it comes from ComfyUI-LTXVideo; with a single mask for the whole clip the frames kept
-        # from the previous scene and the frames being made blend into each other (double exposure)
+        if ltxv:   # which latent frames are new must be said per frame: one mask per frame, and the
+            # node for it comes from ComfyUI-LTXVideo; with a single mask for the whole clip the frames
+            # kept from the previous scene and the frames being made blend into each other (double exposure)
             v_lat = [add("LTXVSetVideoLatentNoiseMasks", samples=[cut2, 0], masks=[vmask, 0]), 0]
         else:
             v_lat = [add("SetLatentNoiseMask", samples=[cut2, 0], mask=[vmask, 0]), 0]
@@ -1070,10 +1111,21 @@ def action_part_graph(m, scenes, k, width, height, seed, images, loras, preview=
         guider = add("BasicGuider", model=mdl, conditioning=[ref, 0])
         smp1 = add("SamplerCustomAdvanced", noise=[noise, 0], guider=[guider, 0], sampler=["12", 0], sigmas=["9", 0], latent_image=[lat, 0])
         sep = add("LTXVSeparateAVLatent", av_latent=[smp1, 1])
-        ucls, uextra = upscaler_node(m["upscaler"], usarp)
-        up = add(ucls, latent=[sep, 0], model_name=m["upscaler"], mode="scale by multiplier",
-                 **{"mode.scale": round(1 / ACTION_LOWRES, 3)}, align=32,
-                 force_unload=True, device="cuda", precision="fp16", **uextra)
+        # the target is the FULL size of the scene latent, not action_sizes(): that helper rounds the
+        # low size back up (1376x768 -> 736), and the tail of the previous scene is 768 tall, so the
+        # concatenation of a continuation failed with «Expected size 48 but got size 46»
+        ucls, uextra = upscaler_node(m["upscaler"], usarp, (width, height))
+        up = add(ucls, latent=[sep, 0], model_name=m["upscaler"], mode=upscaler_mode(m["upscaler"]),
+                 align=32, force_unload=True, device="cuda", precision="fp16",
+                 **upscaler_size(m["upscaler"], round(1 / ACTION_LOWRES, 3), (width, height)), **uextra)
+        # what the node can really give back: the 3D one scales one way, the 2 one averages the scale
+        # over the two sides; the larger of the two guesses is what we then trim down to the scene size
+        s = round(1 / ACTION_LOWRES, 3)
+        a32, b32 = action_sizes(width, height)[2:]
+        eff = ((width / lw) + (height / lh)) / 2.0
+        ew = max(a32, max(32, round(lw * eff / 32) * 32))
+        eh = max(b32, max(32, round(lh * eff / 32) * 32))
+        up = latent_fit(add, up, ew // 16, eh // 16, width // 16, height // 16)
     if faithful:
         final, smp_stages = [smp, 0], {smp: "sample", refiner: "encode"}
     elif single:
