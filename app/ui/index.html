@@ -4065,6 +4065,147 @@ class VideoTrimmer {
   }
 }
 
+/* ---------- AudioRow: три аудио с тегами и ножницами, один и тот же блок в любом месте ---------- */
+/* The row that scene audio grew up with, lifted out so any card can have it: three slots, a chip with
+   each file's tag, the same trimmer, a counter. base numbers the tags (1 for the whole film, a decade
+   for one scene); limit 0 means "as long as it is" - the fifteen seconds were the rule of the old
+   shared loader, not of a sample. It knows nothing about the page it sits on: the owner passes a
+   callback, so the same class serves the film and every scene. */
+class AudioRow {
+  constructor(o) {
+    this.mount = o.mount; this.base = o.base || 1; this.limit = o.limit === 0 ? 0 : (o.limit || 15);
+    this.onChange = o.onChange || (() => {}); this.whereLabel = o.whereLabel || (j => 'аудио ' + (j + 1));
+    this.files = [null, null, null]; this.src = [null, null, null]; this.sel = [null, null, null]; this.dur = [null, null, null];
+    this.pick = -1; this._slot = -1;
+    this.el = document.createElement('div');
+    this.el.className = 'arow';
+    this.el.style.cssText = 'display:flex;flex-wrap:wrap;gap:6px;align-items:center';
+    this.trim = document.createElement('div');
+    this.trim.hidden = true; this.trim.style.marginTop = '8px';
+    this.mount.append(this.el, this.trim);
+    this.inp = document.createElement('input');
+    this.inp.type = 'file'; this.inp.accept = 'audio/*,.wav,.mp3,.ogg,.flac,.m4a'; this.inp.hidden = true;
+    this.mount.append(this.inp);
+    this.inp.onchange = () => {
+      const f = this.inp.files && this.inp.files[0];
+      let j = this.pick; this.pick = -1; this.inp.value = '';
+      if (!f) return;
+      if (j < 0) j = this.files.findIndex(x => !x);
+      if (j < 0) { toast('Больше трёх аудио здесь нельзя'); return; }
+      this.set(j, f);
+      toast('Аудио <Audio ' + (this.base + j) + '>: ' + f.name + (this.limit ? ' - при желании обрежьте (до ' + this.limit + ' с)' : ' - при желании обрежьте, длина не ограничена'));
+    };
+    this.el.onclick = e => {
+      const b = e.target.closest('[data-a]'); if (!b) return;
+      const j = +b.dataset.j;
+      if (b.dataset.a === 'add') {
+        this.pick = this.files.findIndex(x => !x);
+        if (this.pick < 0) { toast('Больше трёх аудио здесь нельзя'); return; }
+        this.inp.click();
+      } else if (b.dataset.a === 'del') {
+        this.set(j, null);
+        if (this._tr && this._tr._slot === j) { this._tr.clear(); this._tr._slot = -1; this.trim.hidden = true; }
+      } else if (b.dataset.a === 'trim') this.openTrim(j);
+    };
+    this.paint();
+  }
+  set(j, f) { this.files[j] = f; this.src[j] = f; this.sel[j] = null; this.dur[j] = null; this.paint(); this.onChange(j, f); }
+  used() { return this.files.filter(Boolean).length; }
+  openTrim(j) {
+    const src = this.src[j] || this.files[j];
+    if (!src) return;
+    if (!this._tr) {
+      this._tr = new AudioTrimmer({
+        mount: this.trim, limit: this.limit,
+        whereLabel: q => this.whereLabel(q._slot),
+        onFile: f => {
+          const j2 = this._tr._slot, s0 = this.src[j2] || f;
+          this.dur[j2] = this._tr.len();
+          this.files[j2] = new File([f], s0.name.replace(/\.[a-z0-9]+$/i, '') + '.wav', { type: 'audio/wav' });
+          this.sel[j2] = { start: this._tr.start, end: this._tr.end, of: s0.name };
+          this.paint(); this.onChange(j2, this.files[j2]);
+        },
+        onState: tr => { const j3 = tr._slot; if (j3 >= 0 && tr.dur0 && !this.sel[j3]) this.dur[j3] = tr.dur0; },
+      });
+    }
+    if (!this.trim.hidden && this._tr._slot === j) {          // the second click closes: what was marked is applied
+      const keep = this.sel[j] || this._tr._loaded || { start: 0, end: this._tr.dur0 };
+      if (this._tr.dur0 && (Math.abs(this._tr.start - keep.start) > .05 || Math.abs(this._tr.end - keep.end) > .05)) this._tr.out();
+      this.trim.hidden = true;
+      return;
+    }
+    this.trim.hidden = false;
+    if (this._tr._slot !== j || !this._tr.dur0) {
+      this._tr._slot = j;
+      this._tr.setFile(src, true);                            // the original always opens, so a second cut is possible
+      const s = this.sel[j];
+      if (s && src === this.src[j] && s.end <= this._tr.dur0 + .2) {
+        this._tr.start = s.start; this._tr.end = Math.min(s.end, this._tr.dur0);
+        this._tr._loaded = { start: s.start, end: this._tr.end }; this._tr._sync();
+      }
+    }
+  }
+  paint() {
+    const e2 = s => String(s).replace(/[<>&]/g, ch => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[ch]));
+    const full = this.used() >= 3;
+    this.el.innerHTML = '<button class="btn mini" type="button" data-a="add"' + (full ? ' disabled' : '') +
+      ' title="До трёх файлов. Модель получает их как образцы и применяет там, где вы упомянули файл тегом в тексте">+ Загрузить аудио</button>' +
+      '<span class="counter" title="Аудио здесь: не больше трёх">' + this.used() + ' / 3</span>' +
+      this.files.map((f, j) => f ? '<span class="token" style="display:inline-flex;gap:6px;align-items:center">&lt;Audio ' +
+        (this.base + j) + '&gt; ' + e2(f.name.slice(0, 18)) + '</span>' +
+        '<button class="btn mini" type="button" data-a="trim" data-j="' + j + '" title="Обрезать: в модель пойдёт выделенный кусок">Обрезать</button>' +
+        '<button class="btn mini" type="button" data-a="del" data-j="' + j + '" title="Убрать это аудио">×</button>' : '').join('') +
+      (full ? '<span class="hint" style="font-size:12px">три аудио - максимум</span>' : '');
+  }
+}
+
+/* The tags one scene offers: the film's samples first, then the scene's own. A chip whose tag already
+   stands in the text is marked; once three tags are in, the rest stop offering themselves - the model
+   cannot listen to more than three audios in one pass. */
+function audioTokens(c, bs, film) {
+  const ta = c.querySelector('textarea'), text = ta ? ta.value : '';
+  const used = new Set((text.match(/<Audio\s*\d+>/g) || []).map(s => +s.replace(/\D+/g, '')));
+  const list = [];
+  (film || []).forEach((f, j) => { if (f) list.push({ tag: 1 + j, name: f.name, own: false }); });
+  (c._auds || []).forEach((f, j) => { if (f) list.push({ tag: bs + j, name: f.name, own: true }); });
+  const full = used.size >= 3;
+  return list.map(x => {
+    const here = used.has(x.tag), off = !here && full;
+    return '<button class="token" type="button" data-ins="&lt;Audio ' + x.tag + '&gt;" data-audio="1"' + (off ? ' disabled' : '') +
+      ' title="' + (here ? 'Этот тег уже в тексте сцены' : off ? 'В сцене уже три аудио - модель слушает не больше трёх'
+        : 'Вставить в текст тег <Audio ' + x.tag + '> - ' + (x.own ? 'аудио этой сцены' : 'общее аудио ролика') + ': ' + x.name) + '">&lt;Audio ' +
+      x.tag + (here ? ' ✓' : '') + '</button>';
+  });
+}
+
+/* What a scene really sends: the files whose tags stand in its text, in the order of those tags, never
+   more than the three places the model has. A text that names no audio sends the scene's own files, as
+   always. The copy handed to the model gets the tags renumbered to the places the files took - the
+   numbers on the screen stay the ones the person wrote. */
+function sceneAudioPlan(c, film, bs) {
+  const ta = c.querySelector('textarea'), raw = ta ? ta.value : '';
+  const byTag = new Map();
+  (film || []).forEach((f, j) => { if (f) byTag.set(1 + j, f); });
+  (c._auds || []).forEach((f, j) => { if (f) byTag.set(bs + j, f); });
+  const seen = (raw.match(/<Audio\s*\d+/g) || []).map(s => +s.replace(/\D+/g, ''));
+  const picked = [];
+  seen.forEach(t => { if (byTag.has(t) && picked.indexOf(t) < 0 && picked.length < 3) picked.push(t); });
+  // a tag that is not sent must not stay in the text: the model would read a number with no file
+  // behind it, and that is worse than no tag at all. Dropped ones are reported, not hidden.
+  const left = [];
+  const text = raw.replace(/<Audio\s*(\d+)>/g, (whole, t) => {
+    const k = picked.indexOf(+t);
+    if (k >= 0) return '<Audio ' + (bs + k) + '>';
+    if (byTag.has(+t)) { left.push(+t); return ''; }   // the fourth and further: the quota is three, the tag goes
+    return whole;                              // a number of another scene or one typed by hand stays
+  });
+  const dropped = left.filter((v, i) => left.indexOf(v) === i);
+  if (!picked.length) return { files: (c._auds || []).slice(0, 3), text: raw, rewritten: false, dropped: [] };
+  const out = text.replace(/ {2,}/g, ' ').replace(/\s+([,.;!?])/g, '$1').trim();
+  return { files: picked.map(t => byTag.get(t)), text: out, rewritten: out !== raw.trim(), dropped: dropped };
+}
+
+
 class AudioTrimmer {
   constructor(o = {}) {
     this.o = o;
@@ -7089,7 +7230,7 @@ function makeRefMode(cfg) {
         const tk = $('.sc-tokens', c);
         const bs = ownBase();
         if (tk) tk.innerHTML = c._files.slice(0, shown).map((f, j) => `<button class="token" type="button" data-ins="&lt;Picture ${bs + j}&gt;"${f ? '' : ' disabled'} title="${f ? 'Вставить в текст тег <Picture ' + (bs + j) + '> - ваше фото номер ' + (j + 1) + ' этой сцены' : 'Место ' + (j + 1) + ' свободно - номер ' + (bs + j) + ' оживёт, когда туда что-нибудь положат'}">&lt;Pic ${bs + j}&gt;</button>`).join('')
-          + (c._auds || []).map((f, j) => f ? `<button class="token" type="button" data-ins="&lt;Audio ${bs + j}&gt;" data-audio="1" title="Вставить в текст тег <Audio ${bs + j}> - аудио номер ${j + 1} этой сцены; звук применяется там, где вы его упомянули">&lt;Audio ${bs + j}&gt;</button>` : '').join('');
+          + audioTokens(c, bs, root._fauds || []).join('');
         c._base = bs; c._counter?.();
         const n = c._files.filter(Boolean).length;
         $('.sc-rhint', c).textContent = n ? `Своих фото в этой сцене: ${n} (мест до девяти). Номера идут десятками по сценам: в первой <Picture 10>, <Picture 11>, во второй <Picture 20>, <Picture 21> - поэтому в Агенте число сразу говорит, о какой сцене речь. Аудио этой сцены зовётся так же: <Audio 10>, <Audio 20>... Общие изображения остаются <Picture 1…5>, фон всего ролика - <Audio 1>.` : 'Своих фото нет: сцена возьмёт общие. У своих мест номера не меняются, даже если убрать другое фото.';
@@ -7196,6 +7337,7 @@ function makeRefMode(cfg) {
         } else if (b.dataset.a === 'trim') openTrim(j);
       };
       c._paintAuds(); c._paintRefs = paintRefs;
+      $('textarea', c).addEventListener('input', () => { try { paintRefs(); } catch (e) { } });   // the chips learn which tags the text already holds
       paintRefs();   // the chips row now knows about restored scene audio
       box.append(c); attachRu($('textarea', c));
       $('.ru-wrap', c)?.insertAdjacentHTML('beforeend', '<span class="sc-left hint" style="font-size:12px;margin-left:10px"></span>');
@@ -7513,10 +7655,28 @@ function makeRefMode(cfg) {
       // pictures right after the settings, then the scenes
       $('h3', refsCard).innerHTML = '<span class="n">1</span>Изображения героя и места';
       $('h3', musCard).innerHTML = '<span class="n">2</span>Аудио';
+      if (!$('.mus-film', musCard)) {   // three samples for the whole film, on the same terms as a scene's
+        const fw = document.createElement('div');
+        fw.className = 'mus-film';
+        fw.style.cssText = 'margin:0 0 10px';
+        fw.innerHTML = '<div class="sub-l"><span>Общие аудио на весь ролик</span></div>' +
+          '<div class="mus-filmrow"></div>' +
+          '<small class="hint" style="display:block;margin-top:6px">До трёх файлов на весь ролик: голос, ритм, атмосфера.' +
+          ' Тег у каждого свой - <b>&lt;Audio 1&gt;</b>, <b>&lt;Audio 2&gt;</b>, <b>&lt;Audio 3&gt;</b> - и вставляется он в текст той сцены, где нужен.' +
+          ' Модель за раз слушает <b>не больше трёх аудио</b>: сколько тегов стоит в сцене, столько и работает, остальные лежат в запасе.' +
+          ' Обрезать можно любой файл, длина не ограничена.</small>';
+        $('.card-h', musCard).insertAdjacentElement('afterend', fw);
+        const frow = new AudioRow({
+          mount: $('.mus-filmrow', fw), base: 1, limit: 0,
+          whereLabel: j => 'общее аудио ролика, аудио ' + (j + 1) + ', тег <Audio ' + (1 + j) + '>',
+          onChange: () => { if (root._save) root._save(); $$('.sc', root).forEach(cc => { try { cc._paintRefs && cc._paintRefs(); } catch (e) { } }); },
+        });
+        root._faudRow = frow; root._fauds = frow.files;
+      }
       if (!$('.mus-cap', musCard)) {   // how many pieces of audio this place allows, said once and in words
         const cap = document.createElement('div'); cap.className = 'hint mus-cap';
         cap.style.margin = '0 0 8px';
-        cap.innerHTML = 'Фон ролика - <b>один файл</b> на весь ролик. Аудио отдельной сцены - <b>до трёх</b> на сцену,' +
+        cap.innerHTML = '<b>Общие аудио</b> - до трёх на весь ролик (теги &lt;Audio 1&gt;, &lt;Audio 2&gt;, &lt;Audio 3&gt;). Аудио отдельной сцены - <b>до трёх</b> на сцену,' +
           ' их номера идут десятками. На фон правило 15 секунд не действует: трек может быть длиннее сцены,' +
           ' а если он короче ролика - включите «пустой фон по кругу».';
         $('.card-h', musCard).insertAdjacentElement('afterend', cap);
@@ -7979,7 +8139,12 @@ function makeRefMode(cfg) {
         }
         if (cfg.scenes && root._mode !== 'parts') { fd.append('run', root._run); if (root._q === 'draft') fd.append('draft', '1'); }
         if (cfg.scenes) { fd.append('scenes', JSON.stringify(sceneList())); $$('.sc', root).forEach((c, i) => c._files.forEach((f, j) => { if (f) fd.append(`simg${i}_${j}`, f); }));
-          $$('.sc', root).forEach((c, i) => (c._auds || []).forEach((f, j) => { if (f) fd.append(`saudio${i}_${j}`, f); })); fd.append('start', $('.lm-start', root).value || '0'); if (root._loop !== false) fd.append('music_loop', '1'); if (root._adur) fd.append('audio_dur', String(Math.round(root._adur * 1000) / 1000)); fd.append('vocals', root._snd === 'own' && $('.lm-vocals', root).checked ? '1' : '0'); if (cfg.mode === 'actionsc') loraForm(S, fd); }
+          $$('.sc', root).forEach((c, i) => {
+            const plan = sceneAudioPlan(c, root._fauds || [], c._base || 10 * (i + 1));
+            plan.files.forEach((f, j) => { if (f) fd.append(`saudio${i}_${j}`, f); });
+            if (plan.rewritten && root._sentText) root._sentText[i] = plan.text;   // the model gets the numbers of the places
+            if (plan.dropped && plan.dropped.length) toast('Сцена ' + (i + 1) + ': модель слушает три аудио, поэтому ' + plan.dropped.map(t => '<Audio ' + t + '>').join(', ') + ' в этот раз не пойдёт - уберите лишний тег или замените его');
+          }); fd.append('start', $('.lm-start', root).value || '0'); if (root._loop !== false) fd.append('music_loop', '1'); if (root._adur) fd.append('audio_dur', String(Math.round(root._adur * 1000) / 1000)); fd.append('vocals', root._snd === 'own' && $('.lm-vocals', root).checked ? '1' : '0'); if (cfg.mode === 'actionsc') loraForm(S, fd); }
         else loraForm(S, fd);
         seedForm(S, fd);
         $$('.ref', imgsEl).filter(r => r._file).forEach((r, i) => fd.append('img' + i, r._file));
@@ -11642,7 +11807,9 @@ if (e.target.closest('.mt-clear')) {
       B('«Продолжить видео»', 'берёт ваше готовое видео и дописывает сцены после него.'),
       B('Плюс под сценой', 'добавляет ещё одну сцену; номер карточки слева - это и есть её место.'),
       B('Картинки сцены', 'до 9 на каждую сцену; свои медиа нумеруются десятками по номеру сцены.'),
-      B('Аудио сцены', 'до трёх файлов на сцену: звук этой сцены берётся из них.'),
+      B('Аудио сцены', 'до трёх файлов на сцену: это образцы - голос, ритм, атмосфера. Модель слушает их и звук создаёт сама; в тексте сцены они значатся как &lt;Audio 10&gt;, &lt;Audio 11&gt;, &lt;Audio 12&gt; (во второй сцене - 20, 21, 22).'),
+      B('Общие аудио на весь ролик', 'до трёх файлов в карточке «Аудио»: те же плитки и ножницы, теги &lt;Audio 1&gt;, &lt;Audio 2&gt;, &lt;Audio 3&gt;. Вставляют в ту сцену, где звук нужен; длина не ограничена.'),
+      B('Три тега - и хватит', 'модель за раз слушает не больше трёх аудио, поэтому в сцене работает три тега: вставили три - остальные чипи гаснут. Что лежит в сцене, но не упомянуто тегом, в этот раз не участвует; четвёртый тег программа уберёт и скажет об этом.'),
       B('Общее аудио', 'фоновый звук всего ролика, тег &lt;Audio 1&gt;.'),
       B('Склейка', 'сцены соединяются подряд в один файл; длина ролика - сумма сцен.'),
     ]),
@@ -11656,7 +11823,8 @@ if (e.target.closest('.mt-clear')) {
       B('Сцены', 'пишутся списком, каждая до 15 секунд: погоня - это несколько сцен, а не одна длинная.'),
       B('Картинки сцены', 'до 5: герой, место, нужный ракурс.'),
       B('Преемственность', 'следующая сцена начинается с последнего кадра предыдущей, поэтому герой не меняет лицо от сцены к сцене.'),
-      B('Звук', 'делает модель; свой звук кладите в карточку «Аудио».'),
+      B('Звук', 'создаёт сама модель, но им можно управлять: до трёх общих аудио на весь ролик (теги &lt;Audio 1&gt;, &lt;Audio 2&gt;, &lt;Audio 3&gt;) и до трёх своих в каждой сцене (&lt;Audio 10&gt;, &lt;Audio 11&gt;, &lt;Audio 12&gt;). Общее подходит, когда голос или ритм нужны во всём ролике, а не в одной сцене.'),
+      B('Три тега - и хватит', 'модель слушает не больше трёх аудио за раз: вставили три тега в сцену - остальные чипи гаснут, а лишний тег программа уберёт и предупредит.'),
     ]),
     lipsync: () => H('<b>Клип - герой говорит или поёт под ваше аудио</b>') + UL([
       B('Аудио', 'обязательно: из него берутся слова, ритм и длительность ролика.'),
