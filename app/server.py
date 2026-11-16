@@ -3374,7 +3374,7 @@ class App:
             return web.Response(body=out.read_bytes(), content_type="audio/mpeg",
                                 headers={"Content-Disposition": 'attachment; filename="sound.mp3"'})
         finally:
-            self.call_later(60, shutil.rmtree, work, True)
+            asyncio.get_running_loop().call_later(60, shutil.rmtree, work, True)
 
     async def h_library_add(self, request):
         """A frame taken in the video bench becomes a library item. People pull a frame out of one video to
