@@ -316,6 +316,15 @@ body.nosb-on #modeBar{left:112px}
 .brand-mark{position:relative;flex:0 0 38px;width:38px;height:38px;margin-top:8px;display:grid;place-items:center;color:var(--accent);box-shadow:0 8px 24px rgba(var(--accent-rgb),.35)}
 .brand-name{font-weight:800;font-size:17px;letter-spacing:-.01em}
 .brand-sub{font-size:11.5px;color:var(--muted)}
+.agfold{border-top:1px solid var(--line);padding:2px 0 8px}
+.agfold>summary{cursor:pointer;font-weight:700;font-size:13.5px;color:var(--fg);padding:9px 2px;list-style:none;display:flex;align-items:center;gap:8px}
+.agfold>summary::-webkit-details-marker{display:none}
+.agfold>summary::before{content:'›';color:var(--dim);font-size:15px;width:9px}
+.agfold[open]>summary::before{content:'⌄'}
+.agfold>summary:hover{color:var(--accent)}
+.agnow{font-weight:600;font-size:12px;color:var(--accent);background:rgba(var(--acc-rgb,232,38,79),.12);border-radius:8px;padding:1px 7px}
+.agfold .seg{grid-auto-rows:auto}
+.agfold .seg button{padding:7px 9px;line-height:1.2;font-size:12.5px;white-space:normal;overflow-wrap:anywhere}
 .nav-ver{font-size:11.5px;opacity:.6;padding:1px 10px 0 47px;letter-spacing:.02em}
 .nav-label{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--dim);padding:14px 10px 6px}
 .nav{display:flex;align-items:center;gap:11px;padding:10px 11px;border-radius:11px;color:var(--muted);font-weight:600;text-align:left;width:100%;transition:.15s}
@@ -1579,7 +1588,7 @@ body.dropping::after{content:'Отпустите — программа разл
       </div>
       <div class="ag-grid">
         <div class="card ag-hist">
-          <button class="btn pri" id="agNew2" style="width:100%">＋ Новый чат</button>
+          
           <div class="ag-hlist" id="agHist"></div>
           <button class="btn" id="agWipe" style="width:100%" title="Удалить все сохранённые переписки с агентом">Очистить историю</button>
         </div>
@@ -1660,41 +1669,45 @@ body.dropping::after{content:'Отпустите — программа разл
             </details>
           </div>
           <div class="card">
-            <div class="card-h"><h3>Ответ агента</h3></div>
-            <div class="seg" id="agThink" style="grid-template-columns:minmax(0,1fr) minmax(0,1fr);margin-bottom:6px"><button type="button" data-k="fast">Быстро<small>без долгих рассуждений</small></button><button type="button" data-k="deep">Думать глубже<small>дольше, для сложных историй</small></button></div>
+            <details class="agfold">
+            <summary>Ответ агента</summary>
+            <div class="seg" id="agThink" style="grid-template-columns:minmax(0,1fr) minmax(0,1fr);margin-bottom:6px"><button type="button" data-k="fast" title="Быстро — без долгих рассуждений">Быстро</button><button type="button" data-k="deep" title="Думать глубже — дольше, для сложных историй">Думать глубже</button></div>
             <div class="hint" id="agThinkHint" style="margin-bottom:14px"></div>
-            <div class="card-h"><h3>Промпт для</h3></div>
+                      </details>
+          <details class="agfold">
+            <summary>Промпт для <span class="agnow" id="agNow"></span></summary>
             <div class="hint" style="margin-bottom:6px">Видео</div>
             <div class="seg" id="agTarget" style="grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-auto-rows:auto">
-              <button data-t="video" class="on">Видео<small>текст / кадры</small></button>
-              <button data-t="lipsync">Lipsync<small>референсы + аудио</small></button>
-              <button data-t="refs">Видеостудия<small>изображения, видео, аудио</small></button>
-              <button data-t="actor">Актёр<small>диалог, голос, эмоции</small></button>
-              <button data-t="swap">Замена персонажа<small>видео + изображение героя</small></button>
-              <button data-t="action">Экшн-видео<small>бой, погоня, бег</small></button>
-              <button data-t="long">Видеостудия<small>клип или ролик по сценам</small></button>
-              <button data-t="actionsc">Экшн-студия<small>экшн по сценам подряд</small></button>
+              <button data-t="video" class="on" title="Видео — текст / кадры">Видео</button>
+              <button data-t="lipsync" title="Lipsync — референсы + аудио">Lipsync</button>
+              <button data-t="refs" title="Референсы: изображения, видео, аудио — промпт по ним">Референсы</button>
+              <button data-t="actor" title="Актёр — диалог, голос, эмоции">Актёр</button>
+              <button data-t="swap" title="Замена персонажа — видео + изображение героя">Замена персонажа</button>
+              <button data-t="action" title="Экшн-видео — бой, погоня, бег">Экшн-видео</button>
+              <button data-t="long" title="Видеостудия — клип или ролик по сценам">Видеостудия</button>
+              <button data-t="actionsc" title="Экшн-студия — экшн по сценам подряд">Экшн-студия</button>
             </div>
             <div class="hint" style="margin:12px 0 6px">Изображения</div>
             <div class="seg" id="agTarget2" style="grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-auto-rows:auto">
-              <button data-t="plist">Список кадров<small>серия изображений</small></button>
-              <button data-t="krea">Изображение по тексту<small>Krea 2</small></button>
-              <button data-t="fluxt">Изображение по тексту<small>FLUX klein</small></button>
-      <button data-t="h3t">Изображение по тексту<small>MiniMax H3 Image, до 16 МП</small></button>
-              <button data-t="qwent">Изображение по тексту<small>Qwen 2.1</small></button>
-              <button data-t="qwen">Правка изображения<small>Qwen, нужно изображение</small></button>
-      <button data-t="h3e">Правка по референсам<small>MiniMax H3 Image, до 5 картинок</small></button>
-              <button data-t="story">Раскадровка<small>история в кадрах на одном изображении</small></button>
-              <button data-t="sheet">Лист персонажа<small>4 панели, Krea 2</small></button>
-              <button data-t="sheet6">Лист персонажа ×6<small>6 панелей, Krea 2</small></button>
+              <button data-t="plist" title="Список кадров — серия изображений">Список кадров</button>
+              <button data-t="krea" title="Изображение по тексту — Krea 2">По тексту · Krea 2</button>
+              <button data-t="fluxt" title="Изображение по тексту — FLUX klein">По тексту · FLUX</button>
+      <button data-t="h3t" title="Изображение по тексту — MiniMax H3 Image, до 16 МП">По тексту · H3</button>
+              <button data-t="qwent" title="Изображение по тексту — Qwen 2.1">По тексту · Qwen</button>
+              <button data-t="qwen" title="Правка изображения — Qwen, нужно изображение">Правка изображения</button>
+      <button data-t="h3e" title="Правка по референсам — MiniMax H3 Image, до 5 картинок">Правка по референсам</button>
+              <button data-t="story" title="Раскадровка — история в кадрах на одном изображении">Раскадровка</button>
+              <button data-t="sheet" title="Лист персонажа — 4 панели, Krea 2">Лист персонажа</button>
+              <button data-t="sheet6" title="Лист персонажа ×6 — 6 панелей, Krea 2">Лист персонажа ×6</button>
             </div>
             <div class="seg" id="agStoryF" hidden style="grid-template-columns:minmax(0,1fr) minmax(0,1fr);margin-top:10px">
-              <button data-f="1">По кадрам<small>кадры отдельно + лист</small></button><button data-f="0">Одним листом<small>одно изображение сразу</small></button>
+              <button data-f="1" title="По кадрам — кадры отдельно + лист">По кадрам</button><button data-f="0" title="Одним листом — одно изображение сразу">Одним листом</button>
             </div>
             <div class="seg" id="agStoryM" hidden style="grid-template-columns:repeat(3,1fr);margin-top:10px">
-              <button data-m="krea">Krea 2<small>можно в коммерцию</small></button><button data-m="flux">FLUX klein<small>правка по описанию, лёгкая модель</small></button><button data-m="qwen">Qwen 2.1<small>не для коммерции</small></button>
+              <button data-m="krea" title="Krea 2 — можно в коммерцию">Krea 2</button><button data-m="flux" title="FLUX klein — правка по описанию, лёгкая модель">FLUX klein</button><button data-m="qwen" title="Qwen 2.1 — не для коммерции">Qwen 2.1</button>
             </div>
-            <small class="hint" id="agCtx" style="display:block;margin-top:8px"></small>
+            </details>
+          <small class="hint" id="agCtx" style="display:block;margin-top:8px"></small>
           </div>
           <div class="card">
             <div class="card-h"><h3 id="skToggle" title="Показать или скрыть список">Скиллы <small id="skCnt" class="hint"></small> <span id="skArr">▸</span></h3>
@@ -8952,7 +8965,6 @@ $('#agWipe').onclick = () => confirmBox('Очистить всю историю?
   await fetch('/api/agent/chats', { method: 'DELETE' }); newChat(); toast('История очищена');
 });
 $('#agNew').onclick = newChat;
-$('#agNew2').onclick = newChat;
 
 // send a finished prompt into a generator, with the chat's pictures
 async function setDropFile(input, file) { const dt = new DataTransfer(); dt.items.add(file); input.files = dt.files; input.dispatchEvent(new Event('change')); }
@@ -11845,8 +11857,7 @@ if (e.target.closest('.mt-clear')) {
     '#resBackfill': 'Скопировать в папку копий то, что уже сделано, но без копии',
     '#resClean': 'Убрать из списка записи, у которых файл на диске пропал; сами файлы не удаляются',
     '#agNew': 'Начать новый разговор:старые переписки останутся в списке слева',
-    '#agNew2': 'Начать новый разговор: старые переписки останутся в списке слева',
-    '#agWipe': 'Удалить все сохранённые переписки. Отменить нельзя',
+      '#agWipe': 'Удалить все сохранённые переписки. Отменить нельзя',
     '#agThinkHint': '',
     '#coreLogBtn': 'Журнал программы: что запускалось, что скачивалось, какие ошибки',
     '#clAdd': 'Добавить папку, откуда программа берёт ваши LoRA',
@@ -11929,6 +11940,23 @@ if (e.target.closest('.mt-clear')) {
   let q = 0;
   new MutationObserver(() => { if (q) return; q = setTimeout(() => { q = 0; paint(); }, 700); })
     .observe(document.body, { childList: true, subtree: true });
+})();
+
+/* A closed fold hides the only place where the choice is visible, so the chosen thing is repeated
+   in the heading of the fold itself. */
+(() => {
+  const now = document.getElementById('agNow');
+  if (!now) return;
+  const paint = () => {
+    const on = document.querySelector('#agTarget button.on, #agTarget2 button.on');
+    now.textContent = on ? on.textContent.trim() : '';
+    now.hidden = !now.textContent;
+  };
+  ['agTarget', 'agTarget2'].forEach(id => {
+    const box = document.getElementById(id);
+    if (box) box.addEventListener('click', () => setTimeout(paint, 0));
+  });
+  paint();
 })();
 </script>
 </body>
