@@ -3383,18 +3383,21 @@ class App:
         data = await request.read()
         if not data:
             return web.json_response({"error": "пустой файл"}, status=400)
-        if len(data) > 25 * 1024 * 1024:
-            return web.json_response({"error": "картинка больше 25 МБ"}, status=413)
+        # the kind is decided first: how big the file may be and which ending it gets depend on it, and
+        # reading a variable before it is set is exactly what broke this handler in the first build
         q = request.query
+        kind = (q.get("kind") or "image").lower()
+        if kind not in ("image", "audio"):
+            kind = "image"
+        cap = 60 if kind == "audio" else 25
+        if len(data) > cap * 1024 * 1024:
+            return web.json_response({"error": "файл больше %d МБ" % cap}, status=413)
         ok_ext = (".mp3", ".wav", ".m4a", ".aac", ".ogg", ".flac") if kind == "audio" \
             else (".png", ".jpg", ".jpeg", ".webp")
         dflt = "звук.mp3" if kind == "audio" else "кадр.png"
         name = re.sub(r"[^\w.\- ]+", "", (q.get("name") or dflt))[:80].strip().lstrip(".") or dflt
         if not name.lower().endswith(ok_ext):
             name += ok_ext[0]
-        kind = (q.get("kind") or "image").lower()
-        if kind not in ("image", "audio"):
-            kind = "image"
         where = DATA_DIR / "keeps"
         where.mkdir(parents=True, exist_ok=True)
         target = where / (datetime.now().strftime("%Y%m%d-%H%M%S-") + uuid.uuid4().hex[:4] + "-" + name)
