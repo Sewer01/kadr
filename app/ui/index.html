@@ -10520,7 +10520,8 @@ applyZoom();
     if (P.mkI >= MT.ids.length) P.mkI = 0;
     const id = MT.ids[P.mkI]; if (!id) return { i: 0, off: 0 };
     let f = P.mkFrac[id];
-    if (typeof f !== 'number') f = 0.5;                       // a clip nobody marked: the middle of the piece
+    if (typeof f !== 'number') f = 0;                          // a clip nobody marked: the marker stands at its BEGINNING -
+                                                           // the middle only made it jump under the hand
     P.mkFrac[id] = Math.min(1, Math.max(0, f));               // a share, so it stays in place as lengths arrive
     return { i: P.mkI, off: Math.max(0, Math.min(durOf(P.mkI) - 0.05, P.mkFrac[id] * durOf(P.mkI))) };
   };
