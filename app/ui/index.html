@@ -1139,10 +1139,6 @@ body.dropping::after{content:'Отпустите — программа разл
 
     /* the marker carries the arrows and the scissors: they belong to the place, not to a row below */
     .vt-ph{display:block}
-    .vt-arrows,.vt-scissors{position:absolute;top:-2px;display:flex;gap:2px}
-    .vt-arrows{right:6px;transform:translateX(-100%)}
-    .vt-scissors{left:6px}
-    .vt-ph.near-left .vt-scissors{left:auto;right:6px;transform:translateX(-100%)}
     .vt-b{background:rgba(0,0,0,.72);color:#fff;border:1px solid var(--line-2);border-radius:6px;
       width:22px;height:20px;line-height:1;font-size:10px;display:grid;place-items:center;cursor:pointer}
     .vt-b:hover{background:var(--accent);border-color:var(--accent)}
@@ -1157,11 +1153,6 @@ body.dropping::after{content:'Отпустите — программа разл
     .mt-scale span:first-child{font-size:12px;opacity:.8}
 
     /* the marker carries the arrows and the scissors: they belong to the place, not to a row below */
-    .vt-arrows,.vt-scissors{position:absolute;top:-2px;display:flex;gap:2px;z-index:4}
-    .vt-arrows{right:7px}
-    .vt-scissors{left:7px}
-    .vt-ph.near-left .vt-scissors{left:auto;right:7px}
-    .vt-ph.near-right .vt-arrows{right:auto;left:7px}
     .vt-b{background:rgba(0,0,0,.74);color:#fff;border:1px solid var(--line-2);border-radius:6px;
       min-width:22px;height:20px;line-height:1;font-size:10px;display:grid;place-items:center;cursor:pointer;padding:0 4px}
     .vt-b:hover{background:var(--accent);border-color:var(--accent)}
@@ -1173,6 +1164,19 @@ body.dropping::after{content:'Отпустите — программа разл
     .vt-strip.narrow .vt-span,.vt-strip.narrow .vt-x{display:none}
     .vt-pp{font-size:12px;opacity:.8}
     .sw-bench{margin-top:10px}
+
+    /* the marker is a place: a head you grab, arrows above it, a scissors on each side of the line.
+       The blue line is a different thing - it only shows where the preview stands right now. */
+    .vt-ph{width:0;z-index:5;cursor:ew-resize;touch-action:none;background:transparent;box-shadow:none}
+    .vt-head{position:absolute;left:-7px;top:-1px;width:14px;height:14px;background:transparent}
+    .vt-head::before{content:'';position:absolute;left:4px;top:0;border:5px solid transparent;border-top-color:#ffd34d}
+    .vt-head::after{content:'';position:absolute;left:5px;top:9px;bottom:-90px;width:2px;background:#ffd34d;
+      box-shadow:0 0 6px rgba(255,211,77,.8)}
+    .vt-step{position:absolute;bottom:100%;left:0;transform:translateX(-50%);display:flex;gap:2px;margin-bottom:2px}
+    .vt-cutl{position:absolute;right:8px;top:34px}
+    .vt-cutr{position:absolute;left:8px;top:34px;transform:scaleX(-1)}
+    .vt-run{position:absolute;top:0;bottom:0;width:2px;background:#4c9cff;box-shadow:0 0 6px rgba(76,156,255,.7);
+      pointer-events:none;z-index:4}
 </style>
 </head>
 <body>
@@ -3381,7 +3385,8 @@ class VideoTrimmer {
     this.onWhole = o.onWhole || (() => {});
     this.say = o.onNotice || (m => toast(m));
     this.whereLabel = o.whereLabel || null;
-    this.dur0 = 0; this.start = 0; this.end = 0; this.t = 0;
+    this.dur0 = 0; this.start = 0; this.end = 0; this.t = 0;   // t is the MARKER - it never moves by itself
+    this.run = 0;                                   // the time the preview stands on while it plays
     this.pps = 0;                                     // pixels per second: 0 means "fit the window"
     try { const p = +localStorage.getItem('h3-vt-px'); if (p >= 10 && p <= 300) this.pps = p; } catch (e) {}
     this.cut = null; this.undo = []; this.file = null; this.url = ''; this.busy = false;
@@ -3399,13 +3404,14 @@ class VideoTrimmer {
       '<div class="vt-sel"><span class="vt-span"></span>' +
       '<i class="at-h" data-h="l"></i><i class="at-h" data-h="r"></i>' +
       '<button class="vt-x" type="button" title="Убрать клип из монтажа">✕</button></div>' +
-      '<div class="vt-ph"><span class="vt-arrows">' +
+      '<div class="vt-ph" title="маркер: его и тянут, от него режут"><i class="vt-head"></i>' +
+      '<span class="vt-step">' +
       '<button class="vt-b" data-s="back" type="button" title="Кадр назад">&#9664;</button>' +
       '<button class="vt-b" data-s="fwd" type="button" title="Кадр впер">&#9654;</button></span>' +
-      '<span class="vt-scissors">' +
-      '<button class="vt-b" data-s="left" type="button" title="Убрать всё до маркера">&#9986;</button>' +
-      '<button class="vt-b" data-s="right" type="button" title="Убрать всё после маркера">&#9986;</button></span>' +
-      '</div></div></div>' +
+      '<button class="vt-b vt-cutl" data-s="left" type="button" title="Убрать всё до маркера">&#9986;</button>' +
+      '<button class="vt-b vt-cutr" data-s="right" type="button" title="Убрать всё после маркера">&#9986;</button>' +
+      '</div>' +
+      '<div class="vt-run" title="идёт просмотр"></div></div></div>' +
       '<div class="mt-scale"><span>Шире лента - точнее кадр:</span>' +
       '<input type="range" class="vt-zr" min="10" max="300" step="5" value="0">' +
       '<span class="vt-pp">по ширине окна</span>' +
@@ -3538,6 +3544,8 @@ class VideoTrimmer {
     sel.hidden = !this.dur0;
     ph.style.left = (this.t / this.dur0 * 100) + '%';
     ph.hidden = !this.dur0;
+    this.q('.vt-run').style.left = (this.run / this.dur0 * 100) + '%';
+    this.q('.vt-run').hidden = !this.dur0 || Math.abs(this.run - this.t) < .01;
     // the montage taught this too: at the very beginning the buttons jump to the other side
     const fr = this.dur0 ? this.t / this.dur0 : 0;
     ph.classList.toggle('near-left', fr < .12);
@@ -3580,14 +3588,14 @@ class VideoTrimmer {
     v.play().catch(() => {});
     cancelAnimationFrame(this.raf);
     const step = () => {
-      this.t = v.currentTime || 0;
+      this.run = v.currentTime || 0;                 // the marker stays where the person put it
       this._sync();
-      if (this.t >= to - .02 || this.t >= this.dur0 - .02) { this.stop(); return; }
+      if (this.run >= to - .02 || this.run >= this.dur0 - .02) { this.stop(); return; }
       this.raf = requestAnimationFrame(step);
     };
     step();
   }
-  stop() { const v = this.q('.vt-view'); if (v) v.pause(); cancelAnimationFrame(this.raf); this.raf = 0; }
+  stop() { const v = this.q('.vt-view'); if (v) v.pause(); cancelAnimationFrame(this.raf); this.raf = 0; this.run = this.t; }
   _setPps(v) {
     this.pps = v <= 0 ? 0 : Math.min(300, Math.max(10, v));
     try { localStorage.setItem('h3-vt-px', String(this.pps)); } catch (e) {}
@@ -3605,15 +3613,15 @@ class VideoTrimmer {
       if (!this.dur0) return;
       const h = e.target.closest('.at-h');
       if (h) { drag = h.dataset.h; this._dragH = drag; }   // later events no longer carry the handle
-      else if (e.target.closest('button')) return;
+      else if (e.target.closest('.vt-ph')) {
+        if (e.target.closest('button')) return;            // its own buttons step and cut
+        drag = 'ph'; this._dragH = 'ph';                   // the line itself is the thing you drag
+      } else if (e.target.closest('button')) return;
       else {
+        // a click does not move the marker: left of it plays up to it, right of it plays from it
         const x = at(e);
-        // a click on the left half of the block plays up to the marker, on the right - from it
-        this.t = x;
-        this._sync();
-        if (x <= this.start || x >= this.end) this._play(this.start, this.end);
-        else if (x < (this.start + this.end) / 2) this._play(this.start, this.t);
-        else this._play(this.t, this.end);
+        if (x < this.t) this._play(this.start, this.t);
+        else this._play(this.t, Math.min(this.end, this.dur0));
         return;
       }
       // a synthetic or already-released pointer has no capture to take, and that must not stop the drag
@@ -3703,9 +3711,9 @@ class VideoTrimmer {
     const h = this._dragH || (e.target && e.target.closest ? (e.target.closest('.at-h') || {}).dataset?.h : null);
     if (h === 'l') this.start = Math.min(t2, this.end - .1);
     else if (h === 'r') this.end = Math.max(t2, this.start + .1);
-    else this.t = t2;
+    else { this.t = t2; this.run = t2; }
     this._sync();
-    if (!h) this._still();
+    if (h === 'ph' || !h) this._still();   // dragging the marker shows that frame in the player
   }
   out(force) {
     if (!force || !this.dur0) { this._sync(); return null; }
@@ -5709,7 +5717,16 @@ function makeRefMode(cfg) {
         }, 600);
       }
     };
-    $('input', slot).addEventListener('change', () => { slot._src = null; slot._vsel = null; tr._loaded = null; paint(); });
+    $('input', slot).addEventListener('change', () => {
+      slot._src = null; slot._vsel = null; slot._dur = 0;   // the new file has its own length
+      tr._loaded = null; tr._srcFile = null; paint();
+      const f = slot._file;
+      if (f) {
+        const m = document.createElement('video');
+        m.preload = 'metadata'; m.src = URL.createObjectURL(f);
+        m.onloadedmetadata = () => { if (slot._file === f) { slot._dur = m.duration || 0; paint(); try { changed(); } catch (e) {} } URL.revokeObjectURL(m.src); };
+      }
+    });
     const x = $('.x', slot);
     if (x) x.addEventListener('click', () => { slot._src = null; slot._vsel = null; tr._loaded = null; box.hidden = true; });
   }
@@ -5782,8 +5799,11 @@ function makeRefMode(cfg) {
         onWhole: q => { const s = slots[q._slot]; if (s) { s._vsel = null; paint(); } }
       });
       const src = s._src || s._file;
-      if (tr._slot !== i || !tr.dur0) {
+      // the same place can hold ANOTHER video: then it has to be loaded again, however the marks stood -
+      // otherwise the bench keeps showing the file that was there before, which is what it did
+      if (tr._slot !== i || !tr.dur0 || tr._srcFile !== src) {
         tr._slot = i;
+        tr._srcFile = src;
         tr.setFile(src, true);                         // the ORIGINAL opens, so cutting again is possible
         const sel = s._vsel;
         if (sel && src === s._src && sel.end <= (tr.dur0 || sel.end) + .2) {
@@ -5830,7 +5850,7 @@ function makeRefMode(cfg) {
       if (f) put(f, i);
     };
     slots.forEach((s, i) => $('input', s).addEventListener('change', () => {
-      s._src = null; s._vsel = null;
+      s._src = null; s._vsel = null; s._dur = 0;    // the length of the previous file must not survive it
       if (cur === i) closeWin();
       paint();
       const f = s._file;
