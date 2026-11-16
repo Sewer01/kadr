@@ -501,6 +501,7 @@ details[open] summary::before{content:'－ '}
 
 /* audio editor */
 .audio-empty{border:1.5px dashed var(--line-2);border-radius:14px;padding:14px 18px;text-align:center;background:var(--bg-2);cursor:pointer;display:grid;gap:4px;justify-items:center}
+.h3vdrop{transition:outline-color .12s}
 .audio-empty:hover,.audio-empty.over{border-color:var(--accent);background:rgba(var(--accent-rgb),.06)}
 .audio-empty svg{width:24px;height:24px;color:var(--accent)}
 .audio-ed{display:none;gap:12px}
@@ -1711,7 +1712,7 @@ body.dropping::after{content:'Отпустите — программа разл
       <button data-t="night" style="background:#2fb5a8" title="Ночь"></button>
       <button data-t="forest" style="background:#d4a24c" title="Лес"></button>
     </div>
-          <div class="zoom-btns" id="uiZoom" title="Размер интерфейса (или Ctrl + колесо мыши)" ><button class="btn" id="uiSm" type="button">А−</button><small id="uiPct">100%</small><button class="btn" id="uiLg" type="button">А+</button></div>
+          <div class="zoom-btns" id="uiZoom" title="Размер интерфейса (или Ctrl + колесо мыши)" ><button class="btn" id="uiSm" type="button" title="Сделать интерфейс мельче - влезает больше (или Ctrl + колесо мыши)">А−</button><small id="uiPct">100%</small><button class="btn" id="uiLg" type="button" title="Сделать интерфейс крупнее - легче читать (или Ctrl + колесо мыши)">А+</button></div>
           <span class="hint">или Ctrl + колесо мыши</span>
         </div>
         <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:14px">
@@ -1790,20 +1791,20 @@ body.dropping::after{content:'Отпустите — программа разл
             <label>Что вы хотите делать? <span class="hint" id="modeHint">— отметьте только нужное, остальное можно докачать потом в разделе «Настройки»</span></label>
             <button type="button" class="a-change" id="modeAll" style="margin:6px 0 10px">Выбрать все</button>
             <div class="mode-cards" id="modePick">
-              <button class="mcard" data-m="video"><i></i><b>Видео</b><span>Видео по тексту, по изображению, по первому и последнему кадру</span><small></small></button>
-              <button class="mcard" data-m="lipsync"><i></i><b>Клип</b><span>Персонаж поёт или говорит под ваше аудио</span><small></small></button>
-              <button class="mcard" data-m="refs"><i></i><b>Видеостудия</b><span>Видео по нескольким изображениям, референс-видео и аудио</span><small></small></button>
-              <button class="mcard" data-m="actor"><i></i><b>Актёр</b><span>Диалоги и крупные планы: эмоции, голос по образцу</span><small></small></button>
-              <button class="mcard" data-m="action"><i></i><b>Экшн-видео</b><span>Бой, погоня, бег, прыжки</span><small></small></button>
-              <button class="mcard" data-m="long"><i></i><b>Видеостудия</b><span>Клипы и ролики по сценам: до 15 с на сцену, сцены продолжают друг друга</span><small></small></button>
-        <button class="mcard" data-m="actionsc"><i></i><b>Экшн-студия</b><span>Длинный экшн по сценам: 8 + 4 шага, файлы ускорения, звук делает модель</span><small></small></button>
-              <button class="mcard" data-m="krea"><i></i><b>Изображение по тексту</b><span>Krea 2: красивые изображения по описанию (можно в коммерцию)</span><small></small></button>
-              <button class="mcard" data-m="kreareal"><i></i><b>Изображение: реализм</b><span>Krea 2 для реалистичных людей и фото (в «Изображении по тексту», +15 ГБ)</span><small></small></button>
-              <button class="mcard" data-m="qwen"><i></i><b>Правка изображения</b><span>Qwen: изменить своё изображение, лист персонажа</span><small></small></button>
-              <button class="mcard" data-m="flux"><i></i><b>Правка изображения: можно в коммерцию</b><span>FLUX.2 klein: изменить своё изображение со свободной лицензией (+12 ГБ)</span><small></small></button>
-        <button class="mcard" data-m="h3img"><i></i><b>Изображения MiniMax H3 Image</b><span>Очень крупные картинки по тексту (до 16 МП) и правка по 5 референсам: стиль, герои, место. Открытая лицензия (+14 ГБ)</span><small></small></button>
-              <button class="mcard" data-m="upscale"><i></i><b>Увеличение видео и изображений</b><span>Увеличить готовое видео и добавить чёткости (долго, но по желанию)</span><small></small></button>
-              <button class="mcard" data-m="relayvsr"><i></i><b>Быстрое увеличение видео (RelayVSR)</b><span>Увеличить готовое видео в 2 раза за минуты. Только видео, до ~10 с</span><small></small></button>
+              <button class="mcard" data-m="video" title="Откроет режим «Видео»: ролик по описанию или по вашей картинке"><i></i><b>Видео</b><span>Видео по тексту, по изображению, по первому и последнему кадру</span><small></small></button>
+              <button class="mcard" data-m="lipsync" title="Герой говорит или поёт под ваше аудио. Плюс модель синхронизации губ."><i></i><b>Клип</b><span>Персонаж поёт или говорит под ваше аудио</span><small></small></button>
+              <button class="mcard" data-m="refs" title="Видео по вашим референсам: картинки, видео и аудио. Качество выше, места нужно больше."><i></i><b>Видеостудия</b><span>Видео по нескольким изображениям, референс-видео и аудио</span><small></small></button>
+              <button class="mcard" data-m="actor" title="Диалог и эмоции: лицо, голос по образцу, до 14 секунд."><i></i><b>Актёр</b><span>Диалоги и крупные планы: эмоции, голос по образцу</span><small></small></button>
+              <button class="mcard" data-m="action" title="Одно динамичное видео: драка, погоня, бег. Быстрый и точный проход уже встроен."><i></i><b>Экшн-видео</b><span>Бой, погоня, бег, прыжки</span><small></small></button>
+              <button class="mcard" data-m="long" title="Фильм по сценам: каждая сцена до 15 секунд, следующая продолжает предыдущую."><i></i><b>Видеостудия</b><span>Клипы и ролики по сценам: до 15 с на сцену, сцены продолжают друг друга</span><small></small></button>
+        <button class="mcard" data-m="actionsc" title="Динамичные сцены подряд: длинный экшн из нескольких сцен."><i></i><b>Экшн-студия</b><span>Длинный экшн по сценам: 8 + 4 шага, файлы ускорения, звук делает модель</span><small></small></button>
+              <button class="mcard" data-m="krea" title="Картинка по описанию. Можно в коммерцию."><i></i><b>Изображение по тексту</b><span>Krea 2: красивые изображения по описанию (можно в коммерцию)</span><small></small></button>
+              <button class="mcard" data-m="kreareal" title="Картинка по описанию в реализме: люди и фото как с камеры, два прохода."><i></i><b>Изображение: реализм</b><span>Krea 2 для реалистичных людей и фото (в «Изображении по тексту», +15 ГБ)</span><small></small></button>
+              <button class="mcard" data-m="qwen" title="Правка готового изображения: нужен файл, который меняем."><i></i><b>Правка изображения</b><span>Qwen: изменить своё изображение, лист персонажа</span><small></small></button>
+              <button class="mcard" data-m="flux" title="Картинка по описанию моделью FLUX.2 - своя, лёгкая, для коммерции."><i></i><b>Правка изображения: можно в коммерцию</b><span>FLUX.2 klein: изменить своё изображение со свободной лицензией (+12 ГБ)</span><small></small></button>
+        <button class="mcard" data-m="h3img" title="Картинка по описанию моделью MiniMax H3 Image: до 5 референсов."><i></i><b>Изображения MiniMax H3 Image</b><span>Очень крупные картинки по тексту (до 16 МП) и правка по 5 референсам: стиль, герои, место. Открытая лицензия (+14 ГБ)</span><small></small></button>
+              <button class="mcard" data-m="upscale" title="Увеличение и улучшение чёткости видео и фото («Ретушь»), вариант SeedVR2."><i></i><b>Увеличение видео и изображений</b><span>Увеличить готовое видео и добавить чёткости (долго, но по желанию)</span><small></small></button>
+              <button class="mcard" data-m="relayvsr" title="Быстрое увеличение видео (RelayVSR): коротких клипов, в разы быстрее."><i></i><b>Быстрое увеличение видео (RelayVSR)</b><span>Увеличить готовое видео в 2 раза за минуты. Только видео, до ~10 с</span><small></small></button>
             </div>
             <div class="note" id="modeTotal" style="margin-top:4px"></div>
           </div>
@@ -1901,7 +1902,7 @@ body.dropping::after{content:'Отпустите — программа разл
           <button class="btn" id="mdOwnGo" type="button" style="margin-top:10px">Перейти к настройке своего ComfyUI</button>
         </div>
         <div class="card" id="clCard" style="margin-bottom:16px" hidden>
-          <div class="card-h"><h3>Свои LoRA <small style="color:var(--muted);font-weight:500">· для тех, кто знает ComfyUI</small></h3><span><button class="btn" id="clRe" type="button">Обновить список</button> <button class="btn pri" id="clAdd" type="button">+ Добавить LoRA</button></span></div>
+          <div class="card-h"><h3>Свои LoRA <small style="color:var(--muted);font-weight:500">· для тех, кто знает ComfyUI</small></h3><span><button class="btn" title="Перечитать папки LoRA: если положили файл вручную, нажмите, чтобы он появился в списке" id="clRe" type="button">Обновить список</button> <button class="btn pri" id="clAdd" type="button">+ Добавить LoRA</button></span></div>
           <div class="hint" style="margin-bottom:10px">Дополнительные файлы к основной модели: усиливают персонажа или стиль. Новичкам не нужно — всё уже настроено.</div>
           <details class="agvar" style="margin-bottom:10px"><summary>Как добавить</summary><div class="hint" style="padding:6px 0;line-height:1.55">Положите файл LoRA в папку <b>ComfyUI\models\loras</b>, нажмите «Обновить список» и добавьте его. Файл подключится ко всем разделам сразу после основной модели; в одном разделе его можно выключить в строке «Модель». Свои VAE и модели меняются кнопкой «Заменить…» в списке моделей.</div></details>
           <div class="mlist" id="clList"></div>
@@ -2343,7 +2344,7 @@ function coreLogHint() {
   const box = $('#mlist');
   if (!box || !document.querySelector('#view-models.active')) return;
   box.innerHTML = `<div class="note warn"><span>ComfyUI не ответил за три минуты. Обычно причина видна в его журнале: видеокарта или драйвер, свободное место, повреждённый файл модели.
-    <button class="btn mini" id="coreLogBtn2" type="button">Показать журнал</button></span></div>`;
+    <button class="btn mini" id="coreLogBtn2" type="button" title="Журнал программы: что запускалось, что скачивалось, какие ошибки. Нужен, когда что-то пошло не так">Показать журнал</button></span></div>`;
   const b = $('#coreLogBtn2'); if (b) b.onclick = showCoreLog;
 }
 function paintProbe(s) {
@@ -5957,6 +5958,11 @@ function makeRefMode(cfg) {
     card.append(host);
     const inp = document.createElement('input');
     inp.type = 'file'; inp.accept = 'video/*,.mp4,.mov,.mkv,.webm,.m4v'; inp.hidden = true; card.append(inp);
+    // a clip dragged from the library panel lands on this card and goes through the same input
+    card.classList.add('h3vdrop'); card.__h3input = inp;
+    card.addEventListener('dragover', e => { if (e.dataTransfer.types.includes('text/h3lib')) { e.preventDefault(); card.style.outline = '2px dashed var(--accent)'; } });
+    card.addEventListener('dragleave', () => { card.style.outline = ''; });
+    card.addEventListener('drop', () => { card.style.outline = ''; });
     const MODE_NAME = { refs: 'Видеостудия', actor: 'Актёр', action: 'Экшн-видео', long: 'Киностудия', actionsc: 'Экшн-студия' }[cfg.mode] || cfg.mode;
     let tr = null, cur = -1, pick = -1;
     const fmt = x => (Math.round(x * 10) / 10 + '').replace('.', ',');
@@ -6239,7 +6245,7 @@ function makeRefMode(cfg) {
     const card = $('.rm-prompt', root).closest('.card');
     card.innerHTML = `<div class="card-h"><h3><span class="n">2</span>Промпт</h3><span class="hint">можно написать в разделе «Агент»</span></div>
       <textarea class="rm-prompt" placeholder="Напишите обычным промптом, кого на кого заменить. Например: Replace the man in the white shirt in <Video 1> with the character from <Picture 1>. Keep the background, camera and movements of the video."></textarea>
-      <div class="ta-foot"><div class="tokens rm-tokens"></div><button class="btn sw-example" type="button" style="padding:3px 10px;font-size:12px">Вставить пример</button></div>
+      <div class="ta-foot"><div class="tokens rm-tokens"></div><button class="btn sw-example" type="button" style="padding:3px 10px;font-size:12px" title="Если поле промпта пустое - впишет готовый текст замены: «замените человека в &lt;Video 1&gt; на героя из &lt;Picture 1&gt;…». Поле с вашим текстом не тронет - пример вставляется только в пустое поле. Текст можно править как обычно.">Вставить пример</button></div>
       <div class="hint" style="margin-top:6px">Изображения называются <b>Picture 1</b>, <b>Picture 2</b> (по порядку слотов), видео — <b>Video 1</b>. Если оставить пустым, программа сама заменит главного человека в видео на героя с первого изображения.</div>
       <div hidden>
         <input class="sw-cuts"><input class="rm-who" data-i="0"><input class="rm-who" data-i="1">
@@ -9219,9 +9225,10 @@ async function openUpscale(it, file, into) {   // `file`: the person's own file;
     + (it.kind === 'image' ? '' : (() => {   // two ways for a video: fast (RelayVSR) and careful (SeedVR2)
       const relayT = (w && h ? (w * 2) * (h * 2) / 1048576 / 4 : 0.9) * Math.round(secs * 24) * 0.7;   // seconds; an estimate for an RTX 4060 Ti (the author's 5090 is ~3.5x faster)
       const tooBig = w && h && w * h * secs > 10 * 1376 * 768;
-      return `<div style="margin-top:14px;padding:12px;border:1.5px solid var(--line-2);border-radius:12px"><div style="font-weight:800;font-size:15px;margin-bottom:4px">⚡ Быстро — RelayVSR, в 2 раза${w ? ` · ${w * 2}×${h * 2}` : ''}</div>`
-        + `<div class="hint" style="margin-bottom:8px">Примерно ${fmtTime(relayT)} на RTX 4060 Ti (оценка). Видео не длиннее ~10 с при 1376×768: оно целиком грузится в память.${tooBig ? ' <b style="color:var(--pink)">Это видео для быстрого варианта слишком большое.</b>' : ''}</div>`
-        + (haveRelay ? `<label style="display:block;font-size:13px;margin-bottom:8px"><b>Детали: <span id="upDetailV">70</span>%</b> <span class="hint">меньше — мягче, без пересвета лиц; больше — чётче</span><input type="range" id="upDetail" min="0" max="100" step="5" value="70" style="width:100%"></label><button class="btn pri up-s" data-e="relay" data-k="2" type="button"${tooBig ? ' disabled' : ''}>Увеличить быстро</button>`
+      const why = 'Быстрый способ берёт всё видео целиком в память видеокарты, поэтому он рассчитан на клип примерно до 10 секунд при 1376×768.';
+      return `<div style="margin-top:14px;padding:12px;border:1.5px solid var(--line-2);border-radius:12px"><div style="font-weight:800;font-size:15px;margin-bottom:4px" title="${why}">⚡ Быстро — RelayVSR, в 2 раза${w ? ` · ${w * 2}×${h * 2}` : ''}</div>`
+        + `<div class="hint" style="margin-bottom:8px">Примерно ${fmtTime(relayT)} на RTX 4060 Ti (оценка). Видео не длиннее ~10 с при 1376×768: оно целиком грузится в память.${tooBig ? ' <b style="color:var(--pink)">Вашего видео это не касается - оно больше, поэтому кнопка ниже выключена. Увеличивайте вариантом «Качественнее».</b>' : ''}</div>`
+        + (haveRelay ? `<label style="display:block;font-size:13px;margin-bottom:8px"><b>Детали: <span id="upDetailV">70</span>%</b> <span class="hint">меньше — мягче, без пересвета лиц; больше — чётче</span><input type="range" id="upDetail" min="0" max="100" step="5" value="70" style="width:100%"></label><button class="btn pri up-s" data-e="relay" data-k="2" type="button"${tooBig ? ' disabled title="' + why + ' Ваше видео длиннее или больше - быстрый способ для него недоступен."' : ' title="Быстрый способ: всё видео целиком в память карты, качество мягче, чем у «Качественнее», но в разы быстрее"'}>Увеличить быстро</button>`
           : `<div class="hint" style="margin-bottom:8px">${relayNodes
               ? `Нужна модель RelayVSR (около 5,3 ГБ).${st.engine === 'managed' ? '' : ' В своём ComfyUI положите relayvsr_x2_lightx2v_int8_convrot в diffusion_models и relayvsr_flash_vae_x2_fp32 в vae.'}`
               : 'Нужен более новый ComfyUI: в вашей версии узлов RelayVSR ещё нет. Обновите ComfyUI (раздел «Модели») — или увеличивайте вариантом «Качественнее», он работает сейчас.'}</div>`
@@ -9659,11 +9666,22 @@ document.addEventListener('click', e => {
     } catch { toast('Не удалось взять файл'); }
   };
 }, true);
-async function libToFile(it) {
+async function libToFile(it, forVideo, keepName) {
   let blob;
+  // a file taken out of the library is named as the panel shows it, not by its internal number
+  const nice = String(keepName || '').replace(/[\\/:*?"<>|]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 60);
+  const named = (base, ext) => {
+    const clean = nice && !new RegExp('\\.' + ext + '$', 'i').test(nice) ? nice + '.' + ext : (nice || base);
+    return clean;
+  };
   // a sound is taken as it is: there is no frame to pull out of it
   if (it.kind === 'image' || it.kind === 'audio') blob = await (await fetch(it.url)).blob();
-  else {  // a video: take its last frame, handy for continuing a scene
+  else if (forVideo) {
+    // a video dropped on a video field IS the video: taking its last frame here used to hand the
+    // person a picture where he expected moving reference
+    blob = await (await fetch(it.url)).blob();
+    return new File([blob], named(it.id + '.mp4', 'mp4'), { type: blob.type || 'video/mp4' });
+  } else {  // a video dropped on a picture field: its last frame, handy for continuing a scene
     const v = document.createElement('video'); v.muted = true; v.preload = 'auto'; v.src = it.url;
     await new Promise((ok, no) => { v.onloadedmetadata = ok; v.onerror = no; });
     v.currentTime = Math.max(0, v.duration - 0.05);
@@ -9671,7 +9689,8 @@ async function libToFile(it) {
     const c = document.createElement('canvas'); c.width = v.videoWidth; c.height = v.videoHeight; c.getContext('2d').drawImage(v, 0, 0);
     blob = await new Promise(ok => c.toBlob(ok, 'image/png'));
   }
-  return new File([blob], `${it.id}.${it.kind === 'image' ? (it.ext || 'png') : 'png'}`, { type: blob.type || 'image/png' });
+  const ext = it.kind === 'audio' ? (it.ext || 'mp3') : (it.kind === 'image' ? (it.ext || 'png') : 'png');
+  return new File([blob], named(it.id + '.' + ext, ext), { type: blob.type || (it.kind === 'image' ? 'image/png' : 'application/octet-stream') });
 }
 
 /* ---------- Library -> workflow: "Use in…" button and the side tray to drag from ---------- */
@@ -9756,7 +9775,15 @@ function useMenu(it) {
     if ($('#view-agent.active') && it && it.kind === 'image') { useInWorkflow(it, 'agent'); return; }   // in the agent a click puts the picture into the chat
     openViewer(t.dataset.id);
   });  // a click opens the picture, a drag takes it into a slot
-  body.addEventListener('dragstart', e => { const t = e.target.closest('[data-id]'); if (t) { e.dataTransfer.setData('text/h3lib', t.dataset.id); e.dataTransfer.effectAllowed = 'copy'; } });
+  body.addEventListener('dragstart', e => {
+    const t = e.target.closest('[data-id]'); if (!t) return;
+    e.dataTransfer.setData('text/h3lib', t.dataset.id);
+    // what a person reads on the tile is the name the file should keep when he drops it:
+    // the tile carries that very text in its own hint, so no lookup is needed here
+    const nm = (t.getAttribute('title') || '').trim();
+    if (nm) { try { e.dataTransfer.setData('text/h3name', nm); } catch {} }
+    e.dataTransfer.effectAllowed = 'copy';
+  });
   const sync = () => { tray.hidden = !!$('#view-library.active, #view-models.active, #view-queue.active'); };   // the agent has the tray too: a picture dropped on the chat is attached to it
   new MutationObserver(sync).observe($('main, body'), { subtree: true, attributes: true, attributeFilter: ['class'] }); sync();
   // pictures of the result windows (the big one and the thumbnails of earlier ones) can be dragged into the picture slots too
@@ -9764,17 +9791,23 @@ function useMenu(it) {
     const t = e.target.closest && e.target.closest('[data-dragid], .cw-th[data-id]'); if (!t || e.target.closest('.lt-body')) return;
     e.dataTransfer.setData('text/h3lib', t.dataset.dragid || t.dataset.id); e.dataTransfer.effectAllowed = 'copy';
   });
-  document.addEventListener('dragover', e => { if (e.dataTransfer.types.includes('text/h3lib') && e.target.closest('label.drop, label.ref, #view-agent')) e.preventDefault(); }, true);
+  // the zones that take a library file: the picture slots, the audio field, the retouching loader and
+  // the reference-video card (a card of buttons, so it declares its own input below)
+  const DZONES = 'label.drop, label.ref, label.audio-empty, #upDrop, .h3vdrop';
+  document.addEventListener('dragover', e => { if (e.dataTransfer.types.includes('text/h3lib') && e.target.closest(DZONES + ', #view-agent')) e.preventDefault(); }, true);
   document.addEventListener('drop', async e => {
     const id = e.dataTransfer.getData('text/h3lib'); if (!id) return;
-    const lb = e.target.closest('label.drop, label.ref');
+    let dragName = ''; try { dragName = e.dataTransfer.getData('text/h3name') || ''; } catch {}
+    const lb = e.target.closest(DZONES);
     if (!lb && e.target.closest('#view-agent')) {   // dropped on the agent's chat: the picture goes into the message
       e.preventDefault(); e.stopPropagation(); const it0 = byId(id); if (it0) await useInWorkflow(it0, 'agent'); return;
     }
     if (!lb) return;
     e.preventDefault(); e.stopPropagation(); lb.classList.remove('over');
-    const it = byId(id), input = $('input[type=file]', lb); if (!it || !input) return;
-    try { await setDropFile(input, await libToFile(it)); toast(it.kind === 'audio' ? 'Звук взят из Библиотеки' : it.kind === 'video' ? 'Видео взято из Библиотеки' : 'Изображение взята из Библиотеки'); } catch { toast('Не удалось взять файл'); }
+    const it = byId(id), input = lb.__h3input || $('input[type=file]', lb); if (!it || !input) return;
+    if (it.kind === 'image' && /audio/i.test(input.accept || '')) { toast('В это поле кладут звук, а не картинку'); return; }
+    if (it.kind === 'audio' && /video/i.test(input.accept || '') && !/audio/i.test(input.accept || '')) { toast('Сюда кладут видео, а не звук'); return; }
+    try { await setDropFile(input, await libToFile(it, /video/i.test(input.accept || ''), dragName)); toast(it.kind === 'audio' ? 'Звук взят из Библиотеки' : it.kind === 'video' ? 'Видео взято из Библиотеки' : 'Изображение взята из Библиотеки'); } catch { toast('Не удалось взять файл'); }
   }, true);
 })();
 /* ---------- PICTURES: "Изображение по тексту" (Krea 2) and "Правка изображения" (Qwen Image 2.1) ---------- */
@@ -11527,6 +11560,109 @@ if (e.target.closest('.mt-clear')) {
     if (queue) return;
     queue = setTimeout(() => { queue = 0; plant(); }, 500);
   }).observe(document.body, { childList: true, subtree: true });
+})();
+
+/* ---------- hints where none existed ----------
+   A button that does not say what it does is a button a person is afraid to press.
+   These are set after the page is built, so they follow controls that pages create
+   themselves; a title written in the markup always wins and is never overwritten. */
+(function () {
+  const T = {
+    '#libFilter .chip[data-f="all"]': 'Показать всё, что делала программа',
+    '#libFilter .chip[data-f="videos"]': 'Только готовые видео, из любого режима',
+    '#libFilter .chip[data-f="images"]': 'Только готовые картинки, из любого режима',
+    '#libFilter .chip[data-f="upscale"]': 'Файлы, увеличенные в «Ретуши»',
+    '#libFilter .chip[data-f="custom"]': 'Задания, собранные в разделе «Свои workflow»',
+    '#libFilter .chip[data-f="fav"]': 'Помеченные звёздочкой',
+    '#resKeep': 'Держать копию каждого готового файла в папке программы: если основную папку переполнят очистки, копия останется',
+    '#resApply': 'Сохранить новую папку для копий',
+    '#resBackfill': 'Скопировать в папку копий то, что уже сделано, но без копии',
+    '#resClean': 'Убрать из списка записи, у которых файл на диске пропал; сами файлы не удаляются',
+    '#agNew': 'Начать новый разговор:старые переписки останутся в списке слева',
+    '#agNew2': 'Начать новый разговор: старые переписки останутся в списке слева',
+    '#agWipe': 'Удалить все сохранённые переписки. Отменить нельзя',
+    '#agThinkHint': '',
+    '#coreLogBtn': 'Журнал программы: что запускалось, что скачивалось, какие ошибки',
+    '#clAdd': 'Добавить папку, откуда программа берёт ваши LoRA',
+  };
+  const GO = 'Запускает задание в очередь. Готовое появится в Библиотеке, ваши файлы не меняются. ' +
+    'Пока работа идёт, кнопка превращается в «Остановить».';
+  const SCENE = 'Делает эту сцену и ставит её видео под карточку. Остальные сцены не трогаются. ' +
+    'Готовый ролик появится в Библиотеке, а целиком фильм собирается кнопкой «Собрать фильм».';
+  function paint() {
+    for (const sel in T) {
+      if (!T[sel]) continue;
+      document.querySelectorAll(sel).forEach(b => { if (!b.getAttribute('title')) b.title = T[sel]; });
+    }
+    // chips and filter buttons pages build themselves
+    document.querySelectorAll('#libFilter .chip, .lf-chip').forEach(b => {
+      if (b.getAttribute('title')) return;
+      const t = (b.textContent || '').trim();
+      if (t && !/^[on✓]+$/.test(t)) b.title = 'Показывать только: ' + t.toLowerCase();
+    });
+    document.querySelectorAll('button.go').forEach(b => {
+      const txt = (b.textContent || '').replace(/\s+/g, ' ').trim();
+      b.title = /Сцена|сцену/i.test(txt) ? SCENE : GO;
+    });
+    document.querySelectorAll('.cw-acts [data-a]').forEach(b => {
+      if (b.getAttribute('title')) return;
+      const a = b.dataset.a;
+      b.title = a === 'save' ? 'Сохранить этот файл в выбранную папку'
+        : a === 'lib' ? 'Положить в Библиотеку'
+        : a === 'up' ? 'Увеличить и сделать чётче: новый файл в Библиотеке, этот останется'
+        : a === 'mont' ? 'Добавить этот клип в ленту монтажа'
+        : a === 'use' ? 'Взять этот файл в другой режим' : '';
+    });
+    // most switches carry their explanation as a small line under the label: that line IS the hint
+    document.querySelectorAll('button').forEach(b => {
+      if (b.getAttribute('title') || b.classList.contains('h3q')) return;
+      const s = b.querySelector(':scope > small') || b.querySelector('small'); if (!s) return;
+      const head = (b.firstChild && b.firstChild.nodeType === 3 ? b.firstChild.textContent : '').replace(/\s+/g, ' ').trim();
+      const foot = s.textContent.replace(/\s+/g, ' ').trim();
+      if (!foot || foot.length < 4) return;
+      b.title = (head && head !== foot ? head + ' · ' : '') + foot;
+    });
+    document.querySelectorAll('[data-pick]').forEach(b => { if (!b.getAttribute('title')) b.title = 'Показать окна с папками на компьютере и выбрать нужную'; });
+    // switches whose meaning is a pair: the word on the button is not enough
+    document.querySelectorAll('#view-agent [data-edit]').forEach(b => {
+      if (b.getAttribute('title')) return;
+      b.title = b.dataset.edit === '1'
+        ? 'Правка: агент меняет ваш готовый промпт - добавляет детали, убирает лишнее'
+        : 'Продолжить сюжет: агент пишет следующую сцену по тому, что уже есть';
+    });
+    document.querySelectorAll('#view-agent [data-k]').forEach(b => {
+      if (b.getAttribute('title')) return;
+      b.title = b.dataset.k === 'deep'
+        ? 'Модель думает дольше и рассуждает: лучше для длинной истории и нескольких героев'
+        : 'Модель отвечает сразу: быстрее, хватает для простой сцены';
+    });
+    const conn = document.querySelector('#view-agent #agOwnGo, #view-agent .wz-go .btn.pri');
+    if (conn && !conn.getAttribute('title')) conn.title = 'Проверить, отвечает ли выбранная модель, и начать с ней разговаривать';
+    document.querySelectorAll('#view-models #mdGpuUiCb, #mdGpuUiCb').forEach(b => {
+      if (!b.getAttribute('title')) b.title = 'Следить за загрузкой видеопамяти во время работы: полоска внизу окна';
+    });
+    document.querySelectorAll('#view-models [data-x], #view-models #mdHelp, #view-models .btn').forEach(b => {
+      if (b.getAttribute('title')) return;
+      const x = (b.textContent || '').trim();
+      if (x === 'Как это работает') b.title = 'Объяснение раздела: что скачивается, где лежит и как это связано с работой';
+      else if (/арендованн/i.test(x)) b.title = 'Работать не на этом компьютере, а на арендованном: вписать адрес и ключ';
+      else if (/своем ComfyUI|настройк/i.test(x)) b.title = 'Программа будет слать задания в тот ComfyUI, который вы уже запустили сами';
+      else if (x === 'включена' || x === 'выключена') b.title = 'Нажмите, чтобы включить или выключить эту LoRA для раздела';
+    });
+    const rb = document.getElementById('agOwnReset');
+    if (rb && !rb.getAttribute('title')) rb.title = 'Убрать свою модель разговора и вернуться к той, что идёт с программой';
+    document.querySelectorAll('#view-library .btn, #view-queue .btn').forEach(b => {
+      if (b.getAttribute('title')) return;
+      const x = (b.textContent || '').trim();
+      if (x === '−' || x === '–') b.title = 'Сделать плитки меньше - влезает больше';
+      else if (x === '+') b.title = 'Сделать плитки крупнее';
+      else if (/^Выбрать/.test(x)) b.title = 'Отметить или снять отметку со всех, что видно в этом фильтре';
+    });
+  }
+  paint();
+  let q = 0;
+  new MutationObserver(() => { if (q) return; q = setTimeout(() => { q = 0; paint(); }, 700); })
+    .observe(document.body, { childList: true, subtree: true });
 })();
 </script>
 </body>
