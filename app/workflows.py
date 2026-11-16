@@ -1022,15 +1022,6 @@ def latent_fit(add, src, got_w, got_h, want_w, want_h):
     return src2
 
 
-def action_full(width, height):
-    """The size the action route can really end up at. The upscaler comes back from 0.6x and then rounds
-       to 32, and 16:9 is the case where that does not return to the asked size: 1376x768 becomes 1376x736
-       (768 * 0.6 = 460.8 -> 448 -> back -> 736). The full-size pass and the tail of the previous scene
-       are made at the asked size, so the concatenation of a continuation died with «Sizes of tensors must
-       match ... Expected size 48 but got size 46». Working at the size the upscaler reproduces keeps the
-       low pass, the full pass and the upscaled part the same shape - and the size stays 16:9 to within
-       4 %."""
-    return action_sizes(width, height)[2:]
 
 
 def upscaler_mode(name):

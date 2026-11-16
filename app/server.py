@@ -3389,52 +3389,6 @@ class App:
         finally:
             asyncio.get_running_loop().call_later(60, shutil.rmtree, work, True)
 
-    async def h_audio_extract(self, request):
-        """POST a video or an audio file, get back only its sound between start and end. The montage works
-        with clips whose voice and music are worth keeping: a person should be able to save them and use
-        them later in any other mode, where a sound of one clip is otherwise invisible."""
-        ff = self._ffmpeg()
-        if not ff:
-            return web.json_response({"error": "декодер не найден: звук выделить нечем"}, status=404)
-        data = await request.read()
-        if not data:
-            return web.json_response({"error": "пустой файл"}, status=400)
-        if len(data) > 300 * 1024 * 1024:
-            return web.json_response({"error": "файл больше 300 МБ"}, status=413)
-        try:
-            start = max(0.0, float(request.query.get("start") or 0))
-            end = float(request.query.get("end") or 0)
-        except ValueError:
-            return web.json_response({"error": "не разобраны границы куска"}, status=400)
-        if end - start < 0.2:
-            return web.json_response({"error": "кусок короче пятой части секунды"}, status=400)
-        if end - start > 600:
-            return web.json_response({"error": "звук берём не длиннее 10 минут"}, status=400)
-        name = urllib.parse.unquote(request.query.get("name") or "video.mp4")
-        suffix = Path(name).suffix.lower()
-        if suffix not in (".mp4", ".mov", ".mkv", ".webm", ".avi", ".m4v", ".mts", ".ts", ".wmv", ".flv",
-                          ".mpg", ".mpeg", ".3gp", ".mp3", ".wav", ".m4a", ".aac", ".ogg", ".flac"):
-            suffix = ".mp4"
-        work = Path(os.environ.get("TEMP", ".")) / ("h3snd-" + uuid.uuid4().hex)
-        work.mkdir(parents=True, exist_ok=True)
-        src, out = work / ("in" + suffix), work / "sound.mp3"
-        try:
-            src.write_bytes(data)
-            cmd = [str(ff), "-hide_banner", "-loglevel", "error", "-y",
-                   "-ss", "%.3f" % start, "-to", "%.3f" % end, "-i", str(src),
-                   "-map", "0:a:0", "-vn", "-c:a", "libmp3lame", "-q:a", "3", str(out)]
-            err = b""
-            proc = await asyncio.create_subprocess_exec(*cmd, stdout=asyncio.subprocess.DEVNULL,
-                                                        stderr=asyncio.subprocess.PIPE)
-            _, err = await asyncio.wait_for(proc.communicate(), timeout=180)
-            if proc.returncode != 0 or not out.exists() or out.stat().st_size < 512:
-                return web.json_response({"error": "звука в этом куске нет: " +
-                                          (err or b"")[-300:].decode("utf-8", "replace").strip()[-200:]},
-                                         status=422)
-            return web.Response(body=out.read_bytes(), content_type="audio/mpeg",
-                                headers={"Content-Disposition": 'attachment; filename="sound.mp3"'})
-        finally:
-            asyncio.get_running_loop().call_later(60, shutil.rmtree, work, True)
 
     async def h_library_add(self, request):
         """A frame taken in the video bench becomes a library item. People pull a frame out of one video to
@@ -4286,7 +4240,6 @@ def build_app(comfy_override=None):
         web.post("/api/audio/separate", state.h_audio_separate),
         web.post("/api/video/lastframe", state.h_video_lastframe),   # the browser cannot decode everything
         web.post("/api/video/cut", state.h_video_cut),
-        web.post("/api/audio/extract", state.h_audio_extract),
         web.post("/api/montage/sound", state.h_montage_sound),   # the sound of the whole strip   # the sound of a piece, to keep it
         web.post("/api/library/add", state.h_library_add),   # a frame from the bench becomes a keepsake   # reference video is trimmed here, not in the browser
         web.get("/api/setup/info", state.h_setup_info),
