@@ -121,9 +121,9 @@
 #view-actionsc .lm-q [data-mq="draft"]{opacity:.4;pointer-events:none}
 #view-actionsc .lm-mode,#view-actionsc .lm-mode-hint,#view-actionsc .lm-q,#view-actionsc .lm-qnote{display:none!important}
 #view-actionsc .rm-imgs{display:flex!important;gap:10px;flex-wrap:wrap}
-#view-actionsc .rm-imgs .ref{width:104px;height:104px;aspect-ratio:auto;flex:0 0 104px}
+#view-actionsc .rm-imgs .ref{width:var(--refw,112px);height:var(--refh,148px);aspect-ratio:auto;flex:0 0 var(--refw,112px)}
 #view-actionsc .slots{--refh:104px;--refw:104px}
-#view-long .rm-imgs{display:flex!important;gap:10px;flex-wrap:wrap}.srf{position:relative;flex:0 0 104px;width:104px;height:104px;border-radius:10px;overflow:hidden;border:1.5px dashed rgba(232,38,79,.7)}.srf img{width:100%;height:100%;object-fit:cover;display:block}.srfl{position:absolute;left:4px;bottom:4px;font-style:normal;font-size:10px;padding:2px 6px;border-radius:6px;background:rgba(232,38,79,.92);color:#fff}#view-long .rm-imgs .ref{width:104px!important;height:104px!important;aspect-ratio:auto;flex:0 0 104px}
+#view-long .rm-imgs{display:flex!important;gap:10px;flex-wrap:wrap}.srf{position:relative;flex:0 0 104px;width:104px;height:104px;border-radius:10px;overflow:hidden;border:1.5px dashed rgba(232,38,79,.7)}.srf img{width:100%;height:100%;object-fit:cover;display:block}.srfl{position:absolute;left:4px;bottom:4px;font-style:normal;font-size:10px;padding:2px 6px;border-radius:6px;background:rgba(232,38,79,.92);color:#fff}#view-long .rm-imgs .ref{width:var(--refw,112px);height:var(--refh,148px);aspect-ratio:auto;flex:0 0 var(--refw,112px)}
 #view-long .slots{--refh:104px;--refw:104px}   // the studio keeps its small squares: its audio place must not tower over them
 /* the hints of the settings card are shown here as in the other sections */
 #view-long .st-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px 34px;align-items:start;margin-top:8px}
@@ -312,7 +312,8 @@ body.nosb-on #modeBar{left:112px}
 /* sidebar */
 .side{background:rgba(var(--bg2-rgb),.7);border-right:1px solid var(--line);display:flex;flex-direction:column;padding:20px 14px;gap:6px;backdrop-filter:blur(12px);overflow-y:auto;min-height:0}
 .brand{display:flex;align-items:center;gap:12px;padding:4px 8px 22px}
-.brand-mark{position:relative;width:38px;height:38px;border-radius:12px;background:var(--grad);display:grid;place-items:center;box-shadow:0 8px 24px rgba(var(--accent-rgb),.35)}
+.brand>div:last-child{min-width:0}
+.brand-mark{position:relative;flex:0 0 38px;width:38px;height:38px;border-radius:12px;background:var(--grad);display:grid;place-items:center;box-shadow:0 8px 24px rgba(var(--accent-rgb),.35)}
 .brand-name{font-weight:800;font-size:17px;letter-spacing:-.01em}
 .brand-sub{font-size:11.5px;color:var(--muted)}
 .nav-label{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--dim);padding:14px 10px 6px}
@@ -1206,9 +1207,7 @@ body.dropping::after{content:'Отпустите — программа разл
   <aside class="side">
     <div class="brand">
       <div class="brand-mark">
-        <!-- a viewfinder with a start sign: the same picture as the program icon on the desktop -->
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8V5.6C3 4.7 3.7 4 4.6 4H8M16 4h3.4c.9 0 1.6.7 1.6 1.6V8M21 16v2.4c0 .9-.7 1.6-1.6 1.6H16M8 20H4.6C3.7 20 3 19.3 3 18.4V16"/></svg>
-        <i class="brand-play"></i>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="8.4" cy="6.2" r="2.6"/><circle cx="15" cy="6.2" r="2.6"/><rect x="2.6" y="10.4" width="12.4" height="9" rx="2.2"/><path d="M15 13.2l4.6-2.2v8l-4.6-2.2"/></svg>
       </div>
       <div><div class="brand-name">Kadr</div><div class="brand-sub">видеостудия на вашем железе</div><div class="brand-sub" id="appVer" style="opacity:.75"></div></div>
     </div>
@@ -1312,10 +1311,9 @@ body.dropping::after{content:'Отпустите — программа разл
         <div class="sys-sep"></div>
         <div class="stat"><span>CPU</span><b id="cpuName">—</b></div>
         <div class="meter"><div class="stat"><span>Нагрузка CPU</span><b id="cpuTxt">—</b></div><div class="vram"><i id="cpuBar"></i></div></div>
-        <div class="stat" id="cpuTempRow"><span>Температура CPU</span><b id="cpuTemp">—</b></div>
         <div class="sys-sep"></div>
         <div class="meter"><div class="stat"><span>Память (ОЗУ)</span><b id="ramTxt">—</b></div><div class="vram"><i id="ramBar"></i></div></div>
-        <div class="stat"><span>Диск <small id="diskName"></small></span><b id="diskTxt">—</b></div>
+        <div class="meter"><div class="stat"><span>Диск <small id="diskName"></small></span><b id="diskTxt">—</b></div><div class="vram"><i id="diskBar"></i></div></div>
       </div>
     </div>
   </aside>
@@ -1515,8 +1513,7 @@ body.dropping::after{content:'Отпустите — программа разл
         <div class="card-h"><h3><span class="n">1</span>Эта программа</h3></div>
         <div style="display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap">
           <div class="brand-mark" style="width:64px;height:64px;border-radius:18px;flex:none">
-            <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8V5.6C3 4.7 3.7 4 4.6 4H8M16 4h3.4c.9 0 1.6.7 1.6 1.6V8M21 16v2.4c0 .9-.7 1.6-1.6 1.6H16M8 20H4.6C3.7 20 3 19.3 3 18.4V16"/></svg>
-            <i class="brand-play" style="border-left-width:13px;border-top-width:9px;border-bottom-width:9px;margin-left:4px"></i>
+            <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="8.4" cy="6.2" r="2.6"/><circle cx="15" cy="6.2" r="2.6"/><rect x="2.6" y="10.4" width="12.4" height="9" rx="2.2"/><path d="M15 13.2l4.6-2.2v8l-4.6-2.2"/></svg>
           </div>
           <div style="flex:1;min-width:240px">
             <div style="font-size:19px;font-weight:800">Kadr</div>
@@ -2495,9 +2492,33 @@ function setEngine(on) {
    in the way: it folds under its own heading, keeps a two-figure summary when folded, and
    remembers the choice between runs */
 function shortCpu(name) {
-  return String(name || '').replace(/^\d+th Gen\s+/i, '').replace(/^Intel\(R\)\s+/i, '')
-    .replace(/^AMD\s+Technologies,?\s+/i, 'AMD ').replace(/\s+Processor$/i, '').replace(/\s+CPU$/i, '')
-    .replace(/\s*\(with .*?\)\s*/i, '').trim().slice(0, 34);
+  // Names come from the registry and no two vendors write them alike:
+  //   "Intel(R) Core(TM) i7-14700K"   "13th Gen Intel(R) Core(TM) i5-13400"
+  //   "AMD Ryzen 7 9800X3D 8-Core Processor"   "Intel(R) Xeon(R) W-2245 CPU @ 3.90GHz"
+  // The noise goes first - brackets, (R)/(TM), "Processor", cores, threads, the clock, "with
+  // graphics", the generation number. Of what is left we keep the family, up to three words, and
+  // the model number even if it stands further along the name: "Ryzen 7" alone is not a computer.
+  let s = ' ' + String(name || '') + ' ';
+  s = s.replace(/\((r|tm|c)\)/gi, ' ')
+       .replace(/\(with[^)]*\)/gi, ' ')
+       .replace(/\b\d+(st|nd|rd|th)\s+gen\b/gi, ' ')
+       .replace(/\b(processor|cpu|series|desktop|socket|64-bit|based|with)\b/gi, ' ')
+       .replace(/@\s*[\d.]+\s*ghz/gi, ' ')
+       .replace(/\b\d+\s*-\s*(core|threaded|cores)\b/gi, ' ')
+       .replace(/\bamd technologies,?\b/gi, 'AMD')
+       .replace(/\s+/g, ' ').trim();
+  const words = s.split(' ').filter(Boolean);
+  // a known family speaks for itself, the vendor's name only eats the place
+  const family = /\b(ryzen|epyc|athlon|sempron|phenom|core|xeon|arc|ultra|cortex|apple|ryzen\d)/i;
+  let out = [];
+  for (const t of words) {
+    if (out.length >= 3) break;
+    if (/^(intel|amd|via|hygoc|huawei|qualcomm|nvidia)$/i.test(t) && family.test(words.join(' '))) continue;
+    out.push(t);
+  }
+  const num = words.find(t => /\d/.test(t) && !out.includes(t));
+  if (num && (out.join(' ') + ' ' + num).length <= 24) out.push(num);
+  return (out.join(' ') || String(name || '')).trim().slice(0, 24);
 }
 (function () {
   const head = document.getElementById('sysHead'), body = document.getElementById('sysBody');
@@ -2684,17 +2705,18 @@ async function pollSystem() {
     const cn = $('#cpuName');
     if (cn) cn.textContent = cpu.name ? shortCpu(cpu.name) : 'не сообщается';
     meter('#cpuTxt', '#cpuBar', cpu.util, cpu.util != null ? `${Math.round(cpu.util)} %` : '—');
-    const ctr = $('#cpuTempRow');
-    // the line stands there whether or not the board reports it: a missing row looks like a bug,
-    // a row that says "the sensor is silent" answers the question without one
-    if (ctr) $('#cpuTemp').textContent = cpu.temp != null ? `${Math.round(cpu.temp)} °C` : 'датчик молчит';
+
       $('#powerRow').hidden = gpu.power == null;
       if (gpu.power != null) $('#gpuPower').textContent = `${Math.round(gpu.power)}` + (gpu.power_limit ? ` / ${Math.round(gpu.power_limit)}` : '') + ' Вт';
     } else $('#gpuName').textContent = 'не найдена';
     const _cpu = (typeof s.cpu === 'object' && s.cpu) ? s.cpu.util : s.cpu;
       meter('#cpuTxt', '#cpuBar', _cpu, _cpu != null ? `${Math.round(_cpu)} %` : '—');
     meter('#ramTxt', '#ramBar', s.ram.used_gb / s.ram.total_gb * 100, `${g1(s.ram.used_gb)} / ${g1(s.ram.total_gb)} ГБ`);
-    if (s.disk) { $('#diskName').textContent = s.disk.drive; $('#diskTxt').textContent = `свободно ${s.disk.free_gb} ГБ`;
+    if (s.disk) {
+      $('#diskName').textContent = s.disk.drive;
+      // the disk is drawn like every other line: how much is taken, not how much is left in words
+      const dtot = s.disk.total_gb || 1, dused = Math.max(0, dtot - (s.disk.free_gb || 0));
+      meter('#diskTxt', '#diskBar', dused / dtot * 100, `занято ${Math.round(dused / dtot * 100)} % · свободно ${s.disk.free_gb} ГБ`);
     window.DISK_FREE = +s.disk.free_gb; window.DISK_DRIVE = s.disk.drive; }
   } catch { /* the server is restarting; try again on the next tick */ }
 }
@@ -5895,7 +5917,7 @@ function makeRefMode(cfg) {
     <div class="head"><div><h1>${cfg.title}</h1><p>${cfg.sub}</p></div><div class="mode-pill"><i></i><span class="rm-pill">${cfg.pill}</span></div></div>
     <div class="grid"><div class="col">
       <div class="card">
-        <div class="card-h"><h3><span class="n">1</span>Видеостудия</h3><span class="counter rm-count"></span> <button class="btn mini rm-clr" type="button" title="Убрать все изображения сразу">Очистить изображения</button>
+        <div class="card-h"><h3><span class="n">1</span>Референсы</h3><span class="counter rm-count"></span> <button class="btn mini rm-clr" type="button" title="Убрать все изображения сразу">Очистить изображения</button>
           <button class="btn mini rm-clear" type="button" title="Убрать всё в этом разделе: картинки, видео, аудио и текст">Очистить всё</button></div>
         <div class="refs rm-imgs"></div>
         <div class="rm-media">
@@ -6516,7 +6538,7 @@ function makeRefMode(cfg) {
       <div class="ta-foot"><div class="tokens rm-tokens"></div><span class="hint">нажмите, чтобы вставить в сцену</span></div>
       <div class="note" style="margin-top:12px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 8h0M11 12h1v5h1"/></svg><span>Изображения героя необязательны: без них ролик строится только по тексту (например, про Древний Рим). Сцены идут одна за другой, каждая продолжает прошлую: герой, место и звук переходят дальше. Но при каждом продолжении изображение немного портится, поэтому при смене плана или места ставьте у сцены галочку «Новый план»: она строится заново по вашим изображениям, и качество остаётся как в первой сцене. В каждой сцене опишите героя, что он делает и как движется камера. Длину сцены задаёт ползунок. Текст сцены можно составить в разделе «Агент».</span></div>`;
     const c1 = $('.rm-imgs', root).closest('.card');
-    $('h3', c1).innerHTML = '<span class="n">1</span>Видеостудия';
+    $('h3', c1).innerHTML = '<span class="n">1</span>Референсы';
     $('.rm-count', root).hidden = true;
     $$('.rm-imgs .plus', root).forEach((pl, i) => { pl.lastChild.textContent = 'Референс'; });
     $('.rm-media .sub-l span', root).textContent = 'Песня или фрагмент';
