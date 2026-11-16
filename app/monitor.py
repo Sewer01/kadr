@@ -37,10 +37,48 @@ def _num(text):
         return None  # "[N/A]" and the like
 
 
+# the marketing name of the processor is read once and kept: it never changes
+_CPU_NAME = None
+
+
 class Monitor:
     def __init__(self):
         self._cpu_prev = None
         self._cache, self._at = None, 0.0
+
+    @staticmethod
+    def cpu_name():
+        """How the person knows his own processor: the marketing name from the registry."""
+        global _CPU_NAME
+        if _CPU_NAME is not None:
+            return _CPU_NAME
+        _CPU_NAME = ""
+        try:
+            import winreg
+            with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"HARDWARE\DESCRIPTION\System\CentralProcessor\0") as k:
+                _CPU_NAME = str(winreg.QueryValueEx(k, "ProcessorNameString")[0]).strip()
+        except Exception:
+            try:
+                import platform
+                _CPU_NAME = str(platform.processor()).strip()
+            except Exception:
+                _CPU_NAME = ""
+        return _CPU_NAME
+
+    @staticmethod
+    def cpu_temp():
+        """Degrees of the processor, when the machine tells them. On most desktop Windows nothing
+           reports it, and then the line stays hidden instead of showing a dash forever."""
+        try:
+            import psutil
+            st = psutil.sensors_temperatures() or {}
+        except Exception:
+            return None      # no psutil or no sensor on this board: the line stays hidden
+        for key, entries in st.items():
+            for e in entries:
+                if getattr(e, "current", None):
+                    return float(e.current)
+        return None
 
     def cpu_percent(self):
         idle, kernel, user = _FileTime(), _FileTime(), _FileTime()
@@ -94,6 +132,6 @@ class Monitor:
         """At most one reading per second, however many windows ask."""
         if self._cache and time.monotonic() - self._at < 1.0:
             return self._cache
-        self._cache = {"cpu": self.cpu_percent(), "ram": self.ram(), "gpu": self.gpu(), "disk": self.disk(disk_path)}
+        self._cache = {"cpu": {"util": self.cpu_percent(), "name": self.cpu_name(), "temp": self.cpu_temp()}, "ram": self.ram(), "gpu": self.gpu(), "disk": self.disk(disk_path)}
         self._at = time.monotonic()
         return self._cache

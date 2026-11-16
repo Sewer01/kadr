@@ -14,8 +14,8 @@ pyz = PYZ(a.pure)
 exe = EXE(
     pyz, a.scripts, [],
     exclude_binaries=True,
-    name="MinimaxH3Workspace",
+    name="Kadr",
     icon=str(APP / "build" / "icon.ico"),
     console=False,
 )
-coll = COLLECT(exe, a.binaries, a.datas, name="MinimaxH3Workspace")
+coll = COLLECT(exe, a.binaries, a.datas, name="Kadr")

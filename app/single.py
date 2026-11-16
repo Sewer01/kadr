@@ -29,7 +29,7 @@ _handle = None  # the mutex has to stay open while the program runs
 def _name(data_dir):
     """A mutex name per data folder (the same folder always gives the same name)."""
     key = hashlib.sha1(str(Path(data_dir)).lower().encode("utf-8")).hexdigest()[:16]
-    return f"Local\\MinimaxH3Workspace-{key}"
+    return f"Local\\Kadr-{key}"
 
 
 def _read(data_dir):

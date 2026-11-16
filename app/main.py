@@ -265,7 +265,7 @@ def main():
                 0, "Не найден компонент Windows «Microsoft Edge WebView2», он рисует окно программы.\n\n"
                    "Скачайте и установите «WebView2 Runtime» (бесплатно, с сайта Microsoft: microsoft.com/edge/webview2), "
                    "затем запустите программу снова.\n\nПока программа откроется в обычном браузере.",
-                "Minimax H3 Workspace", 0x40)
+                "Kadr", 0x40)
         except Exception:
             pass
 
@@ -296,7 +296,7 @@ def main():
         w0, h0, x0, y0, st0 = window_geo()
         open_state = st0 if mode == "geo" else ("max" if mode == "max" else "fullscreen" if mode == "fullscreen" else "window")
         api._window = webview.create_window(
-            "Minimax H3 Workspace", url, width=w0, height=h0, min_size=(1000, 680),
+            "Kadr", url, width=w0, height=h0, min_size=(1000, 680),
             maximized=(open_state == "max"), fullscreen=(open_state == "fullscreen"),
             background_color="#12070a", js_api=api, draggable=True)
         if open_state == "window" and x0 is not None and y0 is not None:

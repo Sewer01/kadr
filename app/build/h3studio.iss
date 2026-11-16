@@ -1,7 +1,7 @@
 ; Inno Setup script: ISCC.exe app\build\h3studio.iss  (after the PyInstaller build)
-#define AppName "Minimax H3 Workspace"
+#define AppName "Kadr"
 #define AppVersion "1.5.3"
-#define AppExe "MinimaxH3Workspace.exe"
+#define AppExe "Kadr.exe"
 
 [Setup]
 AppId={{6B0E3C1E-5D7A-4C64-9A0B-7E2B1C9F4A31}
@@ -16,7 +16,7 @@ DisableDirPage=no
 ; per-user install: no admin rights needed, and the app can write next to itself
 PrivilegesRequired=lowest
 OutputDir=output
-OutputBaseFilename=Minimax.H3.Workspace-Setup
+OutputBaseFilename=Kadr-Setup
 SetupIconFile=icon.ico
 UninstallDisplayIcon={app}\{#AppExe}
 Compression=lzma2/ultra64
@@ -34,7 +34,7 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 
 [Files]
 ; the maker's own settings, library and keys live in dist\...\data: never ship or overwrite them
-Source: "dist\MinimaxH3Workspace\*"; DestDir: "{app}"; Excludes: "data,data\*,data_location.txt"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "dist\Kadr\*"; DestDir: "{app}"; Excludes: "data,data\*,data_location.txt"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
 Name: "{autoprograms}\{#AppName}"; Filename: "{app}\{#AppExe}"

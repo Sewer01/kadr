@@ -502,6 +502,21 @@ details[open] summary::before{content:'－ '}
 /* audio editor */
 .audio-empty{border:1.5px dashed var(--line-2);border-radius:14px;padding:14px 18px;text-align:center;background:var(--bg-2);cursor:pointer;display:grid;gap:4px;justify-items:center}
 .h3vdrop{transition:outline-color .12s}
+/* the load box: a heading that folds, quiet separators between the three groups of numbers */
+.sys-head{display:flex;align-items:center;gap:7px;cursor:pointer;user-select:none;padding:2px 0 6px}
+.sys-head b{font-size:11.5px;letter-spacing:.5px;text-transform:uppercase;color:var(--muted);font-weight:800}
+.sys-head:hover b{color:var(--text)}
+.sys-chev{margin-left:auto;color:var(--muted);font-size:14px;transition:transform .16s}
+.sys-brief{font-size:11px;color:var(--muted);opacity:0;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+body.sys-folded .sys-brief{opacity:1}
+body.sys-folded .sys-chev{transform:rotate(90deg)}
+body.sys-folded .sys-body{display:none}
+.sys-sep{height:1px;background:var(--line);margin:7px 0;opacity:.7}
+/* the mark of the program is the state of the engine */
+.brand-mark.eng-wait{background:#7a1424;box-shadow:0 0 0 0 rgba(232,38,79,.55);animation:kadrpulse 1.05s ease-in-out infinite}
+.brand-mark.eng-on{background:#1c7a4d;box-shadow:0 0 12px rgba(46,196,124,.32);animation:none}
+@keyframes kadrpulse{0%,100%{box-shadow:0 0 0 0 rgba(232,38,79,.0)}50%{box-shadow:0 0 0 7px rgba(232,38,79,.26)}}
+@media (prefers-reduced-motion:reduce){.brand-mark.eng-wait{animation:none}}
 .audio-empty:hover,.audio-empty.over{border-color:var(--accent);background:rgba(var(--accent-rgb),.06)}
 .audio-empty svg{width:24px;height:24px;color:var(--accent)}
 .audio-ed{display:none;gap:12px}
@@ -1192,13 +1207,9 @@ body.dropping::after{content:'Отпустите — программа разл
       <div class="brand-mark">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"><path d="M3 12h2M7 7v10M11 4v16M15 8v8M19 10v4M21 12h0"/></svg>
       </div>
-      <div><div class="brand-name">Minimax H3</div><div class="brand-sub">Workspace · локальная генерация</div><div class="brand-sub" id="appVer" style="opacity:.75"></div></div>
+      <div><div class="brand-name">Kadr</div><div class="brand-sub">видеостудия на вашем железе</div><div class="brand-sub" id="appVer" style="opacity:.75"></div></div>
     </div>
 
-    <button class="nav" data-view="models" title="Движок, модели и файлы, тема и размер интерфейса">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/></svg>
-      Настройки <span class="badge" id="modelsBadge" hidden></span><span class="starthere">Начните здесь</span>
-    </button>
     <div class="nav-label">Создать</div>
     <button class="nav" data-view="presets">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7.5" height="7.5" rx="2"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="2"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="2"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="2"/></svg>
@@ -1273,16 +1284,32 @@ body.dropping::after{content:'Отпустите — программа разл
       Увеличение видео и фото
     </button>
 
-    <div class="side-foot" id="sysBox" title="Нагрузка компьютера, обновляется каждые 2 секунды">
-      <div class="stat" id="engRow" title="Нажмите, чтобы запустить локальный ComfyUI, не перезапуская программу"><span><span class="dot" id="engDot"></span>Движок</span><b id="engTxt">запущен</b></div>
-      <div class="stat"><span>Видеокарта</span><b id="gpuName">—</b></div>
-      <div class="meter"><div class="stat"><span>Нагрузка GPU</span><b id="gpuLoad">—</b></div><div class="vram"><i id="gpuBar"></i></div></div>
-      <div class="meter"><div class="stat"><span>Видеопамять</span><b id="vramTxt">—</b></div><div class="vram"><i id="vramBar"></i></div></div>
-      <div class="meter"><div class="stat"><span>Процессор</span><b id="cpuTxt">—</b></div><div class="vram"><i id="cpuBar"></i></div></div>
-      <div class="meter"><div class="stat"><span>Память (ОЗУ)</span><b id="ramTxt">—</b></div><div class="vram"><i id="ramBar"></i></div></div>
-      <div class="stat" id="tempRow" hidden><span>Температура GPU</span><b id="gpuTemp">—</b></div>
-      <div class="stat" id="powerRow" hidden><span>Питание GPU</span><b id="gpuPower">—</b></div>
-      <div class="stat"><span>Диск <small id="diskName"></small></span><b id="diskTxt">—</b></div>
+    <div class="nav-label">Система</div>
+    <button class="nav" data-view="models" title="Движок, модели и файлы, тема и размер интерфейса">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/></svg>
+      Настройки <span class="badge" id="modelsBadge" hidden></span><span class="starthere">Начните здесь</span>
+    </button>
+
+    <div class="side-foot" id="sysBox">
+      <div class="sys-head" id="sysHead" role="button" tabindex="0" title="Свернуть или показать нагрузку компьютера">
+        <b>Нагрузка</b><span class="sys-brief" id="sysBrief"></span><span class="sys-chev">›</span>
+      </div>
+      <div class="sys-body" id="sysBody">
+        <div class="stat" id="engRow" title="Нажмите, чтобы запустить локальный ComfyUI, не перезапуская программу"><span><span class="dot" id="engDot"></span>Движок</span><b id="engTxt">—</b></div>
+        <div class="sys-sep"></div>
+        <div class="stat"><span>Модель GPU</span><b id="gpuName">—</b></div>
+        <div class="meter"><div class="stat"><span>Загрузка GPU</span><b id="gpuLoad">—</b></div><div class="vram"><i id="gpuBar"></i></div></div>
+        <div class="meter"><div class="stat"><span>Память GPU</span><b id="vramTxt">—</b></div><div class="vram"><i id="vramBar"></i></div></div>
+        <div class="meter" id="powerRow"><div class="stat"><span>Мощность GPU</span><b id="gpuPower">—</b></div><div class="vram"><i id="powerBar"></i></div></div>
+        <div class="stat" id="tempRow" hidden><span>Температура GPU</span><b id="gpuTemp">—</b></div>
+        <div class="sys-sep"></div>
+        <div class="stat"><span>Модель CPU</span><b id="cpuName">—</b></div>
+        <div class="meter"><div class="stat"><span>Нагрузка CPU</span><b id="cpuTxt">—</b></div><div class="vram"><i id="cpuBar"></i></div></div>
+        <div class="stat" id="cpuTempRow" hidden><span>Температура CPU</span><b id="cpuTemp">—</b></div>
+        <div class="sys-sep"></div>
+        <div class="meter"><div class="stat"><span>Память (ОЗУ)</span><b id="ramTxt">—</b></div><div class="vram"><i id="ramBar"></i></div></div>
+        <div class="stat"><span>Диск <small id="diskName"></small></span><b id="diskTxt">—</b></div>
+      </div>
     </div>
   </aside>
 
@@ -2406,6 +2433,52 @@ function setEngine(on) {
   new MutationObserver(paint).observe($('aside') || document.body, { attributes: true, attributeFilter: ['hidden', 'class'], subtree: true });
   paint();
 })();
+/* the load box is a thing a person looks at once in a while, not a wall of numbers standing
+   in the way: it folds under its own heading, keeps a two-figure summary when folded, and
+   remembers the choice between runs */
+function shortCpu(name) {
+  return String(name || '').replace(/^\d+th Gen\s+/i, '').replace(/^Intel\(R\)\s+/i, '')
+    .replace(/^AMD\s+Technologies,?\s+/i, 'AMD ').replace(/\s+Processor$/i, '').replace(/\s+CPU$/i, '')
+    .replace(/\s*\(with .*?\)\s*/i, '').trim().slice(0, 34);
+}
+(function () {
+  const head = document.getElementById('sysHead'), body = document.getElementById('sysBody');
+  if (!head || !body) return;
+  const KEY = 'h3-sys-folded';
+  const folded = () => document.body.classList.toggle('sys-folded', !!localStorage.getItem(KEY));
+  head.onclick = () => { localStorage.setItem(KEY, localStorage.getItem(KEY) ? '' : '1'); folded(); };
+  head.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); head.click(); } };
+  folded();
+  // the brief line carries what matters while the box is closed
+  const bi = new MutationObserver(() => {
+    if (!localStorage.getItem(KEY)) return;
+    const g = id => ($(id) || {}).textContent || '';
+    $('#sysBrief').textContent = [g('#gpuLoad'), g('#vramTxt')].filter(x => x && x !== '—').join(' · ');
+  });
+  bi.observe(document.querySelector('#gpuLoad') || document.body, { childList: true, characterData: true, subtree: true });
+})();
+
+/* the program's own mark answers for the engine: it pulses red while the engine is not with us
+   yet and settles on green when it is, so the answer to "can I press Start" is visible from
+   the far side of the room, without reading the small print */
+(function () {
+  const mark = document.querySelector('.brand-mark');
+  if (!mark) return;
+  const cap = document.getElementById('engTxt');
+  const st = () => {
+    const dot = document.getElementById('engDot');
+    const on = dot && !dot.classList.contains('off');
+    const wait = cap && /запуск|поднима|жд|не запущен|start/i.test(cap.textContent || '');
+    mark.classList.toggle('eng-wait', !on);
+    mark.classList.toggle('eng-on', !!on);
+    mark.title = on ? 'Движок работает - можно снимать' : (wait ? 'Движок поднимается: подождите пару минут' : 'Движок не запущен: нажмите «Движок» внизу');
+  };
+  st();
+  const watch = document.querySelector('.side') || document.body;
+  new MutationObserver(st).observe(watch, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ['class'] });
+  setInterval(st, 3000);
+})();
+
 let SQ_ASKED = false;
 async function askSavedQueue() {
   if (SQ_ASKED) return; SQ_ASKED = true;
@@ -2509,10 +2582,24 @@ async function pollSystem() {
       meter('#gpuLoad', '#gpuBar', gpu.util, gpu.util != null ? `${Math.round(gpu.util)} %` : '—');
       meter('#vramTxt', '#vramBar', gpu.vram_used_gb / gpu.vram_total_gb * 100, `${g1(gpu.vram_used_gb)} / ${g1(gpu.vram_total_gb)} ГБ`);
       $('#tempRow').hidden = gpu.temp == null; if (gpu.temp != null) $('#gpuTemp').textContent = `${Math.round(gpu.temp)} °C`;
+    // the same block of numbers, but read by a person, not by a machine: what the card is, how hard it
+    // works, how much of it is full, what it eats, how hot it is - and the same for the processor
+    const pw = gpu.power, pl = gpu.power_limit;
+    if (pw != null) {
+      $('#gpuPower').textContent = pl ? `${Math.round(pw)} / ${Math.round(pl)} Вт` : `${Math.round(pw)} Вт`;
+      const pb = $('#powerBar'); if (pb) pb.style.width = Math.min(100, (pw / (pl || 100)) * 100) + '%';
+    }
+    const cpu = (typeof s.cpu === 'object' && s.cpu) ? s.cpu : { util: s.cpu };
+    const cn = $('#cpuName');
+    if (cn) cn.textContent = cpu.name ? shortCpu(cpu.name) : 'не сообщается';
+    meter('#cpuTxt', '#cpuBar', cpu.util, cpu.util != null ? `${Math.round(cpu.util)} %` : '—');
+    const ctr = $('#cpuTempRow');
+    if (ctr) { ctr.hidden = cpu.temp == null; if (cpu.temp != null) $('#cpuTemp').textContent = `${Math.round(cpu.temp)} °C`; }
       $('#powerRow').hidden = gpu.power == null;
       if (gpu.power != null) $('#gpuPower').textContent = `${Math.round(gpu.power)}` + (gpu.power_limit ? ` / ${Math.round(gpu.power_limit)}` : '') + ' Вт';
     } else $('#gpuName').textContent = 'не найдена';
-    meter('#cpuTxt', '#cpuBar', s.cpu, s.cpu != null ? `${Math.round(s.cpu)} %` : '—');
+    const _cpu = (typeof s.cpu === 'object' && s.cpu) ? s.cpu.util : s.cpu;
+      meter('#cpuTxt', '#cpuBar', _cpu, _cpu != null ? `${Math.round(_cpu)} %` : '—');
     meter('#ramTxt', '#ramBar', s.ram.used_gb / s.ram.total_gb * 100, `${g1(s.ram.used_gb)} / ${g1(s.ram.total_gb)} ГБ`);
     if (s.disk) { $('#diskName').textContent = s.disk.drive; $('#diskTxt').textContent = `свободно ${s.disk.free_gb} ГБ`;
     window.DISK_FREE = +s.disk.free_gb; window.DISK_DRIVE = s.disk.drive; }

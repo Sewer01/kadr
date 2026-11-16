@@ -15,8 +15,8 @@ import aiohttp
 
 from version import APP_VERSION, UPDATE_REPO
 
-ASSET = "Minimax.H3.Workspace-Setup.exe"
-HEADERS = {"User-Agent": "Minimax-H3-Workspace", "Accept": "application/vnd.github+json"}
+ASSET = "Kadr-Setup.exe"
+HEADERS = {"User-Agent": "Kadr", "Accept": "application/vnd.github+json"}
 
 
 def repo():
