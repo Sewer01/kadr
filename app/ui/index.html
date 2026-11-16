@@ -3380,6 +3380,8 @@ async function soundOut(blob, name, from, at, notice) {
       '&from=' + encodeURIComponent(from || '') + '&at=' + encodeURIComponent(at || ''),
       { method: 'POST', body: blob });
     if (!r.ok) { notice('Звук не принят в библиотеку (ответ ' + r.status + ') - нужна более новая версия программы'); return null; }
+    try { await window.h3ReloadLibrary?.(); } catch (e) { }
+    try { window.trayFill?.(); } catch (e) { }
     notice('Звук сохранён в библиотеку: ' + name);
     return await r.json();
   } catch (e) {
@@ -3405,6 +3407,7 @@ async function frameOut(f, rootEl, notice) {
       '&from=' + encodeURIComponent(f.__from || '') + '&at=' + encodeURIComponent(f.__at || ''),
       { method: 'POST', body: f });
     lib = r.ok ? ' + копия в библиотеке' : ' · в библиотеку не принял ответ ' + r.status;
+    if (r.ok) { try { await window.h3ReloadLibrary?.(); } catch (e) { } try { window.trayFill?.(); } catch (e) { } }
   } catch (e) { lib = ' · в библиотеку не ушёл: нужна более новая версия программы'; }
   notice('Кадр ' + (where ? where + ' ' : '') + lib.trim() + ': ' + f.name);
 }
@@ -5150,6 +5153,16 @@ $('.nav[data-view="models"]').addEventListener('click', async () => {
 /* ---------- LIBRARY ---------- */
 const MODE_NAME = { actionsc: 'Экшн-видеостудия', montage: 'Монтаж', custom: 'Свой workflow', video: 'Видео', lipsync: 'Lipsync', refs: 'Референсы', actor: 'Актёрская игра', swap: 'Замена персонажа', action: 'Экшн-видео', actionsc: 'Экшн-видеостудия', long: 'Видеостудия', krea: 'Изображение по тексту', qwen: 'Правка изображения', upscale: 'Увеличение', relayvsr: 'Увеличение' };
 const LIB = [];
+// a frame or a piece of sound arrives from a button, not from a run: the list is a shared array, so it
+// can be refilled in place, and the side tray is told to repaint - otherwise it shows yesterday's shelf
+window.h3ReloadLibrary = async () => {
+  try {
+    const items = await (await fetch('/api/library')).json();
+    LIB.length = 0;
+    items.forEach(it => LIB.push(typeof normItem === 'function' ? normItem(it) : it));
+    try { window.trayFill?.(); } catch (e) { }
+  } catch (e) { }
+};
 const IMG_PANELS = [];  // refresh functions of the picture result windows
 let libFilter = 'all', selecting = false, selected = new Set(), openId = null, openItem = null;  // openItem: the viewer may show a clip the library does not have yet
 const ICON = {
