@@ -1276,6 +1276,11 @@ class App:
         return web.json_response({**{k: v for k, v in info.items() if k not in ("asset", "sha256")},
                                   "can_update": updater.can_update()})
 
+    async def h_update_progress(self, _req):
+        """How much of the installer has arrived. The update request itself only answers at the end,
+        so without this the window would sit in silence for the whole download."""
+        return web.json_response(dict(updater.PROGRESS))
+
     async def h_update_install(self, _req):
         info = getattr(self, "update_info", None)
         if not info or not updater.can_update():
@@ -1283,7 +1288,9 @@ class App:
         if self.jobs:
             raise web.HTTPConflict(text="Сейчас идёт генерация. Дождитесь её конца и нажмите «Обновить» снова.")
         try:
-            installer = await updater.download(self.session, info)
+            updater.PROGRESS.clear()
+            updater.PROGRESS.update(done=0, total=int(info.get("size") or 0))
+            installer = await updater.download(self.session, info, updater.PROGRESS)
         except Exception as e:
             raise web.HTTPBadGateway(text=str(e))
         updater.run(installer)
@@ -4277,6 +4284,7 @@ def build_app(comfy_override=None):
         web.post("/api/grain", state.h_grain),
         web.get("/api/version", lambda _req: web.json_response({"version": APP_VERSION, "built": build_stamp()})),
         web.get("/api/update/check", state.h_update_check),
+        web.get("/api/update/progress", state.h_update_progress),
         web.post("/api/update/install", state.h_update_install),
         web.post("/api/generate/qwen", state.h_generate_qwen),
         web.post("/api/generate/lipsync", state.h_generate_lipsync),

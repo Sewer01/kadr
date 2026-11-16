@@ -1646,7 +1646,7 @@ body.dropping::after{content:'Отпустите — программа разл
               <button data-t="lipsync" title="Lipsync — референсы + аудио">Lipsync</button>
               <button data-t="refs" title="Референсы (страница «Видеостудия»): промпт по вашим картинкам, видео и аудио">Референсы</button>
               <button data-t="actor" title="Актёр — диалог, голос, эмоции">Актёр</button>
-              <button data-t="swap" title="Замена персонажа — видео + изображение героя">Замена персонажа</button>
+              <button data-t="swap" title="Замена: заменить героя в вашем видео по картинке">Замена</button>
               <button data-t="action" title="Экшн-видео — бой, погоня, бег">Экшн-видео</button>
               <button data-t="long" title="Киностудия — фильм по сценам, каждая до 15 с">Киностудия</button>
               <button data-t="actionsc" title="Экшн-студия — экшн по сценам подряд">Экшн-студия</button>
@@ -1871,15 +1871,15 @@ body.dropping::after{content:'Отпустите — программа разл
               <button class="mcard" data-m="refs" title="Видео по вашим референсам: картинки, видео и аудио. Качество выше, места нужно больше."><i></i><b>Видеостудия</b><span>Видео по нескольким изображениям, референс-видео и аудио</span><small></small></button>
               <button class="mcard" data-m="actor" title="Диалог и эмоции: лицо, голос по образцу, до 14 секунд."><i></i><b>Актёр</b><span>Диалоги и крупные планы: эмоции, голос по образцу</span><small></small></button>
               <button class="mcard" data-m="action" title="Одно динамичное видео: драка, погоня, бег. Быстрый и точный проход уже встроен."><i></i><b>Экшн-видео</b><span>Бой, погоня, бег, прыжки</span><small></small></button>
-              <button class="mcard" data-m="long" title="Фильм по сценам: каждая сцена до 15 секунд, следующая продолжает предыдущую."><i></i><b>Видеостудия</b><span>Клипы и ролики по сценам: до 15 с на сцену, сцены продолжают друг друга</span><small></small></button>
+              <button class="mcard" data-m="long" title="Киностудия: фильм по сценам, каждая до 15 секунд, следующая продолжает предыдущую."><i></i><b>Киностудия</b><span>Клипы и ролики по сценам: до 15 с на сцену, сцены продолжают друг друга</span><small></small></button>
         <button class="mcard" data-m="actionsc" title="Динамичные сцены подряд: длинный экшн из нескольких сцен."><i></i><b>Экшн-студия</b><span>Длинный экшн по сценам: 8 + 4 шага, файлы ускорения, звук делает модель</span><small></small></button>
-              <button class="mcard" data-m="krea" title="Картинка по описанию. Можно в коммерцию."><i></i><b>Изображение по тексту</b><span>Krea 2: красивые изображения по описанию (можно в коммерцию)</span><small></small></button>
-              <button class="mcard" data-m="kreareal" title="Картинка по описанию в реализме: люди и фото как с камеры, два прохода."><i></i><b>Изображение: реализм</b><span>Krea 2 для реалистичных людей и фото (в «Изображении по тексту», +15 ГБ)</span><small></small></button>
-              <button class="mcard" data-m="qwen" title="Правка готового изображения: нужен файл, который меняем."><i></i><b>Правка изображения</b><span>Qwen: изменить своё изображение, лист персонажа</span><small></small></button>
-              <button class="mcard" data-m="flux" title="Своя лёгкая модель правки по описанию: FLUX klein. Какую именно ступень вы скачиваете и что разрешает её лицензия - видно в списке моделей."><i></i><b>Правка изображения: FLUX klein</b><span>Изменить изображение по описанию лёгкой моделью (+12 ГБ)</span><small></small></button>
-        <button class="mcard" data-m="h3img" title="Картинка по описанию моделью MiniMax H3 Image: до 5 референсов."><i></i><b>Изображения MiniMax H3 Image</b><span>Очень крупные картинки по тексту (до 16 МП) и правка по 5 референсам: стиль, герои, место. Открытая лицензия (+14 ГБ)</span><small></small></button>
-              <button class="mcard" data-m="upscale" title="Увеличение и улучшение чёткости видео и фото («Ретушь»), вариант SeedVR2."><i></i><b>Увеличение видео и изображений</b><span>Увеличить готовое видео и добавить чёткости (долго, но по желанию)</span><small></small></button>
-              <button class="mcard" data-m="relayvsr" title="Быстрое увеличение видео (RelayVSR): коротких клипов, в разы быстрее."><i></i><b>Быстрое увеличение видео (RelayVSR)</b><span>Увеличить готовое видео в 2 раза за минуты. Только видео, до ~10 с</span><small></small></button>
+              <button class="mcard" data-m="krea" title="Картинка по описанию. Можно в коммерцию."><i></i><b>Изображение · Krea 2</b><span>Krea 2: красивые изображения по описанию (можно в коммерцию)</span><small></small></button>
+              <button class="mcard" data-m="kreareal" title="Картинка по описанию в реализме: люди и фото как с камеры, два прохода."><i></i><b>Изображение · реализм</b><span>Krea 2 для реалистичных людей и фото (лежит в «Изображении», +15 ГБ)</span><small></small></button>
+              <button class="mcard" data-m="qwen" title="Правка готового изображения: нужен файл, который меняем."><i></i><b>Правка · Qwen</b><span>Qwen: изменить своё изображение, лист персонажа</span><small></small></button>
+              <button class="mcard" data-m="flux" title="Своя лёгкая модель правки по описанию: FLUX klein. Какую именно ступень вы скачиваете и что разрешает её лицензия - видно в списке моделей."><i></i><b>Правка · FLUX klein</b><span>Изменить изображение по описанию лёгкой моделью (+12 ГБ)</span><small></small></button>
+        <button class="mcard" data-m="h3img" title="Картинка по описанию моделью MiniMax H3 Image: до 5 референсов."><i></i><b>Изображение · H3 Image</b><span>Очень крупные картинки по тексту (до 16 МП) и правка по 5 референсам: стиль, герои, место. Открытая лицензия (+14 ГБ)</span><small></small></button>
+              <button class="mcard" data-m="upscale" title="Увеличение и улучшение чёткости видео и фото («Ретушь»), вариант SeedVR2."><i></i><b>Ретушь · качественнее</b><span>Увеличить готовое видео и добавить чёткости (долго, но по желанию)</span><small></small></button>
+              <button class="mcard" data-m="relayvsr" title="Быстрое увеличение видео (RelayVSR): коротких клипов, в разы быстрее."><i></i><b>Ретушь · быстро (RelayVSR)</b><span>Увеличить готовое видео в 2 раза за минуты. Только видео, до ~10 с</span><small></small></button>
             </div>
             <div class="note" id="modeTotal" style="margin-top:4px"></div>
           </div>
@@ -5193,7 +5193,7 @@ setTimeout(fitTopBar, 700);   // the pills are built a moment after the page ope
     try { u = await (await fetch('/api/update/check', { cache: 'no-store' })).json(); }
     catch (e) { say('Интернет не отвечает: ' + esc(e.message)); b.disabled = false; return; }
     if (u.error) { say(esc(u.error)); b.disabled = false; return; }
-    if (!u.available) { say(`У вас последняя версия — ${esc(u.current || '')}.`); b.disabled = false; return; }
+    if (!u.available) { say(u.failed ? `Проверить обновление не вышло: ${esc(u.failed)}` : `У вас последняя версия — ${esc(u.current || '')}.`); b.disabled = false; return; }
     if (!u.can_update) { say(`Вышла ${esc(u.version)}, но установить её отсюда нельзя: проверьте, что папка программы доступна для записи.`); b.disabled = false; return; }
     say(`Вышла <b>${esc(u.version)}</b> (у вас ${esc(u.current)}), ${GB(u.size || 0)}. Настройки, Библиотека и модели не меняются: скачается только установщик, он дождётся выхода программы и поставит новые файлы сам.
       <button class="btn pri mini" id="mdUpdGo" type="button" style="margin-left:6px">Скачать и установить</button>`);
@@ -5201,10 +5201,17 @@ setTimeout(fitTopBar, 700);   // the pills are built a moment after the page ope
     $('#mdUpdGo').onclick = async e => {
       if (QUEUE.some(j => j.state === 'queued' || j.state === 'running')) { toast('Идёт генерация: дождитесь конца и нажмите снова'); return; }
       e.target.disabled = true; say('Скачиваем обновление, файл проверяется по контрольной сумме. Не закрывайте программу.');
+      const bar = setInterval(async () => {         // the request answers only at the end, so percents come from a second one
+        try {
+          const pr = await (await fetch('/api/update/progress', { cache: 'no-store' })).json();
+          if (pr.total) say(`Скачиваем обновление: <b>${Math.min(99, Math.round(pr.done / pr.total * 100))}%</b> из ${GB(pr.total)}. Файл будет проверен по контрольной сумме.`);
+        } catch (e) { }
+      }, 700);
       try {
         await postJSON('/api/update/install', {});
+        clearInterval(bar);
         say('Устанавливаем. Программа закроется сама, установщик подождёт её выхода и закончит обновление — около минуты.');
-      } catch (err) { say('Не получилось: ' + esc(err.message)); e.target.disabled = false; }
+      } catch (err) { clearInterval(bar); say('Не получилось: ' + esc(err.message)); e.target.disabled = false; }
     };
   };
 })();
@@ -6040,7 +6047,7 @@ function makeRefMode(cfg) {
     diffs.forEach(([t, d]) => { if (d > Math.max(28, med * 5) && (!cuts.length || t - cuts[cuts.length - 1] > 1.5)) cuts.push(+t.toFixed(2)); });
     return cuts;
   }
-  mkSlots(audsEl, cfg.scenes ? 1 : 3, 'audio/*', ICON_AUD, cfg.scenes ? 'Музыка' : 'Аудио');
+  mkSlots(audsEl, cfg.mode === 'actionsc' ? 3 : cfg.scenes ? 1 : 3, 'audio/*', ICON_AUD, cfg.mode === 'actionsc' ? 'Аудио-образец' : cfg.scenes ? 'Музыка' : 'Аудио');
   // twelve empty plates are noise: only the filled ones and one free slot stay visible
   [imgsEl, vidsEl, audsEl].forEach(b => { watchSlots(b); foldSlots(b); });
   // Reference audio in Референсы, Актёр and Экшн-видео: the same window the studio uses, instead of a bare
@@ -8107,31 +8114,31 @@ const RM = {
     placeholder: '<Picture 1> идёт по ночной улице к камере, дождь, неон…',
   }),
   actor: makeRefMode({
-    mode: 'actor', title: 'Актёрская игра', pill: 'Singularity Ref2V · 10 шагов', dur: 14, maxImages: 3, videos: false,
+    mode: 'actor', title: 'Актёр', pill: 'Singularity Ref2V · 10 шагов', dur: 14, maxImages: 3, videos: false,
     sub: 'Диалоги и крупные планы: актёрская игра, эмоции и голос по образцу — лучше всего для реализма',
     refHint: 'Первое изображение — стартовый кадр видео (его композиция сохранится). Аудио — образец голоса: из него берётся только тембр и манера, а слова произносятся новые, из вашего промпта. Нужны два голоса — запишите оба в одно аудио. Промпт удобно писать в разделе «Агент» (цель «Актёрская игра»).',
     placeholder: '@image1 - keyframe, first frame of the target video… Лучше всего писать в «Агенте»: он знает формат этого режима',
   }),
   swap: makeRefMode({
-    mode: 'swap', title: 'Замена персонажа', pill: 'Готовый пресет · Ref2V + LoRA замены', dur: 6, maxImages: 2, videos: true, swap: true,
+    mode: 'swap', title: 'Замена', pill: 'Готовый пресет · Ref2V + LoRA замены', dur: 6, maxImages: 2, videos: true, swap: true,
     sub: 'Берём ваше видео и меняем в нём человека на своего персонажа',
     refHint: '<b>Важно:</b> видео до 15 секунд. Размер результата не больше 720p (1280×736), иначе очень долго. На изображении один герой и простой фон. Используйте лица людей только с их согласия.',
     placeholder: '',
   }),
   long: makeRefMode({
-    mode: 'long', title: 'Фильм по сценам', pill: 'Сцены подряд · Pika', dur: 20, maxImages: 5, videos: false, scenes: true,
+    mode: 'long', title: 'Киностудия', pill: 'Сцены подряд · Pika', dur: 20, maxImages: 5, videos: false, scenes: true,
     sub: 'Клипы и ролики по сценам: каждая сцена до 15 секунд и продолжает прошлую. Можно с музыкой, можно без',
     refHint: 'До 5 изображений-референсов: персонаж, локация, предмет, одежда, стиль — всё, что должно сохраняться. Они подаются в каждую сцену, поэтому лицо и место не «плывут». В тексте сцены ссылайтесь на них как &lt;Picture 1&gt;, &lt;Picture 2&gt;… Чем больше референсов, тем тяжелее и дольше считается сцена.',
     placeholder: '',
   }),
   action: makeRefMode({
-    mode: 'action', title: 'Динамичное видео', pill: 'Hybrid · 8 + 4 шага', dur: 8, maxImages: 6, videos: false,
+    mode: 'action', title: 'Экшн-видео', pill: 'Hybrid · 8 + 4 шага', dur: 8, maxImages: 6, videos: false,
     sub: 'Бой, погоня, бег, стрельба — динамичные сцены с вашими персонажами',
     refHint: 'До 6 изображений: персонажи и локация. До 3 аудио: голос, ритм или атмосфера (вместе с изображениями). В промпте: &lt;Picture 1&gt; или роли вида «@image1 - character reference».',
     placeholder: '@image1 - character reference. Девушка с @image1 убегает по ночному рынку, опрокидывает корзины…',
   }),
   actionsc: makeRefMode({
-    mode: 'actionsc', title: 'Динамичное видео по сценам', pill: 'Гибрид · 8 + 4 шага · сцены подряд', dur: 10, maxImages: 5, videos: false, scenes: true,
+    mode: 'actionsc', title: 'Экшн-студия', pill: 'Гибрид · 8 + 4 шага · сцены подряд', dur: 10, maxImages: 5, videos: false, scenes: true,
     sub: 'Длинный экшн по сценам: каждая следующая продолжает прошлую, готовые клипы склеиваются в один ролик',
     refHint: 'До 5 изображений: персонажи, локация, предмет. В тексте сцены ссылайтесь на них &lt;Picture 1&gt;, &lt;Picture 2&gt; - программа сама поставит номера по местам. Звук делает сама модель: своего аудио здесь нет.',
     placeholder: '',
@@ -8140,7 +8147,7 @@ const RM = {
 
 /* ---------- ГОТОВЫЕ ПРЕСЕТЫ: каждая карточка — готовый сценарий, всё нужное докачивается само ---------- */
 const PRESETS = [
-  { id: 'swap', kind: 'video', title: 'Замена персонажа', isNew: true, role: 'swap_lora', need: 'видео + изображение героя',
+  { id: 'swap', kind: 'video', title: 'Замена', isNew: true, role: 'swap_lora', need: 'видео + изображение героя',
     text: 'Берёте любое видео и меняете в нём человека на своего персонажа. Движения, камера и фон остаются прежними.' },
   { id: 'refs', kind: 'video', badge: ['Лучшее качество', 'q'], title: 'Видеостудия', need: 'изображения, по желанию видео и аудио',
     text: 'Видео по вашим изображениям: персонаж, одежда, локация. Видео задаёт движение, аудио — голос или атмосферу.' },
@@ -9049,7 +9056,7 @@ async function sendPrompt(blk, to) {
   if (to === 'lipsync' && au) await setDropFile($('#aFile'), au);
   if (to === 'swap' || to === 'refs') { const r = await handVids(RM[to].root); vUsed = r.used; vAll = r.all; }
   goTo(to);
-  const name = { video: '«Генерацию видео»', lipsync: 'Lipsync', refs: '«Референсы»', actor: '«Актёрскую игру»', swap: '«Замену персонажа»', action: '«Экшн-видео»', actionsc: '«Экшн-видеостудию»', long: '«Видеостудия»', krea: '«Изображение по тексту»', qwen: '«Правку изображения»' }[to];
+  const name = { video: '«Генерацию видео»', lipsync: 'Lipsync', refs: '«Референсы»', actor: '«Актёрскую игру»', swap: '«Замену персонажа»', action: '«Экшн-видео»', actionsc: '«Экшн-студию»', long: '«Киностудию»', krea: '«Изображение»', qwen: '«Правку»' }[to];
   toast(`Промпт перенесён в ${name}` + (files.length && to !== 'video' && to !== 'krea' ? ' вместе с изображениями' : '')
     + (vUsed ? ` и видео: ${vUsed}` : '') + (vidFiles.length > vUsed ? ` (видео в чате ${vidFiles.length}, раздел принимает ${vAll || 1}: лишние не перенесены)` : '') + (to === 'lipsync' ? (au ? ' и аудио — выделите нужный фрагмент' : ' — добавьте аудио') : ''));
 }
@@ -10182,7 +10189,7 @@ const imgSeedForm = (S, fd) => { if (S.seedFixed && S.seed) fd.append('seed', S.
 (() => {
   const root = $('#view-krea'), S = { aspect: '16:9', style: 'plain', scale: '2k', engine: 'krea', mp: '4' };
   root.innerHTML = `
-    <div class="head"><div><h1>Изображение по тексту</h1><p>Опишите изображение словами — модель Krea 2 нарисует его. Загрузить своё изображение здесь нельзя: для этого раздел «Правка изображения»</p></div>
+    <div class="head"><div><h1>Изображение по тексту</h1><p>Опишите изображение словами — модель Krea 2 нарисует его. Загрузить своё изображение здесь нельзя: для этого страница «Правка»</p></div>
       <div class="mode-pill"><i></i><span>Krea 2 · 1 МП</span></div></div>
     <div class="grid"><div class="col">
       <div class="card"><div class="card-h"><h3><span class="n">1</span>Промпт</h3><span class="counter kr-count">0 символов</span><button class="btn mini kr-clear" type="button" title="Убрать промпт (или список промптов)">Очистить</button></div>
@@ -10256,7 +10263,7 @@ const imgSeedForm = (S, fd) => { if (S.seedFixed && S.seed) fd.append('seed', S.
           ? `Для этой модели нужны ещё файлы. Откройте «Настройки» и нажмите «Добавить ${role === 'flux' ? 'Правка изображения: FLUX.2' : role === 'h3img' ? 'Изображения MiniMax H3 Image' : 'Правка изображения'}».`
           : role === 'flux'
             ? 'Положите в папки моделей вашего ComfyUI: flux-2-klein-4b-fp8.safetensors (diffusion_models), qwen_3_4b.safetensors (text_encoders) и flux2-vae.safetensors (vae). Потом обновите раздел «Настройки».'
-            : 'Для Qwen 2.1 нужны её модели (раздел «Правка изображения»). Проверьте «Настройки».';
+            : 'Для Qwen 2.1 нужны её модели (страница «Правка»). Проверьте «Настройки».';
       }
     } catch {}
   }

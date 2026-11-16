@@ -49,15 +49,33 @@ def managed_install_dir(data_dir):
     return None
 
 
+def write_pointer(path, folder):
+    """One line: where the data lives. Written in two places on purpose (see locate)."""
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(str(folder), encoding="utf-8")
+    except OSError:
+        pass
+
+
 def locate(app_dir, local_appdata):
     app_dir, legacy = Path(app_dir), Path(local_appdata) / "MinimaxH3Workspace"
     pointer, default = app_dir / "data_location.txt", app_dir / "data"
+    # A copy of the pointer outside the program folder: it survives "uninstall, install again" and an
+    # update that replaced the folder. Without it the new copy of the program does not know where the
+    # settings are, shows the first start, and offers to download every model onto drive C.
+    spare = Path(local_appdata) / "Kadr" / "data_location.txt" if local_appdata else None
     cur = None
     try:
         if pointer.exists():
             p = Path(pointer.read_text(encoding="utf-8").strip())
             if p.is_dir():
                 cur = p
+        if cur is None and spare is not None and spare.exists():
+            p = Path(spare.read_text(encoding="utf-8").strip())
+            if (p / "config.json").exists():
+                cur = p
+                pointer.write_text(str(cur), encoding="utf-8")
         if cur is None:
             cur = default
             if (legacy / "data").is_dir() and not default.exists():
@@ -78,8 +96,18 @@ def locate(app_dir, local_appdata):
         if inst and cur != inst / "data":
             move_all(cur, inst / "data")
             cur = inst / "data"
-            pointer.write_text(str(cur), encoding="utf-8")
+            write_pointer(pointer, cur)
+            write_pointer(spare, cur)
     except OSError:
         if cur is None or not cur.exists():
             cur = legacy / "data" if (legacy / "data").is_dir() else default
+    try:
+        # both copies are refreshed on every start: the one in the profile is what a reinstalled
+        # program reads when the folder next to the exe was replaced by the installer
+        if cur and cur.is_dir():
+            write_pointer(spare, cur) if spare is not None else None
+            if not pointer.exists() or pointer.read_text(encoding="utf-8").strip() != str(cur):
+                write_pointer(pointer, cur)
+    except OSError:
+        pass
     return cur

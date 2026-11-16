@@ -5,6 +5,6 @@ number is higher. 2.0.0 is the first release of the independent repository: the 
 follows the fork it grew from, and UPDATE_REPO below names the releases it looks at now.
 """
 
-APP_VERSION = "2.0.0"
+APP_VERSION = "2.0.1"
 UPDATE_REPO = "Sewer01/kadr"   # whose releases this program follows
 

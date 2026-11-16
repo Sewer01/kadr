@@ -509,6 +509,31 @@ async def install_core_requirements(comfy_root, timeout=900):
 
 # ---------- managed ComfyUI process ----------
 
+def disable_duplicate_packs(nodes_dir):
+    """Two copies of one node pack - the one the program installed and, say, «ComfyUI-KJNodes-main»
+    from a manual download - register the same ComfyUI route, and ComfyUI then refuses to start
+    («Added route will never be executed»). The extra copy is renamed with «.disabled»: ComfyUI skips
+    such folders, nothing is deleted, and the person can undo it by hand."""
+    nodes_dir = Path(nodes_dir)
+    if not nodes_dir.is_dir():
+        return []
+    off = []
+    for pack in catalog.NODE_PACKS:
+        base = nodes_dir / pack["name"]
+        if not base.is_dir():
+            continue
+        commit = str(pack.get("commit") or "")
+        for suffix in ("-main", "-master", "-develop", "-" + commit, "-" + commit[:7]):
+            extra = nodes_dir / (pack["name"] + suffix)
+            if extra.is_dir():
+                try:
+                    extra.rename(extra.with_name(extra.name + ".disabled"))
+                    off.append(extra.name)
+                except OSError:
+                    pass
+    return off
+
+
 def local_env(root):
     """Environment that keeps caches and temp files inside the install folder instead of the Windows profile."""
     cache = Path(root) / "cache"
@@ -592,6 +617,11 @@ class ComfyProcess:
         self._log = open(self.log_path, "a", encoding="utf-8", errors="replace")
         self._log.write("\n=== новый запуск ComfyUI ===\n")
         self._log.flush()
+        # a second copy of a node pack would stop ComfyUI before it prints anything
+        try:
+            disable_duplicate_packs(Path(self.root) / "ComfyUI" / "custom_nodes")
+        except Exception:
+            pass
         self.proc = subprocess.Popen(args, cwd=self.root, stdout=self._log, stderr=subprocess.STDOUT,
                                      creationflags=CREATE_NO_WINDOW, env=local_env(self.root))
         self.in_job = attach_kill_job(self.proc)   # so the core dies with the program in every case

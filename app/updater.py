@@ -54,15 +54,24 @@ def parse(v):
     return tuple(int(x or 0) for x in m.groups()) if m else None
 
 
+# The page polls /api/update/progress while the download request is still in flight: the answer
+# arrives when the file is already on disk, and until then the window has nothing to show.
+PROGRESS = {}
+
+
 async def check(session):
-    """{"available": bool, "current", "version", "url", "asset", "size", "sha256"}; never raises (no internet is normal)."""
+    """{"available": bool, "current", "version", "url", "asset", "size", "sha256"}; never raises (no internet is normal).
+    When nothing could be learned, "failed" carries why: "обновлений нет" and "GitHub не отвечает" are
+    two different things to a person, and silence looks like the first one."""
     out = {"available": False, "current": APP_VERSION}
     try:
         async with session.get(api_url(), headers=HEADERS, timeout=aiohttp.ClientTimeout(total=8)) as r:
             if r.status != 200:
+                out["failed"] = f"GitHub ответил {r.status}"
                 return out
             rel = await r.json()
     except Exception:
+        out["failed"] = "GitHub не отвечает"
         return out
     new, cur = parse(rel.get("tag_name")), parse(APP_VERSION)
     asset = next((a for a in rel.get("assets", []) if a.get("name") == ASSET), None)
@@ -76,8 +85,9 @@ async def check(session):
     return out
 
 
-async def download(session, info):
-    """Save the installer to a temp folder and check it against the size and sha256 GitHub published. Returns its path."""
+async def download(session, info, prog=None):
+    """Save the installer to a temp folder and check it against the size and sha256 GitHub published. Returns its path.
+    `prog`: a dict that receives {"done","total"} while the file comes, so the page can show percents."""
     if not info.get("asset", "").startswith(download_prefix()):
         raise ValueError("Адрес обновления не с GitHub")
     want = str(info.get("sha256") or "")
@@ -99,6 +109,8 @@ async def download(session, info):
                 f.write(chunk)
                 sha.update(chunk)
                 size += len(chunk)
+                if prog is not None:
+                    prog.update(done=size, total=int(info.get("size") or 0))
     if size != int(info.get("size") or size) or sha.hexdigest() != want.lower():
         dest.unlink(missing_ok=True)
         raise ValueError("Файл обновления скачался с ошибкой или не совпал с контрольной суммой, попробуйте ещё раз")
