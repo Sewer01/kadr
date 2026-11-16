@@ -1159,22 +1159,23 @@ body.dropping::after{content:'Отпустите — программа разл
 
     /* the marker is a place: a head you grab, arrows above it, a scissors on each side of the line.
        The blue line is a different thing - it only shows where the preview stands right now. */
-    .vt-ph{width:0;z-index:5;cursor:grab;touch-action:none;background:transparent;box-shadow:none}
+    .vt-ph{width:20px;margin-left:-10px;z-index:5;cursor:grab;touch-action:none;background:transparent;box-shadow:none}
     .vt-ph:active{cursor:grabbing}
-    .vt-head{position:absolute;left:-7px;top:-1px;width:14px;height:14px;background:transparent}
-    .vt-head::before{content:'';position:absolute;left:4px;top:0;border:5px solid transparent;border-top-color:#ffd34d}
-    .vt-head::after{content:'';position:absolute;left:5px;top:9px;bottom:-90px;width:2px;background:#ffd34d;
-      box-shadow:0 0 6px rgba(255,211,77,.8)}
-    .vt-step{position:absolute;top:4px;left:0;transform:translateX(-50%);display:flex;gap:2px}
-    .vt-cutl{position:absolute;right:8px;top:34px}
-    .vt-cutr{position:absolute;left:8px;top:34px;transform:scaleX(-1)}
+    .vt-line{position:absolute;left:9px;top:0;bottom:0;width:2px;margin:0;background:#ffd34d;
+      box-shadow:0 0 6px rgba(255,211,77,.85)}
+    .vt-head{position:absolute;left:2px;top:0;width:16px;height:14px;margin:0;background:#ffd34d;
+      clip-path:polygon(0 0,100% 0,50% 100%)}
+    .vt-step{position:absolute;top:4px;left:10px;transform:translateX(-50%);display:flex;gap:2px}
+    .vt-cutl{position:absolute;right:calc(100% + 1px);top:34px}
+    .vt-cutr{position:absolute;left:calc(100% + 1px);top:34px;transform:scaleX(-1)}
     .vt-run{position:absolute;top:0;bottom:0;width:2px;background:#4c9cff;box-shadow:0 0 6px rgba(76,156,255,.7);
       pointer-events:none;z-index:4}
 
-    /* near the edges the buttons slide along the marker instead of hanging over the border */
-    .vt-ph.near-left .vt-step,.vt-ph.near-left .vt-cutl{transform:translateX(0)}
-    .vt-ph.near-right .vt-step,.vt-ph.near-right .vt-cutr{transform:translateX(-100%)}
-    .vt-cutl{transform:none}.vt-cutr{transform:scaleX(-1)}
+    /* near the edges the scissors jump to the free side and the arrows slide inside the strip */
+    .vt-ph.near-left .vt-cutl{right:auto;left:calc(100% + 1px)}
+    .vt-ph.near-right .vt-cutr{left:auto;right:calc(100% + 1px)}
+    .vt-ph.near-left .vt-step{transform:translateX(-4px)}
+    .vt-ph.near-right .vt-step{transform:translateX(calc(-100% + 4px))}
 </style>
 </head>
 <body>
@@ -3388,6 +3389,7 @@ class VideoTrimmer {
     this.pps = 0;                                     // pixels per second: 0 means "fit the window"
     try { const p = +localStorage.getItem('h3-vt-px'); if (p >= 10 && p <= 300) this.pps = p; } catch (e) {}
     this.cut = null; this.undo = []; this.file = null; this.url = ''; this.busy = false;
+    this.origFile = null; this.isPiece = false;
     this.name = ''; this.frames = []; this.raf = 0;
     // the root carries atrim as well: the marks, the names and the hint are styled there, and a second
     // copy of those rules would only start disagreeing with the first one later
@@ -3401,7 +3403,7 @@ class VideoTrimmer {
       '<canvas class="vt-cv" height="86"></canvas>' +
       '<div class="vt-sel"><span class="vt-span"></span>' +
       '<i class="at-h" data-h="l"></i><i class="at-h" data-h="r"></i></div>' +
-      '<div class="vt-ph" title="маркер: его и тянут, от него режут"><i class="vt-head"></i>' +
+      '<div class="vt-ph" title="маркер: его и тянут, от него режут"><i class="vt-line"></i><i class="vt-head"></i>' +
       '<span class="vt-step">' +
       '<button class="vt-b" data-s="back" type="button" title="Кадр назад">&#9664;</button>' +
       '<button class="vt-b" data-s="fwd" type="button" title="Кадр впер">&#9654;</button></span>' +
@@ -3445,6 +3447,7 @@ class VideoTrimmer {
     // without this the player never learns anything: the marks, the strip and the scissors all wait here
     v.onloadedmetadata = () => {
       this.dur0 = v.duration || 0;
+      if (!this.origFile) this.origFile = f;              // the very first file stays reachable
       this.start = 0; this.end = this.dur0; this.t = 0; this.cut = null; this.undo = [];
       this.pps = 0; this.q('.vt-zr').value = 0;
       this._thumbs(); this._sync(); this._still();
@@ -3554,10 +3557,11 @@ class VideoTrimmer {
       ? 'в монтаже останется <b>' + this.fmt(this.len()) + ' с</b> из ' + this.fmt(this.dur0) + ' с' +
         (over ? ' · <b style="color:var(--pink)">дальше ' + this.limit + ' с модель не смотрит</b>' : '')
       : '';
-    this.q('.at-hint').textContent = this.cut ? 'Разрезано: в дело пойдёт кусок ' + this.fmt(this.len()) +
-      ' с - оригинал цел, можно резать ещё.' : '';
+    this.q('.at-hint').textContent = this.isPiece
+      ? 'В ленте лежит нарезанный кусок - ' + this.fmt(this.dur0) + ' с. Оригинальный файл цел: «Вернуть целый» положит его обратно.'
+      : (this.cut ? 'Отмечено ' + this.fmt(this.len()) + ' с из ' + this.fmt(this.dur0) + ' с.' : '');
     this.q('.vt-keep').disabled = !this.dur0 || this.busy;
-    this.q('.vt-reset').disabled = !this.cut;
+    this.q('.vt-reset').disabled = !this.isPiece;
     this.q('.vt-ag').disabled = !this.dur0;
     const zr = this.q('.vt-zr');
     zr.value = this.pps || 0;
@@ -3673,7 +3677,16 @@ class VideoTrimmer {
       this._sync();
     };
     num(this.q('.vt-a'), 'a'); num(this.q('.vt-b2'), 'b');
-    this.q('.vt-reset').onclick = () => { this._push(); this.start = 0; this.end = this.dur0; this.cut = null; this._sync(); this.onWhole(this); };
+    this.q('.vt-reset').onclick = () => {
+      if (this.origFile && this.isPiece) {          // the whole file goes back onto the strip
+        this.isPiece = false; this.cut = null;
+        this.setFile(this.origFile, true);
+        this.onWhole(this);
+        this.say('Вернули целый файл: ' + this.fmt(this.dur0) + ' с');
+        return;
+      }
+      this._push(); this.start = 0; this.end = this.dur0; this.cut = null; this._sync(); this.onWhole(this);
+    };
     this.q('.vt-und').onclick = () => {
       const s = this.undo.pop(); if (!s) return;
       this.start = s.s; this.end = s.e; this.cut = s.cut; this.t = s.t;
@@ -3727,11 +3740,14 @@ class VideoTrimmer {
       })
       .then(blob => {
         this.busy = false;
-        this.cut = { s: s, e: e };
-        this.cutFile = new File([blob], stem + '-кусок.mp4', { type: 'video/mp4' });
-        this.onFile(this.cutFile, this);
-        this._sync();
-        this.say('Клип разрезан: ' + this.fmt(e - s) + ' с');
+        const piece = new File([blob], stem + '-кусок.mp4', { type: 'video/mp4' });
+        this.cutFile = piece;
+        this.onFile(piece, this);
+        // what lies on the strip must be what goes to the model: the piece itself, cut out and with its
+        // own frames - not the old film with two marks on it, where one frame was stretched over everything
+        this.isPiece = true;
+        this.setFile(piece, true);
+        this.say('Клип разрезан: ' + this.fmt(e - s) + ' с - в ленте теперь он целиком');
       })
       .catch(err => { this.busy = false; this._sync(); this.say((err && err.message) || 'Разрезать не удалось'); });
     return null;
@@ -5697,9 +5713,11 @@ function makeRefMode(cfg) {
     const paint = () => {
       box.hidden = !slot._file;
       if (box.hidden) return;
-      const src = slot._src || slot._file;
+      const src = slot._file;                          // the piece is what the run will take
       if (tr._loaded !== src) {
         tr._loaded = src;
+        tr.origFile = slot._src || null;
+        tr.isPiece = !!slot._src;
         tr.setFile(src, true);
         const sel = slot._vsel;
         if (sel && slot._src) setTimeout(() => {
@@ -5788,13 +5806,15 @@ function makeRefMode(cfg) {
         },
         onWhole: q => { const s = slots[q._slot]; if (s) { s._vsel = null; paint(); } }
       });
-      const src = s._src || s._file;
+      const src = s._file;                            // what is stored now: the piece, if it was cut
       // the same place can hold ANOTHER video: then it has to be loaded again, however the marks stood -
       // otherwise the bench keeps showing the file that was there before, which is what it did
       if (tr._slot !== i || !tr.dur0 || tr._srcFile !== src) {
         tr._slot = i;
         tr._srcFile = src;
-        tr.setFile(src, true);                         // the ORIGINAL opens, so cutting again is possible
+        tr.origFile = s._src || null;                  // «Вернуть целый» must know the original
+        tr.isPiece = !!s._src;
+        tr.setFile(src, true);
         const sel = s._vsel;
         if (sel && src === s._src && sel.end <= (tr.dur0 || sel.end) + .2) {
           const fix = () => { tr.start = sel.start; tr.end = sel.end; tr.cut = { s: sel.start, e: sel.end }; tr._sync(); };
