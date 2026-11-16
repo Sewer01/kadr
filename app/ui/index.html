@@ -3424,6 +3424,7 @@ class VideoTrimmer {
       '<label>до <input type="number" class="vt-b2" step="0.1" min="0" value="0"> с</label>' +
       '<span class="vt-left"></span><button class="btn mini vt-reset" type="button" disabled>Вернуть целый</button></div>' +
       '<div class="vt-acts"><button class="btn pri vt-keep" type="button" disabled>Оставить выбранное</button>' +
+      '<button class="btn vt-shot" type="button" disabled title="Сохранить кадр, на котором стоит маркер, как фотографию">&#128247; Сделать кадр</button>' +
       '<button class="btn vt-und" type="button" disabled>Отменить</button>' +
       '<button class="btn vt-ag" type="button" disabled title="Агент посмотрит на клип как на кадры">🤖 В агент</button></div>' +
       '</div>';
@@ -3573,6 +3574,7 @@ class VideoTrimmer {
       ? 'В ленте лежит нарезанный кусок - ' + this.fmt(this.dur0) + ' с. Оригинальный файл цел: «Вернуть целый» положит его обратно.'
       : (this.cut ? 'Отмечено ' + this.fmt(this.len()) + ' с из ' + this.fmt(this.dur0) + ' с.' : '');
     this.q('.vt-keep').disabled = !this.dur0 || this.busy;
+    this.q('.vt-shot').disabled = !this.dur0;
     this.q('.vt-reset').disabled = !this.isPiece;
     this.q('.vt-ag').disabled = !this.dur0;
     const zr = this.q('.vt-zr');
@@ -3706,6 +3708,7 @@ class VideoTrimmer {
       this._sync(); this._still();
     };
     this.q('.vt-keep').onclick = () => this.out(true);
+    this.q('.vt-shot').onclick = () => this.shot();
     this.q('.vt-ag').onclick = async () => {
       // the agent can look at a video only as at frames, and that road already exists - the paperclip's
       const go = window.agFramesFromFile;
@@ -3729,6 +3732,50 @@ class VideoTrimmer {
     else { this.t = t2; this.run = t2; }
     this._sync();
     if (h === 'ph' || !h) this._still();   // dragging the marker shows that frame in the player
+  }
+  async shot() {
+    // the marker is the place; the player already stands on it, and if it does not - we ask for that frame
+    const v = this.q('.vt-view');
+    if (!this.dur0) { this.say('Сначала загрузите видео'); return null; }
+    this.stop();
+    const want = Math.min(Math.max(0, this.t), Math.max(0, this.dur0 - .02));
+    // always ask for the frame, even when the clock already shows that time: the picture on the screen can
+    // still be the previous one, and a photograph of it would be a lie - so we wait for seeked, then for a
+    // paint, and only then take the canvas
+    for (let tries = 0; tries < 3; tries++) {
+      await new Promise(res => {
+        let done = false;
+        const finish = () => { if (done) return; done = true; clearTimeout(to); v.onseeked = null; res(); };
+        const to = setTimeout(finish, 1200);
+        v.onseeked = finish;
+        try { v.currentTime = want; } catch (e) { finish(); }
+        if (Math.abs((v.currentTime || 0) - want) < .005) setTimeout(finish, 60);
+      });
+      await new Promise(res => requestAnimationFrame(() => res()));
+      if (v.videoWidth) break;
+    }
+    if (Math.abs((v.currentTime || 0) - want) > .35) {
+      this.say('Браузер не перематывает к нужному месту - кадр не взят, чтобы не врать');
+      return null;
+    }
+    const vw = v.videoWidth || 1280, vh = v.videoHeight || 720;
+    const c = document.createElement('canvas'); c.width = vw; c.height = vh;
+    let ok = true;
+    try { c.getContext('2d').drawImage(v, 0, 0, vw, vh); } catch (e) { ok = false; }
+    if (!ok) { this.say('Кадр взять не удалось - браузер не отдаёт картинку'); return null; }
+    const blob = await new Promise(res => c.toBlob(res, 'image/png'));
+    if (!blob || !blob.size) { this.say('Кадр не получился'); return null; }
+    const stem = this.name.replace(/\.[a-z0-9]+$/i, '');
+    const f = new File([blob], stem + ' \u00b7 \u043a\u0430\u0434\u0440 ' + Math.round(this.t * this.fps) +
+      ' (' + this.fmt2(this.t) + ' \u0441).png', { type: 'image/png' });
+    if (this.o.onFrame) this.o.onFrame(f, this);
+    else {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(f); a.download = f.name; a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+      this.say('Кадр сохранён в файл: ' + f.name);
+    }
+    return f;
   }
   out(force) {
     if (!force || !this.dur0) { this._sync(); return null; }
@@ -5720,7 +5767,14 @@ function makeRefMode(cfg) {
         m.preload = 'metadata'; m.src = URL.createObjectURL(slot._src);
         m.onloadedmetadata = () => { slot._dur = m.duration || 0; paint(); try { changed(); } catch (e) {} URL.revokeObjectURL(m.src); };
       },
-      onRemove: () => { const x = $('.x', slot); if (x) x.click(); box.hidden = true; }
+      onRemove: () => { const x = $('.x', slot); if (x) x.click(); box.hidden = true; },
+      // here the pictures mean "whom to put in", so a frame of the video is not one of them: file only
+      onFrame: f => {
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(f); a.download = f.name; a.click();
+        setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+        toast('Кадр сохранён в файл: ' + f.name);
+      }
     });
     const paint = () => {
       box.hidden = !slot._file;
@@ -5816,7 +5870,17 @@ function makeRefMode(cfg) {
           closeWin(); paint();
           if (root._save) root._save();
         },
-        onWhole: q => { const s = slots[q._slot]; if (s) { s._vsel = null; paint(); } }
+        onWhole: q => { const s = slots[q._slot]; if (s) { s._vsel = null; paint(); } },
+        // a frame of the reference video is a reference picture: it goes to the first free place, and the
+        // person sees it right there - a file nobody sees is not a result
+        onFrame: (f) => {
+          const free = $$('.rm-imgs .ref:not(.filled) input', root)[0] || $$('.ref:not(.filled) input', imgsEl)[0];
+          if (!free) { toast('Нет свободного места под картинку: уберите одну из девяти'); return; }
+          const dt = new DataTransfer(); dt.items.add(f);
+          free.files = dt.files; free.dispatchEvent(new Event('change'));
+          setTimeout(() => { try { changed(); } catch (e) {} if (root._save) root._save(); }, 300);
+          toast('Кадр положен в картинки: ' + f.name);
+        }
       });
       const src = s._file;                            // what is stored now: the piece, if it was cut
       // the same place can hold ANOTHER video: then it has to be loaded again, however the marks stood -
