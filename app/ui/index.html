@@ -310,10 +310,10 @@ body.nosb-on #modeBar{left:112px}
 .app.nosb ~ #sbToggle,body.nosb-on #sbToggle{left:12px}
 
 /* sidebar */
-.side{overscroll-behavior:contain;background:rgba(var(--bg2-rgb),.7);border-right:1px solid var(--line);display:flex;flex-direction:column;padding:20px 14px;gap:6px;backdrop-filter:blur(12px);overflow-y:auto;min-height:0}
-.brand{display:flex;align-items:center;gap:12px;padding:4px 8px 22px}
+.side{overscroll-behavior:contain;background:rgba(var(--bg2-rgb),.7);border-right:1px solid var(--line);display:flex;flex-direction:column;padding:9px 14px 20px;gap:6px;backdrop-filter:blur(12px);overflow-y:auto;min-height:0}
+.brand{display:flex;align-items:flex-start;gap:12px;padding:0 8px 18px}
 .brand>div:last-child{min-width:0}
-.brand-mark{position:relative;flex:0 0 38px;width:38px;height:38px;border-radius:12px;background:var(--grad);display:grid;place-items:center;box-shadow:0 8px 24px rgba(var(--accent-rgb),.35)}
+.brand-mark{position:relative;flex:0 0 38px;width:38px;height:38px;margin-top:8px;display:grid;place-items:center;color:var(--accent);box-shadow:0 8px 24px rgba(var(--accent-rgb),.35)}
 .brand-name{font-weight:800;font-size:17px;letter-spacing:-.01em}
 .brand-sub{font-size:11.5px;color:var(--muted)}
 .nav-label{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--dim);padding:14px 10px 6px}
@@ -348,7 +348,7 @@ body.nosb-on #modeBar{left:112px}
 @media (max-height:1000px){
   .side{padding:12px 12px;gap:4px}
   .brand{padding:2px 6px 14px}
-  .brand-mark{flex:0 0 34px;width:34px;height:34px;border-radius:11px}
+  .brand-mark{flex:0 0 34px;width:34px;height:34px}
   .nav-label{margin:6px 0 2px}
 }
 @media (max-height:760px){.side-foot{gap:6px;padding:10px 12px}.side-foot .stat{font-size:11.5px}}
@@ -521,9 +521,10 @@ body.sys-folded .sys-body{display:none}
 .sys-sep{height:1px;background:var(--line);margin:7px 0;opacity:.7}
 /* the mark of the program is the state of the engine */
 .brand-play{width:0;height:0;border-left:8px solid #fff;border-top:5.5px solid transparent;border-bottom:5.5px solid transparent;margin-left:3px;opacity:.97}
-.brand-mark.eng-wait{background:#7a1424;box-shadow:0 0 0 0 rgba(232,38,79,.55);animation:kadrpulse 1.05s ease-in-out infinite}
-.brand-mark.eng-on{background:#1c7a4d;box-shadow:0 0 12px rgba(46,196,124,.32);animation:none}
-@keyframes kadrpulse{0%,100%{box-shadow:0 0 0 0 rgba(232,38,79,.0)}50%{box-shadow:0 0 0 7px rgba(232,38,79,.26)}}
+.brand-mark.eng-wait{color:#e8264f;animation:kadrbreathe 1.05s ease-in-out infinite}
+.brand-mark.eng-on{color:var(--accent);animation:none}
+@keyframes kadrbreathe{0%,100%{color:#e8264f;filter:none}50%{color:#ff7a94;filter:drop-shadow(0 0 6px rgba(232,38,79,.55))}}
+.brand-icon{border-radius:14px;display:block}
 @media (prefers-reduced-motion:reduce){.brand-mark.eng-wait{animation:none}}
 .audio-empty:hover,.audio-empty.over{border-color:var(--accent);background:rgba(var(--accent-rgb),.06)}
 .audio-empty svg{width:24px;height:24px;color:var(--accent)}
@@ -1213,7 +1214,7 @@ body.dropping::after{content:'Отпустите — программа разл
   <aside class="side">
     <div class="brand">
       <div class="brand-mark">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="8.4" cy="6.2" r="2.6"/><circle cx="15" cy="6.2" r="2.6"/><rect x="2.6" y="10.4" width="12.4" height="9" rx="2.2"/><path d="M15 13.2l4.6-2.2v8l-4.6-2.2"/></svg>
+        <svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><defs><mask id="kadrFrame"><rect width="24" height="24" rx="5" fill="#fff"/><rect x="1.70" y="1.60" width="3.1" height="3.68" rx=".9" fill="#000"/><rect x="19.20" y="1.60" width="3.1" height="3.68" rx=".9" fill="#000"/><rect x="1.70" y="7.30" width="3.1" height="3.68" rx=".9" fill="#000"/><rect x="19.20" y="7.30" width="3.1" height="3.68" rx=".9" fill="#000"/><rect x="1.70" y="13.00" width="3.1" height="3.68" rx=".9" fill="#000"/><rect x="19.20" y="13.00" width="3.1" height="3.68" rx=".9" fill="#000"/><rect x="1.70" y="18.70" width="3.1" height="3.68" rx=".9" fill="#000"/><rect x="19.20" y="18.70" width="3.1" height="3.68" rx=".9" fill="#000"/><path d="M10 6.8 L10 17.2 L17.4 12 Z" fill="#000"/></mask></defs><rect width="24" height="24" rx="5" fill="currentColor" mask="url(#kadrFrame)"/></svg>
       </div>
       <div><div class="brand-name">Kadr</div><div class="brand-sub">видеостудия на вашем железе</div><div class="brand-sub" id="appVer" style="opacity:.75"></div></div>
     </div>
@@ -1518,9 +1519,7 @@ body.dropping::after{content:'Отпустите — программа разл
       <div class="card" style="max-width:820px;margin-bottom:16px">
         <div class="card-h"><h3><span class="n">1</span>Эта программа</h3></div>
         <div style="display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap">
-          <div class="brand-mark" style="width:64px;height:64px;border-radius:18px;flex:none">
-            <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="8.4" cy="6.2" r="2.6"/><circle cx="15" cy="6.2" r="2.6"/><rect x="2.6" y="10.4" width="12.4" height="9" rx="2.2"/><path d="M15 13.2l4.6-2.2v8l-4.6-2.2"/></svg>
-          </div>
+          <svg class="brand-icon" width="64" height="64" viewBox="0 0 24 24" aria-hidden="true" title="Значок программы — он же внутри файла Kadr.exe"><rect width="24" height="24" rx="5" fill="#0e0c0d"/><rect x="1.60" y="1.60" width="3.4" height="3.9" rx="1" fill="#f7f6f7"/><rect x="19.00" y="1.60" width="3.4" height="3.9" rx="1" fill="#f7f6f7"/><rect x="1.60" y="7.32" width="3.4" height="3.9" rx="1" fill="#f7f6f7"/><rect x="19.00" y="7.32" width="3.4" height="3.9" rx="1" fill="#f7f6f7"/><rect x="1.60" y="13.04" width="3.4" height="3.9" rx="1" fill="#f7f6f7"/><rect x="19.00" y="13.04" width="3.4" height="3.9" rx="1" fill="#f7f6f7"/><rect x="1.60" y="18.76" width="3.4" height="3.9" rx="1" fill="#f7f6f7"/><rect x="19.00" y="18.76" width="3.4" height="3.9" rx="1" fill="#f7f6f7"/><path d="M9.6 6.6 L9.6 17.4 L17.6 12 Z" fill="#e8264f"/></svg>
           <div style="flex:1;min-width:240px">
             <div style="font-size:19px;font-weight:800">Kadr</div>
             <div class="hint">Видеостудия на вашем компьютере: картинки, видео, звук и монтаж в одном окне, без подписки и без чужих серверов. Всё считается на вашей видеокарте.</div>
