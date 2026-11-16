@@ -1682,11 +1682,11 @@ body.dropping::after{content:'Отпустите — программа разл
             <div class="seg" id="agTarget" style="grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-auto-rows:auto">
               <button data-t="video" class="on" title="Видео — текст / кадры">Видео</button>
               <button data-t="lipsync" title="Lipsync — референсы + аудио">Lipsync</button>
-              <button data-t="refs" title="Референсы: изображения, видео, аудио — промпт по ним">Референсы</button>
+              <button data-t="refs" title="Референсы (страница «Видеостудия»): промпт по вашим картинкам, видео и аудио">Референсы</button>
               <button data-t="actor" title="Актёр — диалог, голос, эмоции">Актёр</button>
               <button data-t="swap" title="Замена персонажа — видео + изображение героя">Замена персонажа</button>
               <button data-t="action" title="Экшн-видео — бой, погоня, бег">Экшн-видео</button>
-              <button data-t="long" title="Видеостудия — клип или ролик по сценам">Видеостудия</button>
+              <button data-t="long" title="Киностудия — фильм по сценам, каждая до 15 с">Киностудия</button>
               <button data-t="actionsc" title="Экшн-студия — экшн по сценам подряд">Экшн-студия</button>
             </div>
             <div class="hint" style="margin:12px 0 6px">Изображения</div>
@@ -2639,7 +2639,7 @@ function offerNewModes(s) {
   OFFER_SHOWN = true;
   const show = () => {
     if (!$('#confirm').hidden) return setTimeout(show, 3000);  // another question is open: wait
-    const name = { flux: 'Правка изображения: FLUX.2 klein (можно в коммерцию)', long: 'Видеостудия (клипы и ролики по сценам)' }[o.mode] || o.mode;
+    const name = { flux: 'Правка изображения: FLUX klein (можно в коммерцию)', long: '«Киностудия» (клипы и ролики по сценам)' }[o.mode] || o.mode;
     const btn = $('#confirm [data-close]');
     const later = () => fetch('/api/mode/offered', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mode: o.mode }) });
     btn.addEventListener('click', later, { once: true });
@@ -3429,7 +3429,7 @@ const vPrev = previewPanel($('#vPreview'), V, {
   onDone: item => addToLib(item),
 });
 $('#vLoop').onchange = () => { $('#dLast').style.opacity = $('#vLoop').checked ? .4 : ''; vPrev(); };
-const vUpd = paramsCard($('#vParams'), V, { n: 3, duration: true, onChange: () => { vPrev(); vMode(); },
+const vUpd = paramsCard($('#vParams'), V, { n: 3, duration: true, onChange: () => { vPrev(); vMode(); try { agCtx(); } catch (e) {} },
   extraRow: `<div class="row"><div class="row-l">Ускорение <span class="hint">для слабых видеокарт</span></div>
     <div class="seg v-accel" style="grid-template-columns:minmax(0,1fr) minmax(0,1fr)"><button type="button" data-ac="normal">Обычное<small>как раньше</small></button><button type="button" data-ac="sla">Быстрый черновик<small>в 1,3 раза быстрее, качество ниже</small></button></div>
     <div class="hint v-achint" hidden></div><div class="hint" style="margin-top:6px">«Быстрый черновик» нужен для проб: это скорость, а не увеличение размера. Для готового ролика выбирайте «Обычное».</div></div>` });
@@ -5061,7 +5061,7 @@ function renderModels(s) {
   /* список был сплошной простынёй: непонятно, к какому разделу какой файл ✓ теперь группы
      по режимам - файл показан один раз под тем режимом, который раньше всех в нём участвует,
      а остальные режимы перечислены в самой строке */
-  const MNAME = { video: 'Видео', lipsync: 'Клип', refs: 'Видеостудия', actor: 'Актёр', swap: 'Замена', action: 'Экшн-видео', actionsc: 'Экшн-студия', h3img: 'Изображения MiniMax H3 Image', long: 'Видеостудия', krea: 'Изображение по тексту', kreareal: 'Изображение: реализм', qwen: 'Правка изображения', flux: 'Правка изображения: FLUX.2 (в коммерцию)', upscale: 'Увеличение видео и изображений', relayvsr: 'Быстрое увеличение видео (RelayVSR)' };
+  const MNAME = { video: 'Видео', lipsync: 'Клип', refs: 'Видеостудия', actor: 'Актёр', swap: 'Замена', action: 'Экшн-видео', actionsc: 'Экшн-студия', h3img: 'Изображения MiniMax H3 Image', long: 'Киностудия', krea: 'Изображение', kreareal: 'Изображение: реализм', qwen: 'Правка изображения', flux: 'Правка изображения: FLUX.2 (в коммерцию)', upscale: 'Увеличение видео и изображений', relayvsr: 'Быстрое увеличение видео (RelayVSR)' };
   const mRow = m => {
     const optional = !m.modes.length;
     const st = m.have ? '<span class="st ok">✓ загружено</span>' : optional ? '<span class="st opt" title="Без этого файла разделы работают; он добавляет возможность. Нажмите «Скачать», чтобы взять его.">по желанию</span>' : '<span class="st miss" title="Этот файл нужен выбранным разделам. Нажмите «Докачать недостающие» или «Скачать».">нет файла</span>';
@@ -5092,7 +5092,7 @@ function renderModels(s) {
   if (need.length) $('#mdModelsCard').classList.remove('collapsed');   // a missing file has to be seen, not hidden behind a folded card
   fitTopBar();
   $('#mdFixExt').textContent = `Скачать недостающие (${need.length}, ${GB(need.reduce((a, m) => a + m.size, 0))})`;
-  const MN = { video: 'Видео', lipsync: 'Клип', refs: 'Видеостудия', actor: 'Актёр', swap: 'Замена', action: 'Экшн-видео', actionsc: 'Экшн-студия', h3img: 'Изображения MiniMax H3 Image', long: 'Видеостудия', krea: 'Изображение по тексту', kreareal: 'Изображение: реализм', qwen: 'Правка изображения', flux: 'Правка изображения: FLUX.2 (в коммерцию)', upscale: 'Увеличение видео и изображений', relayvsr: 'Быстрое увеличение видео (RelayVSR)' };
+  const MN = { video: 'Видео', lipsync: 'Клип', refs: 'Видеостудия', actor: 'Актёр', swap: 'Замена', action: 'Экшн-видео', actionsc: 'Экшн-студия', h3img: 'Изображения MiniMax H3 Image', long: 'Киностудия', krea: 'Изображение', kreareal: 'Изображение: реализм', qwen: 'Правка изображения', flux: 'Правка изображения: FLUX.2 (в коммерцию)', upscale: 'Увеличение видео и изображений', relayvsr: 'Быстрое увеличение видео (RelayVSR)' };
   $('#mdAdd').innerHTML = s.engine === 'managed' || s.engine === 'external' ? Object.entries(s.add_modes || {}).map(([m, gb]) =>
     /* «(+0 ГБ)» читается как ошибка: когда всё уже лежит на диске, кнопка ничего не качает,
          она только включает режим - так и пишем */
@@ -8510,7 +8510,7 @@ async function agFramesFromFile(f) {   // the only way the agent can look at a v
     const fr = AG.att.filter(a => a.frame);
     const nv = new Set(fr.map(a => a.vname)).size;
     toast(frames.length === 1
-      ? `Взят последний кадр видео (${frames[0].t.toFixed(1)} с) - ровно тот, с которого Видеостудия продолжит ролик. Опишите, что происходит дальше`
+      ? `Взят последний кадр видео (${frames[0].t.toFixed(1)} с) - ровно тот, с которого Киностудия продолжит ролик. Опишите, что происходит дальше`
       : `Из видео взято ${frames.length} кадров` + (cut ? `, повторы убраны: ${cut}` : '')
         + (nv > 1 ? ` · всего ${fr.length} кадров с ${nv} видео` : '') + '. Теперь напишите, кого на что заменить');
   } catch (err) { toast(err.message); return false; }
@@ -8537,7 +8537,7 @@ $('#agFile').onchange = async e => {
 };
 $('#agEmpty').onclick = e => { const s = e.target.closest('span'); if (s) { $('#agIn').value = s.textContent.replace(/[«»]/g, '').replace(/ \+ фото героинь$/, ''); $('#agIn').focus(); } };
 $('#agIn').addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); $('#agSend').click(); } });
-const AG_NAMES = { plist: 'список кадров', h3t: 'Изображение (MiniMax H3 Image)', h3e: 'Правку по референсам (MiniMax H3 Image)', actionsc: 'сцены Экшн-студии', long: 'сцены Видеостудии', video: 'Генерацию видео', lipsync: 'Lipsync', refs: 'Референсы', actor: 'Актёрскую игру', swap: 'Замену персонажа', action: 'Экшн-видео', krea: 'Изображение по тексту', qwen: 'Правку изображения', sheet: 'Изображение по тексту', sheet6: 'Изображение по тексту', fluxt: 'Изображение по тексту', qwent: 'Изображение по тексту', story: 'Изображение по тексту' };
+const AG_NAMES = { plist: '«Изображение» · список кадров', h3t: '«Изображение» · H3 Image', h3e: '«Правка» · по референсам H3', actionsc: '«Экшн-студия»', long: '«Киностудия»', video: '«Видео»', lipsync: '«Клип»', refs: '«Видеостудия» · референсы', actor: '«Актёр»', swap: '«Замена»', action: '«Экшн-видео»', krea: '«Изображение» · Krea 2', qwen: '«Правка»', sheet: '«Изображение» · лист персонажа', sheet6: '«Изображение» · лист ×6', fluxt: '«Изображение» · FLUX klein', qwent: '«Изображение» · Qwen', story: '«Изображение» · раскадровка' };
 const AG_IMG = ['plist', 'krea', 'qwen', 'sheet', 'sheet6', 'fluxt', 'qwent', 'h3t', 'h3e', 'story'];
 AG.storyModel = 'krea'; AG.storyFrames = true;
 AG.think = (() => { try { return localStorage.getItem('h3-ag-think') === 'deep' ? 'deep' : 'fast'; } catch { return 'fast'; } })();
@@ -8559,9 +8559,9 @@ function agVidNote() {
   const names = [...new Set(AG.att.filter(a => a.frame).map(a => a.vname))];
   if (AG.target === 'long') {
     return names.length
-      ? ` Видеостудия продолжит видео «${names[0]}»: режим «продолжить своё видео» включится сам, а его последний кадр встанет отдельной плиткой перед вашими фото. Из видео Агенту нужен только этот последний кадр - его и берём, другие не пересылаем.`
+      ? ` Киностудия продолжит видео «${names[0]}»: режим «продолжить своё видео» включится сам, а его последний кадр встанет отдельной плиткой перед вашими фото. Из видео Агенту нужен только этот последний кадр - его и берём, другие не пересылаем.`
         + (names.length > 1 ? ` Остальные ${names.length - 1} видео студия не принимает - они останутся в чате.` : '')
-      : ' Если приложите видео, Видеостудия продолжит именно его: режим включится сам, последний кадр встанет перед вашими фото.';
+      : ' Если приложите видео, Киностудия продолжит именно его: режим включится сам, последний кадр встанет перед вашими фото.';
   }
   if (!names.length) return '';
   const max = agVideoMax();
@@ -8576,7 +8576,7 @@ function agPlaceholder() {
   const src = (RM.long && RM.long.root && RM.long.root._src) || null;
   const nm = v[0] || (src && src.name) || 'ваше видео';
   el.placeholder = AG.target === 'long' && (v.length || src)
-    ? `Видеостудия продолжит «${nm.length > 28 ? nm.slice(0, 28) + '…' : nm}» с его последнего кадра. Напишите, что происходит дальше: одно движение, один ход камеры. (Enter — создать промт)`
+    ? `Киностудия продолжит «${nm.length > 28 ? nm.slice(0, 28) + '…' : nm}» с его последнего кадра. Напишите, что происходит дальше: одно движение, один ход камеры. (Enter — создать промт)`
     : AG_IN_HINT;
 }
 function agCtx() {
@@ -8590,21 +8590,21 @@ function agCtx() {
     ? ({ krea: 'Опишите изображение словами: агент напишет промпт для Krea 2. Изображения в чате — только образцы настроения.',
          qwen: `Приложите изображение, которое нужно изменить (скрепка или «Из Библиотеки»), и напишите, что поменять. Изображений в чате: ${n}.`,
          story: 'Расскажите историю по кадрам («первый кадр — …, второй кадр — …») и скажите, сколько кадров нужно. Агент напишет промпт одного изображения-раскадровки без подписей и номеров для выбранной модели.',
-         fluxt: 'Опишите изображение словами: агент напишет промпт для FLUX.2 klein (без негатива, описание по порядку: главное сначала). Изображения в чате — только образцы настроения.',
+         fluxt: 'Опишите изображение словами: агент напишет промпт для FLUX klein (без негатива, описание по порядку: главное сначала). Изображения в чате — только образцы настроения.',
          qwent: 'Опишите изображение словами: агент напишет промпт для Qwen 2.1. Негатив впишите отдельным полем в разделе. Изображения в чате — только образцы настроения.',
          sheet: `Опишите персонажа: агент напишет промпт листа из 4 панелей. Изображений в чате: ${n}.`,
          sheet6: `Опишите персонажа: агент напишет промпт листа из 6 панелей (в полный рост спереди, в три четверти, сбоку, сзади + два портрета). Изображений в чате: ${n}.` })[AG.target]
     : AG.target === 'plist'
-    ? `Опишите историю или набор изображений («герой утром, героиня днём, вечер у моря…») и скажите, сколько нужно. Агент напишет промпт для каждого изображения, а кнопка вставит их в «Изображение по тексту» в режим «Список промптов».`
+    ? `Опишите историю или набор изображений («герой утром, героиня днём, вечер у моря…») и скажите, сколько нужно. Агент напишет промпт для каждого изображения, а кнопка вставит их на страницу «Изображение», в режим «Список промптов».`
     : AG.target === 'swap'
-    ? `Скажите, кого в видео заменить (например, «старика в пиджаке») и каким изображением. Изображения героев приложите скрепкой по порядку: они станут Picture 1, 2. Своё видео приложите кнопкой с камерой: программа вырежет из него кадры, и Агент увидит, кто в кадре (видео само уйдёт в «Замену персонажа»). Изображений героев в чате: ${n}.`
+    ? `Скажите, кого в видео заменить (например, «старика в пиджаке») и каким изображением. Изображения героев приложите скрепкой по порядку: они станут Picture 1, 2. Своё видео приложите кнопкой с камерой: программа вырежет из него кадры, и Агент увидит, кто в кадре (видео уйдёт на страницу «Замена»). Изображений героев в чате: ${n}.`
     : AG.target === 'long'
     ? `Опишите историю по сценам («сначала… потом… в конце…») и скажите, с песней ролик или без. Агент разобьёт её на сцены и подпишет длину каждой. Изображения в чате: ${n} — станут референсами героя и места (Picture 1, 2…).`
     : AG.target === 'video'
-    ? `Длительность ${V.dur} с (как в «Генерации видео»). Изображения в чате: ${n} — 1-я станет первым кадром, 2-я последним.`
+    ? `Берём ${V.dur} с — столько стоит на странице «Видео» (меняется там же). Картинки в чате: ${n} — первая станет первым кадром, вторая последним.`
     : AG.target === 'lipsync'
       ? `Длина видео = длине аудио${L.dur0 ? ` (${L.len().toFixed(1)} с)` : ''}. Изображения в чате: ${n} — станут референсами Picture 1, 2…`
-      : `Длительность ${RM[AG.target].S.dur} с (как в разделе «${{ refs: 'Видеостудия', actor: 'Актёр', action: 'Экшн-видео', actionsc: 'Экшн-студия' }[AG.target]}»). Изображения в чате: ${n} — станут Picture 1, 2…`) + agVidNote();
+      : `Берём ${RM[AG.target].S.dur} с — столько стоит на странице «${{ refs: 'Видеостудия', actor: 'Актёр', action: 'Экшн-видео', actionsc: 'Экшн-студия' }[AG.target]}» (меняется там же). Картинки в чате: ${n} — станут Picture 1, 2…`) + agVidNote();
 }
 function mdLite(s) {
   return esc(s).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').split(/\n{2,}/).map(p => `<p>${p.replace(/\n/g, '<br>')}</p>`).join('');
@@ -8864,7 +8864,7 @@ async function agSend() {
   AG.msgs.push(reply); renderMsgs();
   const el = $('#agMsgs .msg:last-child');
   AG.busy = true; $('#agSend').textContent = 'Стоп'; AG.ctrl = new AbortController();
-  // «Правка картинки» делается и на Qwen, и на FLUX.2 klein, а теги картинок у них разные: агенту нужен движок раздела
+  // «Правка картинки» делается и на Qwen, и на FLUX klein, а теги картинок у них разные: агенту нужен движок раздела
   const qwBtn = $('.qw-eng button.on', $('#view-qwen'));
   const ctx = { cont: AG.target === 'long' && (AG.att.some(a => a.frame) || !!RM.long.root._src) ? 1 : 0, model: AG.target === 'qwen' ? ((qwBtn && qwBtn.dataset.e) || 'qwen') : (AG.storyFrames && AG.storyModel === 'krea' ? 'flux' : AG.storyModel), frames: AG.target === 'story' && AG.storyFrames, duration: AG_IMG.includes(AG.target) ? null : AG.target === 'video' ? V.dur : AG.target === 'lipsync' ? (L.dur0 ? L.len() : null) : RM[AG.target].S.dur };
   if (AG.target === 'actor') ctx.voice = RM.actor.voice() ? 1 : 0;
@@ -9063,8 +9063,8 @@ async function sendPrompt(blk, to) {
       const got = await L2.root._takeVideo(vidFiles[0]);
       vUsed = 1; vAll = 1;
       toast(got.frame
-        ? `Видеостудия продолжит «${vidFiles[0].name}»: режим «продолжить своё видео» включён, его последний кадр встал перед вашими фото`
-        : `Видеостудия продолжит «${vidFiles[0].name}», но последний кадр взять не удалось (${got.why || 'не читается'}): ваших мест тогда 9`);
+        ? `Киностудия продолжит «${vidFiles[0].name}»: режим «продолжить своё видео» включён, его последний кадр встал перед вашими фото`
+        : `Киностудия продолжит «${vidFiles[0].name}», но последний кадр взять не удалось (${got.why || 'не читается'}): ваших мест тогда 9`);
     }
     if (fix && files.length) $$('label.ref.filled .x', L2.root).forEach(x => x.click());   // a fix replaces the pictures; a continuation keeps the old ones
     for (const f of files) {   // existing references (e.g. the last frame of the video being continued) stay; new pictures take the free slots
@@ -9313,7 +9313,7 @@ function onAgentSetup(ev) {
 
 // skills
 const SK_MODES = { always: 'Всегда', auto: 'Авто', off: 'Выкл' };
-const AG_SK_IMG = { 'storyboard': 'Раскадровка', 'krea-2': 'Изображение по тексту', 'flux2-klein': 'Изображение: FLUX.2 klein', 'qwen-image-2-1-director-prompt': 'Правка изображения', 'karta-personazha': 'Лист персонажа' };
+const AG_SK_IMG = { 'storyboard': 'Раскадровка', 'krea-2': 'Изображение по тексту', 'flux2-klein': 'Изображение: FLUX klein', 'qwen-image-2-1-director-prompt': 'Правка изображения', 'karta-personazha': 'Лист персонажа' };
 function renderSkills(list) {
   $('#skCnt').textContent = `(${list.length})`;
   $('#skList').innerHTML = list.map(s => `<div class="sk" data-id="${esc(s.id)}">
@@ -10243,7 +10243,7 @@ const imgSeedForm = (S, fd) => { if (S.seedFixed && S.seed) fd.append('seed', S.
             <div class="seg" style="grid-template-columns:repeat(3,1fr)"><button data-mp="4">4 МП<small>быстро</small></button><button data-mp="8">8 МП<small>средне</small></button><button data-mp="16">16 МП<small>максимум деталей, долго</small></button></div>
             <div class="hint" style="margin-top:6px">Модель рассчитана на 4 МП и больше: чем крупнее, тем чище детали. На 16 ГБ памяти 16 МП считается заметно дольше.</div></div>
           <div class="hint kr-enghint" hidden></div>
-          <div class="hint" style="margin-top:6px">Лицензии: <b>Krea 2</b> и <b>FLUX.2 klein</b> можно использовать в коммерции (Krea 2 — если годовой доход компании меньше 1 млн $). <b>MiniMax H3 Image</b> — открытая лицензия, крупные изображения и правка по референсам. <b>Qwen 2.1</b> только для творчества, не для коммерции.</div></div>
+          <div class="hint" style="margin-top:6px">Лицензии: <b>Krea 2</b> и <b>FLUX klein</b> можно использовать в коммерции (Krea 2 — если годовой доход компании меньше 1 млн $). <b>MiniMax H3 Image</b> — открытая лицензия, крупные изображения и правка по референсам. <b>Qwen 2.1</b> только для творчества, не для коммерции.</div></div>
         <div class="row kr-neg" hidden><div class="row-l">Негативный промпт <span class="hint">что не должно быть на изображении</span></div>
           <textarea class="kr-negtxt" rows="2" placeholder="Пусто — быстрее и легче для видеокарты. Если нужно, впишите, например: blurry, low quality, extra fingers, text, watermark"></textarea><div class="hint" style="margin-top:4px">Негативный промпт замедляет Qwen примерно вдвое и требует больше видеопамяти. Заполняйте, только если без него не получается.</div></div>
         <div class="row kr-stylerow"><div class="row-l">Стиль</div>
@@ -10279,7 +10279,7 @@ const imgSeedForm = (S, fd) => { if (S.seedFixed && S.seed) fd.append('seed', S.
     $('.kr-h3mp', root).hidden = !h3;
     $$('.kr-eng button', root).forEach(b => b.classList.toggle('on', b.dataset.e === S.engine));
     $('.kr-stylerow', root).hidden = S.engine !== 'krea'; $('.kr-neg', root).hidden = S.engine !== 'qwen';
-    $('.mode-pill span', root).textContent = { krea: 'Krea 2 · 1 МП', flux: 'FLUX.2 klein · 1 МП', qwen: 'Qwen Image 2.1 · 1 МП', h3img: `MiniMax H3 Image · ${S.mp} МП` }[S.engine];
+    $('.mode-pill span', root).textContent = { krea: 'Krea 2 · 1 МП', flux: 'FLUX klein · 1 МП', qwen: 'Qwen Image 2.1 · 1 МП', h3img: `MiniMax H3 Image · ${S.mp} МП` }[S.engine];
   };
   async function krEngCheck() {
     const hint = $('.kr-enghint', root); hint.hidden = true;
