@@ -4624,9 +4624,32 @@ $('#resBackfill').onclick = async () => { $('#resBackfill').disabled = true; try
 $('#resClean').onclick = async () => { if (!confirm('Убрать из Библиотеки записи, у которых нет файла? Файлы на диске не затрагиваются.')) return; try { const r = await postJSON('/api/results/clean'); resLoad(r); toast(`Убрано записей: ${r.removed}`); const items = await (await fetch('/api/library')).json(); LIB.length = 0; items.forEach(it => LIB.push(normItem(it))); renderLib(); } catch (err) { toast(err.message); } };
 if (API) resLoad();
 // «Ретушь»: any file of the user, not only the ones made in the program
-let UP_FILE = null;
+let UP_FILE = null, UP_JOB = null;
+function upProgress(j) {
+  const line = document.querySelector('#upParams .up-run'); if (!line) return;
+  const t = $('.up-run-t', line); if (!t) return;
+  const v = jobView(j);
+  t.textContent = (v.txt || v.label || 'работаем') + ' · ' + Math.round((v.p || 0) * 100) + '%';
+}
+function upFinished(j) {
+  const line = document.querySelector('#upParams .up-run'), box = document.getElementById('upParams');
+  if (j.state === 'error') {
+    if (line) line.innerHTML = '<b style="color:var(--pink)">Не получилось.</b> <span>' + esc(errSay(j.raw || j.msg)) + '</span>' +
+      '<button class="btn mini" type="button" data-a="again">Убрать и попробовать иначе</button>';
+    const ag = line && $('[data-a="again"]', line); if (ag) ag.onclick = upClear;
+    if (box) {
+      box.querySelectorAll('.up-s, input[type=range]').forEach(b => { b.disabled = false; });
+      [...box.querySelectorAll('input[type=range]')].forEach(paintRange);
+    }
+    toast('Увеличение не получилось: ' + errSay(j.raw || j.msg));
+  } else if (line) {
+    line.innerHTML = '<b style="color:#3fd18b">Готово.</b> <span>Новый файл в Библиотеке, ваш исходный не тронут.</span>';
+    toast('Готово: файл в Библиотеке');
+  }
+  UP_JOB = null;
+}
 function upClear() {
-  UP_FILE = null;
+  UP_FILE = null; UP_JOB = null;      // the page is cleared; the job itself keeps running in the queue
   $('#upInfo').hidden = true; $('#upInfo').innerHTML = '';
   $('#upParamsCard').hidden = true; $('#upParams').innerHTML = '';
   $('#upDrop').hidden = false;
@@ -5010,6 +5033,7 @@ setTimeout(fitTopBar, 700);   // the pills are built a moment after the page ope
     if (s.stage === 'downloading') say(`Скачиваем ComfyUI ${esc(s.version || '')}… ${s.pct || 0}%`);
     else if (s.stage === 'backup') say('Сохраняем резервную копию файлов ядра…');
     else if (s.stage === 'installing') say('Ставим новые файлы ядра; модели, ноды и ваши данные не трогаем…');
+    else if (s.stage === 'deps') say('Догоняем пакеты Python, которые просит новое ядро минуты две…');
     else if (s.stage === 'done') { say(`Готово: ядро обновлено до ${esc(s.version || '')}, файлов ${s.files || 0}. ComfyUI сейчас перезапустится.${roll(lastCore)}`); wire(); loadStatus(); return true; }
     else if (s.stage === 'error') { say('Не вышло: ' + esc(s.error || '') + roll(lastCore)); wire(); return true; }
     else return true;
@@ -5269,12 +5293,27 @@ function qHandle(m) {
     if (it.long && typeof RM !== 'undefined') { const rm = RM[it.mode] || RM.long; if (rm && rm.root && rm.root._partDone) rm.root._partDone(normItem(it) || it); } });
     if (j.mode === 'upscale' && j.itemId && $('#view-queue').classList.contains('active') && $('#viewer').hidden) setTimeout(() => openViewer(j.itemId), 400);  // show before/after at once
     if (j.detached) toast(`Готово: ${MODE_NAME[j.mode] || 'видео'} — оно в Библиотеке`);
-  } else if (m.type === 'error') { j.state = 'error'; j.msg = m.message; if (j.detached) toast('Задание не получилось: ' + m.message);
+  } else if (m.type === 'error') {
+    j.state = 'error'; j.raw = m.message; j.msg = errSay(m.message);
+    if (UP_JOB === j.id) upFinished(j);
+    if (j.detached) toast('Задание не получилось: ' + j.msg);
     // сцена из цепочки упала: молча останавливать «сделать все сцены» нельзя - человек видит только
     // что первая сцена вышла, а дальше тишина (именно так и было, когда причина пряталась в ComfyUI)
     ['long', 'actionsc'].forEach(k => { const st = (typeof RM !== 'undefined' && RM[k]) ? RM[k].root : null; if (st && st._chainFail && st._chainPart != null) st._chainFail(m.message); }); }
   else if (m.type === 'interrupted') j.state = 'stopped';
+  if (UP_JOB && j.id === UP_JOB) upProgress(j);
   qRender();
+}
+// what a raw engine error means in plain words - a person cannot guess it from a module name
+function errSay(msg) {
+  const s = String(msg || '');
+  if (/window_attention/i.test(s) || (/has no attribute/i.test(s) && /comfy_kitchen|attention/i.test(s))) {
+    return 'Быстрому увеличению нужен более новый ComfyUI: в вашей версии не хватает узла window_attention. ' +
+      'Откройте «Настройки» и обновите ComfyUI - или увеличивайте вариантом «Качественнее», он работает и так.';
+  }
+  if (/out of memory/i.test(s)) return 'Не хватило памяти видеокарты: возьмите видео короче или уменьшите степень увеличения.';
+  if (/Could not find a node|not a valid node|node type/i.test(s)) return 'В ComfyUI не хватает нужного узла: обновите ComfyUI в разделе «Настройки».';
+  return s;
 }
 const QBASE = { queued: .02, load: .05, encode: .12, sample: .15, upscale: .67, sample2: .7, decode: .92, save: .98, cloud_queued: .05, cloud_run: .4 };
 /* what the user should see about a job: how far it is, and whether it is alive (green), quiet (yellow) or probably stuck (red) */
@@ -9241,6 +9280,9 @@ async function openUpscale(it, file, into) {   // `file`: the person's own file;
       : (`<div class="hint" style="margin:14px 0">Для этого нужна модель SeedVR2 (около 4 ГБ). ${st.engine === 'managed' ? 'Нажмите, чтобы скачать, и вернитесь сюда.' : 'Если файлов seedvr2_3b_int8_convrot и seedvr2_ema_vae_fp16 нет в вашем ComfyUI, положите их в его папки моделей.'}</div>`
         + (st.engine === 'managed' ? '<button class="btn pri" data-dl type="button">Скачать модель</button>' : '')));
   host.innerHTML = inline ? body : BOX_HEAD + body + '</div>';
+  // the blue part of a slider is painted by hand; a control created later was left unpainted,
+  // which is why the handle stood at 70% while the colour stopped at a third
+  [...host.querySelectorAll('input[type=range]')].forEach(paintRange);
   host.oninput = e => { if (e.target.id === 'upDetail') $('#upDetailV', host).textContent = e.target.value; if (e.target.id === 'upSharp') $('#upSharpV', host).textContent = e.target.value; };
   host.onclick = async e => {
     if (!inline && (e.target === m || e.target.closest('[data-x]'))) { m.hidden = true; return; }
@@ -9265,10 +9307,21 @@ async function openUpscale(it, file, into) {   // `file`: the person's own file;
         r = j;
       } else r = await postJSON('/api/upscale', { id: it.id, scale: b.dataset.k, method: b.dataset.m || '', engine: b.dataset.e || '', detail, sharp });
       qAdd(r.prompt_id, 'upscale', it.prompt || 'Увеличение');
-      if (!inline) m.hidden = true; closeViewer();
-      toast(`Задание в очереди: готовая ${it.kind === 'image' ? 'изображение' : 'видео'} появится в Библиотеке`);
-      if (inline) upClear();
-      goTo('queue');
+      if (!inline) {
+        m.hidden = true; closeViewer();
+        toast(`Задание в очереди: готовая ${it.kind === 'image' ? 'изображение' : 'видео'} появится в Библиотеке`);
+        goTo('queue');
+      } else {
+        // on the retouching page the person stays where he is: the progress has to be visible here.
+        // the queue keeps the job anyway, and clearing the page remains his own decision
+        UP_JOB = r.prompt_id;
+        host.querySelectorAll('.up-s, input[type=range]').forEach(b => { b.disabled = true; });
+        host.insertAdjacentHTML('beforeend',
+          '<div class="hint up-run" style="margin-top:12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">' +
+          '<b>Идёт увеличение</b><span class="up-run-t">Задание в очереди…</span>' +
+          '<button class="btn mini" type="button" data-a="job" title="Открыть очередь: там это же задание и общий ход всех работ">В очередь</button></div>');
+        const jb = host.querySelector('[data-a="job"]'); if (jb) jb.onclick = () => goTo('queue');
+      }
     } catch (err) { toast(err.message); }
   };
 }

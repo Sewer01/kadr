@@ -1774,7 +1774,13 @@ class App:
             st["stage"] = "installing"
             files = await asyncio.to_thread(updates.apply_source, root, archive)
             archive.unlink(missing_ok=True)
-            st.update(stage="done", pct=100, files=files)
+            # new core code asks for newer python packages: install what its own requirements.txt pins,
+            # otherwise the update leaves the engine half-broken (the fast enlargement died that way)
+            st["stage"] = "deps"
+            got = await engine.install_core_requirements(root)
+            if not got["ok"]:
+                applog(f"пакеты ядра после обновления не дошли: {got['msg'][:200]}")
+            st.update(stage="done", pct=100, files=files, deps=got["ok"])
             await asyncio.to_thread(self.wake_comfy)
             applog(f"ядро обновлено до {st['version']}: файлов {files}, копия {mark.name}")
         except Exception as e:

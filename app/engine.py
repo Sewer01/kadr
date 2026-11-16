@@ -378,10 +378,49 @@ class Installer:
         if await proc.wait() != 0 or not (root / "python_embeded" / "python.exe").exists():
             raise RuntimeError("Не удалось распаковать ComfyUI")
         archive.unlink(missing_ok=True)
+        # the frozen python of the portable archive is older than the core it carries: without this a
+        # fresh machine gets the same "comfy_kitchen has no attribute" crash on the first fast video
+        await self.step("comfy", "progress", label="Догоняем пакеты, которые просит ComfyUI…")
+        got = await install_core_requirements(root)
+        if not got["ok"]:
+            await self.step("comfy", "progress",
+                            label="Пакеты ComfyUI не дошли (сеть?): программа доучит их позже")
+            applog(f"requirements ядра не установились: {got['msg'][:200]}")
         await self.step("comfy", "done", label="ComfyUI установлен")
         return root
 
-    async def install_nodes(self, comfy_root):
+
+async def install_core_requirements(comfy_root, timeout=900):
+    """Install what the ComfyUI core itself asks for (ComfyUI/requirements.txt).
+
+    The portable archive ships its own python with packages frozen at the day it was built. When the
+    core is replaced by a newer release (our updater, or a person updating ComfyUI by hand), its code
+    starts calling things the frozen packages do not have yet - "module 'comfy_kitchen' has no
+    attribute 'window_attention'", which killed the fast video enlargement. The version the new core
+    wants is written in its own requirements.txt, so the fix is to read that file, not to guess.
+    """
+    root = Path(comfy_root) / "ComfyUI"
+    req = root / "requirements.txt"
+    py = Path(comfy_root) / "python_embeded" / "python.exe"
+    if not req.exists() or not py.exists():
+        return {"ok": True, "skipped": True, "msg": ""}
+    try:
+        proc = await asyncio.wait_for(
+            asyncio.create_subprocess_exec(
+                str(py), "-s", "-m", "pip", "install", "--disable-pip-version-check", "--no-input",
+                "-r", str(req),
+                stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT,
+                creationflags=CREATE_NO_WINDOW, env=local_env(Path(comfy_root))),
+            timeout=timeout)
+        out = (await proc.communicate())[0] or b""
+        tail = out.decode("utf-8", "ignore").strip().splitlines()[-3:]
+        return {"ok": proc.returncode == 0, "msg": " | ".join(tail)}
+    except Exception as e:
+        # a missing package must not destroy an installation: the person can still finish it by hand
+        return {"ok": False, "msg": f"{type(e).__name__}: {str(e)[:160]}"}
+
+
+
         nodes_dir = comfy_root / "ComfyUI" / "custom_nodes"
         for i, pack in enumerate(catalog.NODE_PACKS):
             target = nodes_dir / pack["name"]
