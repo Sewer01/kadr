@@ -919,6 +919,7 @@ body.dropping::after{content:'Отпустите — программа разл
 .mt-rh{position:absolute;right:0;top:0;bottom:0;width:10px;cursor:ew-resize;background:linear-gradient(90deg,transparent,var(--pink));opacity:.55;z-index:3}.mt-rh:hover{opacity:1}
 .mt-rhl{position:absolute;left:0;top:0;bottom:0;width:10px;cursor:ew-resize;background:linear-gradient(-90deg,transparent,var(--pink));opacity:.55;z-index:3}
 #view-montage .mt-item video{aspect-ratio:auto;height:var(--mt-h,96px);object-fit:cover}
+    #view-montage .mt-item .mt-cv{display:block;width:100%;height:var(--mt-h,96px)}
 .mt-scale{display:flex;align-items:center;gap:8px;margin-top:4px;font-size:12px;color:var(--muted);flex-wrap:wrap}
     .mt-cv{width:100%;height:100%;display:block;border-radius:8px;background:#14161b}
     .mt-mk{font-family:var(--mono);font-size:12px;color:#ffd34d;background:rgba(0,0,0,.45);
@@ -3379,7 +3380,7 @@ async function soundOut(blob, name, from, at, notice) {
     const r = await fetch('/api/library/add?kind=audio&name=' + encodeURIComponent(name) +
       '&from=' + encodeURIComponent(from || '') + '&at=' + encodeURIComponent(at || ''),
       { method: 'POST', body: blob });
-    if (!r.ok) { notice('Звук не принят в библиотеку (ответ ' + r.status + ') - нужна более новая версия программы'); return null; }
+    if (!r.ok) { notice('Звук не принят в библиотеку (ответ ' + r.status + ') - нужна версия 1.5.3 или новее'); return null; }
     try { await window.h3ReloadLibrary?.(); } catch (e) { }
     try { window.trayFill?.(); } catch (e) { }
     notice('Звук сохранён в библиотеку: ' + name);
@@ -3406,7 +3407,7 @@ async function frameOut(f, rootEl, notice) {
     const r = await fetch('/api/library/add?name=' + encodeURIComponent(f.name) +
       '&from=' + encodeURIComponent(f.__from || '') + '&at=' + encodeURIComponent(f.__at || ''),
       { method: 'POST', body: f });
-    lib = r.ok ? ' + копия в библиотеке' : ' · в библиотеку не принял ответ ' + r.status;
+    lib = r.ok ? ' + копия в библиотеке' : ' · в библиотеку не принял ответ ' + r.status + ' (нужна версия 1.5.3 или новее)';
     if (r.ok) { try { await window.h3ReloadLibrary?.(); } catch (e) { } try { window.trayFill?.(); } catch (e) { } }
   } catch (e) { lib = ' · в библиотеку не ушёл: нужна более новая версия программы'; }
   notice('Кадр ' + (where ? where + ' ' : '') + lib.trim() + ': ' + f.name);
@@ -10547,7 +10548,7 @@ applyZoom();
     const key = [it.id, n, W, base.toFixed(2), d.toFixed(2)].join('|');
     if (cv._key === key) return;
     cv._key = key;
-    cv.width = W; cv.height = Math.max(40, el.clientHeight || 84);
+    cv.width = W; cv.height = Math.max(40, MT.hpx || el.clientHeight || 96);   // the height of the ruler, not of the content
     const g = cv.getContext('2d'), fw = cv.width / n;
     g.fillStyle = '#14161b'; g.fillRect(0, 0, cv.width, cv.height);
     if (d <= 0.05) { cv._key = ''; return; }
@@ -10663,27 +10664,26 @@ applyZoom();
 
   async function mtSound() {
     if (!MT.ids.length) { toast('Лента пуста'); return; }
-    const i = mkAt().i, it = get(MT.ids[i]);
-    if (!it) { toast('Этого клипа больше нет в Библиотеке'); return; }
-    const s = inOf(i) || 0, e = s + durOf(i);
-    if (e - s < 0.3) { toast('В этом куске меньше трети секунды звука'); return; }
-    toast('Выделяю звук клипа ' + (i + 1) + '…');
-    let raw;
-    try { raw = await (await fetch(it.url)).blob(); } catch (err) { toast('Клип не читается'); return; }
+    // the sound of the WHOLE strip as it stands now: every clip, its own cut, in the montage order -
+    // that is the work the person made, and a sound of one clip would be something else
+    const parts = MT.ids.map((id, i) => ({ id, start: inOf(i) || 0, end: (inOf(i) || 0) + durOf(i) }));
+    const total = parts.reduce((a, p) => a + (p.end - p.start), 0);
+    if (total < 0.3) { toast('В ленте почти ничего не осталось: сначала отрежьте меньше'); return; }
+    toast('Собираю звук монтажа из ' + parts.length + ' клип(ов)…');
     let r;
     try {
-      r = await fetch('/api/audio/extract?start=' + s.toFixed(3) + '&end=' + e.toFixed(3) +
-        '&name=' + encodeURIComponent(it.title || 'clip.mp4'), { method: 'POST', body: raw });
+      r = await fetch('/api/montage/sound', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ parts })
+      });
     } catch (err) { toast('Сервер не отвечает'); return; }
     if (!r.ok) {
       let msg = '';
       try { msg = (await r.json()).error || ''; } catch (e2) { }
-      toast(msg || 'Звук выделить не удалось - нужна более новая версия программы');
+      toast(msg || 'Звук монтажа требует версию 1.5.3 или новее - в вашей этого адреса ещё нет');
       return;
     }
-    const blob = await r.blob();
-    const stem = String(it.title || 'клип').replace(/\.[a-z0-9]+$/i, '').slice(0, 30);
-    soundOut(blob, stem + ' · клип ' + (i + 1) + '.mp3', stem, s.toFixed(1) + '-' + e.toFixed(1) + ' с', toast);
+    soundOut(await r.blob(), 'монтаж · ' + parts.length + ' клип(а) · ' + (Math.round(total * 10) / 10) + ' с.mp3',
+      'лента монтажа', '0-' + (Math.round(total * 10) / 10) + ' с', toast);
   }
 
   function setPlaying(on) {

@@ -3329,6 +3329,60 @@ class App:
             self.library.save()
         return web.json_response(self.public(item))
 
+    async def h_montage_sound(self, request):
+        """The sound of the whole montage as it stands in the strip: every clip in its order and with its
+        own cut. A person keeps the voice or the music of the finished piece, not of one clip - the strip
+        is what they looked at, and one clip's sound would be a different work."""
+        ff = self._ffmpeg()
+        if not ff:
+            return web.json_response({"error": "декодер не найден: звук собрать нечем"}, status=404)
+        try:
+            body = await request.json()
+        except Exception:
+            return web.json_response({"error": "не разобран состав ленты"}, status=400)
+        # the strip sends {"parts": [...]}, but a bare list is just as honest about what it means
+        parts = (body if isinstance(body, list) else (body.get("parts") or []))[:24]
+        if not parts:
+            return web.json_response({"error": "лента пуста"}, status=400)
+        picked = []
+        for p in parts:
+            item = self.library.get(str(p.get("id") or ""))
+            path = self.file_path(item) if item else None
+            if not path or not path.exists():
+                return web.json_response({"error": "одного клипа уже нет на диске"}, status=422)
+            try:
+                s = max(0.0, float(p.get("start") or 0))
+                e = float(p.get("end") or 0)
+            except (TypeError, ValueError):
+                return web.json_response({"error": "не разобраны границы куска"}, status=400)
+            if e - s < 0.05:
+                return web.json_response({"error": "один из кусков пустой: сначала отрежьте меньше"}, status=400)
+            picked.append((path, s, e))
+        work = Path(os.environ.get("TEMP", ".")) / ("h3mtsnd-" + uuid.uuid4().hex)
+        work.mkdir(parents=True, exist_ok=True)
+        out = work / "montage.mp3"
+        try:
+            cmd = [str(ff), "-hide_banner", "-loglevel", "error", "-y"]
+            for path, s, e in picked:
+                cmd += ["-ss", "%.3f" % s, "-to", "%.3f" % e, "-i", str(path)]
+            # the same sample rate and channels everywhere: pieces of different clips must stitch silently
+            chain = "".join("[%d:a]aformat=sample_rates=44100:channel_layouts=stereo[a%d];" % (i, i)
+                            for i in range(len(picked)))
+            chain += "".join("[a%d]" % i for i in range(len(picked))) + "concat=n=%d:v=0:a=1[out]" % len(picked)
+            cmd += ["-filter_complex", chain, "-map", "[out]", "-c:a", "libmp3lame", "-q:a", "3", str(out)]
+            err = b""
+            proc = await asyncio.create_subprocess_exec(*cmd, stdout=asyncio.subprocess.DEVNULL,
+                                                        stderr=asyncio.subprocess.PIPE)
+            _, err = await asyncio.wait_for(proc.communicate(), timeout=300)
+            if proc.returncode != 0 or not out.exists() or out.stat().st_size < 512:
+                return web.json_response({"error": "в ленте нет общего звука: " +
+                                          (err or b"")[-260:].decode("utf-8", "replace").strip()[-180:]},
+                                         status=422)
+            return web.Response(body=out.read_bytes(), content_type="audio/mpeg",
+                                headers={"Content-Disposition": 'attachment; filename="montage.mp3"'})
+        finally:
+            asyncio.get_running_loop().call_later(60, shutil.rmtree, work, True)
+
     async def h_audio_extract(self, request):
         """POST a video or an audio file, get back only its sound between start and end. The montage works
         with clips whose voice and music are worth keeping: a person should be able to save them and use
@@ -4226,7 +4280,8 @@ def build_app(comfy_override=None):
         web.post("/api/audio/separate", state.h_audio_separate),
         web.post("/api/video/lastframe", state.h_video_lastframe),   # the browser cannot decode everything
         web.post("/api/video/cut", state.h_video_cut),
-        web.post("/api/audio/extract", state.h_audio_extract),   # the sound of a piece, to keep it
+        web.post("/api/audio/extract", state.h_audio_extract),
+        web.post("/api/montage/sound", state.h_montage_sound),   # the sound of the whole strip   # the sound of a piece, to keep it
         web.post("/api/library/add", state.h_library_add),   # a frame from the bench becomes a keepsake   # reference video is trimmed here, not in the browser
         web.get("/api/setup/info", state.h_setup_info),
         web.post("/api/setup/external", state.h_setup_external),
