@@ -3329,6 +3329,32 @@ class App:
             self.library.save()
         return web.json_response(self.public(item))
 
+    async def h_library_add(self, request):
+        """A frame taken in the video bench becomes a library item. People pull a frame out of one video to
+        put it into another, and they clear projects on the way: what was made by hand must not disappear
+        with the project, so the keepsake goes to the library, not only into a slot."""
+        data = await request.read()
+        if not data:
+            return web.json_response({"error": "пустой файл"}, status=400)
+        if len(data) > 25 * 1024 * 1024:
+            return web.json_response({"error": "картинка больше 25 МБ"}, status=413)
+        q = request.query
+        name = re.sub(r"[^\w.\- ]+", "", (q.get("name") or "кадр.png"))[:80].strip().lstrip(".") or "кадр.png"
+        if not name.lower().endswith((".png", ".jpg", ".jpeg", ".webp")):
+            name += ".png"
+        where = DATA_DIR / "frames"
+        where.mkdir(parents=True, exist_ok=True)
+        target = where / (datetime.now().strftime("%Y%m%d-%H%M%S-") + uuid.uuid4().hex[:4] + "-" + name)
+        target.write_bytes(data)
+        item = {"id": uuid.uuid4().hex[:12], "prompt_id": "",
+                "date": datetime.now().isoformat(timespec="seconds"), "fav": False,
+                "file": {"type": "local", "path": str(target), "filename": target.name},
+                "ext": target.suffix.lstrip(".").lower(), "kind": "image", "mode": "frame",
+                "label": "кадр", "title": name,
+                "source": (q.get("from") or "")[:120], "at": (q.get("at") or "")[:24]}
+        self.library.add(item)
+        return web.json_response(self.public(item))
+
     async def h_library_delete_many(self, req):
         """Several library items at once: their files go to the Recycle Bin in one call."""
         ids = [str(i) for i in ((await req.json()).get("ids") or [])][:200]
@@ -4141,7 +4167,8 @@ def build_app(comfy_override=None):
         web.get("/api/audio/info", state.h_audio_info),
         web.post("/api/audio/separate", state.h_audio_separate),
         web.post("/api/video/lastframe", state.h_video_lastframe),   # the browser cannot decode everything
-        web.post("/api/video/cut", state.h_video_cut),   # reference video is trimmed here, not in the browser
+        web.post("/api/video/cut", state.h_video_cut),
+        web.post("/api/library/add", state.h_library_add),   # a frame from the bench becomes a keepsake   # reference video is trimmed here, not in the browser
         web.get("/api/setup/info", state.h_setup_info),
         web.post("/api/setup/external", state.h_setup_external),
         web.post("/api/setup/install", state.h_setup_install),
