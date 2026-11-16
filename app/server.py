@@ -1009,7 +1009,7 @@ class App:
             "vram_total": dev.get("vram_total"), "vram_free": dev.get("vram_free"),
             "comfy_version": stats["system"].get("comfyui_version"),
             "relay_ok": relay,   # the UI offers the fast upscale only when the nodes exist
-            "output_dir": str(self.output_dir) if self.output_dir else None,
+            "output_dir": str(self.output_dir) if self.output_dir else None, "data_dir": str(DATA_DIR),
             "paths": {"install": self.config.get("install_dir"), "models": self.config.get("models_dir"),
                       "ext_models": self.config.get("ext_models_dir"),
                       "assistant": str(self.llm.root), "data": str(DATA_DIR)},

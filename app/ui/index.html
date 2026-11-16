@@ -312,7 +312,7 @@ body.nosb-on #modeBar{left:112px}
 /* sidebar */
 .side{background:rgba(var(--bg2-rgb),.7);border-right:1px solid var(--line);display:flex;flex-direction:column;padding:20px 14px;gap:6px;backdrop-filter:blur(12px);overflow-y:auto;min-height:0}
 .brand{display:flex;align-items:center;gap:12px;padding:4px 8px 22px}
-.brand-mark{width:38px;height:38px;border-radius:12px;background:var(--grad);display:grid;place-items:center;box-shadow:0 8px 24px rgba(var(--accent-rgb),.35)}
+.brand-mark{position:relative;width:38px;height:38px;border-radius:12px;background:var(--grad);display:grid;place-items:center;box-shadow:0 8px 24px rgba(var(--accent-rgb),.35)}
 .brand-name{font-weight:800;font-size:17px;letter-spacing:-.01em}
 .brand-sub{font-size:11.5px;color:var(--muted)}
 .nav-label{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--dim);padding:14px 10px 6px}
@@ -513,6 +513,7 @@ body.sys-folded .sys-chev{transform:rotate(90deg)}
 body.sys-folded .sys-body{display:none}
 .sys-sep{height:1px;background:var(--line);margin:7px 0;opacity:.7}
 /* the mark of the program is the state of the engine */
+.brand-play{width:0;height:0;border-left:8px solid #fff;border-top:5.5px solid transparent;border-bottom:5.5px solid transparent;margin-left:3px;opacity:.97}
 .brand-mark.eng-wait{background:#7a1424;box-shadow:0 0 0 0 rgba(232,38,79,.55);animation:kadrpulse 1.05s ease-in-out infinite}
 .brand-mark.eng-on{background:#1c7a4d;box-shadow:0 0 12px rgba(46,196,124,.32);animation:none}
 @keyframes kadrpulse{0%,100%{box-shadow:0 0 0 0 rgba(232,38,79,.0)}50%{box-shadow:0 0 0 7px rgba(232,38,79,.26)}}
@@ -1205,7 +1206,9 @@ body.dropping::after{content:'Отпустите — программа разл
   <aside class="side">
     <div class="brand">
       <div class="brand-mark">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"><path d="M3 12h2M7 7v10M11 4v16M15 8v8M19 10v4M21 12h0"/></svg>
+        <!-- a viewfinder with a start sign: the same picture as the program icon on the desktop -->
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8V5.6C3 4.7 3.7 4 4.6 4H8M16 4h3.4c.9 0 1.6.7 1.6 1.6V8M21 16v2.4c0 .9-.7 1.6-1.6 1.6H16M8 20H4.6C3.7 20 3 19.3 3 18.4V16"/></svg>
+        <i class="brand-play"></i>
       </div>
       <div><div class="brand-name">Kadr</div><div class="brand-sub">видеостудия на вашем железе</div><div class="brand-sub" id="appVer" style="opacity:.75"></div></div>
     </div>
@@ -1289,6 +1292,10 @@ body.dropping::after{content:'Отпустите — программа разл
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/></svg>
       Настройки <span class="badge" id="modelsBadge" hidden></span><span class="starthere">Начните здесь</span>
     </button>
+    <button class="nav" data-view="about" title="Что это за программа, из чего выросла, где её файлы и кому она обязана">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 16v-4M12 8h.01"/></svg>
+      О программе
+    </button>
 
     <div class="side-foot" id="sysBox">
       <div class="sys-head" id="sysHead" role="button" tabindex="0" title="Свернуть или показать нагрузку компьютера">
@@ -1297,15 +1304,15 @@ body.dropping::after{content:'Отпустите — программа разл
       <div class="sys-body" id="sysBody">
         <div class="stat" id="engRow" title="Нажмите, чтобы запустить локальный ComfyUI, не перезапуская программу"><span><span class="dot" id="engDot"></span>Движок</span><b id="engTxt">—</b></div>
         <div class="sys-sep"></div>
-        <div class="stat"><span>Модель GPU</span><b id="gpuName">—</b></div>
+        <div class="stat"><span>GPU</span><b id="gpuName">—</b></div>
         <div class="meter"><div class="stat"><span>Загрузка GPU</span><b id="gpuLoad">—</b></div><div class="vram"><i id="gpuBar"></i></div></div>
         <div class="meter"><div class="stat"><span>Память GPU</span><b id="vramTxt">—</b></div><div class="vram"><i id="vramBar"></i></div></div>
         <div class="meter" id="powerRow"><div class="stat"><span>Мощность GPU</span><b id="gpuPower">—</b></div><div class="vram"><i id="powerBar"></i></div></div>
         <div class="stat" id="tempRow" hidden><span>Температура GPU</span><b id="gpuTemp">—</b></div>
         <div class="sys-sep"></div>
-        <div class="stat"><span>Модель CPU</span><b id="cpuName">—</b></div>
+        <div class="stat"><span>CPU</span><b id="cpuName">—</b></div>
         <div class="meter"><div class="stat"><span>Нагрузка CPU</span><b id="cpuTxt">—</b></div><div class="vram"><i id="cpuBar"></i></div></div>
-        <div class="stat" id="cpuTempRow" hidden><span>Температура CPU</span><b id="cpuTemp">—</b></div>
+        <div class="stat" id="cpuTempRow"><span>Температура CPU</span><b id="cpuTemp">—</b></div>
         <div class="sys-sep"></div>
         <div class="meter"><div class="stat"><span>Память (ОЗУ)</span><b id="ramTxt">—</b></div><div class="vram"><i id="ramBar"></i></div></div>
         <div class="stat"><span>Диск <small id="diskName"></small></span><b id="diskTxt">—</b></div>
@@ -1497,7 +1504,67 @@ body.dropping::after{content:'Отпустите — программа разл
     <section class="view" id="view-krea"></section>
     <section class="view" id="view-qwen"></section>
 
-    <!-- ============ AGENT ============ -->
+    <!-- ============ ABOUT ============ -->
+    <section class="view" id="view-about">
+      <div class="head">
+        <div><h1>О программе</h1><p>Что это за студия, из чего она выросла, где лежат её файлы и кому обязана</p></div>
+        <div class="mode-pill"><i></i><span id="abVer">Kadr</span></div>
+      </div>
+
+      <div class="card" style="max-width:820px;margin-bottom:16px">
+        <div class="card-h"><h3><span class="n">1</span>Эта программа</h3></div>
+        <div style="display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap">
+          <div class="brand-mark" style="width:64px;height:64px;border-radius:18px;flex:none">
+            <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8V5.6C3 4.7 3.7 4 4.6 4H8M16 4h3.4c.9 0 1.6.7 1.6 1.6V8M21 16v2.4c0 .9-.7 1.6-1.6 1.6H16M8 20H4.6C3.7 20 3 19.3 3 18.4V16"/></svg>
+            <i class="brand-play" style="border-left-width:13px;border-top-width:9px;border-bottom-width:9px;margin-left:4px"></i>
+          </div>
+          <div style="flex:1;min-width:240px">
+            <div style="font-size:19px;font-weight:800">Kadr</div>
+            <div class="hint">Видеостудия на вашем компьютере: картинки, видео, звук и монтаж в одном окне, без подписки и без чужих серверов. Всё считается на вашей видеокарте.</div>
+            <div class="hint" style="margin-top:8px" id="abFacts">Версия: уточняем…</div>
+          </div>
+        </div>
+        <div class="hint" style="margin-top:12px"><b>Что внутри.</b> Пятнадцать режимов: видео по картинке и по описанию, видео по референсам, фильм по сценам, два экшен-режима, клип под аудио, актёрская игра, замена персонажа, рисование и правка картинок, раскадровка, увеличение и улучшение, монтаж готовых клипов и разговор с агентом, который пишет промпты. У каждого режима своя страница, у каждой страницы - справка под знаком «?».</div>
+      </div>
+
+      <div class="card" style="max-width:820px;margin-bottom:16px">
+        <div class="card-h"><h3><span class="n">2</span>Откуда она взялась</h3></div>
+        <div class="hint" style="line-height:1.6">Первая версия выросла из проекта <b>«Minimax H3 Workspace»</b>, который сделал <b>Yuliya1310</b>
+          (<a href="https://github.com/Yuliya1310/minimax-h3-workspace" target="_blank" rel="noopener">github.com/Yuliya1310/minimax-h3-workspace</a> ✓) -
+          спасибо автору за основу ✓ Дальше программа развивалась своей дорогой и перестала быть обвязкой вокруг одной модели ✓
+          Сейчас она живёт как отдельный продукт под именем <b>Kadr</b> здесь ✓
+          <a href="https://github.com/Sewer01/minimax-h3-workspace" target="_blank" rel="noopener">github.com/Sewer01/minimax-h3-workspace</a> ✓</div>
+        <div class="hint" style="margin-top:10px;line-height:1.6"><b>Что добавилось по дороге.</b> Верстак референс-видео с лентой кадров ✓ маркером ✓ ножницами и покадровой прокруткой ✓ звук со всей ленты монтажа ✓ сохранение кадра и звука в библиотеку ✓ боковая панель «Библиотека» с перетаскиванием ✓ монтажная комната ✓ страница «Ретушь» на одной странице с параметрами ✓ единые имена режимов ✓ подсказки на кнопках ✓ справки под «?» ✓ и лечение зависимостей ComfyUI при установке и обновлении ядра ✓</div>
+      </div>
+
+      <div class="card" style="max-width:820px;margin-bottom:16px">
+        <div class="card-h"><h3><span class="n">3</span>Чем пользуется</h3></div>
+        <div class="hint" style="line-height:1.6"><b>ComfyUI</b> - движок, в который уходят все задания ✓ <b>ffmpeg</b> - читает и режет видео ✓ звук ✓ делает кадры ✓ <b>модели</b> - H3 ✓ Pika ✓ Krea ✓ FLUX ✓ Qwen ✓ SeedVR2 ✓ RelayVSR и другие: их подбирает сам раздел «Настройки» ✓ и у каждой в списке показана лицензия ✓</div>
+        <div class="hint" style="margin-top:10px;line-height:1.6"><b>Ваши файлы программа не трогает и не выкладывает наружу ✓</b> Готовые работы и служебные файлы лежат в одной папке данных ✓ куда именно - видно ниже ✓там же папка keeps - сохранённые кадры и звук ✓ и копия списка библиотеки ✓</div>
+        <div style="margin-top:12px;display:flex;flex-direction:column;gap:6px">
+          <div class="stat"><span>Папка данных</span><b id="abData">—</b></div>
+          <div class="stat"><span>Куда сохраняются работы</span><b id="abOut">—</b></div>
+          <div class="stat"><span>Движок</span><b id="abEng">—</b></div>
+          <div class="stat"><span>Ваша видеокарта</span><b id="abGpu">—</b></div>
+        </div>
+      </div>
+
+      <div class="card" style="max-width:820px;margin-bottom:16px">
+        <div class="card-h"><h3><span class="n">4</span>Лицензии и права</h3></div>
+        <div class="hint" style="line-height:1.6">Программа распространяется как есть ✓ условия - в её репозитории ✓ Модели и узлы остаются собственностью их авторов ✓ лицензия каждой показана рядом с ней в списке моделей ✓ там же значок ✓ можно ли результат использовать в коммерции ✓ Ответственность за то ✓ как вы используете готовые ролики ✓ на вас ✓</div>
+        <div class="hint" style="margin-top:8px">Отдельная благодарность авторам ComfyUI ✓ ffmpeg ✓ Hugging Face ✓ и всем ✓ кто присылал скриншоты с ошибками и терпеливо ждал правок - из них выросла большая часть того ✓ что здесь работает ровно ✓</div>
+      </div>
+    <div class="card" style="max-width:820px;margin-bottom:16px" id="mdServiceCard"><div class="card-h"><h3><span class="n">5</span>Обслуживание</h3></div>
+          <div class="hint">Здесь то, что к выбранному режиму относится косвенно: обновление самой программы и полный сброс.</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px"><button class="btn" id="mdUpd" type="button" title="Спросить на GitHub, есть ли новая версия программы">Проверить обновление программы</button></div>
+          <div class="hint" id="mdUpdState" style="margin-top:6px"></div>
+          <div class="note warn" style="margin-top:14px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 9v4M12 17h0M10.3 3.9 2.6 17a2 2 0 0 0 1.7 3h15.4a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/></svg>
+            <span><b>Сброс настроек</b> остановит ComfyUI и вернёт на стартовый экран: программа заново спросит папку, соберёт список моделей и нод. Видео в Библиотеке и очередь останутся на месте.</span></div>
+          <button class="btn" id="mdReset" type="button" style="margin-top:10px">Сброс настроек</button>
+        </div>
+    </section>
+    </div>
+        <!-- ============ AGENT ============ -->
     <section class="view" id="view-agent">
       <div class="head">
         <div>
@@ -1608,7 +1675,7 @@ body.dropping::after{content:'Отпустите — программа разл
             <div class="seg" id="agTarget2" style="grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-auto-rows:auto">
               <button data-t="plist">Список кадров<small>серия изображений</small></button>
               <button data-t="krea">Изображение по тексту<small>Krea 2</small></button>
-              <button data-t="fluxt">Изображение по тексту<small>FLUX.2 klein</small></button>
+              <button data-t="fluxt">Изображение по тексту<small>FLUX klein</small></button>
       <button data-t="h3t">Изображение по тексту<small>MiniMax H3 Image, до 16 МП</small></button>
               <button data-t="qwent">Изображение по тексту<small>Qwen 2.1</small></button>
               <button data-t="qwen">Правка изображения<small>Qwen, нужно изображение</small></button>
@@ -1621,7 +1688,7 @@ body.dropping::after{content:'Отпустите — программа разл
               <button data-f="1">По кадрам<small>кадры отдельно + лист</small></button><button data-f="0">Одним листом<small>одно изображение сразу</small></button>
             </div>
             <div class="seg" id="agStoryM" hidden style="grid-template-columns:repeat(3,1fr);margin-top:10px">
-              <button data-m="krea">Krea 2<small>можно в коммерцию</small></button><button data-m="flux">FLUX.2 klein<small>для коммерции</small></button><button data-m="qwen">Qwen 2.1<small>не для коммерции</small></button>
+              <button data-m="krea">Krea 2<small>можно в коммерцию</small></button><button data-m="flux">FLUX klein<small>правка по описанию, лёгкая модель</small></button><button data-m="qwen">Qwen 2.1<small>не для коммерции</small></button>
             </div>
             <small class="hint" id="agCtx" style="display:block;margin-top:8px"></small>
           </div>
@@ -1828,7 +1895,7 @@ body.dropping::after{content:'Отпустите — программа разл
               <button class="mcard" data-m="krea" title="Картинка по описанию. Можно в коммерцию."><i></i><b>Изображение по тексту</b><span>Krea 2: красивые изображения по описанию (можно в коммерцию)</span><small></small></button>
               <button class="mcard" data-m="kreareal" title="Картинка по описанию в реализме: люди и фото как с камеры, два прохода."><i></i><b>Изображение: реализм</b><span>Krea 2 для реалистичных людей и фото (в «Изображении по тексту», +15 ГБ)</span><small></small></button>
               <button class="mcard" data-m="qwen" title="Правка готового изображения: нужен файл, который меняем."><i></i><b>Правка изображения</b><span>Qwen: изменить своё изображение, лист персонажа</span><small></small></button>
-              <button class="mcard" data-m="flux" title="Картинка по описанию моделью FLUX.2 - своя, лёгкая, для коммерции."><i></i><b>Правка изображения: можно в коммерцию</b><span>FLUX.2 klein: изменить своё изображение со свободной лицензией (+12 ГБ)</span><small></small></button>
+              <button class="mcard" data-m="flux" title="Своя лёгкая модель правки по описанию: FLUX klein. Какую именно ступень вы скачиваете и что разрешает её лицензия - видно в списке моделей."><i></i><b>Правка изображения: FLUX klein</b><span>Изменить изображение по описанию лёгкой моделью (+12 ГБ)</span><small></small></button>
         <button class="mcard" data-m="h3img" title="Картинка по описанию моделью MiniMax H3 Image: до 5 референсов."><i></i><b>Изображения MiniMax H3 Image</b><span>Очень крупные картинки по тексту (до 16 МП) и правка по 5 референсам: стиль, герои, место. Открытая лицензия (+14 ГБ)</span><small></small></button>
               <button class="mcard" data-m="upscale" title="Увеличение и улучшение чёткости видео и фото («Ретушь»), вариант SeedVR2."><i></i><b>Увеличение видео и изображений</b><span>Увеличить готовое видео и добавить чёткости (долго, но по желанию)</span><small></small></button>
               <button class="mcard" data-m="relayvsr" title="Быстрое увеличение видео (RelayVSR): коротких клипов, в разы быстрее."><i></i><b>Быстрое увеличение видео (RelayVSR)</b><span>Увеличить готовое видео в 2 раза за минуты. Только видео, до ~10 с</span><small></small></button>
@@ -1962,16 +2029,7 @@ equirements.txt</code><br>
           <div class="mlist" id="nodesUpd" hidden style="margin-bottom:12px"></div>
           <div class="mlist" id="mlist"></div>
         </div>
-        <div class="card" id="mdServiceCard" style="margin-bottom:16px">
-          <div class="card-h"><h3>Обслуживание</h3></div>
-          <div class="hint">Здесь то, что к выбранному режиму относится косвенно: обновление самой программы и полный сброс.</div>
-          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px"><button class="btn" id="mdUpd" type="button" title="Спросить на GitHub, есть ли новая версия программы">Проверить обновление программы</button></div>
-          <div class="hint" id="mdUpdState" style="margin-top:6px"></div>
-          <div class="note warn" style="margin-top:14px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 9v4M12 17h0M10.3 3.9 2.6 17a2 2 0 0 0 1.7 3h15.4a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/></svg>
-            <span><b>Сброс настроек</b> остановит ComfyUI и вернёт на стартовый экран: программа заново спросит папку, соберёт список моделей и нод. Видео в Библиотеке и очередь останутся на месте.</span></div>
-          <button class="btn" id="mdReset" type="button" style="margin-top:10px">Сброс настроек</button>
-        </div>
-      </div>
+              </div>
     </section>
 
   </main>
@@ -2479,6 +2537,39 @@ function shortCpu(name) {
   setInterval(st, 3000);
 })();
 
+/* the about page speaks in values, not in promises: it reads the same answers the rest of the
+   program works with, so a person sees where his files really lie */
+(function () {
+  const put = (id, txt) => { const e = document.getElementById(id); if (e && txt) e.textContent = txt; };
+  async function fill() {
+    try {
+      const v = await (await fetch('/api/version')).json();
+      put('abVer', 'Kadr ' + (v.version || ''));
+      put('abFacts', 'Версия ' + (v.version || '?') + (v.built ? ' · сборка от ' + v.built : '') +
+        '. Программа работает на этом компьютере и не отправляет ваши файлы никуда.');
+    } catch {}
+    try {
+      const s = await (await fetch('/api/status')).json();
+      const p = s.paths || {};
+      put('abData', s.data_dir || 'рядом с программой');
+      ['abOut', 'abEng', 'abGpu'].forEach(id => { const e = document.getElementById(id); if (e && e.textContent === 'уточняем…' && !s[id === 'abOut' ? 'output_dir' : id === 'abEng' ? 'engine' : 'gpu']) e.textContent = 'нет данных'; });
+      put('abOut', s.output_dir || 'рядом с программой');
+      put('abEng', s.engine === 'managed' ? 'ComfyUI, который программа ведёт сама' : s.engine === 'external' ? 'ваш собственный ComfyUI' : s.engine === 'cloud' ? 'арендованный сервер' : (s.engine || '—'));
+      put('abGpu', (s.gpu || '—') + (s.vram_total ? ' · ' + Math.round(s.vram_total / 1073741824) + ' ГБ памяти' : '') +
+        ' · режимов: ' + ((s.modes || []).length));
+    } catch {}
+  }
+  let busy = false;
+  const run = () => { if (!busy && document.querySelector('#view-about.active')) { busy = true; fill().finally(() => { busy = false; }); } };
+  const mo = new MutationObserver(run);
+  mo.observe(document.querySelector('.main') || document.body, { attributes: true, subtree: true, attributeFilter: ['class'] });
+  // the engine answers about itself slowly, so the lines say "уточняем" and fill in when they can
+  const wait = document.querySelectorAll('#abData, #abOut, #abEng, #abGpu');
+  wait.forEach(e => { if (e.textContent === '—') e.textContent = 'уточняем…'; });
+  run();
+  setInterval(run, 4000);
+})();
+
 let SQ_ASKED = false;
 async function askSavedQueue() {
   if (SQ_ASKED) return; SQ_ASKED = true;
@@ -2594,7 +2685,9 @@ async function pollSystem() {
     if (cn) cn.textContent = cpu.name ? shortCpu(cpu.name) : 'не сообщается';
     meter('#cpuTxt', '#cpuBar', cpu.util, cpu.util != null ? `${Math.round(cpu.util)} %` : '—');
     const ctr = $('#cpuTempRow');
-    if (ctr) { ctr.hidden = cpu.temp == null; if (cpu.temp != null) $('#cpuTemp').textContent = `${Math.round(cpu.temp)} °C`; }
+    // the line stands there whether or not the board reports it: a missing row looks like a bug,
+    // a row that says "the sensor is silent" answers the question without one
+    if (ctr) $('#cpuTemp').textContent = cpu.temp != null ? `${Math.round(cpu.temp)} °C` : 'датчик молчит';
       $('#powerRow').hidden = gpu.power == null;
       if (gpu.power != null) $('#gpuPower').textContent = `${Math.round(gpu.power)}` + (gpu.power_limit ? ` / ${Math.round(gpu.power_limit)}` : '') + ' Вт';
     } else $('#gpuName').textContent = 'не найдена';
@@ -5298,7 +5391,7 @@ $('.nav[data-view="models"]').addEventListener('click', async () => {
 const MODE_NAME = {
     // one name per mode, the same the bar shows; the key used to be written twice, and the last
     // one silently won - that is how an old name kept surviving every rename
-    montage: 'Монтаж', custom: 'Свой workflow', video: 'Видео', lipsync: 'Клип', refs: 'Видеостудия',
+    montage: 'Монтаж', about: 'О программе', custom: 'Свой workflow', video: 'Видео', lipsync: 'Клип', refs: 'Видеостудия',
     actor: 'Актёр', swap: 'Замена', action: 'Экшн-видео', actionsc: 'Экшн-студия', long: 'Киностудия',
     krea: 'Изображение', fluxt: 'Изображение', qwent: 'Изображение', qwen: 'Правка', upfile: 'Ретушь',
     upscale: 'Ретушь', relayvsr: 'Ретушь', plist: 'Список кадров', story: 'Раскадровка', sheet: 'Лист персонажа',
@@ -10098,7 +10191,7 @@ const imgSeedForm = (S, fd) => { if (S.seedFixed && S.seed) fd.append('seed', S.
         <div class="ta-foot"><span class="hint">Лучше писать подробно, одним абзацем. Помощник в разделе «Агент» умеет писать такие промпты</span></div></div>
       <div class="card"><div class="card-h"><h3><span class="n">2</span>Параметры</h3></div>
         <div class="row"><div class="row-l">Модель</div>
-          <div class="seg kr-eng" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr))"><button data-e="krea">Krea 2<small>лучшее качество, можно в коммерцию</small></button><button data-e="h3img">MiniMax H3 Image<small>очень высоко: до 16 МП</small></button><button data-e="flux">FLUX.2 klein<small>можно в коммерцию</small></button><button data-e="qwen">Qwen 2.1<small>текст на изображении, не для коммерции</small></button></div>
+          <div class="seg kr-eng" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr))"><button data-e="krea">Krea 2<small>лучшее качество, можно в коммерцию</small></button><button data-e="h3img">MiniMax H3 Image<small>очень высоко: до 16 МП</small></button><button data-e="flux">FLUX klein<small>лёгкая модель; лицензию см. в списке моделей</small></button><button data-e="qwen">Qwen 2.1<small>текст на изображении, не для коммерции</small></button></div>
           <div class="row kr-h3mp" hidden style="margin-top:10px"><div class="row-l">Размер результата</div>
             <div class="seg" style="grid-template-columns:repeat(3,1fr)"><button data-mp="4">4 МП<small>быстро</small></button><button data-mp="8">8 МП<small>средне</small></button><button data-mp="16">16 МП<small>максимум деталей, долго</small></button></div>
             <div class="hint" style="margin-top:6px">Модель рассчитана на 4 МП и больше: чем крупнее, тем чище детали. На 16 ГБ памяти 16 МП считается заметно дольше.</div></div>
@@ -10267,7 +10360,7 @@ const imgSeedForm = (S, fd) => { if (S.seedFixed && S.seed) fd.append('seed', S.
             <div class="row qw-lnrow" style="margin-top:10px"><div class="row-l">Линия между кадрами</div>
               <div class="seg qw-ln" style="grid-template-columns:repeat(3,1fr)"><button data-ln="white">Тонкая белая</button><button data-ln="black">Тонкая чёрная</button><button data-ln="none">Без линии</button></div></div>
             <div class="hint" style="margin-top:6px">Кадры пишите по одному в строке: «1: ...», «2: ...» (2, 3, 4, 6, 8 или 9 кадров). Каждый кадр сохраняется отдельно в Библиотеку в полном размере. FLUX.2 рисует кадр за секунды, Qwen 2.1 заметно дольше (минуты на кадр).</div></div>
-          <div class="row" style="margin-bottom:12px"><div class="row-l">Модель</div><div class="seg qw-eng" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr))"><button data-e="qwen">Qwen 2.1<small>для творчества, не для коммерции</small></button><button data-e="h3img">MiniMax H3 Image<small>до 5 референсов, крупно</small></button><button data-e="flux">FLUX.2 klein<small>можно в коммерцию</small></button></div>
+          <div class="row" style="margin-bottom:12px"><div class="row-l">Модель</div><div class="seg qw-eng" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr))"><button data-e="qwen">Qwen 2.1<small>для творчества, не для коммерции</small></button><button data-e="h3img">MiniMax H3 Image<small>до 5 референсов, крупно</small></button><button data-e="flux">FLUX klein<small>лёгкая модель; лицензию см. в списке моделей</small></button></div>
             <div class="hint qw-fluxhint" hidden></div></div>
           <textarea class="qw-prompt" placeholder="Что изменить и что оставить. Например: Этот человек сидит в кафе у окна и пьёт кофе. Лицо, причёска и одежда как на изображении."></textarea>
           <div class="ta-foot"><span class="hint">Скажите и что поменять, и что оставить прежним — так результат точнее</span></div>

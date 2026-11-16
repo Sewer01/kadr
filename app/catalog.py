@@ -415,7 +415,7 @@ def marks_text(role):
 
 # Plain words for the "another version" choice in the Models section (only versions of the same model replace each other)
 VARIANT_LABELS = {
-        "flux_clip": {"bf16": "Qwen3-VL-4B · прежняя (для FLUX.2)",
+        "flux_clip": {"bf16": "Qwen3-VL-4B · прежнее поколение",
                   "flux3_qwen": "Qwen3-VL-4B из репозитория FLUX.3 · подхватывается сам"},
 "upscaler": {"bf16": "3D-свёртка · прежняя",
                  "2d_fp16": "2D-свёртка fp16 · качество (резче на замере, есть шкала резкости)",
@@ -424,7 +424,7 @@ VARIANT_LABELS = {
                            "v2": "Исправление движения v2 · качество (быстрые движения)"},
     "ref2v_turbo_lora": {"bf16": "Ref2V Turbo 4 шага v0.1 · быстрая",
                          "v1.1_8step": "Ref2V Turbo 8 шагов v1.1 · качество (свежее, 12.11)"},
-    "flux_unet": {"fp8": "FLUX.2 klein 4B fp8 · прежняя",
+    "flux_unet": {"fp8": "FLUX klein 4B fp8 · прежнее поколение",
                   "flux3_int8": "FLUX.3 klein int8 · качество",
                   "flux3_nvfp4": "FLUX.3 klein NVFP4 · быстрая"},
     "h3img_unet": {"w4a8": "лёгкая W4A8 · быстрая (12,5 ГБ)", "int8": "обычная int8 · качество (21 ГБ)"},
@@ -528,13 +528,13 @@ ROLE_TITLES = {
     "qwen_unet": "Основная модель — Правка изображения (Qwen Image 2.1)",
     "qwen_clip": "Текстовый энкодер Qwen (Qwen3-VL 8B)",
     "qwen_vae": "VAE для Qwen Image 2.1",
-    "flux_unet": "Основная модель — Правка изображения для коммерции (FLUX.2 klein 4B)",
-    "flux_clip": "Текстовый энкодер FLUX.2 klein (Qwen3 4B)",
-    "flux_vae": "VAE для FLUX.2",
+    "flux_unet": "Основная модель — Правка изображения (FLUX klein)",
+    "flux_clip": "Текстовый энкодер этой модели (Qwen3 4B)",
+    "flux_vae": "VAE этого семейства",
 }
 
 MODE_TITLES = {"video": "Image-to-Video", "lipsync": "Lipsync", "refs": "Референсы", "actor": "Актёрская игра", "swap": "Замена персонажа", "action": "Экшн-сцены",
-               "krea": "Изображение по тексту", "kreareal": "Изображение: реализм", "qwen": "Правка изображения", "flux": "Правка изображения: FLUX.2 (можно в коммерцию)", "h3img": "Изображения MiniMax H3 Image (по тексту и по референсам)",
+               "krea": "Изображение по тексту", "kreareal": "Изображение: реализм", "qwen": "Правка изображения", "flux": "Правка изображения: FLUX klein", "h3img": "Изображения MiniMax H3 Image (по тексту и по референсам)",
                "upscale": "Увеличение видео и изображений", "relayvsr": "Быстрое увеличение видео (RelayVSR)", "long": "Длинное видео",
     "actionsc": "Экшн-видеостудия (сцены подряд)"}
 
