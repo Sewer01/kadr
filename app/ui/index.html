@@ -1128,8 +1128,6 @@ body.dropping::after{content:'Отпустите — программа разл
     .vt-cv{display:block;width:100%;height:86px}
     .vt-sel{position:absolute;top:0;bottom:0;border-left:2px solid var(--accent);border-right:2px solid var(--accent);
       background:rgba(255,255,255,.06);box-shadow:0 0 0 9999px rgba(0,0,0,.42)}
-    .vt-ph{position:absolute;top:0;bottom:0;width:2px;background:#ffd34d;box-shadow:0 0 6px rgba(255,211,77,.8)}
-    .vt-ph::after{content:'';position:absolute;top:-1px;left:-5px;border:6px solid transparent;border-top-color:#ffd34d}
     .vt-sc{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
     .vt-sc>.btn.mini{height:30px;padding:0 11px;font-size:12px;font-weight:700;border-radius:8px}
     .vt-cutl,.vt-cutr{background:#2b2f38;border-color:var(--line-2)}
@@ -1138,13 +1136,9 @@ body.dropping::after{content:'Отпустите — программа разл
     .ra-row>.token[data-j]{cursor:pointer}
 
     /* the marker carries the arrows and the scissors: they belong to the place, not to a row below */
-    .vt-ph{display:block}
     .vt-b{background:rgba(0,0,0,.72);color:#fff;border:1px solid var(--line-2);border-radius:6px;
       width:22px;height:20px;line-height:1;font-size:10px;display:grid;place-items:center;cursor:pointer}
     .vt-b:hover{background:var(--accent);border-color:var(--accent)}
-    .vt-span{position:absolute;top:2px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.7);
-      color:#fff;border-radius:6px;padding:1px 6px;font-size:11px;white-space:nowrap}
-    .vt-sel{display:block}
     .vt-pp{font-size:12px;opacity:.8}
     .mt-scale span:first-child{font-size:12px;opacity:.8}
 
@@ -1152,30 +1146,35 @@ body.dropping::after{content:'Отпустите — программа разл
     .vt-b{background:rgba(0,0,0,.74);color:#fff;border:1px solid var(--line-2);border-radius:6px;
       min-width:22px;height:20px;line-height:1;font-size:10px;display:grid;place-items:center;cursor:pointer;padding:0 4px}
     .vt-b:hover{background:var(--accent);border-color:var(--accent)}
-    .vt-span{position:absolute;top:2px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.72);
+    .vt-span{position:absolute;top:2px;left:3px;background:rgba(0,0,0,.72);
       color:#fff;border-radius:6px;padding:1px 6px;font-size:11px;white-space:nowrap;pointer-events:none}
     .vt-pp{font-size:12px;opacity:.8}
     .sw-bench{margin-top:10px}
 
     /* the marker is a place: a head you grab, arrows above it, a scissors on each side of the line.
        The blue line is a different thing - it only shows where the preview stands right now. */
-    .vt-ph{width:20px;margin-left:-10px;z-index:5;cursor:grab;touch-action:none;background:transparent;box-shadow:none}
+    /* --k is the distance from the left edge of the grip to the real line: the grip slides to stay
+       inside the film, the line, the head and the buttons are placed from --k, so the marker stays
+       exactly where the time says while everything around it remains reachable */
+    .vt-ph{position:absolute;top:0;bottom:0;width:24px;z-index:5;cursor:grab;touch-action:none;background:transparent}
     .vt-ph:active{cursor:grabbing}
-    .vt-line{position:absolute;left:9px;top:0;bottom:0;width:2px;margin:0;background:#ffd34d;
+    .vt-line{position:absolute;left:var(--k,11px);top:0;bottom:0;width:2px;background:#ffd34d;
       box-shadow:0 0 6px rgba(255,211,77,.85)}
-    .vt-head{position:absolute;left:2px;top:0;width:16px;height:14px;margin:0;background:#ffd34d;
+    .vt-head{position:absolute;left:calc(var(--k,11px) - 7px);top:0;width:16px;height:14px;background:#ffd34d;
       clip-path:polygon(0 0,100% 0,50% 100%)}
-    .vt-step{position:absolute;top:4px;left:10px;transform:translateX(-50%);display:flex;gap:2px}
-    .vt-cutl{position:absolute;right:calc(100% + 1px);top:34px}
-    .vt-cutr{position:absolute;left:calc(100% + 1px);top:34px;transform:scaleX(-1)}
+    .vt-step{position:absolute;top:4px;left:var(--k,11px);transform:translateX(-50%);display:flex;gap:2px}
+    .vt-cutl{position:absolute;top:34px;left:calc(var(--k,11px) - 27px)}
+    .vt-cutr{position:absolute;top:34px;left:calc(var(--k,11px) + 4px);transform:scaleX(-1)}
     .vt-run{position:absolute;top:0;bottom:0;width:2px;background:#4c9cff;box-shadow:0 0 6px rgba(76,156,255,.7);
       pointer-events:none;z-index:4}
 
-    /* near the edges the scissors jump to the free side and the arrows slide inside the strip */
-    .vt-ph.near-left .vt-cutl{right:auto;left:calc(100% + 1px)}
-    .vt-ph.near-right .vt-cutr{left:auto;right:calc(100% + 1px)}
-    .vt-ph.near-left .vt-step{transform:translateX(-4px)}
-    .vt-ph.near-right .vt-step{transform:translateX(calc(-100% + 4px))}
+    /* at the edges both scissors stand side by side on the free side, the arrows slide along too:
+       two buttons in the same pixel is what made them look broken */
+    .vt-ph.near-left .vt-cutl{left:calc(var(--k,11px) + 32px)}
+    .vt-ph.near-right .vt-cutr{left:calc(var(--k,11px) - 30px)}
+    .vt-ph.near-right .vt-cutl{left:calc(var(--k,11px) - 61px)}
+    .vt-ph.near-left .vt-step{transform:none;left:calc(var(--k,11px) + 2px)}
+    .vt-ph.near-right .vt-step{transform:translateX(-100%);left:calc(var(--k,11px) - 2px)}
 </style>
 </head>
 <body>
@@ -3540,14 +3539,21 @@ class VideoTrimmer {
     sel.style.left = (this.start / this.dur0 * 100) + '%';
     sel.style.width = (Math.max(0, this.len()) / this.dur0 * 100) + '%';
     sel.hidden = !this.dur0;
-    ph.style.left = (this.t / this.dur0 * 100) + '%';
+    // the grip is placed in pixels and clamped inside the film, so at the very first second it is still
+    // under the cursor; --k keeps the yellow line exactly at its time whatever the grip does
+    const W = strip.clientWidth || 1, GRIP = 24;
+    const linePx = this.dur0 ? this.t / this.dur0 * W : 0;
+    const boxLeft = Math.max(0, Math.min(W - GRIP, linePx - GRIP / 2));
+    ph.style.left = boxLeft + 'px';
+    ph.style.setProperty('--k', (linePx - boxLeft) + 'px');
     ph.hidden = !this.dur0;
-    this.q('.vt-run').style.left = (this.run / this.dur0 * 100) + '%';
-    this.q('.vt-run').hidden = !this.dur0 || Math.abs(this.run - this.t) < .01;
-    // the montage taught this too: at the very beginning the buttons jump to the other side
-    const fr = this.dur0 ? this.t / this.dur0 : 0;
-    ph.classList.toggle('near-left', fr < .12);
-    ph.classList.toggle('near-right', fr > .88);
+    const runPx = this.dur0 ? this.run / this.dur0 * W : 0;
+    const run = this.q('.vt-run');
+    run.style.left = Math.max(0, Math.min(W - 2, runPx)) + 'px';
+    run.style.setProperty('--k', '0px');
+    run.hidden = !this.dur0 || Math.abs(this.run - this.t) < .01;
+    ph.classList.toggle('near-left', linePx < 34);
+    ph.classList.toggle('near-right', linePx > W - 34);
     this.q('.vt-span').textContent = this.dur0 ? this.fmt(this.start) + '–' + this.fmt(this.end) + ' с' : '';
     this.q('.at-len').textContent = this.dur0 ? this.fmt(this.dur0) + ' с' : '—';
     this.q('.vt-a').value = this.fmt(this.start).replace(',', '.');
