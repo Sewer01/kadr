@@ -1445,6 +1445,7 @@ body.dropping::after{content:'Отпустите — программа разл
     <section class="view" id="view-upfile">
       <div class="head"><div><h1>Улучшение видео или фото</h1><p>Любой ваш файл, не обязательно сделанный в программе</p></div></div>
       <div class="card" style="max-width:760px">
+        <div class="card-h"><h3><span class="n">1</span>Файл</h3><span class="hint">видео или фото до 300 МБ</span></div>
         <label id="upDrop" class="upfile-drop" style="display:grid;place-items:center;gap:6px;min-height:200px;border:2px dashed var(--line-2);border-radius:16px;cursor:pointer;text-align:center;padding:24px">
           <input type="file" id="upFile" accept="video/*,image/*" hidden>
           <div style="font-size:42px">⬆</div>
@@ -1452,6 +1453,10 @@ body.dropping::after{content:'Отпустите — программа разл
           <div class="hint">Файл до 300 МБ. Дальше выберите способ: быстро или качественнее.</div>
         </label>
         <div id="upInfo" hidden style="margin-top:14px"></div>
+      </div>
+      <div class="card" id="upParamsCard" style="max-width:760px" hidden>
+        <div class="card-h"><h3><span class="n">2</span>Параметры</h3><span class="hint" id="upKind"></span></div>
+        <div id="upParams"></div>
       </div>
     </section>
     <section class="view" id="view-swap"></section>
@@ -4617,20 +4622,35 @@ $('#resApply').onclick = async () => { try { resLoad(await postJSON('/api/result
 $('#resBackfill').onclick = async () => { $('#resBackfill').disabled = true; try { const r = await postJSON('/api/results/backfill'); resLoad(r); toast(`Скопировано файлов: ${r.copied}`); } catch (err) { toast(err.message); } };
 $('#resClean').onclick = async () => { if (!confirm('Убрать из Библиотеки записи, у которых нет файла? Файлы на диске не затрагиваются.')) return; try { const r = await postJSON('/api/results/clean'); resLoad(r); toast(`Убрано записей: ${r.removed}`); const items = await (await fetch('/api/library')).json(); LIB.length = 0; items.forEach(it => LIB.push(normItem(it))); renderLib(); } catch (err) { toast(err.message); } };
 if (API) resLoad();
-// «Увеличение видео и фото»: any file of the user, not only the ones made in the program
+// «Ретушь»: any file of the user, not only the ones made in the program
+let UP_FILE = null;
+function upClear() {
+  UP_FILE = null;
+  $('#upInfo').hidden = true; $('#upInfo').innerHTML = '';
+  $('#upParamsCard').hidden = true; $('#upParams').innerHTML = '';
+  $('#upDrop').hidden = false;
+}
 function upPick(f) {
   if (!f) return;
   const isVid = f.type.startsWith('video/'), isImg = f.type.startsWith('image/');
   if (!isVid && !isImg) { toast('Нужен файл видео или изображения'); return; }
   if (f.size > 300 * 1048576) { toast('Файл больше 300 МБ: уменьшите или обрежьте его'); return; }
+  UP_FILE = f;
   const info = $('#upInfo'); info.hidden = false; info.innerHTML = `<span class="hint">Читаем файл «${esc(f.name)}»…</span>`;
   const url = URL.createObjectURL(f), el = document.createElement(isVid ? 'video' : 'img');
   const done = (w, h, len) => {
     const it = { kind: isVid ? 'video' : 'image', res: w ? `${w}×${h}` : '', len: len || 0, prompt: '' };
-    info.innerHTML = `<div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap"><div><div style="font-size:16px;font-weight:800;color:#3fd18b">✓ Файл загружен</div><div style="word-break:break-all"><b>${esc(f.name)}</b></div><div class="hint">${isVid ? 'Видео' : 'Изображение'}${w ? ` · ${w}×${h}` : ''}${len ? ` · ${len.toFixed(1)} с` : ''} · ${(f.size / 1048576).toFixed(1)} МБ</div></div>`
-      + `<button class="btn pri" id="upGo" type="button" style="padding:10px 18px">Выбрать способ увеличения</button></div>`;
-    $('#upGo').onclick = () => openUpscale(it, f);
-    openUpscale(it, f);
+    // the file becomes a chip with a cross, and the settings appear under it - on the same page
+    info.innerHTML = `<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:9px 11px;border:1px solid var(--line-2);border-radius:12px;background:var(--bg-2)">
+      <b style="max-width:320px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(f.name)}</b>
+      <span class="hint">${it.res || 'размер не читается'}${it.len ? ' · ' + (Math.round(it.len * 10) / 10) + ' с' : ''} · ${Math.round(f.size / 1048576 * 10) / 10} МБ</span>
+      <button class="btn mini" type="button" id="upClearBtn" title="Убрать файл и начать заново">✕ Убрать</button></div>`;
+    $('#upClearBtn').onclick = upClear;
+    $('#upDrop').hidden = true;
+    $('#upKind').textContent = it.kind === 'image' ? 'настроки для изображения' : 'настроки для видео';
+    const card = $('#upParamsCard'), box = $('#upParams');
+    card.hidden = false; box.innerHTML = '<span class="hint">Смотрим, какие способы доступны на вашей видеокарте…</span>';
+    openUpscale(it, f, box).catch(err => { box.innerHTML = '<span class="hint" style="color:var(--pink)">' + esc(err.message) + '</span>'; });
   };
   if (isVid) { el.muted = true; el.preload = 'metadata'; el.onloadedmetadata = () => { done(el.videoWidth, el.videoHeight, el.duration); URL.revokeObjectURL(url); }; el.onerror = () => { info.innerHTML = `<span style="color:var(--pink)">Не получилось открыть «${esc(f.name)}» (необычный формат или кодек). Сохраните как обычный MP4 (H.264) и загрузите снова.</span>`; }; }
   else { el.onload = () => { done(el.naturalWidth, el.naturalHeight, 0); URL.revokeObjectURL(url); }; el.onerror = () => { info.innerHTML = `<span style="color:var(--pink)">Не получилось открыть изображение «${esc(f.name)}».</span>`; }; }
@@ -9172,20 +9192,27 @@ $('#mlist').addEventListener('click', async e => {
 
 /* ---------- improve quality of a finished video (SeedVR2) ---------- */
 $('#vwUp').onclick = () => openUpscale((byId(openId) || openItem));
-async function openUpscale(it, file) {   // `file`: any file of the user (not from the Library)
+async function openUpscale(it, file, into) {   // `file`: the person's own file; `into`: draw into a card on the page
   if (!it) return;
   const st = await (await fetch('/api/status')).json();
   const have = (st.modes || []).includes('upscale') && !(st.models || []).some(m => m.role.startsWith('seedvr') && !m.have);
   const relayNodes = st.relay_ok !== false;   // the ComfyUI build itself must know the RelayVSR nodes
   const haveRelay = relayNodes && (st.modes || []).includes('relayvsr') && !(st.models || []).some(m => m.role.startsWith('relayvsr') && !m.have);
-  let m = $('#upMenu');
-  if (!m) { m = document.createElement('div'); m.className = 'modal'; m.id = 'upMenu'; document.body.append(m); }
-  m.hidden = false;
+  const inline = !!into;          // on the page the person sees the file AND the settings at once, and can say no
+  let m = null;
+  if (!inline) {                  // the empty overlay must not exist when the controls live on the page
+    m = $('#upMenu');
+    if (!m) { m = document.createElement('div'); m.className = 'modal'; m.id = 'upMenu'; document.body.append(m); }
+    m.hidden = false;
+  }
+  const host = into || m;
   const [w, h] = (it.res || '').split('×').map(Number), secs = it.len || 5;
   const est = sc => (w && h ? (w * sc) * (h * sc) / 1048576 : 1.4) * (it.kind === 'image' ? 1 : Math.round(secs * 24)) * 3.24;  // seconds, measured on an RTX 4060 Ti 16 GB
   const opt = (k, name) => { const out = w ? `${Math.round(w * k / 2) * 2}×${Math.round(h * k / 2) * 2}` : '';
     return `<button class="btn up-s" data-k="${k}" type="button">${name}${out ? ` · ${out}` : ''}<small style="display:block;opacity:.7">примерно ${fmtTime(est(k))} на видеокарте уровня RTX 4060 Ti, у слабой — дольше</small></button>`; };
-  m.innerHTML = `<div class="box" style="padding:20px;max-width:460px"><div class="card-h"><h3>${it.kind === 'image' ? 'Увеличить изображение' : 'Увеличить видео'}</h3><button class="btn" data-x type="button">Закрыть</button></div>`
+  const BOX_HEAD = `<div class="box" style="padding:20px;max-width:460px"><div class="card-h"><h3>${it.kind === 'image' ? 'Увеличить изображение' : 'Увеличить видео'}</h3><button class="btn" data-x type="button">Закрыть</button></div>`;
+  const HEAD = `<div class="hint" style="margin-bottom:10px">${it.kind === 'image' ? 'Изображение' : 'Видео'} ${esc(it.res || '')}${it.len ? ' · ' + Math.round(it.len) + ' с' : ''}. Готовый файл появится в Библиотеке отдельно, исходный не изменится.</div>`;
+  const body = (inline ? HEAD : '')
     + (it.kind === 'image'
       ? `<div class="note"><span>Изображение станет крупнее и чётче (с деталями). Это занимает от десятков секунд до нескольких минут. Задание пойдёт в очередь, а готовое изображение появится в Библиотеке отдельным файлом, исходная останется.</span></div>`
       : `<div class="note"><span>Видео станет крупнее и чётче, звук останется прежним. Это долго: от нескольких минут до часа на видео. Задание пойдёт в очередь, вы можете заниматься другим, а готовое видео появится в Библиотеке отдельным файлом. Если ждать не хочется — просто закройте это окно.</span></div>`)
@@ -9205,19 +9232,20 @@ async function openUpscale(it, file) {   // `file`: any file of the user (not fr
         return `<div style="display:grid;gap:10px;margin-top:14px"><button class="btn pri up-s" data-k="2k" data-m="soft2k" type="button">До 2К, мягко${tw ? ` · ${tw}×${th}` : ''}<small style="display:block;opacity:.8">добавляет чёткость, но без «цифровой» резкости; быстро</small></button></div>`; })() : '')
     + (have ? `<label style="display:block;font-size:13px;margin-top:10px"><b>Чёткость: <span id="upSharpV">100</span>%</b> <span class="hint">меньше — мягче, ближе к обычному увеличению; 100 — как есть</span><input type="range" id="upSharp" min="0" max="100" step="5" value="100" style="width:100%"></label><div style="display:grid;gap:10px;margin-top:14px">${opt(1.5, (it.kind === 'image' ? 'Чётче (SeedVR2): ' : '') + 'Увеличить в 1,5 раза')}${opt(2, (it.kind === 'image' ? 'Чётче (SeedVR2): ' : '') + 'Увеличить в 2 раза')}</div>`
       : (`<div class="hint" style="margin:14px 0">Для этого нужна модель SeedVR2 (около 4 ГБ). ${st.engine === 'managed' ? 'Нажмите, чтобы скачать, и вернитесь сюда.' : 'Если файлов seedvr2_3b_int8_convrot и seedvr2_ema_vae_fp16 нет в вашем ComfyUI, положите их в его папки моделей.'}</div>`
-        + (st.engine === 'managed' ? '<button class="btn pri" data-dl type="button">Скачать модель</button>' : ''))) + '</div>';
-  m.oninput = e => { if (e.target.id === 'upDetail') $('#upDetailV', m).textContent = e.target.value; if (e.target.id === 'upSharp') $('#upSharpV', m).textContent = e.target.value; };
-  m.onclick = async e => {
-    if (e.target === m || e.target.closest('[data-x]')) { m.hidden = true; return; }
+        + (st.engine === 'managed' ? '<button class="btn pri" data-dl type="button">Скачать модель</button>' : '')));
+  host.innerHTML = inline ? body : BOX_HEAD + body + '</div>';
+  host.oninput = e => { if (e.target.id === 'upDetail') $('#upDetailV', host).textContent = e.target.value; if (e.target.id === 'upSharp') $('#upSharpV', host).textContent = e.target.value; };
+  host.onclick = async e => {
+    if (!inline && (e.target === m || e.target.closest('[data-x]'))) { m.hidden = true; return; }
     if (e.target.closest('[data-dl]')) {
-      m.hidden = true; closeViewer();
+      if (!inline) m.hidden = true; closeViewer();
       if (!setupInfo) setupInfo = await (await fetch('/api/setup/info')).json();
       const c = setupInfo.config;
       try { await postJSON('/api/setup/install', { install_dir: c.install_dir, models_dir: c.models_dir || '', add_mode: e.target.closest('[data-dl]').dataset.dl || 'upscale' }); goTo('models'); showSetupPane('progress'); setStep(2); resetProgress(); } catch (err) { toast(err.message); }
       return;
     }
     const b = e.target.closest('.up-s'); if (!b) return;
-    const detail = ($('#upDetail', m) ? +$('#upDetail', m).value : 70) / 100, sharp = ($('#upSharp', m) ? +$('#upSharp', m).value : 100) / 100;
+    const detail = ($('#upDetail', host) ? +$('#upDetail', host).value : 70) / 100, sharp = ($('#upSharp', host) ? +$('#upSharp', host).value : 100) / 100;
     try {
       let r;
       if (file) {
@@ -9230,7 +9258,10 @@ async function openUpscale(it, file) {   // `file`: any file of the user (not fr
         r = j;
       } else r = await postJSON('/api/upscale', { id: it.id, scale: b.dataset.k, method: b.dataset.m || '', engine: b.dataset.e || '', detail, sharp });
       qAdd(r.prompt_id, 'upscale', it.prompt || 'Увеличение');
-      m.hidden = true; closeViewer(); toast(`Задание в очереди: готовая ${it.kind === 'image' ? 'изображение' : 'видео'} появится в Библиотеке`); goTo('queue');
+      if (!inline) m.hidden = true; closeViewer();
+      toast(`Задание в очереди: готовая ${it.kind === 'image' ? 'изображение' : 'видео'} появится в Библиотеке`);
+      if (inline) upClear();
+      goTo('queue');
     } catch (err) { toast(err.message); }
   };
 }
@@ -11376,10 +11407,12 @@ if (e.target.closest('.mt-clear')) {
       B('Много правок', 'лучше по одной: так лицо и одежда не уплывают.'),
     ]),
     upfile: () => H('<b>Ретушь - улучшение видео или фото</b>') + UL([
-      B('Файл', 'видео или фото, которое нужно вытянуть.'),
-      B('Степень', '"быстро" - картинки уменьшаются; "максимум" - лучшее сходство, дольше.'),
-      B('Лицо', 'отдельная обработка лица: включайте, когда в кадре крупно человек.'),
-      B('Результат', 'кладётся в Библиотеку как новый файл, исходный не меняется.'),
+      B('Файл', 'перетащите видео или фото в верхнее окно (до 300 МБ). Под ним появится карточка с именем, размером и длиной - крестик «✕ Убрать» возвращает всё назад, файл при этом не тронут.'),
+      B('Параметры', 'появляются под файлом и зависят от него: для фото - «До 2К, мягко», «Чёткость» и увеличение в 1,5 или 2 раза; для видео - «Быстро (RelayVSR)» и «Качественнее (SeedVR2)».'),
+      B('«Детали» (у быстрого видео)', 'меньше - мягче и без пересвеченных лиц, больше - резче. Обычно 70%.'),
+      B('«Чёткость»', 'меньше - ближе к обычному увеличению, 100 - как есть.'),
+      B('Кнопка способа', 'отправляет задание в очередь; рядом написано, сколько примерно это займёт. Скорость считана на RTX 4060 Ti, на более слабой карте будет дольше.'),
+      B('Результат', 'новый файл в Библиотеке; ваш исходный файл не меняется.'),
     ]),
     montage: () => H('<b>Монтаж - склейка готовых клипов</b>') + UL([
       B('Клик по клипу сверху', 'кладёт его в ленту; повторный клик убирает.'),
