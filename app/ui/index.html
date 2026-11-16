@@ -1123,8 +1123,8 @@ body.dropping::after{content:'Отпустите — программа разл
     .vtrim{display:grid;gap:8px;padding:10px;border:1px solid var(--line-2);border-radius:12px;background:var(--surface-2)}
     .vt-view{width:100%;max-height:230px;border-radius:10px;background:#000;object-fit:contain}
     .vt-body{display:grid;gap:8px}
-    .vt-strip{position:relative;height:86px;border-radius:9px;overflow:hidden;background:#0c0f14;cursor:text;
-      border:1px solid var(--line-2);touch-action:none}
+    .vt-stripwrap{overflow:hidden;border-radius:9px;border:1px solid var(--line-2);background:#0c0f14}
+    .vt-strip{position:relative;height:86px;cursor:text;touch-action:none;min-width:100%}
     .vt-cv{display:block;width:100%;height:86px}
     .vt-sel{position:absolute;top:0;bottom:0;border-left:2px solid var(--accent);border-right:2px solid var(--accent);
       background:rgba(255,255,255,.06);box-shadow:0 0 0 9999px rgba(0,0,0,.42)}
@@ -1136,6 +1136,43 @@ body.dropping::after{content:'Отпустите — программа разл
     .vt-time{font-size:12px;opacity:.8;margin-left:auto}
     .vt-acts{display:flex;gap:8px;flex-wrap:wrap}
     .ra-row>.token[data-j]{cursor:pointer}
+
+    /* the marker carries the arrows and the scissors: they belong to the place, not to a row below */
+    .vt-ph{display:block}
+    .vt-arrows,.vt-scissors{position:absolute;top:-2px;display:flex;gap:2px}
+    .vt-arrows{right:6px;transform:translateX(-100%)}
+    .vt-scissors{left:6px}
+    .vt-ph.near-left .vt-scissors{left:auto;right:6px;transform:translateX(-100%)}
+    .vt-b{background:rgba(0,0,0,.72);color:#fff;border:1px solid var(--line-2);border-radius:6px;
+      width:22px;height:20px;line-height:1;font-size:10px;display:grid;place-items:center;cursor:pointer}
+    .vt-b:hover{background:var(--accent);border-color:var(--accent)}
+    .vt-span{position:absolute;top:2px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.7);
+      color:#fff;border-radius:6px;padding:1px 6px;font-size:11px;white-space:nowrap}
+    .vt-x{position:absolute;right:3px;top:2px;background:rgba(0,0,0,.6);color:#fff;border:0;border-radius:6px;
+      width:20px;height:18px;font-size:11px;line-height:1;cursor:pointer}
+    .vt-x:hover{background:#c0303f}
+    .vt-sel{display:block}
+    .vt-strip.narrow .vt-span,.vt-strip.narrow .vt-x{display:none}
+    .vt-pp{font-size:12px;opacity:.8}
+    .mt-scale span:first-child{font-size:12px;opacity:.8}
+
+    /* the marker carries the arrows and the scissors: they belong to the place, not to a row below */
+    .vt-arrows,.vt-scissors{position:absolute;top:-2px;display:flex;gap:2px;z-index:4}
+    .vt-arrows{right:7px}
+    .vt-scissors{left:7px}
+    .vt-ph.near-left .vt-scissors{left:auto;right:7px}
+    .vt-ph.near-right .vt-arrows{right:auto;left:7px}
+    .vt-b{background:rgba(0,0,0,.74);color:#fff;border:1px solid var(--line-2);border-radius:6px;
+      min-width:22px;height:20px;line-height:1;font-size:10px;display:grid;place-items:center;cursor:pointer;padding:0 4px}
+    .vt-b:hover{background:var(--accent);border-color:var(--accent)}
+    .vt-span{position:absolute;top:2px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.72);
+      color:#fff;border-radius:6px;padding:1px 6px;font-size:11px;white-space:nowrap;pointer-events:none}
+    .vt-x{position:absolute;right:3px;top:2px;background:rgba(0,0,0,.6);color:#fff;border:0;border-radius:6px;
+      width:20px;height:18px;font-size:11px;line-height:1;cursor:pointer;z-index:4}
+    .vt-x:hover{background:#c0303f}
+    .vt-strip.narrow .vt-span,.vt-strip.narrow .vt-x{display:none}
+    .vt-pp{font-size:12px;opacity:.8}
+    .sw-bench{margin-top:10px}
 </style>
 </head>
 <body>
@@ -3330,86 +3367,104 @@ aDrop.addEventListener('drop', e => { e.preventDefault(); aDrop.classList.remove
    it. Cutting is done by the program itself (a real decoder), because a browser cannot cut what it did not
    encode, and a cut on keyframes alone would leave a frozen start exactly where the clip should begin. */
 class VideoTrimmer {
+  /* One bench for any single clip: the film strip with frames, a marker you can step frame by frame,
+     scissors sitting ON the timeline next to the marker, and a zoom that only changes how wide the strip
+     is - so a second of film always stays readable. The player above the strip stands on the marker and
+     shows it as a still: choosing the exact frame is the whole point of the bench.
+     It is written to be mounted anywhere (the «Референс-видео» card, the swap mode, and later the
+     montage), so it knows nothing about tiles: it takes a file and gives a file back. */
   constructor(o = {}) {
     this.o = o;
-    this.limit = o.limit || 25;                       // the model does not look further than this
+    this.limit = o.limit || 25;                       // seconds: the model does not look further
+    this.fps = o.fps || 24;                           // the frame step, as in the montage strip
     this.onFile = o.onFile || (() => {});
+    this.onWhole = o.onWhole || (() => {});
     this.say = o.onNotice || (m => toast(m));
     this.whereLabel = o.whereLabel || null;
     this.dur0 = 0; this.start = 0; this.end = 0; this.t = 0;
-    this.zoom = 1; this.win0 = 0; this.win1 = 0;
+    this.pps = 0;                                     // pixels per second: 0 means "fit the window"
+    try { const p = +localStorage.getItem('h3-vt-px'); if (p >= 10 && p <= 300) this.pps = p; } catch (e) {}
     this.cut = null; this.undo = []; this.file = null; this.url = ''; this.busy = false;
-    this.name = ''; this.frames = []; this.raf = 0;
-    this.el = document.createElement('div'); this.el.className = 'vtrim';
+    this.name = ''; this.frames = []; this.raf = 0; this.narrow = false;
+    // the root carries atrim as well: the marks, the names and the hint are styled there, and a second
+    // copy of those rules would only start disagreeing with the first one later
+    this.el = document.createElement('div'); this.el.className = 'atrim vtrim';
     this.el.innerHTML =
       '<div class="at-top"><button class="btn mini vt-play" type="button" title="Показать выбранное">&#9654;</button>' +
       '<div class="at-name">видео не загружено</div><div class="at-len">—</div></div>' +
       '<div class="vt-body" hidden>' +
       '<video class="vt-view" muted playsinline preload="auto"></video>' +
-      '<div class="vt-strip"><canvas class="vt-cv" height="86"></canvas>' +
-      '<div class="vt-sel"><i class="at-h" data-h="l"></i><i class="at-h" data-h="r"></i></div>' +
-      '<div class="vt-ph" title="маркер времени: от него режут ножницы"></div></div>' +
-      '<div class="vt-sc"><button class="btn mini vt-cutl" type="button" title="Всё, что левее маркера, убрать">✂ убрать до маркера</button>' +
-      '<button class="btn mini vt-cutr" type="button" title="Всё, что правее маркера, убрать">убрать после маркера ✂</button>' +
-      '<span class="vt-time hint"></span></div>' +
+      '<div class="vt-stripwrap"><div class="vt-strip">' +
+      '<canvas class="vt-cv" height="86"></canvas>' +
+      '<div class="vt-sel"><span class="vt-span"></span>' +
+      '<i class="at-h" data-h="l"></i><i class="at-h" data-h="r"></i>' +
+      '<button class="vt-x" type="button" title="Убрать клип из монтажа">✕</button></div>' +
+      '<div class="vt-ph"><span class="vt-arrows">' +
+      '<button class="vt-b" data-s="back" type="button" title="Кадр назад">&#9664;</button>' +
+      '<button class="vt-b" data-s="fwd" type="button" title="Кадр впер">&#9654;</button></span>' +
+      '<span class="vt-scissors">' +
+      '<button class="vt-b" data-s="left" type="button" title="Убрать всё до маркера">&#9986;</button>' +
+      '<button class="vt-b" data-s="right" type="button" title="Убрать всё после маркера">&#9986;</button></span>' +
+      '</div></div></div>' +
+      '<div class="mt-scale"><span>Шире лента - точнее кадр:</span>' +
+      '<input type="range" class="vt-zr" min="10" max="300" step="5" value="0">' +
+      '<span class="vt-pp">по ширине окна</span>' +
+      '<button class="btn mini vt-zm" type="button" title="Сжать ленту">−</button>' +
+      '<button class="btn mini vt-zp" type="button" title="Растянуть ленту">+</button>' +
+      '<button class="btn mini vt-fit" type="button" title="Чтобы весь клип влез в окно">По ширине</button></div>' +
       '<div class="at-hint"></div>' +
-      '<div class="at-zoom"><span>Резать удобнее с приближением:</span><button class="btn mini vt-zm" type="button">−</button>' +
-      '<input type="range" class="at-zr vt-zr" min="1" max="20" step="1" value="1"><button class="btn mini vt-zp" type="button">+</button>' +
-      '<span class="vt-zl">весь клип</span><button class="btn mini vt-z0" type="button">Весь клип</button></div>' +
+      '<div class="mt-trim"><span class="tt-what">Обрезка</span>' +
+      '<label>с <input type="number" class="vt-a" step="0.1" min="0" value="0"> с</label>' +
+      '<label>до <input type="number" class="vt-b2" step="0.1" min="0" value="0"> с</label>' +
+      '<span class="vt-left"></span><button class="btn mini vt-reset" type="button" disabled>Вернуть целый</button></div>' +
       '<div class="vt-acts"><button class="btn pri vt-keep" type="button" disabled>Оставить выбранное</button>' +
       '<button class="btn vt-und" type="button" disabled>Отменить</button>' +
-      '<button class="btn vt-reset" type="button" disabled>Вернуть целиком</button></div></div>';
+      '<button class="btn vt-ag" type="button" disabled title="Агент посмотрит на клип как на кадры">🤖 В агент</button></div>' +
+      '</div>';
     this._wire();
     if (o.mount) this.mount(o.mount);
   }
   mount(el) { el.append(this.el); return this; }
   q(s) { return this.el.querySelector(s); }
   len() { return Math.max(0, this.end - this.start); }
-  view() {                                   // what the strip shows: the whole clip or a piece around the marks
-    if (this.zoom <= 1) { this.win0 = 0; this.win1 = this.dur0; return; }
-    const span = Math.max(0.4, this.dur0 / this.zoom);
-    // zoom in where the person is looking: the marker, or the middle of what is left selected
-    const c = (this.t > this.start && this.t < this.end) ? this.t : (this.start + this.end) / 2;
-    let a = c - span / 2, b = c + span / 2;
-    if (a < 0) { b -= a; a = 0; }
-    if (b > this.dur0) { a -= (b - this.dur0); b = this.dur0; }
-    this.win0 = Math.max(0, a); this.win1 = b;
-  }
-  tAt(frac) { return this.win0 + (this.win1 - this.win0) * Math.min(1, Math.max(0, frac)); }
-  fracAt(t) { return (this.win1 - this.win0) > 0 ? (t - this.win0) / (this.win1 - this.win0) : 0; }
-  _push() { this.undo.push({ s: this.start, e: this.end, cut: this.cut }); if (this.undo.length > 20) this.undo.shift(); this.q('.vt-und').disabled = false; }
+  fmt(x) { return (Math.round(x * 10) / 10 + '').replace('.', ','); }
+  stripW() { return this.pps ? Math.max(80, this.dur0 * this.pps) : 0; }   // 0 = as wide as the window
+  _push() { this.undo.push({ s: this.start, e: this.end, cut: this.cut, t: this.t }); if (this.undo.length > 20) this.undo.shift(); this.q('.vt-und').disabled = false; }
   setFile(f, silent) {
     if (!f) { this.clear(); return; }
     this.file = f; this.name = f.name;
     if (this.url) URL.revokeObjectURL(this.url);
     this.url = URL.createObjectURL(f);
     const v = this.q('.vt-view');
-    v.src = this.url;
     this.el.hidden = false;
     this.q('.vt-body').hidden = false;
     this.q('.at-name').textContent = f.name;
+    // without this the player never learns anything: the marks, the strip and the scissors all wait here
     v.onloadedmetadata = () => {
       this.dur0 = v.duration || 0;
       this.start = 0; this.end = this.dur0; this.t = 0; this.cut = null; this.undo = [];
-      this.view(); this._thumbs(); this._sync();
+      this.pps = 0; this.q('.vt-zr').value = 0;
+      this._thumbs(); this._sync(); this._still();
       if (!silent) this.out();
     };
     v.onerror = () => this.say('Браузер не может показать это видео - для резки оно всё равно подойдёт, если декодер его читает');
+    v.src = this.url;
+    try { v.load(); } catch (e) {}
     return this;
   }
   clear() {
     this.stop();
     if (this.url) URL.revokeObjectURL(this.url);
     this.url = ''; this.file = null; this.frames = [];
-    this.dur0 = 0; this.start = this.end = this.t = 0; this.cut = null; this.zoom = 1; this.undo = [];
+    this.dur0 = 0; this.start = this.end = this.t = 0; this.cut = null; this.pps = 0; this.undo = [];
     this.q('.at-name').textContent = 'видео не загружено';
     this.q('.at-len').textContent = '—';
     this.q('.vt-body').hidden = true;
   }
-  async _thumbs() {                           // a strip of frames: without them the bench is blind
-    const v = this.q('.vt-view'), n = 12;
+  async _thumbs() {                            // frames across the whole strip: the bench must not be blind
+    const v = this.q('.vt-view'), n = 16;
     this.frames = new Array(n).fill(null);
-    if (v.readyState < 2) {                   // a fresh file has no decodable frame yet
+    if (v.readyState < 2) {
       await new Promise(res => {
         let to = 0;
         const done = () => { clearTimeout(to); v.removeEventListener('loadeddata', done); res(); };
@@ -3417,9 +3472,10 @@ class VideoTrimmer {
         v.addEventListener('loadeddata', done);
       });
     }
+    const was = v.currentTime;
     for (let i = 0; i < n; i++) {
       const tt = Math.min(Math.max(0, this.dur0 - 0.05), this.dur0 * (i + 0.5) / n);
-      // every seek gets its own deadline: one frame the browser refuses to give must not stop the strip
+      // every seek gets its own deadline: one frame the browser refuses must not stop the whole strip
       await new Promise(res => {
         let done = false;
         const finish = () => { if (done) return; done = true; clearTimeout(to); v.onseeked = null; res(); };
@@ -3429,13 +3485,15 @@ class VideoTrimmer {
       });
       try {
         const c = document.createElement('canvas');
-        c.width = 120; c.height = Math.max(24, Math.round(120 * (v.videoHeight || 9) / (v.videoWidth || 16)));
+        c.width = 140; c.height = Math.max(28, Math.round(140 * (v.videoHeight || 9) / (v.videoWidth || 16)));
         c.getContext('2d').drawImage(v, 0, 0, c.width, c.height);
         this.frames[i] = c;
       } catch (e) { this.frames[i] = null; }
-      this._paint();                          // the strip fills in front of the person's eyes
+      this._paint();
     }
     v.onseeked = null;
+    try { v.currentTime = this.t; } catch (e) {}
+    this._paint();
   }
   _paint() {
     const cv = this.q('.vt-cv'); if (!cv || !this.dur0) return;
@@ -3444,138 +3502,222 @@ class VideoTrimmer {
     const g = cv.getContext('2d');
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
     g.clearRect(0, 0, cssW, 86);
-    const span = this.win1 - this.win0;
-    if (!this.frames.filter(Boolean).length) {        // frames are still coming: paint a ruler, not a void
+    if (!this.frames.filter(Boolean).length) {         // frames are still coming: a grid is honest, a void is not
       g.fillStyle = '#151a21'; g.fillRect(0, 0, cssW, 86);
-      g.strokeStyle = 'rgba(255,255,255,.10)';
-      for (let x = 0; x < cssW; x += 28) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x, 86); g.stroke(); }
       g.fillStyle = 'rgba(255,255,255,.45)'; g.font = '11px system-ui';
-      g.fillText('кадры ещё читаются…', 8, 20);
+      g.fillText('кадры ещё читаются…', 8, 18);
     }
+    const n = this.frames.length || 1;
     this.frames.forEach((im, i) => {
-      const tt = this.dur0 * (i + 0.5) / this.frames.length;
-      const x = this.fracAt(tt) * cssW, cw = cssW / Math.max(1, this.frames.length) * (this.dur0 / span);
-      if (x + cw < 0 || x > cssW || !im) return;
+      if (!im) return;
+      const x = cssW * i / n, cw = cssW / n;
       g.drawImage(im, x, 0, cw + 1, 86);
-      g.fillStyle = 'rgba(0,0,0,.45)'; g.fillRect(x + cw - 1, 0, 1, 86);
+      g.fillStyle = 'rgba(0,0,0,.5)'; g.fillRect(x + cw - 1, 0, 1, 86);
     });
-    // the ruler: seconds, denser when zoomed
-    g.fillStyle = 'rgba(255,255,255,.65)'; g.font = '10px system-ui'; g.strokeStyle = 'rgba(255,255,255,.25)';
-    const step = span > 40 ? 10 : span > 16 ? 5 : span > 6 ? 2 : 1;
-    for (let s2 = Math.ceil(this.win0 / step) * step; s2 <= this.win1; s2 += step) {
-      const x = this.fracAt(s2) * cssW;
-      g.beginPath(); g.moveTo(x, 74); g.lineTo(x, 86); g.stroke();
-      g.fillText(String(s2), x + 2, 84);
+    // the ruler under the frames: how many seconds fit depends on the strip width
+    const span = this.dur0, pps = cssW / span;
+    const step = span / (cssW / 70) > 4 ? 5 : span / (cssW / 70) > 1.6 ? 2 : 1;
+    g.font = '10px system-ui';
+    for (let s2 = 0; s2 <= span + .001; s2 += step) {
+      const x = s2 * pps;
+      g.fillStyle = 'rgba(255,255,255,.85)'; g.fillRect(x, 78, 1, 8);
+      g.fillStyle = 'rgba(255,255,255,.7)';
+      g.fillText(Math.round(s2) + ' с', Math.min(cssW - 26, x + 3), 76);
     }
   }
   _sync() {
-    this.view(); this._paint();
+    const strip = this.q('.vt-strip'), wrap = this.q('.vt-stripwrap');
+    const wpx = this.stripW();
+    strip.style.width = wpx ? wpx + 'px' : '100%';
+    wrap.style.overflowX = wpx ? 'auto' : 'hidden';
+    this.narrow = !!wpx && wpx > (wrap.clientWidth || 99999);
+    strip.classList.toggle('narrow', this.narrow);     // when the strip is wider than the window the
     const sel = this.q('.vt-sel'), ph = this.q('.vt-ph');
-    const cl = x => Math.min(1, Math.max(0, x));        // when zoomed, the marks stand outside the window
-    const a = cl(this.fracAt(this.start)), b = cl(this.fracAt(this.end));
-    sel.style.left = (a * 100) + '%';
-    sel.style.width = (Math.max(0, b - a) * 100) + '%';
+    sel.style.left = (this.start / this.dur0 * 100) + '%';
+    sel.style.width = (Math.max(0, this.len()) / this.dur0 * 100) + '%';
     sel.hidden = !this.dur0;
-    ph.style.left = (cl(this.fracAt(this.t)) * 100) + '%';
+    ph.style.left = (this.t / this.dur0 * 100) + '%';
     ph.hidden = !this.dur0;
-    this.q('.at-len').textContent = this.dur0 ? Math.round(this.dur0 * 10) / 10 + ' с' : '—';
-    this.q('.vt-time').textContent = 'маркер ' + (Math.round(this.t * 10) / 10 + '').replace('.', ',') + ' с · выбрано ' +
-      (Math.round(this.len() * 10) / 10 + '').replace('.', ',') + ' с';
+    // the montage taught this too: at the very beginning the buttons jump to the other side
+    const fr = this.dur0 ? this.t / this.dur0 : 0;
+    ph.classList.toggle('near-left', fr < .12);
+    ph.classList.toggle('near-right', fr > .88);
+    this.q('.vt-span').textContent = this.dur0 ? this.fmt(this.start) + '–' + this.fmt(this.end) + ' с' : '';
+    this.q('.at-len').textContent = this.dur0 ? this.fmt(this.dur0) + ' с' : '—';
+    this.q('.vt-a').value = this.fmt(this.start).replace(',', '.');
+    this.q('.vt-b2').value = this.fmt(this.end).replace(',', '.');
     const over = this.len() > this.limit + .1;
-    this.q('.at-hint').innerHTML = this.cut ? 'Разрезано: в расчёт пойдёт кусок ' + (Math.round(this.len() * 10) / 10 + '').replace('.', ',') + ' с - оригинал цел, можно резать ещё.'
-      : over ? '<b style="color:var(--pink)">Выбрано длиннее ' + this.limit + ' с - референс-видео дальше модель не смотрит.</b>' : '';
+    this.q('.vt-left').innerHTML = this.dur0
+      ? 'в монтаже останется <b>' + this.fmt(this.len()) + ' с</b> из ' + this.fmt(this.dur0) + ' с' +
+        (over ? ' · <b style="color:var(--pink)">дальше ' + this.limit + ' с модель не смотрит</b>' : '')
+      : '';
+    this.q('.at-hint').textContent = this.cut ? 'Разрезано: в дело пойдёт кусок ' + this.fmt(this.len()) +
+      ' с - оригинал цел, можно резать ещё.' : '';
     this.q('.vt-keep').disabled = !this.dur0 || this.busy;
     this.q('.vt-reset').disabled = !this.cut;
-    this.q('.vt-zl').textContent = this.zoom <= 1 ? 'весь клип' : 'кусок ' + (Math.round((this.win1 - this.win0) * 10) / 10 + '').replace('.', ',') + ' с';
-    const zr = this.q('.vt-zr'); zr.value = this.zoom; if (typeof paintRange === 'function') paintRange(zr);
+    this.q('.vt-ag').disabled = !this.dur0;
+    const zr = this.q('.vt-zr');
+    zr.value = this.pps || 0;
+    if (typeof paintRange === 'function') paintRange(zr);
+    this.q('.vt-pp').textContent = this.pps ? Math.round(this.pps) + ' px/с' : 'по ширине окна';
+    this._paint();
   }
-  _setZoom(v) { this.zoom = Math.min(20, Math.max(1, v)); this._sync(); }
-  play() {
+  _still() {                                  // the player stands on the marker and shows it as a still
     const v = this.q('.vt-view');
-    v.currentTime = this.start;
+    if (!this.dur0) return;
+    this.stop();
+    try { v.currentTime = Math.min(this.dur0 - 0.04, this.t); } catch (e) {}
+  }
+  _step(dir, n) {                             // one frame at a time - that is what the arrows are for
+    const dt = (n || 1) / this.fps;
+    this.t = Math.min(this.dur0, Math.max(0, this.t + dir * dt));
+    this._sync(); this._still();
+  }
+  _play(from, to) {
+    const v = this.q('.vt-view');
+    if (!this.dur0) return;
+    v.currentTime = from;
     v.play().catch(() => {});
     cancelAnimationFrame(this.raf);
     const step = () => {
       this.t = v.currentTime || 0;
-      if (this.t >= this.end - .02) { this.stop(); return; }
       this._sync();
+      if (this.t >= to - .02 || this.t >= this.dur0 - .02) { this.stop(); return; }
       this.raf = requestAnimationFrame(step);
     };
     step();
   }
-  stop() {
-    const v = this.q('.vt-view');
-    if (v) v.pause();
-    cancelAnimationFrame(this.raf); this.raf = 0;
+  stop() { const v = this.q('.vt-view'); if (v) v.pause(); cancelAnimationFrame(this.raf); this.raf = 0; }
+  _setPps(v) {
+    this.pps = v <= 0 ? 0 : Math.min(300, Math.max(10, v));
+    try { localStorage.setItem('h3-vt-px', String(this.pps)); } catch (e) {}
+    this._sync();
+    requestAnimationFrame(() => this._sync());   // the strip just changed size - the ruler needs a repaint
   }
   _wire() {
     const strip = this.q('.vt-strip');
-    const frac = e => {
+    const at = e => {
       const r = strip.getBoundingClientRect();
-      return (e.clientX - r.left) / Math.max(1, r.width);
+      return Math.min(this.dur0, Math.max(0, (e.clientX - r.left) / Math.max(1, r.width) * this.dur0));
     };
     let drag = null;
     strip.addEventListener('pointerdown', e => {
       if (!this.dur0) return;
       const h = e.target.closest('.at-h');
-      drag = h ? h.dataset.h : 'ph';
-      strip.setPointerCapture(e.pointerId);
+      if (h) { drag = h.dataset.h; this._dragH = drag; }   // later events no longer carry the handle
+      else if (e.target.closest('button')) return;
+      else {
+        const x = at(e);
+        // a click on the left half of the block plays up to the marker, on the right - from it
+        this.t = x;
+        this._sync();
+        if (x <= this.start || x >= this.end) this._play(this.start, this.end);
+        else if (x < (this.start + this.end) / 2) this._play(this.start, this.t);
+        else this._play(this.t, this.end);
+        return;
+      }
+      // a synthetic or already-released pointer has no capture to take, and that must not stop the drag
+      try { strip.setPointerCapture(e.pointerId); } catch (err) {}
+      const up = () => { drag = null; this._dragH = null; window.removeEventListener('pointerup', up); };
+      window.addEventListener('pointerup', up);
       this._move(e);
     });
     strip.addEventListener('pointermove', e => { if (drag) this._move(e); });
+    window.addEventListener('pointermove', e => {
+      if (!drag || strip.contains(e.target)) return;      // outside the strip the capture may be lost
+      const r = strip.getBoundingClientRect();
+      this._move({ clientX: Math.min(r.right, Math.max(r.left, e.clientX)), target: strip, currentTarget: strip });
+    });
     strip.addEventListener('pointerup', () => { drag = null; });
     strip.addEventListener('pointercancel', () => { drag = null; });
+    strip.addEventListener('dblclick', () => {           // the same double click the montage taught
+      if (!this.dur0) return;
+      if (this.cut || this.start > .02 || this.end < this.dur0 - .02) {
+        this._push(); this.start = 0; this.end = this.dur0; this.cut = null;
+        this._sync(); this.onWhole(this);
+        this.say('Вернули целый клип');
+      }
+    });
+    this.el.querySelectorAll('.vt-b').forEach(b => {
+      b.onclick = ev => {
+        ev.stopPropagation();
+        const k = b.dataset.s;
+        if (k === 'back') this._step(-1);
+        else if (k === 'fwd') this._step(1);
+        else if (k === 'left') {
+          if (this.t <= this.start + .02 || this.t >= this.end - .02) { this.say('Поставьте маркер внутрь куска'); return; }
+          this._push(); this.start = this.t; this._sync();
+          this.say('Убрано до маркера: осталось ' + this.fmt(this.len()) + ' с');
+        } else if (k === 'right') {
+          if (this.t >= this.end - .02 || this.t <= this.start + .02) { this.say('Поставьте маркер внутрь куска'); return; }
+          this._push(); this.end = this.t; this._sync();
+          this.say('Убрано после маркера: осталось ' + this.fmt(this.len()) + ' с');
+        }
+      };
+    });
+    this.q('.vt-x').onclick = ev => {
+      ev.stopPropagation();
+      if (this.o.onRemove) this.o.onRemove(this);
+      else this.say('Убрать клип должен тот, кто его сюда положил');
+    };
     this.q('.vt-play').onclick = () => {
       const v = this.q('.vt-view');
       if (this.busy) return;
-      if (v.paused) this.play(); else this.stop();
+      if (v.paused) this._play(this.start, this.end); else { this.stop(); this._still(); }
     };
-    this.q('.vt-cutl').onclick = () => {
-      if (!this.dur0) return;
-      if (this.t <= this.start + .05 || this.t >= this.end - .05) { this.say('Поставьте маркер внутрь выбранного'); return; }
-      this._push(); this.start = this.t; this._sync();
-      this.say('Убрано до маркера: осталось ' + (Math.round(this.len() * 10) / 10 + '').replace('.', ',') + ' с');
-    };
-    this.q('.vt-cutr').onclick = () => {
-      if (!this.dur0) return;
-      if (this.t >= this.end - .05 || this.t <= this.start + .05) { this.say('Поставьте маркер внутрь выбранного'); return; }
-      this._push(); this.end = this.t; this._sync();
-      this.say('Убрано после маркера: осталось ' + (Math.round(this.len() * 10) / 10 + '').replace('.', ',') + ' с');
-    };
-    this.q('.vt-und').onclick = () => {
-      const s2 = this.undo.pop(); if (!s2) return;
-      this.start = s2.s; this.end = s2.e; this.cut = s2.cut;
-      this.q('.vt-und').disabled = !this.undo.length;
+    this.q('.vt-zm').onclick = () => this._setPps((this.pps || Math.round((this.q('.vt-stripwrap').clientWidth || 600) / Math.max(1, this.dur0))) - 20);
+    this.q('.vt-zp').onclick = () => this._setPps((this.pps || Math.round((this.q('.vt-stripwrap').clientWidth || 600) / Math.max(1, this.dur0))) + 20);
+    this.q('.vt-fit').onclick = () => this._setPps(0);
+    this.q('.vt-zr').addEventListener('input', e => this._setPps(+e.target.value));
+    const num = (inp, which) => inp.onchange = () => {
+      const v = Math.min(this.dur0, Math.max(0, parseFloat(String(inp.value).replace(',', '.')) || 0));
+      if (which === 'a') this.start = Math.min(v, this.end - .1); else this.end = Math.max(v, this.start + .1);
       this._sync();
     };
-    this.q('.vt-reset').onclick = () => { this.start = 0; this.end = this.dur0; this.cut = null; this._sync(); };
-    this.q('.vt-zm').onclick = () => this._setZoom(this.zoom - 1);
-    this.q('.vt-zp').onclick = () => this._setZoom(this.zoom + 1);
-    this.q('.vt-z0').onclick = () => this._setZoom(1);
-    this.q('.vt-zr').addEventListener('input', e => { this.zoom = +e.target.value; this._sync(); });
+    num(this.q('.vt-a'), 'a'); num(this.q('.vt-b2'), 'b');
+    this.q('.vt-reset').onclick = () => { this._push(); this.start = 0; this.end = this.dur0; this.cut = null; this._sync(); this.onWhole(this); };
+    this.q('.vt-und').onclick = () => {
+      const s = this.undo.pop(); if (!s) return;
+      this.start = s.s; this.end = s.e; this.cut = s.cut; this.t = s.t;
+      this.q('.vt-und').disabled = !this.undo.length;
+      this._sync(); this._still();
+    };
     this.q('.vt-keep').onclick = () => this.out(true);
+    this.q('.vt-ag').onclick = async () => {
+      // the agent can look at a video only as at frames, and that road already exists - the paperclip's
+      const go = window.agFramesFromFile;
+      if (typeof go !== 'function') { this.say('Агент пока не умеет смотреть видео'); return; }
+      const tg = document.querySelector('#agTarget [data-t="' + (this.o.agentTarget || 'long') + '"]');
+      if (tg) tg.click();
+      goTo('agent');
+      try { if (!AG.status || !AG.status.speech_ready) await agStatus(); } catch (e) {}
+      const ok = await go(this.cut ? this.cutFile : this.file);
+      if (ok !== false) this.say('Клип отправлен Агенту: вырежем из него кадры');
+    };
+    window.addEventListener('resize', () => { if (this.dur0) this._sync(); });
   }
   _move(e) {
-    const r = e.currentTarget.getBoundingClientRect();
-    const t2 = Math.min(this.dur0, Math.max(0, this.tAt((e.clientX - r.left) / Math.max(1, r.width))));
-    const h = e.target.closest ? e.target.closest('.at-h') : null;
-    if (h && h.dataset.h === 'l') this.start = Math.min(t2, this.end - .05);
-    else if (h && h.dataset.h === 'r') this.end = Math.max(t2, this.start + .05);
+    const r = this.q('.vt-strip').getBoundingClientRect();
+    const t2 = Math.min(this.dur0, Math.max(0, (e.clientX - r.left) / Math.max(1, r.width) * this.dur0));
+    // which handle was grabbed is remembered at pointerdown: a move event does not carry it any more
+    const h = this._dragH || (e.target && e.target.closest ? (e.target.closest('.at-h') || {}).dataset?.h : null);
+    if (h === 'l') this.start = Math.min(t2, this.end - .1);
+    else if (h === 'r') this.end = Math.max(t2, this.start + .1);
     else this.t = t2;
     this._sync();
+    if (!h) this._still();
   }
   out(force) {
-    // without force it is the silent repaint the row does after loading; with it - the real cut
     if (!force || !this.dur0) { this._sync(); return null; }
-    const s2 = this.start, e2 = this.end;
-    if (e2 - s2 < .6) { this.say('Кусок короче секунды: модель его не разберёт'); return null; }
-    if (e2 - s2 > this.limit + .1) { this.say('Референс-видео не длиннее ' + this.limit + ' с: сейчас ' + (Math.round((e2 - s2) * 10) / 10 + '').replace('.', ',') + ' с'); return null; }
-    if (Math.abs(s2) < .02 && Math.abs(e2 - this.dur0) < .02) { this.say('Ничего не убрано - клип пойдёт целиком'); return null; }
+    const s = this.start, e = this.end;
+    if (e - s < .6) { this.say('Кусок короче секунды: модель его не разберёт'); return null; }
+    if (e - s > this.limit + .1) { this.say('Видео не длиннее ' + this.limit + ' с: сейчас ' + this.fmt(e - s) + ' с'); return null; }
+    if (Math.abs(s) < .02 && Math.abs(e - this.dur0) < .02) { this.say('Ничего не убрано - клип пойдёт целиком'); return null; }
     if (this.busy) return null;
     this.busy = true; this.q('.vt-keep').disabled = true;
     this.say('Режу клип - это секунды, не минуты…');
     const stem = this.name.replace(/\.[a-z0-9]+$/i, '').replace(/(-кусок)+$/g, '');
-    fetch('/api/video/cut?start=' + s2.toFixed(3) + '&end=' + e2.toFixed(3) + '&name=' + encodeURIComponent(this.name),
+    fetch('/api/video/cut?start=' + s.toFixed(3) + '&end=' + e.toFixed(3) + '&name=' + encodeURIComponent(this.name),
       { method: 'POST', body: this.file })
       .then(async r => {
         if (!r.ok) {
@@ -3586,17 +3728,14 @@ class VideoTrimmer {
         return r.blob();
       })
       .then(blob => {
-        this.busy = false; this.cut = { s: s2, e: e2 };
-        const f = new File([blob], stem + '-кусок.mp4', { type: 'video/mp4' });
-        this.onFile(f, this);
+        this.busy = false;
+        this.cut = { s: s, e: e };
+        this.cutFile = new File([blob], stem + '-кусок.mp4', { type: 'video/mp4' });
+        this.onFile(this.cutFile, this);
         this._sync();
-        this.say('Клип разрезан: ' + (Math.round((e2 - s2) * 10) / 10 + '').replace('.', ',') + ' с');
-        this.o.onDone && this.o.onDone(f);
+        this.say('Клип разрезан: ' + this.fmt(e - s) + ' с');
       })
-      .catch(err => {
-        this.busy = false; this._sync();
-        this.say((err && err.message) || 'Разрезать не удалось');
-      });
+      .catch(err => { this.busy = false; this._sync(); this.say((err && err.message) || 'Разрезать не удалось'); });
     return null;
   }
 }
@@ -5515,10 +5654,66 @@ function makeRefMode(cfg) {
   // the video card is put in SECOND: both ask to stand right after the first card, so the one that
   // comes later ends up nearer the top - and he wants «Референс-видео» to be the second card
   if (!cfg.scenes && !cfg.swap && vidsEl && $$('.slot', vidsEl).length) refVideoCard();
+  if (cfg.swap) swapVideoBench();   // the same bench for the video a person is replacing a face in
   // The card for reference video: same way of growing as the audio card has - nothing stands empty, a
   // file appears when the person adds it - and its «Монтаж» window cuts the clip with a marker, scissors
   // on both sides of it and a zoom, because finding the right second in a 20-second film by numbers is
   // hopeless. The limit is what the model actually looks at.
+  // The swap mode had a bare tile: a two-minute phone video went to the model whole, and the first
+  // seconds of it decided everything. The bench under the tile is the same class the reference card
+  // uses, so nothing new is learned twice.
+  function swapVideoBench() {
+    const slot = $('.rm-vids .slot', root);
+    if (!slot || typeof VideoTrimmer !== 'function') return;
+    const card = slot.closest('.card');
+    if (!card) return;
+    const box = document.createElement('div');
+    box.className = 'sw-bench'; box.hidden = true;
+    box.innerHTML = '<div class="hint" style="margin:10px 0 6px">Отрежьте лишнее: в расчёт пойдёт только выбранное время.' +
+      ' Дальше <b>25 секунд</b> модель не смотрит. Двойной клик по ленте возвращает целый клип.</div>';
+    card.append(box);
+    const tr = root._vtrim = new VideoTrimmer({
+      mount: box, limit: 25, agentTarget: 'swap',
+      onFile: (f, q) => {
+        const src = slot._src || slot._file;
+        slot._src = slot._src || slot._file;
+        slot._file = f;
+        slot._vsel = { start: q.start, end: q.end, of: src ? src.name : f.name };
+        slot._dur = q.len();
+        $('span', slot).textContent = f.name;
+        paint();
+        try { changed(); } catch (e) {}
+        if (root._save) root._save();
+      },
+      onWhole: () => {
+        if (!slot._src) return;
+        slot._file = slot._src; slot._vsel = null;
+        slot._dur = 0;
+        $('span', slot).textContent = slot._src.name;
+        const m = document.createElement('video');
+        m.preload = 'metadata'; m.src = URL.createObjectURL(slot._src);
+        m.onloadedmetadata = () => { slot._dur = m.duration || 0; paint(); try { changed(); } catch (e) {} URL.revokeObjectURL(m.src); };
+      },
+      onRemove: () => { const x = $('.x', slot); if (x) x.click(); box.hidden = true; }
+    });
+    const paint = () => {
+      box.hidden = !slot._file;
+      if (box.hidden) return;
+      const src = slot._src || slot._file;
+      if (tr._loaded !== src) {
+        tr._loaded = src;
+        tr.setFile(src, true);
+        const sel = slot._vsel;
+        if (sel && slot._src) setTimeout(() => {
+          tr.start = sel.start; tr.end = sel.end; tr.cut = { s: sel.start, e: sel.end }; tr._sync();
+        }, 600);
+      }
+    };
+    $('input', slot).addEventListener('change', () => { slot._src = null; slot._vsel = null; tr._loaded = null; paint(); });
+    const x = $('.x', slot);
+    if (x) x.addEventListener('click', () => { slot._src = null; slot._vsel = null; tr._loaded = null; box.hidden = true; });
+  }
+
   function refVideoCard() {
     const slots = [...$$('.slot', vidsEl)];
     if (!slots.length || typeof VideoTrimmer !== 'function') return;
@@ -5576,7 +5771,15 @@ function makeRefMode(cfg) {
       host.hidden = false;
       if (!tr) tr = root._vtrim = new VideoTrimmer({
         mount: host, limit: LIMIT, agentTarget: cfg.mode, onFile,
-        whereLabel: q => 'раздел «' + MODE_NAME + '», референс-видео ' + (q._slot + 1) + ', тег <Video ' + (q._slot + 1) + '>'
+        whereLabel: q => 'раздел «' + MODE_NAME + '», референс-видео ' + (q._slot + 1) + ', тег <Video ' + (q._slot + 1) + '>',
+        onRemove: q => {                       // the cross on the block does the same as ✕ in the chip
+          const s = slots[q._slot]; if (!s) return;
+          const x = $('.x', s); if (x) x.click();
+          s._src = null; s._vsel = null;
+          closeWin(); paint();
+          if (root._save) root._save();
+        },
+        onWhole: q => { const s = slots[q._slot]; if (s) { s._vsel = null; paint(); } }
       });
       const src = s._src || s._file;
       if (tr._slot !== i || !tr.dur0) {
@@ -6808,8 +7011,9 @@ function makeRefMode(cfg) {
             () => '<div class="hint" style="font-size:12.5px;line-height:1.55"><b>Тег &lt;Audio 1&gt;.</b> Когда аудио лежит, под текстом сцены появляется плашка &lt;Audio 1&gt; - клик вставляет тег туда, где стоит курсор. Он не выбирает, брать ли ваш файл (файл уже взят), а объясняет модели, что этот звук - фон данной сцены. Плашка не занимает ни одного из девяти мест под картинки; аудио в проекте одно, поэтому тег - всегда &lt;Audio 1&gt;.</div>',
             () => '<div class="hint" style="font-size:12.5px;line-height:1.55"><b>Длина фонового звука.</b> Обычное правило «не больше 15 секунд» к общему треку больше не применяется: ролик длиннее сцены, и весь трек выделяется целиком. Если трек короче ролика, включите «пустой фон по кругу» - тогда звук начнётся сначала и дойдёт до конца; с выключенной галкой музыка оборвётся там, где кончился файл. Для аудио отдельной сцены 15 секунд останутся в силе: сцена сама не длиннее.</div>',
             () => '<div class="hint" style="font-size:12.5px;line-height:1.55"><b>Аудио отдельной сцены.</b> Под текстом сцены есть кнопка «Загрузить аудио сцены» - до трёх файлов. У каждой сцены свои номера десятками: во второй сцене это &lt;Audio 20&gt;, &lt;Audio 21&gt;, &lt;Audio 22&gt;, в третьей - от 30; первый номер &lt;Audio 1&gt; оставлен фону всего ролика. Модель получает их как ссылки, а применяет там, где вы упомянули файл тегом в тексте сцены: не упомянули - звук в сцене делает модель. Кнопка «Обрезать» открывает тот же прибор, что и в карточке «Аудио», но с правилом 15 секунд - сцена длиннее всё равно не будет. Файлы хранятся вместе с проектом.</div>',
+            ,
             () => '<div class="hint" style="font-size:12.5px;line-height:1.55"><b>Аудио в Референсах, Актёре и Экшн-видео.</b> Здесь у звука своя карточка «Аудио». Файлы не выкладываются тремя пустыми плашками: нажимаете «Загрузить аудио» - и файл становится отдельной меткой с названием, длиной и тегом &lt;Audio 1&gt;, &lt;Audio 2&gt;, &lt;Audio 3&gt;. Нажатие на метку ставит тег в текст, «Обрезать» открывает тот же прибор, что и в Видеостудии: волна, перетаскивание, прослушивание, до 15 секунд. Второе нажатие закрывает окно и применяет выделенное, а открывается снова целый файл - резать можно сколько раз угодно, файл на диске при этом не портится. Больше трёх аудио нельзя: кнопка гаснет сама.</div>',
-            () => '<div class="hint" style="font-size:12.5px;line-height:1.55"><b>Референс-видео.</b> В Референсах у видео своя карточка. Файлы добавляются по одному, каждый подписан &lt;Video 1&gt;, &lt;Video 2&gt;, &lt;Video 3&gt; - нажатие на метку ставит тег в текст. <b>Дальше 25 секунд модель в референс-видео не смотрит</b>, поэтому длинное стоит обрезать. Кнопка «✂ Монтаж» открывает верстак: лента кадров, жёлтый маркер времени (его можно тащить), две пары ножниц - убрать всё до маркера и убрать всё после него, приближение, отмена и «вернуть целиком». Резает программа сама, настоящим декодером: браузер так не умеет, а рез по ключевым кадрам оставил бы замороженное начало ровно там, где клип должен начинаться. Оригинал не портится: в карточке лежит нарезанный кусок, а открывается для новой резки всегда целый файл.</div>',
+            () => '<div class="hint" style="font-size:12.5px;line-height:1.55"><b>Референс-видео.</b> В Референсах у видео своя карточка, а в «Замене персонажа» под окном видео стоит тот же верстак. Файлы добавляются по одному, каждый подписан &lt;Video 1&gt;, &lt;Video 2&gt;, &lt;Video 3&gt; - нажатие на метку ставит тег в текст. <b>Дальше 25 секунд модель не смотрит</b>, поэтому лишнее стоит отрезать. «✂ Монтаж» открывает верстак: над лентой окно просмотра, на ленте - сами кадры, жёлтый маркер, а прямо у маркера стрелки покадровой прокрутки (один кадр = 1/24 с) и ножницы: левые убирают всё до маркера, правые - всё после. Ползунок и кнопки «−» «+» меняют <b>ширину ленты</b> (сколько пикселей приходится на секунду), «По ширине» возвращает весь клип в окно. Клик по ленте слева от метки играет от начала куска до метки, справа - от метки до конца, а окно просмотра стоит на маркере и показывает его как стоп-кадр. Края выделенного участка тянутся мышью, двойной клик возвращает целый клип, крестик на блоке убирает файл совсем, «Отменить» шагает назад. «Оставить выбранное» режет по-настоящему, настоящим декодером: в карточке останется кусок, а для новой резки всегда открывается целый файл. «🤖 В агент» отправляет клип Агенту - он посмотрит на него как на кадры.</div>',
             () => '<div class="hint" style="font-size:12.5px;line-height:1.55"><b>«🤖 В агент».</b> Отправляет выделенный кусок в раздел «Агент»: он распознаёт слова и пишет промпт уже зная, что говорится. Перед отправкой Агент сам переключается на Видеостудию, чтобы не писать в чужой раздел. Если распознавание речи ещё не скачано, кнопка об этом скажет - карточка «Модель», «Докачать».</div>',
             () => {
               const mp = root.querySelector('.mdl-pick'); if (!mp) return '';
@@ -10707,4 +10911,3 @@ applyZoom();
 </script>
 </body>
 </html>
-            () => '<div class="hint" style="font-size:12.5px;line-height:1.55"><b>Длина фонового звука.</b> Обычное ограничение в 15 секунд к общему треку больше не применяется: ролик длиннее сцены. Если трек короче ролика, включите «по кругу» - звук начнётся сначала и дойдёт до конца; без этого музыка оборвётся там, где кончился файл. Для аудио внутри отдельной сцены 15 секунд остаются в силе: сцена сама не длиннее.</div>',
