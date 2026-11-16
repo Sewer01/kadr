@@ -5736,10 +5736,17 @@ function makeRefMode(cfg) {
   // seconds of it decided everything. The bench under the tile is the same class the reference card
   // uses, so nothing new is learned twice.
   function swapVideoBench() {
+    const esc = s => String(s).replace(/[<>&]/g, ch => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[ch]));
     const slot = $('.rm-vids .slot', root);
     if (!slot || typeof VideoTrimmer !== 'function') return;
     const card = slot.closest('.card');
     if (!card) return;
+    // a bench that appears out of nowhere is hard to find: the video gets the same chip as in the
+    // reference card - its number, its name, its length, the scissors and the cross
+    const chips = document.createElement('div');
+    chips.className = 'ra-row sw-chips';
+    const media = $('.rm-media', root);
+    (media || card).after(chips);
     const box = document.createElement('div');
     box.className = 'sw-bench'; box.hidden = true;
     box.innerHTML = '<div class="hint" style="margin:10px 0 6px">Отрежьте лишнее: в расчёт пойдёт только выбранное время.' +
@@ -5767,7 +5774,7 @@ function makeRefMode(cfg) {
         m.preload = 'metadata'; m.src = URL.createObjectURL(slot._src);
         m.onloadedmetadata = () => { slot._dur = m.duration || 0; paint(); try { changed(); } catch (e) {} URL.revokeObjectURL(m.src); };
       },
-      onRemove: () => { const x = $('.x', slot); if (x) x.click(); box.hidden = true; },
+      onRemove: () => { const x = $('.x', slot); if (x) x.click(); box.hidden = true; syncChip(); },
       // here the pictures mean "whom to put in", so a frame of the video is not one of them: file only
       onFrame: f => {
         const a = document.createElement('a');
@@ -5776,7 +5783,39 @@ function makeRefMode(cfg) {
         toast('Кадр сохранён в файл: ' + f.name);
       }
     });
+    const syncChip = () => {
+      const f = slot._file;
+      if (!f) { chips.innerHTML = ''; chips.hidden = true; return; }
+      chips.hidden = false;
+      const dur = slot._dur ? (Math.round(slot._dur * 10) / 10 + '').replace('.', ',') + ' с' : '...';
+      chips.innerHTML = '<span class="token"><button class="tk" type="button" data-video="1" title="вставить метку в текст">&lt;Video 1&gt;</button>' +
+        '<span class="tk-n">' + esc(f.name) + '</span><span class="tk-d">' + dur + '</span>' +
+        '<button class="tk-e" data-a="montage" type="button" title="открыть верстак монтажа">&#9986; Монтаж</button></span>' +
+        '<span class="ra-count">1 / 1</span>';
+    };
+    // the tile's own cross is the app's removal path and it does not know about the chip: listen there too
+    // capture, because the cross stops the event from bubbling and the chip would stay behind
+    slot.addEventListener('click', () => setTimeout(syncChip, 80), true);
+    chips.addEventListener('click', e => {
+      const b = e.target.closest('button');
+      if (!b) return;
+      if (b.dataset.video) {
+        const ta = $('.rm-prompt', root);
+        if (ta) {
+          const p = ta.selectionStart ?? ta.value.length;
+          ta.value = ta.value.slice(0, p) + '<Video 1>' + ta.value.slice(p);
+          ta.dispatchEvent(new Event('input', { bubbles: true })); ta.focus();
+        }
+        return;
+      }
+      if (b.dataset.a === 'montage') {
+        if (!slot._file) return;
+        box.hidden = !box.hidden;
+        if (!box.hidden) { try { box.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); } catch (e2) {} }
+      }
+    });
     const paint = () => {
+      syncChip();
       box.hidden = !slot._file;
       if (box.hidden) return;
       const src = slot._file;                          // the piece is what the run will take
@@ -6121,7 +6160,7 @@ function makeRefMode(cfg) {
       </div>`;
     $('.sw-example', root).onclick = () => { const t = $('.rm-prompt', root); if (!t.value.trim()) { t.value = 'Replace the person in <Video 1> with the character from <Picture 1>. Retain the identity, attire and style of the character from <Picture 1>. Preserve the camera angle, background, lighting and the movements of the original video. Do not display the reference images or their backgrounds.'; t.dispatchEvent(new Event('input', { bubbles: true })); } };
     $('.rm-media .sub-l span', root).textContent = 'Видео, в котором меняем';
-    $('.rm-media .media-hint', root).textContent = 'до 15 секунд · лучше один непрерывный план';
+    $('.rm-media .media-hint', root).textContent = 'одно видео · брать можно до 25 секунд · лучше один непрерывный план · лишнее отрежьте: ✂ Монтаж под плитками';
     $$('.rm-imgs .plus', root).forEach((pl, i) => { pl.lastChild.textContent = i ? 'Персонаж 2' : 'Персонаж 1'; });
     // the video sits in the same row as the pictures (third slot); its status line goes under the row
     vidsEl._hint = $('.rm-media .media-hint', root); vidsEl.style.display = 'contents'; imgsEl.append(vidsEl);
