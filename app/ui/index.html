@@ -1584,10 +1584,10 @@ body.dropping::after{content:'Отпустите — программа разл
           <h1>Агент</h1>
           <p>Опишите сцену своими словами, приложите персонажей — агент напишет правильный промпт для H3 по вашим скиллам</p>
         </div>
-        <button class="btn" id="agNew">Новый чат</button>
       </div>
       <div class="ag-grid">
         <div class="card ag-hist">
+          <button class="btn pri" id="agNew2" style="width:100%;margin-bottom:8px">＋ Новый чат</button>
           
           <div class="ag-hlist" id="agHist"></div>
           <button class="btn" id="agWipe" style="width:100%" title="Удалить все сохранённые переписки с агентом">Очистить историю</button>
@@ -1637,7 +1637,8 @@ body.dropping::after{content:'Отпустите — программа разл
         </div>
         <div class="col">
           <div class="card">
-            <div class="card-h"><h3>Модель агента</h3><span class="verdict" id="agState" hidden></span></div>
+            <details class="agfold">
+            <summary>Модель агента <span class="verdict" id="agState" hidden></span></summary>
             <div id="agBig" class="agbig"></div>
             <details id="agVarBox" class="agvar"><summary>Выбор моделей агента</summary><div id="agVariants"></div></details>
             <details class="agvar" id="agMore"><summary>Подробности</summary><div id="agModel" class="hint"></div></details>
@@ -1667,6 +1668,7 @@ body.dropping::after{content:'Отпустите — программа разл
               <div class="hint" id="agWhInfo" style="margin-top:6px"></div>
               <div class="wz-go" style="margin-top:8px"><button class="btn" id="agWhReset" hidden>Вернуть встроенный whisper</button><button class="btn pri" id="agWhUse">Подключить</button></div>
             </details>
+            </details>
           </div>
           <div class="card">
             <details class="agfold">
@@ -1674,7 +1676,7 @@ body.dropping::after{content:'Отпустите — программа разл
             <div class="seg" id="agThink" style="grid-template-columns:minmax(0,1fr) minmax(0,1fr);margin-bottom:6px"><button type="button" data-k="fast" title="Быстро — без долгих рассуждений">Быстро</button><button type="button" data-k="deep" title="Думать глубже — дольше, для сложных историй">Думать глубже</button></div>
             <div class="hint" id="agThinkHint" style="margin-bottom:14px"></div>
                       </details>
-          <details class="agfold">
+          <details class="agfold" open>
             <summary>Промпт для <span class="agnow" id="agNow"></span></summary>
             <div class="hint" style="margin-bottom:6px">Видео</div>
             <div class="seg" id="agTarget" style="grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-auto-rows:auto">
@@ -8964,7 +8966,7 @@ $('#agHist').addEventListener('click', e => {
 $('#agWipe').onclick = () => confirmBox('Очистить всю историю?', 'Все переписки с агентом будут удалены, восстановить нельзя. Видео и картинки в Библиотеке останутся.', 'Очистить', async () => {
   await fetch('/api/agent/chats', { method: 'DELETE' }); newChat(); toast('История очищена');
 });
-$('#agNew').onclick = newChat;
+  $('#agNew2').onclick = newChat;
 
 // send a finished prompt into a generator, with the chat's pictures
 async function setDropFile(input, file) { const dt = new DataTransfer(); dt.items.add(file); input.files = dt.files; input.dispatchEvent(new Event('change')); }
@@ -11856,7 +11858,7 @@ if (e.target.closest('.mt-clear')) {
     '#resApply': 'Сохранить новую папку для копий',
     '#resBackfill': 'Скопировать в папку копий то, что уже сделано, но без копии',
     '#resClean': 'Убрать из списка записи, у которых файл на диске пропал; сами файлы не удаляются',
-    '#agNew': 'Начать новый разговор:старые переписки останутся в списке слева',
+    '#agNew2': 'Начать новый разговор: старые переписки останутся в списке слева',
       '#agWipe': 'Удалить все сохранённые переписки. Отменить нельзя',
     '#agThinkHint': '',
     '#coreLogBtn': 'Журнал программы: что запускалось, что скачивалось, какие ошибки',
