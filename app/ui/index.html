@@ -1291,7 +1291,7 @@ body.dropping::after{content:'Отпустите — программа разл
     <section class="view active" id="view-video">
       <div class="head">
         <div>
-          <h1>Image-to-Video</h1>
+          <h1>Видео из картинки</h1>
           <p>Изображение или текст в видео: по тексту, по первому кадру или между первым и последним кадром</p>
         </div>
         <div class="mode-pill"><i></i><span id="vMode">Режим: видео по тексту</span></div>
@@ -1345,7 +1345,7 @@ body.dropping::after{content:'Отпустите — программа разл
     <section class="view" id="view-lipsync">
       <div class="head">
         <div>
-          <h1>Lipsync / клип</h1>
+          <h1>Музыкальный клип</h1>
           <p>Персонаж говорит или поёт под ваше аудио. Длина видео = длине выбранного фрагмента</p>
         </div>
         <div class="mode-pill"><i></i><span>Singularity · 2 прохода</span></div>
@@ -1443,7 +1443,7 @@ body.dropping::after{content:'Отпустите — программа разл
     <!-- ============ REFS & ACTION (built by makeRefMode) ============ -->
     <section class="view" id="view-presets"></section>
     <section class="view" id="view-upfile">
-      <div class="head"><div><h1>Увеличение видео и фото</h1><p>Любой ваш файл, не обязательно сделанный в программе</p></div></div>
+      <div class="head"><div><h1>Улучшение видео или фото</h1><p>Любой ваш файл, не обязательно сделанный в программе</p></div></div>
       <div class="card" style="max-width:760px">
         <label id="upDrop" class="upfile-drop" style="display:grid;place-items:center;gap:6px;min-height:200px;border:2px dashed var(--line-2);border-radius:16px;cursor:pointer;text-align:center;padding:24px">
           <input type="file" id="upFile" accept="video/*,image/*" hidden>
@@ -2369,15 +2369,26 @@ function setEngine(on) {
 /* pinned top bar with every video and image section */
 (function () {
   const bar = document.createElement('div'); bar.id = 'modeBar'; document.body.appendChild(bar);
-  const SHORT = { video: 'Видео', lipsync: 'Lipsync', refs: 'Референсы', actor: 'Актёр', swap: 'Замена', long: 'Видеостудия', actionsc: 'Экшн-студия', action: 'Экшн-видео', krea: 'Изображение', qwen: 'Правка', upfile: 'Увеличить' };
-  const GROUPS = [['presets'], ['video', 'lipsync', 'refs', 'actor', 'swap', 'long', 'actionsc', 'action'], ['krea', 'qwen'], ['upfile']];
+  // the names people read all day; the side menu keeps its own, longer ones for now
+  const SHORT = { video: 'Видео', lipsync: 'Клип', refs: 'Видеостудия', actor: 'Актёр', swap: 'Замена',
+    long: 'Киностудия', actionsc: 'Экшн-студия', action: 'Экшн-видео',
+    krea: 'Изображение', qwen: 'Правка', upfile: 'Ретушь' };
+  // what a button really opens, said in one line: the bar is short by design, the tooltip is not
+  const TIP = { video: 'Видео из картинки', lipsync: 'Музыкальный клип', refs: 'Видео по референсам',
+    actor: 'Актёрская игра', swap: 'Замена персонажа', long: 'Фильм по сценам',
+    actionsc: 'Динамичное видео по сценам', action: 'Динамичное видео',
+    krea: 'Изображение по тексту', qwen: 'Изменение изображения', upfile: 'Улучшение видео или фото' };
+  // the order a person works in: the picture, then the references, then the studios, then the clip
+  // and the actor; pictures and the retouching stay in their own groups, the separators as they were
+  const GROUPS = [['video', 'refs', 'long', 'action', 'actionsc', 'lipsync', 'actor', 'swap'],
+                  ['krea', 'qwen'], ['upfile']];
   function paint() {
     const cur = ($('.view.active')?.id || '').replace('view-', '');
     let html = '';
     GROUPS.forEach(g => {
       const part = g.map(v => {
         const n = $(`.nav[data-view="${v}"]`); if (!n || n.hidden) return '';
-        return `<button type="button" class="mb${v === cur ? ' on' : ''}" data-go="${v}" title="${n.textContent.trim().replace(/["<>&]/g, '')}">${n.querySelector('svg')?.outerHTML || ''}<i>${v === 'presets' ? 'Главная' : SHORT[v]}</i></button>`;
+        return `<button type="button" class="mb${v === cur ? ' on' : ''}" data-go="${v}" title="${(TIP[v] || SHORT[v] || '').replace(/["<>&]/g, '')}">${n.querySelector('svg')?.outerHTML || ''}<i>${SHORT[v]}</i></button>`;
       }).join('');
       if (part) html += (html ? '<i class="mb-sep"></i>' : '') + part;
     });
@@ -7846,19 +7857,19 @@ const RM = {
     placeholder: '',
   }),
   long: makeRefMode({
-    mode: 'long', title: 'Видеостудия', pill: 'Сцены подряд · Pika', dur: 20, maxImages: 5, videos: false, scenes: true,
+    mode: 'long', title: 'Фильм по сценам', pill: 'Сцены подряд · Pika', dur: 20, maxImages: 5, videos: false, scenes: true,
     sub: 'Клипы и ролики по сценам: каждая сцена до 15 секунд и продолжает прошлую. Можно с музыкой, можно без',
     refHint: 'До 5 изображений-референсов: персонаж, локация, предмет, одежда, стиль — всё, что должно сохраняться. Они подаются в каждую сцену, поэтому лицо и место не «плывут». В тексте сцены ссылайтесь на них как &lt;Picture 1&gt;, &lt;Picture 2&gt;… Чем больше референсов, тем тяжелее и дольше считается сцена.',
     placeholder: '',
   }),
   action: makeRefMode({
-    mode: 'action', title: 'Экшн-видео', pill: 'Hybrid · 8 + 4 шага', dur: 8, maxImages: 6, videos: false,
+    mode: 'action', title: 'Динамичное видео', pill: 'Hybrid · 8 + 4 шага', dur: 8, maxImages: 6, videos: false,
     sub: 'Бой, погоня, бег, стрельба — динамичные сцены с вашими персонажами',
     refHint: 'До 6 изображений: персонажи и локация. До 3 аудио: голос, ритм или атмосфера (вместе с изображениями). В промпте: &lt;Picture 1&gt; или роли вида «@image1 - character reference».',
     placeholder: '@image1 - character reference. Девушка с @image1 убегает по ночному рынку, опрокидывает корзины…',
   }),
   actionsc: makeRefMode({
-    mode: 'actionsc', title: 'Экшн-видеостудия', pill: 'Гибрид · 8 + 4 шага · сцены подряд', dur: 10, maxImages: 5, videos: false, scenes: true,
+    mode: 'actionsc', title: 'Динамичное видео по сценам', pill: 'Гибрид · 8 + 4 шага · сцены подряд', dur: 10, maxImages: 5, videos: false, scenes: true,
     sub: 'Длинный экшн по сценам: каждая следующая продолжает прошлую, готовые клипы склеиваются в один ролик',
     refHint: 'До 5 изображений: персонажи, локация, предмет. В тексте сцены ссылайтесь на них &lt;Picture 1&gt;, &lt;Picture 2&gt; - программа сама поставит номера по местам. Звук делает сама модель: своего аудио здесь нет.',
     placeholder: '',
@@ -10025,7 +10036,7 @@ const imgSeedForm = (S, fd) => { if (S.seedFixed && S.seed) fd.append('seed', S.
 (() => {
   const root = $('#view-qwen'), S = { kind: 'edit', size: '1', h3s: '4', aspect: '', headless: true, bg: 'grey', panels: 4, engine: 'qwen', frames: true, line: 'white' };
   root.innerHTML = `
-    <div class="head"><div><h1>Правка изображения</h1><p>Загрузите изображение и напишите, что изменить: поменять место, одежду, свет, поставить персонажа в новую сцену. Или соберите лист персонажа</p></div>
+    <div class="head"><div><h1>Изменение изображения</h1><p>Загрузите изображение и напишите, что изменить: поменять место, одежду, свет, поставить персонажа в новую сцену. Или соберите лист персонажа</p></div>
       <div class="mode-pill"><i></i><span>Qwen Image 2.1</span></div></div>
     <div class="grid"><div class="col">
       <div class="card"><div class="card-h"><h3><span class="n">1</span>Картинка</h3><button class="btn mini qw-clear" type="button" title="Убрать картинки и текст правки">Очистить</button></div>
