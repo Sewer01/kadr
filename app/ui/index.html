@@ -1118,6 +1118,24 @@ body.dropping::after{content:'Отпустите — программа разл
     /* the small counter that tells how many audio pieces a place allows */
     .ra-row>.counter{font-size:12px;opacity:.75;padding:0 2px}
     .sc-auds>.counter{font-size:12px;opacity:.75;padding:0 2px}
+
+    /* the film bench: a strip of frames with marks, a marker line and scissors on both sides of it */
+    .vtrim{display:grid;gap:8px;padding:10px;border:1px solid var(--line-2);border-radius:12px;background:var(--surface-2)}
+    .vt-view{width:100%;max-height:230px;border-radius:10px;background:#000;object-fit:contain}
+    .vt-body{display:grid;gap:8px}
+    .vt-strip{position:relative;height:86px;border-radius:9px;overflow:hidden;background:#0c0f14;cursor:text;
+      border:1px solid var(--line-2);touch-action:none}
+    .vt-cv{display:block;width:100%;height:86px}
+    .vt-sel{position:absolute;top:0;bottom:0;border-left:2px solid var(--accent);border-right:2px solid var(--accent);
+      background:rgba(255,255,255,.06);box-shadow:0 0 0 9999px rgba(0,0,0,.42)}
+    .vt-ph{position:absolute;top:0;bottom:0;width:2px;background:#ffd34d;box-shadow:0 0 6px rgba(255,211,77,.8)}
+    .vt-ph::after{content:'';position:absolute;top:-1px;left:-5px;border:6px solid transparent;border-top-color:#ffd34d}
+    .vt-sc{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+    .vt-sc>.btn.mini{height:30px;padding:0 11px;font-size:12px;font-weight:700;border-radius:8px}
+    .vt-cutl,.vt-cutr{background:#2b2f38;border-color:var(--line-2)}
+    .vt-time{font-size:12px;opacity:.8;margin-left:auto}
+    .vt-acts{display:flex;gap:8px;flex-wrap:wrap}
+    .ra-row>.token[data-j]{cursor:pointer}
 </style>
 </head>
 <body>
@@ -3308,6 +3326,281 @@ aDrop.addEventListener('drop', e => { e.preventDefault(); aDrop.classList.remove
    Никакого состояния режима он не знает: ему дают куда встроиться, лимит в секундах и функцию,
    которой вернуть готовый файл. Сама обработка звука - общие функции keepRanges, findPauses,
    shiftAfter, wavSlice, так что логика срезов живёт в одном месте. */
+/* The film bench for reference video: a strip of frames, a marker you drag, and scissors on both sides of
+   it. Cutting is done by the program itself (a real decoder), because a browser cannot cut what it did not
+   encode, and a cut on keyframes alone would leave a frozen start exactly where the clip should begin. */
+class VideoTrimmer {
+  constructor(o = {}) {
+    this.o = o;
+    this.limit = o.limit || 25;                       // the model does not look further than this
+    this.onFile = o.onFile || (() => {});
+    this.say = o.onNotice || (m => toast(m));
+    this.whereLabel = o.whereLabel || null;
+    this.dur0 = 0; this.start = 0; this.end = 0; this.t = 0;
+    this.zoom = 1; this.win0 = 0; this.win1 = 0;
+    this.cut = null; this.undo = []; this.file = null; this.url = ''; this.busy = false;
+    this.name = ''; this.frames = []; this.raf = 0;
+    this.el = document.createElement('div'); this.el.className = 'vtrim';
+    this.el.innerHTML =
+      '<div class="at-top"><button class="btn mini vt-play" type="button" title="Показать выбранное">&#9654;</button>' +
+      '<div class="at-name">видео не загружено</div><div class="at-len">—</div></div>' +
+      '<div class="vt-body" hidden>' +
+      '<video class="vt-view" muted playsinline preload="auto"></video>' +
+      '<div class="vt-strip"><canvas class="vt-cv" height="86"></canvas>' +
+      '<div class="vt-sel"><i class="at-h" data-h="l"></i><i class="at-h" data-h="r"></i></div>' +
+      '<div class="vt-ph" title="маркер времени: от него режут ножницы"></div></div>' +
+      '<div class="vt-sc"><button class="btn mini vt-cutl" type="button" title="Всё, что левее маркера, убрать">✂ убрать до маркера</button>' +
+      '<button class="btn mini vt-cutr" type="button" title="Всё, что правее маркера, убрать">убрать после маркера ✂</button>' +
+      '<span class="vt-time hint"></span></div>' +
+      '<div class="at-hint"></div>' +
+      '<div class="at-zoom"><span>Резать удобнее с приближением:</span><button class="btn mini vt-zm" type="button">−</button>' +
+      '<input type="range" class="at-zr vt-zr" min="1" max="20" step="1" value="1"><button class="btn mini vt-zp" type="button">+</button>' +
+      '<span class="vt-zl">весь клип</span><button class="btn mini vt-z0" type="button">Весь клип</button></div>' +
+      '<div class="vt-acts"><button class="btn pri vt-keep" type="button" disabled>Оставить выбранное</button>' +
+      '<button class="btn vt-und" type="button" disabled>Отменить</button>' +
+      '<button class="btn vt-reset" type="button" disabled>Вернуть целиком</button></div></div>';
+    this._wire();
+    if (o.mount) this.mount(o.mount);
+  }
+  mount(el) { el.append(this.el); return this; }
+  q(s) { return this.el.querySelector(s); }
+  len() { return Math.max(0, this.end - this.start); }
+  view() {                                   // what the strip shows: the whole clip or a piece around the marks
+    if (this.zoom <= 1) { this.win0 = 0; this.win1 = this.dur0; return; }
+    const span = Math.max(0.4, this.dur0 / this.zoom);
+    // zoom in where the person is looking: the marker, or the middle of what is left selected
+    const c = (this.t > this.start && this.t < this.end) ? this.t : (this.start + this.end) / 2;
+    let a = c - span / 2, b = c + span / 2;
+    if (a < 0) { b -= a; a = 0; }
+    if (b > this.dur0) { a -= (b - this.dur0); b = this.dur0; }
+    this.win0 = Math.max(0, a); this.win1 = b;
+  }
+  tAt(frac) { return this.win0 + (this.win1 - this.win0) * Math.min(1, Math.max(0, frac)); }
+  fracAt(t) { return (this.win1 - this.win0) > 0 ? (t - this.win0) / (this.win1 - this.win0) : 0; }
+  _push() { this.undo.push({ s: this.start, e: this.end, cut: this.cut }); if (this.undo.length > 20) this.undo.shift(); this.q('.vt-und').disabled = false; }
+  setFile(f, silent) {
+    if (!f) { this.clear(); return; }
+    this.file = f; this.name = f.name;
+    if (this.url) URL.revokeObjectURL(this.url);
+    this.url = URL.createObjectURL(f);
+    const v = this.q('.vt-view');
+    v.src = this.url;
+    this.el.hidden = false;
+    this.q('.vt-body').hidden = false;
+    this.q('.at-name').textContent = f.name;
+    v.onloadedmetadata = () => {
+      this.dur0 = v.duration || 0;
+      this.start = 0; this.end = this.dur0; this.t = 0; this.cut = null; this.undo = [];
+      this.view(); this._thumbs(); this._sync();
+      if (!silent) this.out();
+    };
+    v.onerror = () => this.say('Браузер не может показать это видео - для резки оно всё равно подойдёт, если декодер его читает');
+    return this;
+  }
+  clear() {
+    this.stop();
+    if (this.url) URL.revokeObjectURL(this.url);
+    this.url = ''; this.file = null; this.frames = [];
+    this.dur0 = 0; this.start = this.end = this.t = 0; this.cut = null; this.zoom = 1; this.undo = [];
+    this.q('.at-name').textContent = 'видео не загружено';
+    this.q('.at-len').textContent = '—';
+    this.q('.vt-body').hidden = true;
+  }
+  async _thumbs() {                           // a strip of frames: without them the bench is blind
+    const v = this.q('.vt-view'), n = 12;
+    this.frames = new Array(n).fill(null);
+    if (v.readyState < 2) {                   // a fresh file has no decodable frame yet
+      await new Promise(res => {
+        let to = 0;
+        const done = () => { clearTimeout(to); v.removeEventListener('loadeddata', done); res(); };
+        to = setTimeout(done, 1200);
+        v.addEventListener('loadeddata', done);
+      });
+    }
+    for (let i = 0; i < n; i++) {
+      const tt = Math.min(Math.max(0, this.dur0 - 0.05), this.dur0 * (i + 0.5) / n);
+      // every seek gets its own deadline: one frame the browser refuses to give must not stop the strip
+      await new Promise(res => {
+        let done = false;
+        const finish = () => { if (done) return; done = true; clearTimeout(to); v.onseeked = null; res(); };
+        const to = setTimeout(finish, 400);
+        v.onseeked = finish;
+        try { v.currentTime = tt; } catch (e) { finish(); }
+      });
+      try {
+        const c = document.createElement('canvas');
+        c.width = 120; c.height = Math.max(24, Math.round(120 * (v.videoHeight || 9) / (v.videoWidth || 16)));
+        c.getContext('2d').drawImage(v, 0, 0, c.width, c.height);
+        this.frames[i] = c;
+      } catch (e) { this.frames[i] = null; }
+      this._paint();                          // the strip fills in front of the person's eyes
+    }
+    v.onseeked = null;
+  }
+  _paint() {
+    const cv = this.q('.vt-cv'); if (!cv || !this.dur0) return;
+    const dpr = devicePixelRatio || 1, cssW = cv.clientWidth || 600;
+    cv.width = Math.round(cssW * dpr);
+    const g = cv.getContext('2d');
+    g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    g.clearRect(0, 0, cssW, 86);
+    const span = this.win1 - this.win0;
+    if (!this.frames.filter(Boolean).length) {        // frames are still coming: paint a ruler, not a void
+      g.fillStyle = '#151a21'; g.fillRect(0, 0, cssW, 86);
+      g.strokeStyle = 'rgba(255,255,255,.10)';
+      for (let x = 0; x < cssW; x += 28) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x, 86); g.stroke(); }
+      g.fillStyle = 'rgba(255,255,255,.45)'; g.font = '11px system-ui';
+      g.fillText('кадры ещё читаются…', 8, 20);
+    }
+    this.frames.forEach((im, i) => {
+      const tt = this.dur0 * (i + 0.5) / this.frames.length;
+      const x = this.fracAt(tt) * cssW, cw = cssW / Math.max(1, this.frames.length) * (this.dur0 / span);
+      if (x + cw < 0 || x > cssW || !im) return;
+      g.drawImage(im, x, 0, cw + 1, 86);
+      g.fillStyle = 'rgba(0,0,0,.45)'; g.fillRect(x + cw - 1, 0, 1, 86);
+    });
+    // the ruler: seconds, denser when zoomed
+    g.fillStyle = 'rgba(255,255,255,.65)'; g.font = '10px system-ui'; g.strokeStyle = 'rgba(255,255,255,.25)';
+    const step = span > 40 ? 10 : span > 16 ? 5 : span > 6 ? 2 : 1;
+    for (let s2 = Math.ceil(this.win0 / step) * step; s2 <= this.win1; s2 += step) {
+      const x = this.fracAt(s2) * cssW;
+      g.beginPath(); g.moveTo(x, 74); g.lineTo(x, 86); g.stroke();
+      g.fillText(String(s2), x + 2, 84);
+    }
+  }
+  _sync() {
+    this.view(); this._paint();
+    const sel = this.q('.vt-sel'), ph = this.q('.vt-ph');
+    const cl = x => Math.min(1, Math.max(0, x));        // when zoomed, the marks stand outside the window
+    const a = cl(this.fracAt(this.start)), b = cl(this.fracAt(this.end));
+    sel.style.left = (a * 100) + '%';
+    sel.style.width = (Math.max(0, b - a) * 100) + '%';
+    sel.hidden = !this.dur0;
+    ph.style.left = (cl(this.fracAt(this.t)) * 100) + '%';
+    ph.hidden = !this.dur0;
+    this.q('.at-len').textContent = this.dur0 ? Math.round(this.dur0 * 10) / 10 + ' с' : '—';
+    this.q('.vt-time').textContent = 'маркер ' + (Math.round(this.t * 10) / 10 + '').replace('.', ',') + ' с · выбрано ' +
+      (Math.round(this.len() * 10) / 10 + '').replace('.', ',') + ' с';
+    const over = this.len() > this.limit + .1;
+    this.q('.at-hint').innerHTML = this.cut ? 'Разрезано: в расчёт пойдёт кусок ' + (Math.round(this.len() * 10) / 10 + '').replace('.', ',') + ' с - оригинал цел, можно резать ещё.'
+      : over ? '<b style="color:var(--pink)">Выбрано длиннее ' + this.limit + ' с - референс-видео дальше модель не смотрит.</b>' : '';
+    this.q('.vt-keep').disabled = !this.dur0 || this.busy;
+    this.q('.vt-reset').disabled = !this.cut;
+    this.q('.vt-zl').textContent = this.zoom <= 1 ? 'весь клип' : 'кусок ' + (Math.round((this.win1 - this.win0) * 10) / 10 + '').replace('.', ',') + ' с';
+    const zr = this.q('.vt-zr'); zr.value = this.zoom; if (typeof paintRange === 'function') paintRange(zr);
+  }
+  _setZoom(v) { this.zoom = Math.min(20, Math.max(1, v)); this._sync(); }
+  play() {
+    const v = this.q('.vt-view');
+    v.currentTime = this.start;
+    v.play().catch(() => {});
+    cancelAnimationFrame(this.raf);
+    const step = () => {
+      this.t = v.currentTime || 0;
+      if (this.t >= this.end - .02) { this.stop(); return; }
+      this._sync();
+      this.raf = requestAnimationFrame(step);
+    };
+    step();
+  }
+  stop() {
+    const v = this.q('.vt-view');
+    if (v) v.pause();
+    cancelAnimationFrame(this.raf); this.raf = 0;
+  }
+  _wire() {
+    const strip = this.q('.vt-strip');
+    const frac = e => {
+      const r = strip.getBoundingClientRect();
+      return (e.clientX - r.left) / Math.max(1, r.width);
+    };
+    let drag = null;
+    strip.addEventListener('pointerdown', e => {
+      if (!this.dur0) return;
+      const h = e.target.closest('.at-h');
+      drag = h ? h.dataset.h : 'ph';
+      strip.setPointerCapture(e.pointerId);
+      this._move(e);
+    });
+    strip.addEventListener('pointermove', e => { if (drag) this._move(e); });
+    strip.addEventListener('pointerup', () => { drag = null; });
+    strip.addEventListener('pointercancel', () => { drag = null; });
+    this.q('.vt-play').onclick = () => {
+      const v = this.q('.vt-view');
+      if (this.busy) return;
+      if (v.paused) this.play(); else this.stop();
+    };
+    this.q('.vt-cutl').onclick = () => {
+      if (!this.dur0) return;
+      if (this.t <= this.start + .05 || this.t >= this.end - .05) { this.say('Поставьте маркер внутрь выбранного'); return; }
+      this._push(); this.start = this.t; this._sync();
+      this.say('Убрано до маркера: осталось ' + (Math.round(this.len() * 10) / 10 + '').replace('.', ',') + ' с');
+    };
+    this.q('.vt-cutr').onclick = () => {
+      if (!this.dur0) return;
+      if (this.t >= this.end - .05 || this.t <= this.start + .05) { this.say('Поставьте маркер внутрь выбранного'); return; }
+      this._push(); this.end = this.t; this._sync();
+      this.say('Убрано после маркера: осталось ' + (Math.round(this.len() * 10) / 10 + '').replace('.', ',') + ' с');
+    };
+    this.q('.vt-und').onclick = () => {
+      const s2 = this.undo.pop(); if (!s2) return;
+      this.start = s2.s; this.end = s2.e; this.cut = s2.cut;
+      this.q('.vt-und').disabled = !this.undo.length;
+      this._sync();
+    };
+    this.q('.vt-reset').onclick = () => { this.start = 0; this.end = this.dur0; this.cut = null; this._sync(); };
+    this.q('.vt-zm').onclick = () => this._setZoom(this.zoom - 1);
+    this.q('.vt-zp').onclick = () => this._setZoom(this.zoom + 1);
+    this.q('.vt-z0').onclick = () => this._setZoom(1);
+    this.q('.vt-zr').addEventListener('input', e => { this.zoom = +e.target.value; this._sync(); });
+    this.q('.vt-keep').onclick = () => this.out(true);
+  }
+  _move(e) {
+    const r = e.currentTarget.getBoundingClientRect();
+    const t2 = Math.min(this.dur0, Math.max(0, this.tAt((e.clientX - r.left) / Math.max(1, r.width))));
+    const h = e.target.closest ? e.target.closest('.at-h') : null;
+    if (h && h.dataset.h === 'l') this.start = Math.min(t2, this.end - .05);
+    else if (h && h.dataset.h === 'r') this.end = Math.max(t2, this.start + .05);
+    else this.t = t2;
+    this._sync();
+  }
+  out(force) {
+    // without force it is the silent repaint the row does after loading; with it - the real cut
+    if (!force || !this.dur0) { this._sync(); return null; }
+    const s2 = this.start, e2 = this.end;
+    if (e2 - s2 < .6) { this.say('Кусок короче секунды: модель его не разберёт'); return null; }
+    if (e2 - s2 > this.limit + .1) { this.say('Референс-видео не длиннее ' + this.limit + ' с: сейчас ' + (Math.round((e2 - s2) * 10) / 10 + '').replace('.', ',') + ' с'); return null; }
+    if (Math.abs(s2) < .02 && Math.abs(e2 - this.dur0) < .02) { this.say('Ничего не убрано - клип пойдёт целиком'); return null; }
+    if (this.busy) return null;
+    this.busy = true; this.q('.vt-keep').disabled = true;
+    this.say('Режу клип - это секунды, не минуты…');
+    const stem = this.name.replace(/\.[a-z0-9]+$/i, '').replace(/(-кусок)+$/g, '');
+    fetch('/api/video/cut?start=' + s2.toFixed(3) + '&end=' + e2.toFixed(3) + '&name=' + encodeURIComponent(this.name),
+      { method: 'POST', body: this.file })
+      .then(async r => {
+        if (!r.ok) {
+          let msg = 'Разрезать не удалось';
+          try { msg = (await r.json()).error || msg; } catch (e3) {}
+          throw new Error(msg);
+        }
+        return r.blob();
+      })
+      .then(blob => {
+        this.busy = false; this.cut = { s: s2, e: e2 };
+        const f = new File([blob], stem + '-кусок.mp4', { type: 'video/mp4' });
+        this.onFile(f, this);
+        this._sync();
+        this.say('Клип разрезан: ' + (Math.round((e2 - s2) * 10) / 10 + '').replace('.', ',') + ' с');
+        this.o.onDone && this.o.onDone(f);
+      })
+      .catch(err => {
+        this.busy = false; this._sync();
+        this.say((err && err.message) || 'Разрезать не удалось');
+      });
+    return null;
+  }
+}
+
 class AudioTrimmer {
   constructor(o = {}) {
     this.o = o;
@@ -5219,6 +5512,143 @@ function makeRefMode(cfg) {
   // they did not need. The tiles stay in the page: the run collects them by selector, so the card writes
   // into them and the calculation cannot tell the difference.
   if (!cfg.scenes && !cfg.swap) refAudioCard();
+  // the video card is put in SECOND: both ask to stand right after the first card, so the one that
+  // comes later ends up nearer the top - and he wants «Референс-видео» to be the second card
+  if (!cfg.scenes && !cfg.swap && vidsEl && $$('.slot', vidsEl).length) refVideoCard();
+  // The card for reference video: same way of growing as the audio card has - nothing stands empty, a
+  // file appears when the person adds it - and its «Монтаж» window cuts the clip with a marker, scissors
+  // on both sides of it and a zoom, because finding the right second in a 20-second film by numbers is
+  // hopeless. The limit is what the model actually looks at.
+  function refVideoCard() {
+    const slots = [...$$('.slot', vidsEl)];
+    if (!slots.length || typeof VideoTrimmer !== 'function') return;
+    const refCard = vidsEl.closest('.card');
+    if (!refCard) return;
+    const newEl = cls => { const e = document.createElement('div'); if (cls) e.className = cls; return e; };
+    const esc = s => String(s).replace(/[<>&]/g, ch => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[ch]));
+    const LIMIT = 25;                                  // seconds: the model does not look further
+    vidsEl.parentElement.classList.add('ra-tiles');    // the old block: storage only
+    const card = newEl('card');
+    card.innerHTML = '<div class="card-h"><h3><span class="n">2</span>Референс-видео</h3></div>' +
+      '<div class="hint" style="margin-bottom:9px">Видео-пример для модели: она берёт из него движение и кадр.' +
+      ' <b>Не длиннее ' + LIMIT + ' секунд</b> - дальше модель просто не смотрит, поэтому лишнее лучше отрезать.' +
+      ' Кнопка «Монтаж» открывает верстак: лента кадров, маркер, ножницы с двух сторон от него и приближение.</div>' +
+      '<div class="ra-row"></div>';
+    refCard.after(card);
+    const row = $('.ra-row', card), host = newEl('ra-host'); host.hidden = true;
+    card.append(host);
+    const inp = document.createElement('input');
+    inp.type = 'file'; inp.accept = 'video/*,.mp4,.mov,.mkv,.webm,.m4v'; inp.hidden = true; card.append(inp);
+    const MODE_NAME = { refs: 'Референсы', actor: 'Актёрская игра', action: 'Экшн-видео', long: 'Видеостудия', actionsc: 'Экшн-студия' }[cfg.mode] || cfg.mode;
+    let tr = null, cur = -1, pick = -1;
+    const fmt = x => (Math.round(x * 10) / 10 + '').replace('.', ',');
+    const paint = () => {
+      const full = slots.filter(s => s._file).length >= slots.length;
+      row.innerHTML = '<button class="btn mini" type="button" data-a="add"' + (full ? ' disabled' : '') +
+        ' title="Видео-пример: до ' + slots.length + ' файлов, каждый не длиннее ' + LIMIT + ' с">Добавить видео</button>' +
+        '<span class="counter" title="Сколько референс-видео допускается">' + slots.filter(s => s._file).length + ' / ' + slots.length + '</span>' +
+        slots.map((s, i) => s._file
+          ? `<span class="token" data-j="${i}" title="Тег вставится в текст по нажатию">&lt;Video ${i + 1}&gt; ${esc(s._file.name.slice(0, 22))}` +
+            (s._dur ? ' · <small style="opacity:.75">' + fmt(s._dur) + ' с' + (s._vsel ? ' · нарезано' : '') + '</small>' : '') +
+            (s._dur > LIMIT + .1 ? ' <small style="color:var(--pink)">длиннее ' + LIMIT + ' с</small>' : '') +
+            ` <button class="btn mini" type="button" data-a="edit" data-j="${i}" title="Лента кадров, маркер и ножницы">✂ Монтаж</button>` +
+            `<button class="btn mini" type="button" data-a="del" data-j="${i}" title="Убрать этот файл">✕</button></span>`
+          : '').join('') +
+        (full ? '<span class="hint" style="font-size:12px">' + slots.length + ' видео - максимум</span>' : '');
+    };
+    const closeWin = () => { host.hidden = true; cur = -1; };
+    const onFile = (f, q) => {                         // the cut replaces the file in the tile; the original stays
+      const i = q._slot, s = slots[i]; if (!s) return;
+      s._src = s._src || s._file;
+      s._file = f;
+      s._vsel = { start: q.start, end: q.end, of: s._src.name };
+      s._dur = q.len();
+      $('span', s).textContent = f.name;
+      $('small', s).textContent = Math.round(s._dur) + ' с';
+      paint();
+      try { changed(); } catch (e) {}
+      if (root._save) root._save();
+    };
+    const openTrim = i => {
+      const s = slots[i];
+      if (!s._file) return;
+      if (!host.hidden && cur === i) { closeWin(); return; }
+      host.hidden = false;
+      if (!tr) tr = root._vtrim = new VideoTrimmer({
+        mount: host, limit: LIMIT, agentTarget: cfg.mode, onFile,
+        whereLabel: q => 'раздел «' + MODE_NAME + '», референс-видео ' + (q._slot + 1) + ', тег <Video ' + (q._slot + 1) + '>'
+      });
+      const src = s._src || s._file;
+      if (tr._slot !== i || !tr.dur0) {
+        tr._slot = i;
+        tr.setFile(src, true);                         // the ORIGINAL opens, so cutting again is possible
+        const sel = s._vsel;
+        if (sel && src === s._src && sel.end <= (tr.dur0 || sel.end) + .2) {
+          const fix = () => { tr.start = sel.start; tr.end = sel.end; tr.cut = { s: sel.start, e: sel.end }; tr._sync(); };
+          if (tr.dur0) fix(); else setTimeout(fix, 500);
+        }
+      }
+      cur = i;
+      host.scrollIntoView({ block: 'nearest' });
+    };
+    const put = (f, i) => {
+      const free = slots.findIndex(x => !x._file);
+      const s = slots[i < 0 ? free : i];
+      if (!s) { toast('Больше ' + slots.length + ' референс-видео нельзя'); return; }
+      const e2 = new DataTransfer(); e2.items.add(f);
+      const input = $('input', s);
+      input.files = e2.files; input.dispatchEvent(new Event('change'));
+    };
+    row.onclick = e => {
+      const b = e.target.closest('button'), j = e.target.closest('.token');
+      if (b && b.dataset.a === 'add') { pick = -1; inp.click(); return; }
+      if (b && b.dataset.a === 'edit') { openTrim(+b.dataset.j); return; }
+      if (b && b.dataset.a === 'del') {
+        const s = slots[+b.dataset.j], x = $('.x', s);
+        if (x) x.click();
+        s._src = null; s._vsel = null;
+        if (cur === +b.dataset.j) closeWin();
+        paint();
+        if (root._save) root._save();
+        return;
+      }
+      if (j && !b) {
+        const ta = $('textarea', root), tag = '<Video ' + (+j.dataset.j + 1) + '>';
+        if (!ta) { toast('Тег ' + tag + ' - в этом режиме текста нет'); return; }
+        const p = ta.selectionStart || 0;
+        ta.value = ta.value.slice(0, p) + tag + ta.value.slice(p);
+        ta.focus(); ta.selectionStart = ta.selectionEnd = p + tag.length;
+        if (root._save) root._save();
+      }
+    };
+    inp.onchange = () => {
+      const f = inp.files && inp.files[0], i = pick; pick = -1;
+      inp.value = '';
+      if (f) put(f, i);
+    };
+    slots.forEach((s, i) => $('input', s).addEventListener('change', () => {
+      s._src = null; s._vsel = null;
+      if (cur === i) closeWin();
+      paint();
+      const f = s._file;
+      if (f && !s._dur) {                 // the length arrives a moment later than the file itself
+        const m = document.createElement('video');
+        m.preload = 'metadata'; m.src = URL.createObjectURL(f);
+        m.onloadedmetadata = () => {
+          if (s._file === f) { s._dur = m.duration || 0; paint(); }
+          URL.revokeObjectURL(m.src);
+        };
+      }
+    }));
+    row.addEventListener('dragover', e => { e.preventDefault(); row.classList.add('over'); });
+    row.addEventListener('dragleave', () => row.classList.remove('over'));
+    row.addEventListener('drop', e => {
+      e.preventDefault(); row.classList.remove('over');
+      const f = e.dataTransfer.files[0]; if (f) put(f, -1);
+    });
+    paint();
+  }
+
   function refAudioCard() {
     const slots = [...$$('.slot', audsEl)];
     if (!slots.length || typeof AudioTrimmer !== 'function') return;
@@ -5358,7 +5788,10 @@ function makeRefMode(cfg) {
       });
     };
     renumber();
-    (root.closest('.view') || root)._h3Renumber = renumber;
+    const viewEl = root.closest('.view') || root;
+    viewEl._h3Renumber = renumber;
+    setTimeout(renumber, 700);          // the settings card and any later card are numbered too
+    setTimeout(renumber, 2500);
     paint();
   }
   if (cfg.swap) $('.rm-vids input', root).addEventListener('change', async e => {
@@ -6376,6 +6809,7 @@ function makeRefMode(cfg) {
             () => '<div class="hint" style="font-size:12.5px;line-height:1.55"><b>Длина фонового звука.</b> Обычное правило «не больше 15 секунд» к общему треку больше не применяется: ролик длиннее сцены, и весь трек выделяется целиком. Если трек короче ролика, включите «пустой фон по кругу» - тогда звук начнётся сначала и дойдёт до конца; с выключенной галкой музыка оборвётся там, где кончился файл. Для аудио отдельной сцены 15 секунд останутся в силе: сцена сама не длиннее.</div>',
             () => '<div class="hint" style="font-size:12.5px;line-height:1.55"><b>Аудио отдельной сцены.</b> Под текстом сцены есть кнопка «Загрузить аудио сцены» - до трёх файлов. У каждой сцены свои номера десятками: во второй сцене это &lt;Audio 20&gt;, &lt;Audio 21&gt;, &lt;Audio 22&gt;, в третьей - от 30; первый номер &lt;Audio 1&gt; оставлен фону всего ролика. Модель получает их как ссылки, а применяет там, где вы упомянули файл тегом в тексте сцены: не упомянули - звук в сцене делает модель. Кнопка «Обрезать» открывает тот же прибор, что и в карточке «Аудио», но с правилом 15 секунд - сцена длиннее всё равно не будет. Файлы хранятся вместе с проектом.</div>',
             () => '<div class="hint" style="font-size:12.5px;line-height:1.55"><b>Аудио в Референсах, Актёре и Экшн-видео.</b> Здесь у звука своя карточка «Аудио». Файлы не выкладываются тремя пустыми плашками: нажимаете «Загрузить аудио» - и файл становится отдельной меткой с названием, длиной и тегом &lt;Audio 1&gt;, &lt;Audio 2&gt;, &lt;Audio 3&gt;. Нажатие на метку ставит тег в текст, «Обрезать» открывает тот же прибор, что и в Видеостудии: волна, перетаскивание, прослушивание, до 15 секунд. Второе нажатие закрывает окно и применяет выделенное, а открывается снова целый файл - резать можно сколько раз угодно, файл на диске при этом не портится. Больше трёх аудио нельзя: кнопка гаснет сама.</div>',
+            () => '<div class="hint" style="font-size:12.5px;line-height:1.55"><b>Референс-видео.</b> В Референсах у видео своя карточка. Файлы добавляются по одному, каждый подписан &lt;Video 1&gt;, &lt;Video 2&gt;, &lt;Video 3&gt; - нажатие на метку ставит тег в текст. <b>Дальше 25 секунд модель в референс-видео не смотрит</b>, поэтому длинное стоит обрезать. Кнопка «✂ Монтаж» открывает верстак: лента кадров, жёлтый маркер времени (его можно тащить), две пары ножниц - убрать всё до маркера и убрать всё после него, приближение, отмена и «вернуть целиком». Резает программа сама, настоящим декодером: браузер так не умеет, а рез по ключевым кадрам оставил бы замороженное начало ровно там, где клип должен начинаться. Оригинал не портится: в карточке лежит нарезанный кусок, а открывается для новой резки всегда целый файл.</div>',
             () => '<div class="hint" style="font-size:12.5px;line-height:1.55"><b>«🤖 В агент».</b> Отправляет выделенный кусок в раздел «Агент»: он распознаёт слова и пишет промпт уже зная, что говорится. Перед отправкой Агент сам переключается на Видеостудию, чтобы не писать в чужой раздел. Если распознавание речи ещё не скачано, кнопка об этом скажет - карточка «Модель», «Докачать».</div>',
             () => {
               const mp = root.querySelector('.mdl-pick'); if (!mp) return '';
@@ -6749,6 +7183,9 @@ function makeRefMode(cfg) {
       // anywhere, in any mode, and no syntax check could see anything wrong with it.
       + $$('.rm-auds .slot', root).map((s, i) => s._file
         ? `<button class="token tok-aud" type="button" data-audio="${i + 1}" title="&lt;Audio ${i + 1}&gt; - ссылка на это аудио: вставьте тег туда, где звук должен пригодиться">&lt;Audio ${i + 1}&gt;</button>`
+        : '').join('')
+      + $$('.rm-vids .slot', root).map((s, i) => s._file
+        ? `<button class="token tok-vid" type="button" data-video="${i + 1}" title="&lt;Video ${i + 1}&gt; - ссылка на это видео: модель возьмёт из него движение">&lt;Video ${i + 1}&gt;</button>`
         : '').join('');
     $$('.sc', root).forEach(x => x._counter?.());   // after the row was rebuilt, or the lock it puts on the chips is wiped
     if (cfg.swap) { const w2 = $('.rm-who[data-i="1"]', root); if (w2) w2.hidden = imgs.length < 2; }
@@ -6761,19 +7198,22 @@ function makeRefMode(cfg) {
     // touching the picture places
     const footEl = $('.rm-tokens', root).closest('.ta-foot') || $('.rm-tokens', root).parentNode;
     footEl.addEventListener('click', e => {
-      const b = e.target.closest && e.target.closest('[data-audio]');
+      const b = e.target.closest && (e.target.closest('[data-audio]') || e.target.closest('[data-video]'));
       if (!b) return;
       e.preventDefault(); e.stopPropagation();
       const own = (root._ta && root._ta.closest && root._ta.closest('.sc')) || $$('.sc', root)[root._sel] || $$('.sc', root).find(x => x.offsetParent !== null);
       const box = (own && $('textarea', own)) || promptEl();
       if (!box) { toast('Откройте сцену, куда вставить тег'); return; }
       const at = box.selectionStart == null ? box.value.length : box.selectionStart;
-      const an = +b.dataset.audio || 1, tag = '<Audio ' + an + '> ';   // the chip carries its own number
+      const isVid = b.dataset.video != null;
+      const an = +(isVid ? b.dataset.video : b.dataset.audio) || 1;
+      const tag = '<' + (isVid ? 'Video' : 'Audio') + ' ' + an + '> ';   // the chip carries its own number
       box.value = box.value.slice(0, at) + tag + box.value.slice(box.selectionEnd || at);
       box.focus(); box.selectionStart = box.selectionEnd = at + tag.length;
       box.dispatchEvent(new Event('input'));
       if (root._save) root._save();
-      toast('Тег <Audio ' + an + '> вставлен: звук применится там, где его тег назван в тексте');
+      toast(isVid ? 'Тег <Video ' + an + '> вставлен: модель возьмёт движение из этого видео'
+        : 'Тег <Audio ' + an + '> вставлен: звук применится там, где его тег назван в тексте');
     }, true);
     $('.rm-tokens', root).onclick = e => {
     const t = e.target.closest('.token'); if (!t) return;

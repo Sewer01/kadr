@@ -169,7 +169,9 @@ def _refs(g, cond_node, images, videos=(), audios=(), base=100, vsize=None, abas
         nid = str(base + 10 + i)
         g[nid] = {"class_type": "VHS_LoadVideo", "inputs": {
             "video": name, "force_rate": 24, "custom_width": vsize[0] if vsize else 0, "custom_height": vsize[1] if vsize else 0,
-            "frame_load_cap": 360, "skip_first_frames": 0, "select_every_nth": 1, "format": "None"}}
+            "frame_load_cap": 600, "skip_first_frames": 0, "select_every_nth": 1, "format": "None"}}
+        # 600 frames at 24 fps: the reference video may now be as long as the 25 seconds the person
+        # trims it to; 360 used to cut every clip down to 15 seconds silently
         inputs[f"ref_videos.ref_video_{i}"] = [nid, 0]
     for i, name in enumerate(audios[:3]):
         nid = str((abase if abase is not None else base + 20) + i)   # per-scene audio must not land on the next scene's nodes

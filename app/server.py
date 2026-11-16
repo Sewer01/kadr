@@ -27,6 +27,7 @@ import webbrowser
 from datetime import datetime
 from pathlib import Path
 
+MAX_REF_VIDEO = 25   # reference video: the model does not look further than this
 import aiohttp
 from aiohttp import web
 
@@ -241,6 +242,63 @@ class App:
                     return p
         w = shutil.which("ffmpeg")
         return Path(w) if w else None
+
+    async def h_video_cut(self, request):
+        """POST a clip, get back the piece between start and end from the query string. Re-encoded on
+        purpose: cutting on keyframes alone would leave a grey second or a frozen picture exactly where
+        the person wanted the clip to begin, and a reference video is judged from its first frame."""
+        ff = self._ffmpeg()
+        if not ff:
+            return web.json_response({"error": "декодер не найден: режьте видео в любой программе"}, status=404)
+        data = await request.read()
+        if not data:
+            return web.json_response({"error": "пустой файл"}, status=400)
+        if len(data) > 300 * 1024 * 1024:
+            return web.json_response({"error": "файл больше 300 МБ"}, status=413)
+        try:
+            start = max(0.0, float(request.query.get("start") or 0))
+            end = float(request.query.get("end") or 0)
+        except ValueError:
+            return web.json_response({"error": "не разобраны границы куска"}, status=400)
+        if end - start < 0.5:
+            return web.json_response({"error": "кусок короче полсекунды: модель его всё равно не разберёт"}, status=400)
+        if end - start > MAX_REF_VIDEO + 1:
+            return web.json_response({"error": "референс-видео не длиннее %d секунд" % MAX_REF_VIDEO}, status=400)
+        name = urllib.parse.unquote(request.query.get("name") or "video.mp4")
+        suffix = Path(name).suffix.lower()
+        if suffix not in (".mp4", ".mov", ".mkv", ".webm", ".avi", ".m4v", ".mts", ".ts", ".wmv", ".flv", ".mpg", ".mpeg", ".3gp"):
+            suffix = ".mp4"
+        work = Path(os.environ.get("TEMP", ".")) / ("h3cut-" + uuid.uuid4().hex)
+        work.mkdir(parents=True, exist_ok=True)
+        src, out = work / ("in" + suffix), work / "cut.mp4"
+        try:
+            src.write_bytes(data)
+            cmd = [str(ff), "-hide_banner", "-loglevel", "error", "-y",
+                   "-ss", "%.3f" % start, "-to", "%.3f" % end, "-i", str(src),
+                   "-map", "0:v:0", "-map", "0:a:0?",
+                   "-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-pix_fmt", "yuv420p",
+                   "-c:a", "aac", "-ac", "2", "-movflags", "+faststart", str(out)]
+            proc = await asyncio.create_subprocess_exec(*cmd, stdout=asyncio.subprocess.DEVNULL,
+                                                        stderr=asyncio.subprocess.PIPE)
+            try:
+                _, err = await asyncio.wait_for(proc.communicate(), timeout=300)
+            except asyncio.TimeoutError:
+                try:
+                    proc.kill()
+                except Exception:
+                    pass
+                return web.json_response({"error": "декодер не успел за 5 минут"}, status=500)
+            if proc.returncode or not out.is_file() or out.stat().st_size < 1024:
+                return web.json_response({"error": "не удалось разрезать: " +
+                                          (err or b"").decode(errors="replace")[-300:]}, status=500)
+            resp = web.FileResponse(out, headers={"Content-Disposition": 'attachment; filename="cut.mp4"',
+                                                  "Cache-Control": "no-store"})
+            # the file must survive until it is sent, so the working folder goes a minute later
+            asyncio.get_event_loop().call_later(60, shutil.rmtree, work, True)
+            return resp
+        except Exception as e:                                  # a broken phone video must not kill the app
+            shutil.rmtree(work, ignore_errors=True)
+            return web.json_response({"error": "сбой разреза: %s" % e}, status=500)
 
     async def h_video_lastframe(self, request):
         """POST a video file, get back its last frame as a PNG. The name comes in the query string."""
@@ -4083,6 +4141,7 @@ def build_app(comfy_override=None):
         web.get("/api/audio/info", state.h_audio_info),
         web.post("/api/audio/separate", state.h_audio_separate),
         web.post("/api/video/lastframe", state.h_video_lastframe),   # the browser cannot decode everything
+        web.post("/api/video/cut", state.h_video_cut),   # reference video is trimmed here, not in the browser
         web.get("/api/setup/info", state.h_setup_info),
         web.post("/api/setup/external", state.h_setup_external),
         web.post("/api/setup/install", state.h_setup_install),
