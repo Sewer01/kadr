@@ -5161,6 +5161,9 @@ window.h3ReloadLibrary = async () => {
     const items = await (await fetch('/api/library')).json();
     LIB.length = 0;
     items.forEach(it => LIB.push(typeof normItem === 'function' ? normItem(it) : it));
+    // refilling the array is not enough: the list on the screen is drawn by renderLib, and the tray is a
+    // different thing - a keepsake that only reaches the array is a file the person cannot see
+    try { window.renderLib?.(); } catch (e) { }
     try { window.trayFill?.(); } catch (e) { }
   } catch (e) { }
 };
@@ -5317,6 +5320,7 @@ function addToLib(item, date = new Date()) {
   renderLib();
   window.trayFill?.();
 }
+window.renderLib = renderLib;   // a keepsake saved from any bench must be able to ask for a redraw
 function renderLib() {
   $('#libBadge').textContent = LIB.length;
   const items = LIB.filter(it => libFilter === 'all' || (libFilter === 'fav' ? it.fav : libFilter === 'images' ? it.kind === 'image' : libFilter === 'videos' ? it.kind !== 'image' : it.mode === libFilter));
