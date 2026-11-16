@@ -3388,7 +3388,7 @@ class VideoTrimmer {
     this.pps = 0;                                     // pixels per second: 0 means "fit the window"
     try { const p = +localStorage.getItem('h3-vt-px'); if (p >= 10 && p <= 300) this.pps = p; } catch (e) {}
     this.cut = null; this.undo = []; this.file = null; this.url = ''; this.busy = false;
-    this.name = ''; this.frames = []; this.raf = 0; this.narrow = false;
+    this.name = ''; this.frames = []; this.raf = 0;
     // the root carries atrim as well: the marks, the names and the hint are styled there, and a second
     // copy of those rules would only start disagreeing with the first one later
     this.el = document.createElement('div'); this.el.className = 'atrim vtrim';
@@ -3533,8 +3533,6 @@ class VideoTrimmer {
     const wpx = this.stripW();
     strip.style.width = wpx ? wpx + 'px' : '100%';
     wrap.style.overflowX = wpx ? 'auto' : 'hidden';
-    this.narrow = !!wpx && wpx > (wrap.clientWidth || 99999);
-    strip.classList.toggle('narrow', this.narrow);     // when the strip is wider than the window the
     const sel = this.q('.vt-sel'), ph = this.q('.vt-ph');
     sel.style.left = (this.start / this.dur0 * 100) + '%';
     sel.style.width = (Math.max(0, this.len()) / this.dur0 * 100) + '%';
