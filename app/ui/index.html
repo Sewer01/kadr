@@ -1236,7 +1236,7 @@ body.dropping::after{content:'Отпустите — программа разл
       Экшн-видео
     </button>
     <button class="nav sub" data-view="actionsc">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 4 14h6l-1 8 9-12h-6z"/></svg>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.6 2 4 11.4h4.3L7.6 16.6 13.4 7H8.9z"/><path d="M16.4 7.4 11 16.8h4.3l-.7 5.2 5.8-9.6h-4.5z"/></svg>
       Экшн-видеостудия
     </button>
 
@@ -1562,14 +1562,14 @@ body.dropping::after{content:'Отпустите — программа разл
             <div class="card-h"><h3>Промпт для</h3></div>
             <div class="hint" style="margin-bottom:6px">Видео</div>
             <div class="seg" id="agTarget" style="grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-auto-rows:auto">
-              <button data-t="video" class="on">Image-to-Video<small>текст / кадры</small></button>
+              <button data-t="video" class="on">Видео<small>текст / кадры</small></button>
               <button data-t="lipsync">Lipsync<small>референсы + аудио</small></button>
-              <button data-t="refs">Референсы<small>изображения, видео, аудио</small></button>
-              <button data-t="actor">Актёрская игра<small>диалог, голос, эмоции</small></button>
+              <button data-t="refs">Видеостудия<small>изображения, видео, аудио</small></button>
+              <button data-t="actor">Актёр<small>диалог, голос, эмоции</small></button>
               <button data-t="swap">Замена персонажа<small>видео + изображение героя</small></button>
               <button data-t="action">Экшн-видео<small>бой, погоня, бег</small></button>
               <button data-t="long">Видеостудия<small>клип или ролик по сценам</small></button>
-              <button data-t="actionsc">Экшн-видеостудия<small>экшн по сценам подряд</small></button>
+              <button data-t="actionsc">Экшн-студия<small>экшн по сценам подряд</small></button>
             </div>
             <div class="hint" style="margin:12px 0 6px">Изображения</div>
             <div class="seg" id="agTarget2" style="grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-auto-rows:auto">
@@ -1663,15 +1663,15 @@ body.dropping::after{content:'Отпустите — программа разл
       <div class="lib-bar">
         <div class="chips" id="libFilter">
           <button class="chip on" data-f="all">Все</button>
-          <button class="chip" data-f="videos">Видео</button>
-          <button class="chip" data-f="images">Изображения</button>
-          <button class="chip" data-f="video">Image-to-Video</button>
-          <button class="chip" data-f="lipsync">Lipsync</button>
-          <button class="chip" data-f="refs">Референсы</button>
-          <button class="chip" data-f="actor">Актёрская игра</button>
-          <button class="chip" data-f="action">Экшн</button>
-          <button class="chip" data-f="long">Видеостудия</button>
-              <button class="chip" data-f="actionsc">Экшн-видеостудия</button>
+          <button class="chip" data-f="videos">Все видео</button>
+          <button class="chip" data-f="images">Все картинки</button>
+          <button class="chip" data-f="video">Видео</button>
+          <button class="chip" data-f="lipsync">Клип</button>
+          <button class="chip" data-f="refs">Видеостудия</button>
+          <button class="chip" data-f="actor">Актёр</button>
+          <button class="chip" data-f="action">Экшн-видео</button>
+          <button class="chip" data-f="long">Киностудия</button>
+              <button class="chip" data-f="actionsc">Экшн-студия</button>
           <button class="chip" data-f="custom">Свои</button>
           <button class="chip" data-f="fav">★ Избранное</button>
         </div>
@@ -1785,13 +1785,13 @@ body.dropping::after{content:'Отпустите — программа разл
             <label>Что вы хотите делать? <span class="hint" id="modeHint">— отметьте только нужное, остальное можно докачать потом в разделе «Настройки»</span></label>
             <button type="button" class="a-change" id="modeAll" style="margin:6px 0 10px">Выбрать все</button>
             <div class="mode-cards" id="modePick">
-              <button class="mcard" data-m="video"><i></i><b>Image-to-Video</b><span>Видео по тексту, по изображению, по первому и последнему кадру</span><small></small></button>
-              <button class="mcard" data-m="lipsync"><i></i><b>Lipsync / клип</b><span>Персонаж поёт или говорит под ваше аудио</span><small></small></button>
-              <button class="mcard" data-m="refs"><i></i><b>Референсы</b><span>Видео по нескольким изображениям, референс-видео и аудио</span><small></small></button>
-              <button class="mcard" data-m="actor"><i></i><b>Актёрская игра</b><span>Диалоги и крупные планы: эмоции, голос по образцу</span><small></small></button>
+              <button class="mcard" data-m="video"><i></i><b>Видео</b><span>Видео по тексту, по изображению, по первому и последнему кадру</span><small></small></button>
+              <button class="mcard" data-m="lipsync"><i></i><b>Клип</b><span>Персонаж поёт или говорит под ваше аудио</span><small></small></button>
+              <button class="mcard" data-m="refs"><i></i><b>Видеостудия</b><span>Видео по нескольким изображениям, референс-видео и аудио</span><small></small></button>
+              <button class="mcard" data-m="actor"><i></i><b>Актёр</b><span>Диалоги и крупные планы: эмоции, голос по образцу</span><small></small></button>
               <button class="mcard" data-m="action"><i></i><b>Экшн-видео</b><span>Бой, погоня, бег, прыжки</span><small></small></button>
               <button class="mcard" data-m="long"><i></i><b>Видеостудия</b><span>Клипы и ролики по сценам: до 15 с на сцену, сцены продолжают друг друга</span><small></small></button>
-        <button class="mcard" data-m="actionsc"><i></i><b>Экшн-видеостудия</b><span>Длинный экшн по сценам: 8 + 4 шага, файлы ускорения, звук делает модель</span><small></small></button>
+        <button class="mcard" data-m="actionsc"><i></i><b>Экшн-студия</b><span>Длинный экшн по сценам: 8 + 4 шага, файлы ускорения, звук делает модель</span><small></small></button>
               <button class="mcard" data-m="krea"><i></i><b>Изображение по тексту</b><span>Krea 2: красивые изображения по описанию (можно в коммерцию)</span><small></small></button>
               <button class="mcard" data-m="kreareal"><i></i><b>Изображение: реализм</b><span>Krea 2 для реалистичных людей и фото (в «Изображении по тексту», +15 ГБ)</span><small></small></button>
               <button class="mcard" data-m="qwen"><i></i><b>Правка изображения</b><span>Qwen: изменить своё изображение, лист персонажа</span><small></small></button>
@@ -2979,7 +2979,7 @@ function previewPanel(el, st, opts) {
   go.onclick = () => {
     const err = opts.validate(); if (err) { status.textContent = err; return; }
     if (API) {
-      if (!opts.real) { status.textContent = 'Этот режим ещё не подключён к ComfyUI — пока работает «Image-to-Video»'; return; }
+      if (!opts.real) { status.textContent = 'Этот режим ещё не подключён к ComfyUI — пока работает «Видео»'; return; }
       return realStart();
     }
     const [w, h] = resFor(st.aspect, st.q);
@@ -3231,7 +3231,7 @@ $('#vPrompt').oninput = e => $('#vCount').textContent = e.target.value.length + 
 $('#vClear').onclick = () => {
   const pics = ['#dFirst', '#dLast'].filter(s => $(s).classList.contains('filled')), txt = $('#vPrompt').value.trim();
   if (!pics.length && !txt) { toast('Здесь и так пусто'); return; }
-  confirmBox('Очистить «Image-to-Video»?',
+  confirmBox('Очистить «Видео»?',
     `Уберём${pics.length ? ' картинки (' + pics.length + ' шт.) и' : ''} промпт. Готовые видео в Библиотеке останутся.`, 'Очистить', () => {
       pics.forEach(s => $(s + ' .x').click());
       $('#vPrompt').value = ''; $('#vPrompt').oninput({ target: $('#vPrompt') });
@@ -4533,12 +4533,12 @@ async function openSetup() {
   const P = setupInfo.profiles;
   $$('#modePick .mcard').forEach(c => {
     c.classList.toggle('on', setupModes.includes(c.dataset.m));
-    $('#modeAll').textContent = $$('#modePick .mcard').every(x => setupModes.includes(x.dataset.m)) ? 'Снять все (оставить только Image-to-Video)' : 'Выбрать все';
+    $('#modeAll').textContent = $$('#modePick .mcard').every(x => setupModes.includes(x.dataset.m)) ? 'Снять все (оставить только «Видео»)' : 'Выбрать все';
     $('small', c).textContent = `~${P[setupProfile].sizes[c.dataset.m]} ГБ, если ставить только его`
       + (c.dataset.m === 'relayvsr' && setupInfo.relay_ok === false ? ' · сам режим заработает, когда ComfyUI обновится' : '');
   });
   const shared = setupModes.includes('lipsync') && setupModes.includes('refs')
-    ? ' Lipsync и Референсы используют одну и ту же основную модель — вместе они почти не добавляют места.' : '';
+    ? ' «Клип» и «Видеостудия» используют одну и ту же основную модель — вместе они почти не добавляют места.' : '';
   $('#modeTotal').innerHTML = `<span>Скачается всего: <b>~${P[setupProfile].sizes.selected} ГБ</b> (из них ~19 ГБ — общая часть для любого режима: текстовый энкодер и VAE).${shared}</span>`;
   $('#profilePick').innerHTML = Object.entries(P).map(([k, p]) =>
     `<button data-p="${k}" class="${k === setupProfile ? 'on' : ''}">${p.title}${k === setupInfo.recommended ? ' ★' : ''}<small>~${p.sizes[key]} ГБ</small></button>`).join('');
@@ -4789,7 +4789,7 @@ function renderModels(s) {
   /* список был сплошной простынёй: непонятно, к какому разделу какой файл ✓ теперь группы
      по режимам - файл показан один раз под тем режимом, который раньше всех в нём участвует,
      а остальные режимы перечислены в самой строке */
-  const MNAME = { video: 'Image-to-Video', lipsync: 'Lipsync', refs: 'Референсы', actor: 'Актёрская игра', swap: 'Замена персонажа', action: 'Экшн-видео', actionsc: 'Экшн-видеостудия', h3img: 'Изображения MiniMax H3 Image', long: 'Видеостудия', krea: 'Изображение по тексту', kreareal: 'Изображение: реализм', qwen: 'Правка изображения', flux: 'Правка изображения: FLUX.2 (в коммерцию)', upscale: 'Увеличение видео и изображений', relayvsr: 'Быстрое увеличение видео (RelayVSR)' };
+  const MNAME = { video: 'Видео', lipsync: 'Клип', refs: 'Видеостудия', actor: 'Актёр', swap: 'Замена', action: 'Экшн-видео', actionsc: 'Экшн-студия', h3img: 'Изображения MiniMax H3 Image', long: 'Видеостудия', krea: 'Изображение по тексту', kreareal: 'Изображение: реализм', qwen: 'Правка изображения', flux: 'Правка изображения: FLUX.2 (в коммерцию)', upscale: 'Увеличение видео и изображений', relayvsr: 'Быстрое увеличение видео (RelayVSR)' };
   const mRow = m => {
     const optional = !m.modes.length;
     const st = m.have ? '<span class="st ok">✓ загружено</span>' : optional ? '<span class="st opt" title="Без этого файла разделы работают; он добавляет возможность. Нажмите «Скачать», чтобы взять его.">по желанию</span>' : '<span class="st miss" title="Этот файл нужен выбранным разделам. Нажмите «Докачать недостающие» или «Скачать».">нет файла</span>';
@@ -4820,7 +4820,7 @@ function renderModels(s) {
   if (need.length) $('#mdModelsCard').classList.remove('collapsed');   // a missing file has to be seen, not hidden behind a folded card
   fitTopBar();
   $('#mdFixExt').textContent = `Скачать недостающие (${need.length}, ${GB(need.reduce((a, m) => a + m.size, 0))})`;
-  const MN = { video: 'Image-to-Video', lipsync: 'Lipsync', refs: 'Референсы', actor: 'Актёрская игра', swap: 'Замена персонажа', action: 'Экшн-видео', actionsc: 'Экшн-видеостудия', h3img: 'Изображения MiniMax H3 Image', long: 'Видеостудия', krea: 'Изображение по тексту', kreareal: 'Изображение: реализм', qwen: 'Правка изображения', flux: 'Правка изображения: FLUX.2 (в коммерцию)', upscale: 'Увеличение видео и изображений', relayvsr: 'Быстрое увеличение видео (RelayVSR)' };
+  const MN = { video: 'Видео', lipsync: 'Клип', refs: 'Видеостудия', actor: 'Актёр', swap: 'Замена', action: 'Экшн-видео', actionsc: 'Экшн-студия', h3img: 'Изображения MiniMax H3 Image', long: 'Видеостудия', krea: 'Изображение по тексту', kreareal: 'Изображение: реализм', qwen: 'Правка изображения', flux: 'Правка изображения: FLUX.2 (в коммерцию)', upscale: 'Увеличение видео и изображений', relayvsr: 'Быстрое увеличение видео (RelayVSR)' };
   $('#mdAdd').innerHTML = s.engine === 'managed' || s.engine === 'external' ? Object.entries(s.add_modes || {}).map(([m, gb]) =>
     /* «(+0 ГБ)» читается как ошибка: когда всё уже лежит на диске, кнопка ничего не качает,
          она только включает режим - так и пишем */
@@ -5163,7 +5163,14 @@ $('.nav[data-view="models"]').addEventListener('click', async () => {
 });
 
 /* ---------- LIBRARY ---------- */
-const MODE_NAME = { actionsc: 'Экшн-видеостудия', montage: 'Монтаж', custom: 'Свой workflow', video: 'Видео', lipsync: 'Lipsync', refs: 'Референсы', actor: 'Актёрская игра', swap: 'Замена персонажа', action: 'Экшн-видео', actionsc: 'Экшн-видеостудия', long: 'Видеостудия', krea: 'Изображение по тексту', qwen: 'Правка изображения', upscale: 'Увеличение', relayvsr: 'Увеличение' };
+const MODE_NAME = {
+    // one name per mode, the same the bar shows; the key used to be written twice, and the last
+    // one silently won - that is how an old name kept surviving every rename
+    montage: 'Монтаж', custom: 'Свой workflow', video: 'Видео', lipsync: 'Клип', refs: 'Видеостудия',
+    actor: 'Актёр', swap: 'Замена', action: 'Экшн-видео', actionsc: 'Экшн-студия', long: 'Киностудия',
+    krea: 'Изображение', fluxt: 'Изображение', qwent: 'Изображение', qwen: 'Правка', upfile: 'Ретушь',
+    upscale: 'Ретушь', relayvsr: 'Ретушь', plist: 'Список кадров', story: 'Раскадровка', sheet: 'Лист персонажа',
+  };
 const LIB = [];
 // a frame or a piece of sound arrives from a button, not from a run: the list is a shared array, so it
 // can be refilled in place, and the side tray is told to repaint - otherwise it shows yesterday's shelf
@@ -5648,7 +5655,7 @@ function makeRefMode(cfg) {
     <div class="head"><div><h1>${cfg.title}</h1><p>${cfg.sub}</p></div><div class="mode-pill"><i></i><span class="rm-pill">${cfg.pill}</span></div></div>
     <div class="grid"><div class="col">
       <div class="card">
-        <div class="card-h"><h3><span class="n">1</span>Референсы</h3><span class="counter rm-count"></span> <button class="btn mini rm-clr" type="button" title="Убрать все изображения сразу">Очистить изображения</button>
+        <div class="card-h"><h3><span class="n">1</span>Видеостудия</h3><span class="counter rm-count"></span> <button class="btn mini rm-clr" type="button" title="Убрать все изображения сразу">Очистить изображения</button>
           <button class="btn mini rm-clear" type="button" title="Убрать всё в этом разделе: картинки, видео, аудио и текст">Очистить всё</button></div>
         <div class="refs rm-imgs"></div>
         <div class="rm-media">
@@ -5930,7 +5937,7 @@ function makeRefMode(cfg) {
     card.append(host);
     const inp = document.createElement('input');
     inp.type = 'file'; inp.accept = 'video/*,.mp4,.mov,.mkv,.webm,.m4v'; inp.hidden = true; card.append(inp);
-    const MODE_NAME = { refs: 'Референсы', actor: 'Актёрская игра', action: 'Экшн-видео', long: 'Видеостудия', actionsc: 'Экшн-студия' }[cfg.mode] || cfg.mode;
+    const MODE_NAME = { refs: 'Видеостудия', actor: 'Актёр', action: 'Экшн-видео', long: 'Киностудия', actionsc: 'Экшн-студия' }[cfg.mode] || cfg.mode;
     let tr = null, cur = -1, pick = -1;
     const fmt = x => (Math.round(x * 10) / 10 + '').replace('.', ',');
     const paint = () => {
@@ -6112,7 +6119,7 @@ function makeRefMode(cfg) {
         return;
       }
       host.hidden = false;
-      const MODE_NAME = { refs: 'Референсы', actor: 'Актёрская игра', action: 'Экшн-видео', long: 'Видеостудия', actionsc: 'Экшн-студия' }[cfg.mode] || cfg.mode;
+      const MODE_NAME = { refs: 'Видеостудия', actor: 'Актёр', action: 'Экшн-видео', long: 'Киностудия', actionsc: 'Экшн-студия' }[cfg.mode] || cfg.mode;
       if (!tr) tr = root._raTrim = new AudioTrimmer({ mount: host, limit: 15, agentTarget: cfg.mode, onFile,
         whereLabel: q => 'раздел «' + MODE_NAME + '», аудио ' + (q._slot + 1) + ', тег <Audio ' + (q._slot + 1) + '>, ' + slots.length + ' места в разделе' });
       const src = s._src || s._file;
@@ -6264,7 +6271,7 @@ function makeRefMode(cfg) {
       <div class="ta-foot"><div class="tokens rm-tokens"></div><span class="hint">нажмите, чтобы вставить в сцену</span></div>
       <div class="note" style="margin-top:12px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 8h0M11 12h1v5h1"/></svg><span>Изображения героя необязательны: без них ролик строится только по тексту (например, про Древний Рим). Сцены идут одна за другой, каждая продолжает прошлую: герой, место и звук переходят дальше. Но при каждом продолжении изображение немного портится, поэтому при смене плана или места ставьте у сцены галочку «Новый план»: она строится заново по вашим изображениям, и качество остаётся как в первой сцене. В каждой сцене опишите героя, что он делает и как движется камера. Длину сцены задаёт ползунок. Текст сцены можно составить в разделе «Агент».</span></div>`;
     const c1 = $('.rm-imgs', root).closest('.card');
-    $('h3', c1).innerHTML = '<span class="n">1</span>Референсы';
+    $('h3', c1).innerHTML = '<span class="n">1</span>Видеостудия';
     $('.rm-count', root).hidden = true;
     $$('.rm-imgs .plus', root).forEach((pl, i) => { pl.lastChild.textContent = 'Референс'; });
     $('.rm-media .sub-l span', root).textContent = 'Песня или фрагмент';
@@ -7839,7 +7846,7 @@ function makeRefMode(cfg) {
 }
 const RM = {
   refs: makeRefMode({
-    mode: 'refs', title: 'Референсы', pill: 'Singularity Ref2V · 1 проход', dur: 6, maxImages: 9, videos: true,
+    mode: 'refs', title: 'Видеостудия', pill: 'Singularity Ref2V · 1 проход', dur: 6, maxImages: 9, videos: true,
     sub: 'Видео по изображениям, видео и аудио: персонаж, локация, движение, голос',
     refHint: 'Изображения — персонажи, локация, предметы (до 9). Видео задаёт движение или камеру, аудио — голос, ритм или атмосферу (всего до 12 файлов). В промпте ссылайтесь на изображения как &lt;Picture 1&gt;, &lt;Picture 2&gt;…',
     placeholder: '<Picture 1> идёт по ночной улице к камере, дождь, неон…',
@@ -7880,19 +7887,19 @@ const RM = {
 const PRESETS = [
   { id: 'swap', kind: 'video', title: 'Замена персонажа', isNew: true, role: 'swap_lora', need: 'видео + изображение героя',
     text: 'Берёте любое видео и меняете в нём человека на своего персонажа. Движения, камера и фон остаются прежними.' },
-  { id: 'refs', kind: 'video', badge: ['Лучшее качество', 'q'], title: 'Референсы', need: 'изображения, по желанию видео и аудио',
+  { id: 'refs', kind: 'video', badge: ['Лучшее качество', 'q'], title: 'Видеостудия', need: 'изображения, по желанию видео и аудио',
     text: 'Видео по вашим изображениям: персонаж, одежда, локация. Видео задаёт движение, аудио — голос или атмосферу.' },
-  { id: 'actor', kind: 'video', title: 'Актёрская игра', need: 'изображение + образец голоса',
+  { id: 'actor', kind: 'video', title: 'Актёр', need: 'изображение + образец голоса',
     text: 'Диалоги и крупные планы: эмоции, речь и голос по образцу.' },
-  { id: 'lipsync', kind: 'video', title: 'Lipsync / клип', need: 'аудио + лицо героя',
+  { id: 'lipsync', kind: 'video', title: 'Клип', need: 'аудио + лицо героя',
     text: 'Персонаж говорит или поёт ваше аудио: губы попадают в слова.' },
-  { id: 'video', kind: 'video', badge: ['Быстро', 'f'], title: 'Image-to-Video', need: 'текст или изображение',
+  { id: 'video', kind: 'video', badge: ['Быстро', 'f'], title: 'Видео', need: 'текст или изображение',
     text: 'Оживить изображение или сделать видео из текста. Можно начальный и конечный кадр.' },
   { id: 'action', kind: 'video', title: 'Экшн-видео', need: 'изображения героев',
     text: 'Бой, погоня, бег: динамичные сцены с вашими персонажами.' },
   { id: 'long', kind: 'video', badge: ['Быстрый черновик', 'f'], title: 'Видеостудия', need: 'изображения героев + сцены',
     text: 'Ролик из нескольких сцен, каждая продолжает прошлую: клипы, истории, музыка.' },
-  { id: 'actionsc', kind: 'video', isNew: true, role: 'action_unet', badge: ['8 + 4 шага', 'f'], title: 'Экшн-видеостудия',
+  { id: 'actionsc', kind: 'video', isNew: true, role: 'action_unet', badge: ['8 + 4 шага', 'f'], title: 'Экшн-студия',
     need: 'изображения героев + сцены',
     text: 'Длинный экшн по сценам: погоня или бой нарастает от сцены к сцене, клипы склеиваются в один ролик. Быстрый гибрид-расчёт, звук модель делает сама.' },
   { id: 'krea', kind: 'image', title: 'Изображение по тексту', need: 'только текст',
@@ -8155,7 +8162,7 @@ function agVidBtn() {
   lb.style.pointerEvents = n ? '' : 'none';
   lb.title = n
     ? `Агент посмотрит на видео как на кадры - вырежем их сами (этот режим принимает видео: ${n}). При переносе промпта в раздел уйдёт сам файл`
-    : 'Это видео не примет режим, для которого пишется промпт: выберите «Референсы», «Замену персонажа» или «Видеостудию»';
+    : 'Это видео не примет режим, для которого пишется промпт: выберите «Видеостудию», «Замену» или «Киностудию»';
 }
 function agFitVideos() {
   // the mode changed under the tray: the extra videos leave, the first ones stay
@@ -8191,7 +8198,7 @@ function agShareFrames() {
 }
 async function agFramesFromFile(f) {   // the only way the agent can look at a video: pieces of it
   const max = agVideoMax();
-  if (!max) { toast('Видео не нужен режиму, для которого пишется промпт: выберите «Референсы», «Замену персонажа» или «Видеостудию»'); return false; }
+  if (!max) { toast('Видео не нужен режиму, для которого пишется промпт: выберите «Видеостудию», «Замену» или «Киностудию»'); return false; }
   const again = AG.att.some(a => a.frame && a.vname === f.name);
   if (again) AG.att = AG.att.filter(a => !(a.frame && a.vname === f.name));   // the same video lays its frames out anew
   if (max === 1) AG.att = AG.att.filter(a => !a.frame);                       // one place: the new video takes it from the old
@@ -8237,7 +8244,7 @@ $('#agFile').onchange = async e => {
 };
 $('#agEmpty').onclick = e => { const s = e.target.closest('span'); if (s) { $('#agIn').value = s.textContent.replace(/[«»]/g, '').replace(/ \+ фото героинь$/, ''); $('#agIn').focus(); } };
 $('#agIn').addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); $('#agSend').click(); } });
-const AG_NAMES = { plist: 'список кадров', h3t: 'Изображение (MiniMax H3 Image)', h3e: 'Правку по референсам (MiniMax H3 Image)', actionsc: 'сцены Экшн-видеостудии', long: 'сцены Видеостудии', video: 'Генерацию видео', lipsync: 'Lipsync', refs: 'Референсы', actor: 'Актёрскую игру', swap: 'Замену персонажа', action: 'Экшн-видео', krea: 'Изображение по тексту', qwen: 'Правку изображения', sheet: 'Изображение по тексту', sheet6: 'Изображение по тексту', fluxt: 'Изображение по тексту', qwent: 'Изображение по тексту', story: 'Изображение по тексту' };
+const AG_NAMES = { plist: 'список кадров', h3t: 'Изображение (MiniMax H3 Image)', h3e: 'Правку по референсам (MiniMax H3 Image)', actionsc: 'сцены Экшн-студии', long: 'сцены Видеостудии', video: 'Генерацию видео', lipsync: 'Lipsync', refs: 'Референсы', actor: 'Актёрскую игру', swap: 'Замену персонажа', action: 'Экшн-видео', krea: 'Изображение по тексту', qwen: 'Правку изображения', sheet: 'Изображение по тексту', sheet6: 'Изображение по тексту', fluxt: 'Изображение по тексту', qwent: 'Изображение по тексту', story: 'Изображение по тексту' };
 const AG_IMG = ['plist', 'krea', 'qwen', 'sheet', 'sheet6', 'fluxt', 'qwent', 'h3t', 'h3e', 'story'];
 AG.storyModel = 'krea'; AG.storyFrames = true;
 AG.think = (() => { try { return localStorage.getItem('h3-ag-think') === 'deep' ? 'deep' : 'fast'; } catch { return 'fast'; } })();
@@ -8304,7 +8311,7 @@ function agCtx() {
     ? `Длительность ${V.dur} с (как в «Генерации видео»). Изображения в чате: ${n} — 1-я станет первым кадром, 2-я последним.`
     : AG.target === 'lipsync'
       ? `Длина видео = длине аудио${L.dur0 ? ` (${L.len().toFixed(1)} с)` : ''}. Изображения в чате: ${n} — станут референсами Picture 1, 2…`
-      : `Длительность ${RM[AG.target].S.dur} с (как в разделе «${{ refs: 'Референсы', actor: 'Актёрская игра', action: 'Экшн-видео', actionsc: 'Экшн-видеостудия' }[AG.target]}»). Изображения в чате: ${n} — станут Picture 1, 2…`) + agVidNote();
+      : `Длительность ${RM[AG.target].S.dur} с (как в разделе «${{ refs: 'Видеостудия', actor: 'Актёр', action: 'Экшн-видео', actionsc: 'Экшн-студия' }[AG.target]}»). Изображения в чате: ${n} — станут Picture 1, 2…`) + agVidNote();
 }
 function mdLite(s) {
   return esc(s).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').split(/\n{2,}/).map(p => `<p>${p.replace(/\n/g, '<br>')}</p>`).join('');
@@ -8390,7 +8397,7 @@ function audioTagFor(name, dur) {
     const near = d => !(d > 0) || !(dur > 0) || Math.abs(d - dur) < 0.4;
     const found = [];
     const view = (document.querySelector('.view.active') || {}).id || '';
-    const PLAIN = { 'view-refs': ['refs', 'Референсы'], 'view-actor': ['actor', 'Актёрская игра'], 'view-action': ['action', 'Экшн-видео'] };
+    const PLAIN = { 'view-refs': ['refs', 'Видеостудия'], 'view-actor': ['actor', 'Актёр'], 'view-action': ['action', 'Экшн-видео'] };
     if (PLAIN[view]) {
       const key = PLAIN[view][0], R = (typeof RM !== 'undefined' && RM[key]) ? RM[key].root : null;
       if (R) {
@@ -9637,7 +9644,7 @@ async function libToFile(it) {
 }
 
 /* ---------- Library -> workflow: "Use in…" button and the side tray to drag from ---------- */
-const USE_TARGETS = [['video', 'Image-to-Video'], ['lipsync', 'Lipsync / клип'], ['refs', 'Референсы'], ['actor', 'Актёрская игра'], ['action', 'Экшн-видео'], ['actionsc', 'Экшн-видеостудия'], ['long', 'Видеостудия'], ['qwen', 'Правка изображения'], ['agent', 'Агент (в чат)']];
+const USE_TARGETS = [['video', 'Видео'], ['lipsync', 'Клип'], ['refs', 'Видеостудия'], ['actor', 'Актёр'], ['action', 'Экшн-видео'], ['actionsc', 'Экшн-студия'], ['long', 'Видеостудия'], ['qwen', 'Правка изображения'], ['agent', 'Агент (в чат)']];
 function freeSlot(view) {
   const root = $('#view-' + view); if (!root) return null;
   const s = $$('label.drop:not(.disabled):not(.filled), label.ref:not(.filled)', root)[0];
@@ -11258,6 +11265,236 @@ if (e.target.closest('.mt-clear')) {
   $$('.view').forEach(watch);
 })();
 
+
+/* ---------- one place for instructions: the ? next to a page title ----------
+   Every page has one ? button and nothing else. The texts say only how to work here:
+   what a button does, what a field answers for, what is saved and what it affects. */
+(function () {
+  const escq = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const H = t => '<div class="hint mh-h">' + t + '</div>';
+  const B = (name, what) => '<li><b>' + name + '</b> - ' + what + '</li>';
+  const UL = items => '<ul class="mh-ul">' + items.join('') + '</ul>';
+
+  // what stands on almost every page
+  const SHARED = () => H('<b>Общее для всех режимов</b>') + UL([
+    B('Кнопки вверху и слева', 'открывают режимы; наведение на верхнюю подсказывает, что откроется.'),
+    B('Карточка с номером', 'сворачивается и разворачивается щелчком по её заголовку; свернуть всё разом - кнопка «Свернуть всё».'),
+    B('Кнопка «Старт» внизу', 'запускает задание; во время работы она превращается в «Остановить».'),
+    B('Очередь', 'все запущенные задания стоят там; можно дождаться, остановить или убрать из списка.'),
+    B('Библиотека', 'сюда попадают все готовые работы; нажмите на неё, чтобы открыть просмотр, «★» - пометить, «Удалить» - убрать файл в корзину.'),
+    B('Панель «Библиотека» справа', 'открывается кнопкой у правого края: Фото, Видео и Аудио тремя группами. Файл можно перетащить из неё в любое место любого режима, а щелчок открывает просмотр.'),
+    B('Звук', 'его не надо включать. Положите аудио - ролик строится под него. Не положили - звук сделает модель.'),
+    B('Куда что попадает', 'готовые видео и фото - в Библиотеку и в папку data/outputs; кадры и звук, сохранённые кнопками, - в папку data/keeps.'),
+  ]);
+
+  const BENCH = () => H('<b>Верстак видео: «✂ Монтаж»</b>') + UL([
+    B('Лента', 'показывает кадры вашего видео. Ползунок «Шире лента - точнее кадр» растягивает ленту: чем шире, тем легче попасть в нужный кадр.'),
+    B('Жёлтая линия', 'это метка реза. Схватите её мышью и поставьте куда нужно; она же стоит там, когда вы листаете кадры.'),
+    B('Стрелки над меткой', 'шаг на один кадр (1/24 секунды).'),
+    B('Ножницы у метки', 'левая убирает всё до метки, правая - всё после.'),
+    B('Слева вверху на ленте', 'секунды метки и номер кадра: «маркер 3,25 с · кадр 78».'),
+    B('Клик по ленте', 'играет видео: левее метки - от начала куска до метки, правее - от метки до конца.'),
+    B('Ручки по краям синей рамки', 'задают начало и конец куска; поля «с» и «до» ниже - то же самое числами.'),
+    B('«Оставить выбранное»', 'отрезает кусок и кладёт в ленту его одного. Ваш файл не меняется.'),
+    B('«Вернуть целый»', 'возвращает в ленту исходный файл целиком.'),
+    B('Двойной щелчок по ленте', 'то же: снять обрезку.'),
+    B('«📷 Сделать кадр»', 'сохраняет кадр под меткой: он встаёт в свободное место картинок этого режима и копией уходит в Библиотеку.'),
+    B('«🤖 В агент»', 'отправляет отрезанный кусок в «Агент»: он слушает звук и пишет промпт по тому, что видит.'),
+  ]);
+
+  const TAGS = () => H('<b>Теги в тексте</b>') + UL([
+    B('&lt;Picture 1&gt;, &lt;Picture 2&gt;…', 'ваши загруженные картинки по порядку. Нажмите на плашку под текстом - тег встанет туда, где курсор.'),
+    B('&lt;Video 1&gt; …', 'референс-видео этого режима.'),
+    B('&lt;Audio 1&gt; …', 'аудио этого режима.'),
+    B('Номера в режимах со сценами', 'свои медиа сцены занимают десятки: первая сцена - 10-19, вторая - 20-29. Номер сам говорит, из какой он сцены.'),
+    B('Если тег не написан', 'модель файл не использует, даже если он загружен.'),
+  ]);
+
+  const PER = {
+    video: () => H('<b>Видео из картинки</b>') + UL([
+      B('Промпт', 'опишите, что происходит. Одна фраза - одно действие, так стабильнее.'),
+      B('Изображения', 'первая картинка - стартовый кадр; если хотите конкретный конец, положите последний кадр в специальное место.'),
+      B('Длительность', 'сколько секунд ролика получить.'),
+      B('Что влияет на сходство', 'чем меньше изменений в кадре нужно, тем короче и проще должен быть текст.'),
+    ]),
+    refs: () => H('<b>Видеостудия - видео по вашим референсам</b>') + UL([
+      B('Картинки (до 9)', 'герои, одежда, предметы, пространство. Каждый вызов в тексте - &lt;Picture №&gt;.'),
+      B('Видео (до 3, до 25 секунд)', 'задаёт движение и камеру. Обрежьте лишнее в верстаке - в расчёт пойдёт только отмеренное время.'),
+      B('Аудио (до 3)', 'определяет звук и длину. Аудио длиннее - ролик тянется под него.'),
+      B('Длительность', 'если аудио нет, длину задаёте вы.'),
+      B('Промпт', 'что делают герои и куда смотрит камера; вставляйте теги вместо слов «он», «она», «это».'),
+    ]),
+    long: () => H('<b>Киностудия - фильм по сценам</b>') + UL([
+      B('«Новые сцены»', 'вы пишете список сцен; каждая - отдельный клип до 15 секунд, следующая продолжает последнюю картинку предыдущей.'),
+      B('«Продолжить видео»', 'берёт ваше готовое видео и дописывает сцены после него.'),
+      B('Плюс под сценой', 'добавляет ещё одну сцену; номер карточки слева - это и есть её место.'),
+      B('Картинки сцены', 'до 9 на каждую сцену; свои медиа нумеруются десятками по номеру сцены.'),
+      B('Аудио сцены', 'до трёх файлов на сцену: звук этой сцены берётся из них.'),
+      B('Общее аудио', 'фоновый звук всего ролика, тег &lt;Audio 1&gt;.'),
+      B('Склейка', 'сцены соединяются подряд в один файл; длина ролика - сумма сцен.'),
+    ]),
+    action: () => H('<b>Экшн-видео - одно динамичное видео</b>') + UL([
+      B('Картинки', 'герой и пространство; первым ставьте то, что должно узнаваться.'),
+      B('Промпт', 'движение и удары глаголами: «бежит», «прыгает», «отбивает».'),
+      B('Длительность', 'для драки хватает 6-8 секунд; длиннее - движение начинает плыть.'),
+      B('Быстрый и точный проход', 'программа делает черновой кадр и уточняет его; это уже встроено.'),
+    ]),
+    actionsc: () => H('<b>Экшн-студия - динамичные сцены подряд</b>') + UL([
+      B('Сцены', 'пишутся списком, каждая до 15 секунд: погоня - это несколько сцен, а не одна длинная.'),
+      B('Картинки сцены', 'до 5: герой, место, нужный ракурс.'),
+      B('Преемственность', 'следующая сцена начинается с последнего кадра предыдущей, поэтому герой не меняет лицо от сцены к сцене.'),
+      B('Звук', 'делает модель; свой звук кладите в карточку «Аудио».'),
+    ]),
+    lipsync: () => H('<b>Клип - герой говорит или поёт под ваше аудио</b>') + UL([
+      B('Аудио', 'обязательно: из него берутся слова, ритм и длительность ролика.'),
+      B('Лицо', 'одна картинка с лицом; лучше крупно и анфас.'),
+      B('Длительность', 'её задаёт аудио; менять смысла нет.'),
+      B('Ускорение черновика', 'быстрее, но губы чуть грубее; снимите галочку для точной синхронизации.'),
+    ]),
+    actor: () => H('<b>Актёр - диалог и эмоции</b>') + UL([
+      B('Картинка (до 3)', 'герой и окружение; первой - та, где лицо хорошо видно.'),
+      B('Аудио', 'образец голоса: берутся тембр и манера, а слова произносятся из вашего текста.'),
+      B('Текст', 'что герой говорит и что чувствует: «спокойно», «с угрозой», «сквозь слёзы».'),
+      B('Длительность', 'до 14 секунд; подлиннее - мимика начинает сползать.'),
+    ]),
+    swap: () => H('<b>Замена - меняем человека в вашем видео</b>') + UL([
+      B('Видео', 'до 25 секунд, один непрерывный план лучше. Обрежьте лишнее кнопкой «✂ Монтаж».'),
+      B('Персонаж 1', 'тот, кого ставим вместо вашего героя. Одна картинка - одна замена.'),
+      B('Персонаж 2', 'второй герой, если в кадре двое.'),
+      B('«📷 Сделать кадр»', 'сохраняет кадр из вашего видео как картинку - её можно поставить вместо героя или взять в другой режим.'),
+      B('Длительность', 'по умолчанию берётся длина видео; уменьшить - быстрее.'),
+    ]),
+    krea: () => H('<b>Изображение по тексту</b>') + UL([
+      B('Текст', 'что нарисовать; стиль и свет пишите отдельными словами в конце.'),
+      B('Формат', 'горизонт, вертикаль, квадрат; размер выбирается под формат.'),
+      B('Детализация', 'больше мегапикселей - дольше и чище детали.'),
+      B('«Увеличить изображение»', 'поднимает разрешение и добавляет резкости готовой картинке.'),
+    ]),
+    qwen: () => H('<b>Правка - изменение готового изображения</b>') + UL([
+      B('Изображение', 'обязательно: что правим.'),
+      B('Текст', 'что изменить: «убери фон», «сделай куртку красной», «добавь очки».'),
+      B('Много правок', 'лучше по одной: так лицо и одежда не уплывают.'),
+    ]),
+    upfile: () => H('<b>Ретушь - улучшение видео или фото</b>') + UL([
+      B('Файл', 'видео или фото, которое нужно вытянуть.'),
+      B('Степень', '"быстро" - картинки уменьшаются; "максимум" - лучшее сходство, дольше.'),
+      B('Лицо', 'отдельная обработка лица: включайте, когда в кадре крупно человек.'),
+      B('Результат', 'кладётся в Библиотеку как новый файл, исходный не меняется.'),
+    ]),
+    montage: () => H('<b>Монтаж - склейка готовых клипов</b>') + UL([
+      B('Клик по клипу сверху', 'кладёт его в ленту; повторный клик убирает.'),
+      B('Стрелки ◀ ▶ под клипом или перетаскивание', 'меняют порядок склейки.'),
+      B('Лента', 'показывает кадры каждого клипа; жёлтая линия - метка реза, стрелки листают по кадру, ножницы режут у метки.'),
+      B('Поля «с» и «до»', 'обрезка выбранного клипа; «Вернуть целый» снимает её.'),
+      B('Клик по ленте', 'играет с этого места.'),
+      B('Ползунок «1 секунда»', 'масштаб ленты: шире - точнее режешь.'),
+      B('Треугольник под лентой', 'тяните вверх-вниз, чтобы сделать ленту выше; двойной щелчок возвращает обычную высоту.'),
+      B('«📷 Сделать кадр»', 'кадр под меткой уходит в Библиотеку.'),
+      B('«🎧 Сделать звук»', 'собирает звук всей ленты после обрезки в один файл и кладёт в Библиотеку.'),
+      B('Кнопка запуска', 'складывает клипы в один ролик; «Очистить ленту» убирает их из монтажа, сами файлы остаются в Библиотеке.'),
+    ]),
+    library: () => H('<b>Библиотека - всё, что программа сделала</b>') + UL([
+      B('Полоса сверху', 'фильтр: все, только видео, только картинки, по режиму, избранное.'),
+      B('Щелчок по карточке', 'открывает просмотр; галочки слева включают режим выбора, чтобы убрать несколько сразу.'),
+      B('«★»', 'помечает, чтобы не lostлось в общем списке.'),
+      B('"В монтаж"', 'кладёт клип в ленту монтажа.'),
+      B('"Использовать в…"', 'переносит файл в нужный режим одним нажатием.'),
+      B('«Удалить»', 'убирает запись и файл в корзину; «Сохранить копии старых файлов» держит второй экземпляр в папке программы.'),
+    ]),
+    models: () => H('<b>Настройки - движок, модели, файлы</b>') + UL([
+      B('Движок', 'показывает, подключён ли ComfyUI; кнопка запускает его, если он не запущен.'),
+      B('Модели', 'что скачано и что можно докачать; отмечены только нужные - остальное докачивается позже.'),
+      B('Свои модели', 'папка, откуда программа берёт файлы; туда же кладите свои safetensors.'),
+      B('Ваши LoRA', 'ускорение и стили, которые вы положили сами; включаются по одному на режим.'),
+      B('Интерфейс', 'тема и размер; размер нужен, когда экран маленький и карточки не влезают.'),
+      B('Резервные копии', 'копии готовых файлов в папке программы: включают, если боитесь потерять результат.'),
+    ]),
+    presets: () => H('<b>Главная - с чего начать</b>') + UL([
+      B('Карточка режима', 'открывает нужный режим; под названием написано, что ему нужно загрузить.'),
+      B('Отметить режимы', 'если включить несколько, в «Промпт для» и вверху останутся только они - так экран чище.'),
+      B('Первый запуск', 'достаточно настроить движок и выбрать один режим; остальное программа спросит сама.'),
+    ]),
+    queue: () => H('<b>Очередь - что сейчас делается</b>') + UL([
+      B('Строка задания', 'режим, промпт и прогресс; нажмите, чтобы развернуть подробности.'),
+      B('«Остановить»', 'прерывает одно задание, остальные идут дальше.'),
+      B('«Убрать»', 'вычёркивает из списка; готовый файл остаётся в Библиотеке.'),
+      B('После закрытия программы', 'недоделанные задания сохраняются, и при следующем запуске программа спросит, продолжить ли их.'),
+    ]),
+    agent: () => H('<b>Агент - думает и собирает задание</b>') + UL([
+      B('Режим', 'то, что в итоге будет сниматься; от него зависит, какие места доступны.'),
+      B('Вложение', 'картинка или файл из панели Библиотеки: перетащите в чат.'),
+      B('«Быстро» / «Думать глубже»', 'короткий ответ или длинное размышление для сложной истории.'),
+      B('Ответ агента', 'можно отправить прямо в работу - кнопки под сообщением.'),
+    ]),
+  };
+
+  function open(view, name) {
+    let m = document.getElementById('modeHelpM');
+    if (!m) {
+      m = document.createElement('div'); m.className = 'modal'; m.id = 'modeHelpM';
+      document.body.append(m);
+      m.addEventListener('click', e => { if (e.target === m || e.target.closest('[data-x]')) m.hidden = true; });
+    }
+    const key = (view.id || '').replace('view-', '');
+    const body = ((PER[key] ? PER[key]() : '') + TAGS() + (PER[key] === PER.refs || PER[key] === PER.swap ? BENCH() : '') +
+      (key === 'montage' ? '' : '') + SHARED());
+    m.hidden = false;
+    m.innerHTML = '<div class="box"><div class="card-h"><h3>' + escq(name) + '</h3>' +
+      '<button class="x" type="button" data-x aria-label="Закрыть">✕</button></div>' +
+      '<div class="mh-body">' + body + '</div>' +
+      '<div class="mh-foot"><button class="btn mini" type="button" data-x>Закрыть</button></div></div>';
+  }
+
+  const style = document.createElement('style');
+  style.textContent = '.h3q{width:22px;height:22px;flex:none;border-radius:50%;border:1px solid var(--line-2);' +
+    'background:var(--card,#222);color:var(--muted);font-size:12.5px;font-weight:800;line-height:1;cursor:pointer;' +
+    'display:inline-grid;place-items:center;padding:0;transition:.15s}' +
+    '.h3q:hover{background:var(--accent,#c0405a);color:#fff;border-color:transparent;transform:scale(1.08)}' +
+    'h1.h1q{display:flex;align-items:center;gap:9px}' +
+    '#modeHelpM .box{padding:22px;max-width:760px;max-height:calc(var(--vh,1vh)*86);overflow:auto}' +
+    '#modeHelpM .mh-h{font-size:12.5px;margin-top:4px}' +
+    '#modeHelpM .mh-ul{margin:6px 0 10px;padding-left:18px;font-size:12.5px;line-height:1.6;color:var(--text)}' +
+    '#modeHelpM .mh-ul li{margin:3px 0}' +
+    '#modeHelpM .mh-foot{margin-top:14px}' +
+    '.how-hidden{display:none!important}';
+  document.head.append(style);
+
+  // any other way to open instructions is off: the ? is the only one
+  const OFF = /как работает|как пользоваться|советы|справка|подсказк/i;
+  function hideOthers(root) {
+    root.querySelectorAll('details.agvar, .btn, summary, button').forEach(el => {
+      const t = (el.textContent || '').trim();
+      if (t.length > 60 || !OFF.test(t)) return;
+      if (el.closest('.mh-body') || el.classList.contains('h3q')) return;
+      // a fold with fields inside is a control, not an instruction: leaving it alone
+      if (el.matches('details') ? el.querySelector('input,select,textarea,button:not([data-x])')
+                               : el.tagName === 'BUTTON' ? false : el.querySelector('input,select,textarea')) return;
+      el.classList.add('how-hidden');
+    });
+  }
+  function plant() {
+    document.querySelectorAll('.view').forEach(v => {
+      const h = v.querySelector('.head h1, h1');
+      if (h && !h.querySelector('.h3q')) {
+        const name = (h.textContent || '').trim();
+        h.classList.add('h1q');
+        const b = document.createElement('button');
+        b.type = 'button'; b.className = 'h3q'; b.textContent = '?';
+        b.title = 'Как пользоваться этим режимом';
+        b.onclick = () => open(v, name);
+        h.append(b);
+      }
+      hideOthers(v);
+    });
+    hideOthers(document.body);
+  }
+  plant();
+  let queue = 0;
+  new MutationObserver(() => {
+    if (queue) return;
+    queue = setTimeout(() => { queue = 0; plant(); }, 500);
+  }).observe(document.body, { childList: true, subtree: true });
+})();
 </script>
 </body>
 </html>
