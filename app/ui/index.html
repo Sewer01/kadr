@@ -1124,7 +1124,7 @@ body.dropping::after{content:'Отпустите — программа разл
     .vt-view{width:100%;max-height:230px;border-radius:10px;background:#000;object-fit:contain}
     .vt-body{display:grid;gap:8px}
     .vt-stripwrap{overflow:hidden;border-radius:9px;border:1px solid var(--line-2);background:#0c0f14}
-    .vt-strip{position:relative;height:86px;cursor:text;touch-action:none;min-width:100%}
+    .vt-strip{position:relative;height:86px;cursor:pointer;touch-action:none;min-width:100%}
     .vt-cv{display:block;width:100%;height:86px}
     .vt-sel{position:absolute;top:0;bottom:0;border-left:2px solid var(--accent);border-right:2px solid var(--accent);
       background:rgba(255,255,255,.06);box-shadow:0 0 0 9999px rgba(0,0,0,.42)}
@@ -1144,11 +1144,7 @@ body.dropping::after{content:'Отпустите — программа разл
     .vt-b:hover{background:var(--accent);border-color:var(--accent)}
     .vt-span{position:absolute;top:2px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.7);
       color:#fff;border-radius:6px;padding:1px 6px;font-size:11px;white-space:nowrap}
-    .vt-x{position:absolute;right:3px;top:2px;background:rgba(0,0,0,.6);color:#fff;border:0;border-radius:6px;
-      width:20px;height:18px;font-size:11px;line-height:1;cursor:pointer}
-    .vt-x:hover{background:#c0303f}
     .vt-sel{display:block}
-    .vt-strip.narrow .vt-span,.vt-strip.narrow .vt-x{display:none}
     .vt-pp{font-size:12px;opacity:.8}
     .mt-scale span:first-child{font-size:12px;opacity:.8}
 
@@ -1158,25 +1154,27 @@ body.dropping::after{content:'Отпустите — программа разл
     .vt-b:hover{background:var(--accent);border-color:var(--accent)}
     .vt-span{position:absolute;top:2px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.72);
       color:#fff;border-radius:6px;padding:1px 6px;font-size:11px;white-space:nowrap;pointer-events:none}
-    .vt-x{position:absolute;right:3px;top:2px;background:rgba(0,0,0,.6);color:#fff;border:0;border-radius:6px;
-      width:20px;height:18px;font-size:11px;line-height:1;cursor:pointer;z-index:4}
-    .vt-x:hover{background:#c0303f}
-    .vt-strip.narrow .vt-span,.vt-strip.narrow .vt-x{display:none}
     .vt-pp{font-size:12px;opacity:.8}
     .sw-bench{margin-top:10px}
 
     /* the marker is a place: a head you grab, arrows above it, a scissors on each side of the line.
        The blue line is a different thing - it only shows where the preview stands right now. */
-    .vt-ph{width:0;z-index:5;cursor:ew-resize;touch-action:none;background:transparent;box-shadow:none}
+    .vt-ph{width:0;z-index:5;cursor:grab;touch-action:none;background:transparent;box-shadow:none}
+    .vt-ph:active{cursor:grabbing}
     .vt-head{position:absolute;left:-7px;top:-1px;width:14px;height:14px;background:transparent}
     .vt-head::before{content:'';position:absolute;left:4px;top:0;border:5px solid transparent;border-top-color:#ffd34d}
     .vt-head::after{content:'';position:absolute;left:5px;top:9px;bottom:-90px;width:2px;background:#ffd34d;
       box-shadow:0 0 6px rgba(255,211,77,.8)}
-    .vt-step{position:absolute;bottom:100%;left:0;transform:translateX(-50%);display:flex;gap:2px;margin-bottom:2px}
+    .vt-step{position:absolute;top:4px;left:0;transform:translateX(-50%);display:flex;gap:2px}
     .vt-cutl{position:absolute;right:8px;top:34px}
     .vt-cutr{position:absolute;left:8px;top:34px;transform:scaleX(-1)}
     .vt-run{position:absolute;top:0;bottom:0;width:2px;background:#4c9cff;box-shadow:0 0 6px rgba(76,156,255,.7);
       pointer-events:none;z-index:4}
+
+    /* near the edges the buttons slide along the marker instead of hanging over the border */
+    .vt-ph.near-left .vt-step,.vt-ph.near-left .vt-cutl{transform:translateX(0)}
+    .vt-ph.near-right .vt-step,.vt-ph.near-right .vt-cutr{transform:translateX(-100%)}
+    .vt-cutl{transform:none}.vt-cutr{transform:scaleX(-1)}
 </style>
 </head>
 <body>
@@ -3402,8 +3400,7 @@ class VideoTrimmer {
       '<div class="vt-stripwrap"><div class="vt-strip">' +
       '<canvas class="vt-cv" height="86"></canvas>' +
       '<div class="vt-sel"><span class="vt-span"></span>' +
-      '<i class="at-h" data-h="l"></i><i class="at-h" data-h="r"></i>' +
-      '<button class="vt-x" type="button" title="Убрать клип из монтажа">✕</button></div>' +
+      '<i class="at-h" data-h="l"></i><i class="at-h" data-h="r"></i></div>' +
       '<div class="vt-ph" title="маркер: его и тянут, от него режут"><i class="vt-head"></i>' +
       '<span class="vt-step">' +
       '<button class="vt-b" data-s="back" type="button" title="Кадр назад">&#9664;</button>' +
@@ -3663,11 +3660,6 @@ class VideoTrimmer {
         }
       };
     });
-    this.q('.vt-x').onclick = ev => {
-      ev.stopPropagation();
-      if (this.o.onRemove) this.o.onRemove(this);
-      else this.say('Убрать клип должен тот, кто его сюда положил');
-    };
     this.q('.vt-play').onclick = () => {
       const v = this.q('.vt-view');
       if (this.busy) return;
