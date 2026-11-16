@@ -10630,15 +10630,24 @@ applyZoom();
     const mkEl = $('.mt-mk', root);
     if (mkEl) mkEl.textContent = 'маркер ' + (Math.round(mk.off * 100) / 100 + '').replace('.', ',') +
       ' с · кадр ' + Math.round(mk.off / frameStep()) + ' · клип ' + (mk.i + 1);
-    const mx = xOf(mk.i, mk.off);   // drawn where it truly is: a "keep it in view" clamp here puts the screen out of step with the mouse
-    ph.style.left = mx + 'px'; if (ln) ln.style.left = mx + 'px';
-    $$('.mt-fr', strip).forEach(b => { b.style.left = (mx + (+b.dataset.fr === 1 ? 14 : -36)) + 'px'; });
+    const mx = xOf(mk.i, mk.off);   // the line is drawn where it truly is
+    if (ln) ln.style.left = mx + 'px';
+    // the grip, the arrows and the scissors are a hand's business: at the very beginning of the first
+    // block they used to hang over the edge of the ribbon, where nothing can catch them. The line stays
+    // exact, the handles slide to stay under the cursor. The bounds are the VISIBLE part of the ribbon:
+    // it scrolls, and the handles live in the ribbon's own coordinates
+    const L0 = strip.scrollLeft, R0 = strip.scrollLeft + (strip.clientWidth || 1);
+    ph.style.left = Math.max(L0 + 12, Math.min(R0 - 12, mx)) + 'px';
+    $$('.mt-fr', strip).forEach(b => {
+      const want = mx + (+b.dataset.fr === 1 ? 14 : -36);
+      b.style.left = Math.max(L0, Math.min(R0 - 22, want)) + 'px';
+    });
     // the scissors stand on both sides of the marker: one click and the piece is cut there
     $$('.mt-cut', strip).forEach(b => {
       const out = b.dataset.cut === 'out';
       let want = mx + (out ? 10 : -36);
       if (want < 2) want = Math.max(2, mx + (out ? -36 : 10));    // no room outside - stand on the other side
-      b.style.left = want + 'px';
+      b.style.left = Math.max(0, Math.min((strip.clientWidth || 1) - 26, want)) + 'px';
     });
     const gx = xOf(P.i, P.g - startOf(P.i));     // the running playhead: this one may move
     if (run) run.style.left = gx + 'px';
