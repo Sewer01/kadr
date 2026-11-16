@@ -3434,6 +3434,7 @@ class VideoTrimmer {
   q(s) { return this.el.querySelector(s); }
   len() { return Math.max(0, this.end - this.start); }
   fmt(x) { return (Math.round(x * 10) / 10 + '').replace('.', ','); }
+  fmt2(x) { return (Math.round(x * 100) / 100 + '').replace('.', ','); }
   stripW() { return this.pps ? Math.max(80, this.dur0 * this.pps) : 0; }   // 0 = as wide as the window
   _push() { this.undo.push({ s: this.start, e: this.end, cut: this.cut, t: this.t }); if (this.undo.length > 20) this.undo.shift(); this.q('.vt-und').disabled = false; }
   setFile(f, silent) {
@@ -3556,7 +3557,10 @@ class VideoTrimmer {
     run.hidden = !this.dur0 || Math.abs(this.run - this.t) < .01;
     ph.classList.toggle('near-left', linePx < 34);
     ph.classList.toggle('near-right', linePx > W - 34);
-    this.q('.vt-span').textContent = this.dur0 ? 'маркер ' + this.fmt(this.t) + ' с' : '';
+    // two decimals and the frame number: a frame is 1/24 = 0,04 с, so with one decimal two
+    // neighbouring frames showed the same number, which is exactly what the plate is for
+    this.q('.vt-span').textContent = this.dur0
+      ? 'маркер ' + this.fmt2(this.t) + ' с · кадр ' + Math.round(this.t * this.fps) : '';
     this.q('.at-len').textContent = this.dur0 ? this.fmt(this.dur0) + ' с' : '—';
     this.q('.vt-a').value = this.fmt(this.start).replace(',', '.');
     this.q('.vt-b2').value = this.fmt(this.end).replace(',', '.');
