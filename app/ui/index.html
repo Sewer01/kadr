@@ -815,6 +815,9 @@ img.pr-media{object-position:center 38%}
 /* the button that sits in a card heading: same small size, pushed to the right edge, quiet until
    the pointer reaches it */
 .rm-clr{margin-left:auto}
+.sub-l .agall-h{margin-left:auto}
+/* the same control, asleep: nothing to take yet */
+.agall-h:disabled{opacity:.42;cursor:not-allowed;filter:none;background:var(--surface-2);border-color:var(--line-2);color:var(--muted)}
 .agall-h{margin-left:0;flex:none;font-size:12px;padding:5px 11px;min-height:0;border-radius:9px;background:var(--surface-2);border:1px solid var(--line-2);color:var(--muted)}
 .agall-h:hover{border-color:var(--accent);color:var(--text)}
 .card.fold.collapsed>.card-h .agall-h{background:rgba(var(--accent-rgb),.12);border-color:var(--accent);color:var(--text)}
@@ -901,7 +904,7 @@ body.dropping::after{content:'Отпустите — программа разл
 .slot small{color:var(--dim);font-family:var(--mono);font-size:10.5px}
 .slot .x{position:absolute;right:5px;top:5px;width:20px;height:20px;border-radius:6px;background:rgba(var(--ov-rgb),.8);display:none;place-items:center;font-size:9px}
 .slot.filled .x{display:grid}
-.sub-l{font-size:12px;font-weight:700;color:var(--muted);margin:14px 0 8px;display:flex;justify-content:space-between}
+.sub-l{font-size:12px;font-weight:700;color:var(--muted);margin:14px 0 8px;display:flex;justify-content:space-between;gap:8px}
 .media-hint{display:block;margin-top:6px;font-size:11px;color:var(--dim)}
 .toggles{display:flex;gap:8px;flex-wrap:wrap}
 .status-box{display:grid;gap:4px;font-size:12.5px;padding:10px 12px;border-radius:11px;background:var(--bg-2);border:1px solid var(--line)}
@@ -6819,40 +6822,6 @@ function makeRefMode(cfg) {
     $$('.rm-imgs .plus', root).forEach((pl, i) => { pl.lastChild.textContent = 'Референс'; });
     $('.rm-media .sub-l span', root).textContent = 'Песня или фрагмент';
     $('.rm-media .media-hint', root).textContent = 'любой длины: каждая сцена берёт свой кусок по порядку';
-    /* One press puts every picture of this section into the Agent's chat - and nothing else. The
-       button that used to stand here also switched the Agent's target and opened a fresh context, so
-       what a person had already typed or attached disappeared; the Agent is a basket to fill, not a
-       form to reset. The heading is where the control lives: the card is folded most of the time. */
-    const imgAll = document.createElement('button');
-    imgAll.type = 'button'; imgAll.className = 'btn mini agall-h';
-    imgAll.textContent = '🖼 Все изображения в агент';
-    imgAll.title = 'Сложить в чат Агента все изображения - и общие, и те, что лежат в отдельных сценах; он допишет их к тому, что уже есть, и ничего не очистит';
-    $('.card-h', c1).append(imgAll);
-    imgAll.addEventListener('click', e => e.stopPropagation());   // a press here must not fold the card
-    imgAll.onclick = async () => {
-      // every picture the film can stand on: the common places first (<Picture 1..9>), then each
-      // scene's own places in the order of their tags (<Picture 10..>, <Picture 20..>) - the Agent
-      // receives them in the same order a person reads them on the screen
-      const want = [];
-      // the number of the tag is the place the picture stands in, not its rank among the filled ones
-      $$('label.ref', imgsEl).forEach((r, j) => { if (r._file) want.push({ f: r._file, note: 'общий референс, тег <Picture ' + (j + 1) + '>' }); });
-      $$('.sc', root).forEach((cc, i) => (cc._files || []).forEach((f, j) => { if (f) want.push({ f, note: 'сцена ' + (i + 1) + ', своё фото, тег <Picture ' + (10 * (i + 1) + j) + '>' }); }));
-      if (!want.length) { toast('Изображений нет - добавьте их в общий раздел или в сцену'); return; }
-      let added = 0, again = 0, own = 0;
-      try {
-        for (const it of want) {
-          if (AG.att.some(a => a.file && a.file.name === it.f.name && a.file.size === it.f.size)) { again++; continue; }
-          await agAttachFile(it.f, it.note); added++;
-          if (it.note.startsWith('сцена')) own++;
-        }
-        goTo('agent');   // the current target stays as it is: the chat is filled, never restarted
-        const common = added - own;
-        toast(added ? ('В чат агента добавлено изображений: ' + added
-            + (common && own ? ' (общих ' + common + ', из сцен ' + own + ')' : own ? ' (все из сцен)' : '')
-            + (again ? ' · ' + again + ' уже лежало' : ''))
-            : 'Все эти изображения уже лежат в чате агента');
-      } catch { toast('Не удалось передать изображения агенту'); }
-    };
     const box = $('.lm-scenes', root);
     const snap = v => { v = Math.max(5, Math.round(v * 24)); return v + (5 - v % 17 + 17) % 17; };
     const accs = () => {  // frames of the finished video after each scene (same arithmetic as the server)
@@ -7831,7 +7800,7 @@ function makeRefMode(cfg) {
           '<div class="mus-extra"></div>' +
           '<small class="hint" style="display:block;margin-top:6px"><b>Первый файл - звук ролика</b> (тег &lt;Audio 1&gt;): модель перекладывает его в видео,' +
           ' правило 15 секунд на него не действует. <b>Второй и третий - образцы</b> (теги &lt;Audio 2&gt; и &lt;Audio 3&gt;): голос, ритм, атмосфера,' +
-          ' которые можно сослать в тексте любой сцены. Обрезать и глушить лесенкой можно каждый. Кнопка «🤖 Всё аудио в агент» живёт в заголовке этой карточки - она видна, даже когда карточка свёрнута.</small>';
+          ' которые можно сослать в тексте любой сцены. Обрезать и глушить лесенкой можно каждый. Кнопка «🎧 Все в агент» живёт в заголовке этой карточки - она видна, даже когда карточка свёрнута.</small>';
         $('.card-h', musCard).insertAdjacentElement('afterend', fw);
         // the old tile stays in the tree - the calculation reads its field - but it is not shown:
         // the row above is what the person sees and uses
@@ -7889,12 +7858,17 @@ function makeRefMode(cfg) {
         lp.innerHTML = '<input type="checkbox" class="lm-loop"><span>Пустой фон по кругу - если ваш трек короче ролика, остаток заполняется им же, без тишины</span>';
         const ab = document.createElement('button');
         ab.type = 'button'; ab.className = 'btn mini at-all agall-h';
-        ab.textContent = '🤖 Всё аудио в агент';
-        ab.title = 'Отправить в Агент сразу всё готовое: фон ролика, его образцы и аудио всех сцен - Агент увидит их списком, а не одно включение';
+        ab.textContent = '🎧 Все в агент';
+        ab.title = 'Сложить в чат Агента всё аудио - фон ролика, его образцы и аудио всех сцен; он допишет к тому, что уже есть, и ничего не очистит';
         // the button belongs to the card's heading, not to its body: the audio card is folded most
         // of the time, and a control hidden inside a fold is a control nobody finds
         const head = $('.card-h', musCard);
         (head || extra).append(ab);
+        // the button wakes only when there is audio to take: the film's background, its samples or a
+        // scene's own track - and sleeps again when the last of them is removed
+        ab._agCount = () => ((root._filmFiles ? root._filmFiles() : [])[0] ? 1 : 0)
+          + (root._fauds || []).filter((f, j) => f && j > 0).length
+          + $$('.sc', root).reduce((z, cc) => z + ((cc._auds || []).filter(Boolean).length), 0);
         extra.append(lp);
         const voc = $('.lm-vocals', root), vocRow = voc && voc.closest('label');
         if (vocRow) extra.append(vocRow);   // «музыка в готовом ролике целиком» - флаг остаётся на виду
@@ -8381,6 +8355,125 @@ function makeRefMode(cfg) {
     };
     $(`.nav[data-view="${cfg.mode}"]`).addEventListener('click', check);
     check();
+  }
+  /* Every group of files this mode holds gets the same button in the heading above it: «Все в агент».
+     One action everywhere - only the icon says what is being sent. The Agent is filled, never
+     restarted: whatever a person has typed and whichever «Промт для» they chose stay as they are. */
+  const agHeadBtn = (host, icon, what) => {
+    if (!host) return null;
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'btn mini agall-h';
+    b.textContent = icon + ' Все в агент';
+    b.title = 'Сложить в чат Агента ' + what + ' - он допишет к тому, что уже лежит, и ничего не очистит';
+    b.addEventListener('click', e => e.stopPropagation());   // a press here must not fold the card
+    host.append(b);
+    return b;
+  };
+  // a button with nothing to take is a dead button: it lies grey until a file appears
+  const agCount = (btn, fn) => { btn._agCount = fn; btn.dataset.agKind = '1'; return btn; };
+  const agSay = (what, added, again) => {
+    toast(added ? ('В чат агента добавлено ' + what + ': ' + added + (again ? ' · ' + again + ' уже лежало' : ''))
+                : ('Всё это ' + what + ' уже лежит в чате агента'));
+  };
+
+  // ···· images: the common places, and in the studios also every scene's own places
+  const imgBtn = agHeadBtn($('.card-h', $('.rm-imgs', root).closest('.card')), '🖼',
+    'все изображения - и общие, и те, что лежат в отдельных сценах');
+  if (imgBtn) agCount(imgBtn, () => $$('label.ref', imgsEl).filter(r => r._file).length
+    + $$('.sc', root).reduce((z, cc) => z + ((cc._files || []).filter(Boolean).length), 0)
+    + (cfg.videos && cfg.swap ? $$('.slot', vidsEl).filter(s => s._src || s._file).length : 0));
+  if (imgBtn) imgBtn.onclick = async () => {
+    const want = [];
+    // the number of a tag is the place the picture stands in, not its rank among the filled ones
+    $$('label.ref', imgsEl).forEach((r, j) => { if (r._file) want.push({ f: r._file, note: 'общий референс, тег <Picture ' + (j + 1) + '>' }); });
+    $$('.sc', root).forEach((cc, i) => (cc._files || []).forEach((f, j) => { if (f) want.push({ f, note: 'сцена ' + (i + 1) + ', своё фото, тег <Picture ' + (10 * (i + 1) + j) + '>' }); }));
+    // in «Замена» the video stands in the same row as the pictures and has no heading of its own, so
+    // this button takes it too; elsewhere the video has its own button and must not be doubled
+    if (cfg.videos && cfg.swap) $$('.slot', vidsEl).forEach((s, j) => { const f = s._src || s._file; if (f) want.push({ f, vid: true, note: 'видео, в котором меняем, тег <Video ' + (j + 1) + '>' }); });
+    if (!want.length) { toast('Изображений нет - сначала добавьте их'); return; }
+    let added = 0, again = 0, own = 0;
+    try {
+      for (const it of want) {
+        if (it.vid) { if (AG.att.some(a => a.frame && a.vname === it.f.name)) { again++; continue; } if (await agAttachFile(it.f)) added++; else again++; continue; }
+        if (AG.att.some(a => a.file && a.file.name === it.f.name && a.file.size === it.f.size)) { again++; continue; }
+        await agAttachFile(it.f, it.note); added++;
+        if (it.note.startsWith('сцена')) own++;
+      }
+      goTo('agent');
+      const common = added - own;
+      toast(added ? ('В чат агента добавлено изображений: ' + added
+          + (common && own ? ' (общих ' + common + ', из сцен ' + own + ')' : own ? ' (все из сцен)' : '')
+          + (again ? ' · ' + again + ' уже лежало' : ''))
+          : 'Все эти изображения уже лежат в чате агента');
+    } catch { toast('Не удалось передать изображения агенту'); }
+  };
+
+  // ···· reference videos: the Agent receives them as frames, which is how a video reaches the model
+  if (cfg.videos && !cfg.swap) {
+    const vb = $('.rm-vids', root);
+    const vidBtn = agHeadBtn(vb && vb.parentElement && $('.sub-l', vb.parentElement), '🎞',
+      'референс-видео - модель получит их кадрами');
+    if (vidBtn) agCount(vidBtn, () => $$('.slot', vidsEl).filter(s => s._src || s._file).length);
+    if (vidBtn) vidBtn.onclick = async () => {
+      const list = $$('.slot', vb).map(s => s._src || s._file).filter(Boolean);
+      if (!list.length) { toast('Референс-видео нет - сначала добавьте его'); return; }
+      let added = 0, again = 0;
+      try {
+        for (const f of list) {
+          if (AG.att.some(a => a.frame && a.vname === f.name)) { again++; continue; }
+          if (await agAttachFile(f)) added++;
+        }
+        goTo('agent');
+        agSay('видео (кадрами)', added, again);
+      } catch (err) { toast('Не удалось передать видео агенту: ' + (err && err.message ? err.message : '')); }
+    };
+  }
+
+  // ···· reference audio (the studios have their own audio card and its button)
+  if (!cfg.scenes) {
+    const ab = $('.rm-auds', root);
+    const audBtn = agHeadBtn(ab && ab.parentElement && $('.sub-l', ab.parentElement), '🎧',
+      'весь референс-аудио: Агент распознает слова и вставит их в промпт');
+    if (audBtn) agCount(audBtn, () => $$('.slot', audsEl).filter(s => s._file).length);
+    if (audBtn) audBtn.onclick = async () => {
+      const list = $$('.slot', ab).map(s => s._file).filter(Boolean);
+      if (!list.length) { toast('Референс-аудио нет - сначала добавьте его'); return; }
+      if (needSpeech()) return;
+      let added = 0, again = 0;
+      for (let j = 0; j < list.length; j++) {
+        const f = list[j];
+        try {
+          const ac = actx = actx || new AudioContext();
+          const buf = await ac.decodeAudioData(await f.arrayBuffer());
+          const e = Math.min(buf.duration, 15);
+          const where = 'референс-аудио ' + (j + 1) + ', тег <Audio ' + (j + 1) + '>'
+            + (buf.duration > 15 ? ' (берём первые 15 с)' : '');
+          if (await setChatAudio(wavSlice(buf, 0, e), f.name, e, where)) added++; else again++;
+        } catch (err) { toast('Не удалось передать «' + f.name + '»: ' + (err && err.message ? err.message : '')); }
+      }
+      goTo('agent');
+      agSay('аудио', added, again);
+    };
+  }
+
+  // ···· the prompt card: a way in that also chooses what the Agent is writing for
+  {
+    const pe = $('.rm-prompt', root) || $('.lm-scenes', root) || (cfg.scenes ? $('.sc textarea', root) : null);
+    const pcard = pe && pe.closest('.card');
+    if (pcard) {
+      const go = document.createElement('button');
+      go.type = 'button'; go.className = 'btn mini agall-h';
+      go.textContent = '🤖 Переход в агент';
+      go.title = 'Открыть «Агента» и включить для него «Промт для: ' + cfg.title + '»';
+      $('.card-h', pcard).append(go);
+      go.onclick = () => {
+        const t = $('#agTarget [data-t="' + cfg.mode + '"]');
+        if (t && !t.classList.contains('on')) t.click();   // the Agent starts writing for this mode
+        goTo('agent');
+        // the hand arrives where it meant to arrive: the field, not the page
+        setTimeout(() => { const ta = $('#agIn'); if (ta) { try { ta.focus(); } catch (e) { } } }, 260);
+      };
+    }
   }
   return { root, S, upd, voice: () => files('.rm-auds .slot').length, prompt: () => promptEl(), imgSlots: () => $$('.ref input', imgsEl) };
 }
@@ -12394,6 +12487,138 @@ if (e.target.closest('.mt-clear')) {
   });
   paint();
 })();
+
+/* ── «Все в агент» там, где окно собрано не общей схемой: «Клип», «Видео», «Изменение изображения».
+   Одно правило на всю программу: каждая карточка, в которой лежат файлы, предлагает их Агенту -
+   сколько бы файлов там ни было, хоть одно видео. Иконка говорит, что за вид; кнопка спит, пока
+   брать нечего, и просыпается, как только файл появился. */
+function agWireOtherWindows() {
+  if (window._agWired) return;      // called once now and once later: the windows are wired once
+  window._agWired = 1;
+  const fileOf = el => {
+    if (!el) return null;
+    if (el._file) return el._file;
+    if (el._src) return el._src;
+    const i = el.querySelector && el.querySelector('input[type=file]');
+    return (i && i.files && i.files[0]) || null;
+  };
+  const mk = (host, icon, what, count, run) => {
+    if (!host) return null;
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'btn mini agall-h';
+    b.textContent = icon + ' Все в агент';
+    b.title = 'Сложить в чат Агента ' + what + ' - он допишет к тому, что уже лежит, и ничего не очистит';
+    b._agCount = count;
+    b.addEventListener('click', e => e.stopPropagation());   // a press here must not fold the card
+    b.onclick = async () => { try { await run(); } catch (err) { toast('Не удалось передать файлы агенту: ' + (err && err.message ? err.message : err)); } };
+    host.append(b);
+    return b;
+  };
+  const goBtn = (card, target, label) => {
+    if (!card) return;
+    const go = document.createElement('button');
+    go.type = 'button'; go.className = 'btn mini agall-h';
+    go.textContent = '🤖 Переход в агент';
+    go.title = 'Открыть «Агента» и включить для него «Промт для: ' + label + '»';
+    go.onclick = () => {
+      const t = $('#agTarget [data-t="' + target + '"]');
+      if (t && !t.classList.contains('on')) t.click();
+      goTo('agent');
+      setTimeout(() => { const ta = $('#agIn'); if (ta) { try { ta.focus(); } catch (e) { } } }, 260);
+    };
+    card.querySelector('.card-h').append(go);
+  };
+  const say = (what, added, again) => toast(added ? ('В чат агента добавлено ' + what + ': ' + added + (again ? ' · ' + again + ' уже лежало' : ''))
+    : ('Всё это ' + what + ' уже лежит в чате агента'));
+  const sendPics = async list => {
+    if (!list.length) { toast('Файлов нет - сначала добавьте их'); return; }
+    let added = 0, again = 0;
+    for (const it of list) {
+      if (AG.att.some(a => a.file && a.file.name === it.f.name && a.file.size === it.f.size)) { again++; continue; }
+      if (await agAttachFile(it.f, it.note)) added++; else again++;
+    }
+    goTo('agent'); say('файлов', added, again);
+  };
+
+  // ···· «Видео из картинки»: кадры, из которых делают ролик (их может быть один или два)
+  {
+    const v = $('#view-video');
+    if (v) {
+      const drops = [$('#dFirst', v), $('#dLast', v)].filter(Boolean);
+      const card = drops.length ? drops[0].closest('.card') : null;
+      mk(card && card.querySelector('.card-h'), '🖼', 'кадры этого ролика - первый и последний',
+        () => drops.filter(d => fileOf(d)).length,
+        () => sendPics(drops.map((d, j) => ({ f: fileOf(d), note: (j ? 'последний' : 'первый') + ' кадр видео, тег <Picture ' + (j + 1) + '>' })).filter(x => x.f)));
+      goBtn($('#vPrompt', v) && $('#vPrompt', v).closest('.card'), 'video', 'Видео');
+    }
+  }
+
+  // ···· «Клип»: аудио, под которое герой говорит, и референсы лица
+  {
+    const lv = $('#view-lipsync');
+    if (lv) {
+      const aCard = $('#aDrop', lv) && $('#aDrop', lv).closest('.card');
+      mk(aCard && aCard.querySelector('.card-h'), '🎧',
+        'аудио этого Клипа - тот кусок, который пойдёт в ролик; Агент послушает слова',
+        () => (typeof L !== 'undefined' && L.dur0) ? 1 : 0,
+        async () => {
+          if (!L.dur0) { toast('Сначала загрузите аудио'); return; }
+          if (needSpeech()) return;
+          const piece = wavSlice(abuf, L.start, L.end), dur = Math.max(0.1, L.len());
+          const ok = await setChatAudio(piece, (typeof audioName === 'string' ? audioName : 'аудио из Клипа').replace(/\.[^.]+$/, ''), dur, 'аудио из «Клипа», тег <Audio 1>');
+          goTo('agent');
+          say('аудио', ok ? 1 : 0, ok ? 0 : 1);
+        });
+      const rCard = $('#refs', lv) && $('#refs', lv).closest('.card');
+      mk(rCard && rCard.querySelector('.card-h'), '🖼', 'все референсы этого Клипа',
+        () => $$('#refs label.ref', lv).filter(el => fileOf(el)).length,
+        () => sendPics($$('#refs label.ref', lv).map((el, j) => ({ f: fileOf(el), note: 'референс персонажа, тег <Picture ' + (j + 1) + '>' })).filter(x => x.f)));
+      goBtn($('#lPrompt', lv) && $('#lPrompt', lv).closest('.card'), 'lipsync', 'Клип');
+    }
+  }
+
+  // ···· «Изменение изображения»: картинка, которую правят, и референсы к ней
+  {
+    const qv = $('#view-qwen');
+    if (qv) {
+      const slots = $$('.qw-slots .drop', qv);
+      const card = slots.length ? slots[0].closest('.card') : null;
+      mk(card && card.querySelector('.card-h'), '🖼', 'все картинки этой правки',
+        () => slots.filter(s => fileOf(s)).length,
+        () => sendPics(slots.map((s, j) => ({ f: fileOf(s), note: 'картинка для правки, тег <Picture ' + (j + 1) + '>' })).filter(x => x.f)));
+    }
+  }
+
+  // ···· каждая такая кнопка спит, пока в её карточке нечего брать
+  const btns = $$('.agall-h').filter(b => typeof b._agCount === 'function');
+  if (!btns.length) return;
+  // dragging a marker changes styles on every frame: check at most a few times a second, the button
+  // does not need to wake in the same millisecond the file lands
+  let last = 0, timer = null;
+  const tick = () => {
+    last = Date.now();
+    btns.forEach(b => {
+      let c = 0; try { c = b._agCount(); } catch (e) { c = 0; }
+      b.disabled = !c;
+    });
+  };
+  const sync = () => {
+    const gap = Date.now() - last;
+    if (gap >= 180) { if (timer) { clearTimeout(timer); timer = null; } tick(); return; }
+    if (timer) return;
+    timer = setTimeout(() => { timer = null; tick(); }, 180 - gap);
+  };
+  const mo = new MutationObserver(sync);
+  $$('.view').forEach(v => mo.observe(v, { subtree: true, childList: true, attributes: true, attributeFilter: ['class', 'hidden', 'src', 'style'] }));
+  document.addEventListener('change', sync, true);
+  document.addEventListener('input', sync, true);
+  window._agSync = sync;
+  sync();
+}
+if (document.readyState === 'complete') agWireOtherWindows();
+else window.addEventListener('load', agWireOtherWindows);
+setTimeout(agWireOtherWindows, 2500);   // a second pass for a window built later
+
 </script>
 </body>
 </html>
