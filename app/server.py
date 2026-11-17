@@ -3372,29 +3372,38 @@ class App:
                 return web.json_response({"error": "один из кусков пустой: сначала отрежьте меньше"}, status=400)
             # a fade of this clip, asked for in the strip: from the marker to the far end ('r')
             # or from the marker back to the beginning ('l'); measured inside the kept piece
-            fade, fade_at = str(p.get("fade") or ""), max(0.0, float(p.get("fade_at") or 0))
-            if fade not in ("", "l", "r"):
-                fade = ""
-            if fade == "r" and (e - s) - fade_at < 0.05:
-                fade = ""            # the marker stands at the very end: nothing to fade over
-            if fade == "l" and fade_at < 0.05:
-                fade = ""
-            picked.append((path, s, e, fade, fade_at))
+            # a piece can die at both ends at once: fade_out from the marker to the end, fade_in
+            # from the beginning up to the marker; the old single-side words still arrive, so they
+            # are read as well
+            fade_out, fade_in = None, None
+            if str(p.get("fade") or "") == "r":
+                fade_out = max(0.0, float(p.get("fade_at") or 0))
+            if p.get("fade_in") is not None:
+                fade_in = max(0.0, float(p.get("fade_in") or 0))
+            if p.get("at_out") is not None:
+                fade_out = max(0.0, float(p.get("at_out") or 0))
+            if p.get("at_in") is not None:
+                fade_in = max(0.0, float(p.get("at_in") or 0))
+            if fade_out is not None and (e - s) - fade_out < 0.05:
+                fade_out = None
+            if fade_in is not None and fade_in < 0.05:
+                fade_in = None
+            picked.append((path, s, e, fade_out, fade_in))
         work = Path(os.environ.get("TEMP", ".")) / ("h3mtsnd-" + uuid.uuid4().hex)
         work.mkdir(parents=True, exist_ok=True)
         out = work / "montage.mp3"
         try:
             cmd = [str(ff), "-hide_banner", "-loglevel", "error", "-y"]
-            for path, s, e, fade, fade_at in picked:
+            for path, s, e, fade_out, fade_in in picked:
                 cmd += ["-ss", "%.3f" % s, "-to", "%.3f" % e, "-i", str(path)]
             # the same sample rate and channels everywhere: pieces of different clips must stitch silently.
             # A fade rides on the same chain: out to the right end, in from the left one.
             def seg(i, path, s, e, fade, fade_at):
                 f = "[%d:a]aformat=sample_rates=44100:channel_layouts=stereo" % i
-                if fade == "r":
-                    f += ",afade=t=out:st=%.3f:d=%.3f" % (fade_at, max(0.05, (e - s) - fade_at))
-                elif fade == "l":
-                    f += ",afade=t=in:st=0:d=%.3f" % max(0.05, fade_at)
+                if fade_out is not None:      # the two are chained: a clip may die at both ends
+                    f += ",afade=t=out:st=%.3f:d=%.3f" % (fade_out, max(0.05, (e - s) - fade_out))
+                if fade_in is not None:
+                    f += ",afade=t=in:st=0:d=%.3f" % max(0.05, fade_in)
                 return f + "[a%d];" % i
             chain = "".join(seg(i, *p) for i, p in enumerate(picked))
             chain += "".join("[a%d]" % i for i in range(len(picked))) + "concat=n=%d:v=0:a=1[out]" % len(picked)
@@ -3443,13 +3452,18 @@ class App:
             if dur <= 0:
                 continue
             total += dur
-            if way not in ("l", "r"):
-                continue
-            pos = max(0.0, min(dur, at))
-            if way == "r" and dur - pos > 0.05:
-                filters.append("afade=t=out:st=%.3f:d=%.3f" % (t0 + pos, dur - pos))
-            elif way == "l" and pos > 0.05:
-                filters.append("afade=t=in:st=%.3f:d=%.3f" % (t0, pos))
+            # both ends may fade on the same clip: out from the marker to the end, in from the
+            # beginning up to the marker (the single "dir" word is still understood)
+            ends = []
+            if way == "r" or seg.get("at_out") is not None:
+                ends.append(("out", max(0.0, min(dur, at if seg.get("at_out") is None else float(seg["at_out"])))))
+            if way == "l" or seg.get("at_in") is not None:
+                ends.append(("in", max(0.0, min(dur, at if seg.get("at_in") is None else float(seg["at_in"])))))
+            for kind, pos in ends:
+                if kind == "out" and dur - pos > 0.05:
+                    filters.append("afade=t=out:st=%.3f:d=%.3f" % (t0 + pos, dur - pos))
+                elif kind == "in" and pos > 0.05:
+                    filters.append("afade=t=in:st=%.3f:d=%.3f" % (t0, pos))
             t0 += dur
         applog("монтаж: прошу затухание на %s - план %d сегмент(а), спусков %d"
                % (item.get("id"), len(body.get("timeline") or []), len(filters)))

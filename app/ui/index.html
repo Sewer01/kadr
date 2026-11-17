@@ -10975,7 +10975,7 @@ applyZoom();
        <button type="button" class="btn mini mt-fade" title="Режим затухания: ножницы в ленте становятся лесенками. Поставьте метку в клипе и нажмите лесенку - звук начнёт стихать от метки в эту сторону">Затухание аудио</button></span>
 <button type="button" class="btn mini mt-clear" title="Убрать из ленты все клипы (сами видео останутся в Библиотеке)">Очистить ленту</button></div>
         <div class="mt-trim" hidden></div>
-        <div class="hint mt-hint" style="margin-top:8px">Нажмите на клип в ленте - он сразу заиграет справа с этого места. Ширина блока равна длине клипа. Порядок меняется перетаскиванием или стрелками ◀ ▶ (они именно переставляют, а не играют), крестик убирает клип из монтажа. Край блока тянется внутрь: левый отрезает начало, правый - конец; на клипе появится отметка вида 2.5–8 с. Двойной щелчок по клипу возвращает его целиком. Кнопка «Затухание аудио» меняет ножницы у метки на лесенки: метка ставится туда, где звук начинает стихать, лесенка выбирает сторону - к началу клипа или к его концу; на блоке появляется отметка ↘ или ↙, и затухание уйдёт в сохранённый звук монтажа. Метка реза (треугольник сверху) стоит там, куда её поставили, и не убегает во время показа; голубая линия - это бегунок воспроизведения. Клик по клипу слева от метки играет от начала оставленного куска до метки, клик справа - от метки до конца куска. Ножницы: левая убирает всё до метки, правая - всё после неё. Потяните правый край блока, чтобы сделать клип короче (или вернуть длину). Клипы разного размера приводятся к размеру первого.</div></div>
+        <div class="hint mt-hint" style="margin-top:8px">Нажмите на клип в ленте - он сразу заиграет справа с этого места. Ширина блока равна длине клипа. Порядок меняется перетаскиванием или стрелками ◀ ▶ (они именно переставляют, а не играют), крестик убирает клип из монтажа. Край блока тянется внутрь: левый отрезает начало, правый - конец; на клипе появится отметка вида 2.5–8 с. Двойной щелчок по клипу возвращает его целиком. Кнопка «Затухание аудио» меняет ножницы у метки на две лесенки: метка ставится туда, где звук начинает стихать, <b>левая лесенка гасит звук к началу клипа, правая - к его концу</b>. Стороны включаются <b>независимо</b>: можно держать обе сразу - тогда на блоке появятся и ↙, и ↘. Включённая лесенка горит, повторное нажатие выключает только её, вторая остаётся работать. Спуск уходит и в собранный звук («Сделать звук»), и в сохранённый ролик; клипы, из которых он собран, не меняются. Метка реза (треугольник сверху) стоит там, куда её поставили, и не убегает во время показа; голубая линия - это бегунок воспроизведения. Клик по клипу слева от метки играет от начала оставленного куска до метки, клик справа - от метки до конца куска. Ножницы: левая убирает всё до метки, правая - всё после неё. Потяните правый край блока, чтобы сделать клип короче (или вернуть длину). Клипы разного размера приводятся к размеру первого.</div></div>
     </div><div class="preview">
       <div class="screen"><div class="frame" style="aspect-ratio:16/9;width:100%"><div class="res mt-empty"><b>Монтаж пуст</b>добавьте клип из Библиотеки (или несколько, если хотите склеить) - они появятся в ленте, и здесь сразу покажется кадр, на который указывает метка реза. Кнопка «▶» играет всю ленту по порядку, после склейки тут же встанет готовый ролик.</div><video class="result mt-pv" playsinline hidden></video><video class="result mt-res" controls loop playsinline hidden></video></div></div>
       <div class="mt-bar" hidden><button type="button" class="btn mt-restart" title="Смотреть с начала ленты">⏮</button><button type="button" class="btn mt-play" title="Играть / пауза (пробел)">▶</button><input type="range" class="mt-seek" min="0" max="0" value="0" title="Перемотка"><span class="mt-time">0:00 / 0:00</span></div>
@@ -10997,6 +10997,16 @@ applyZoom();
   const FD_L = '<svg viewBox="0 0 20 14" style="width:18px;height:13px;vertical-align:-2px"><path d="M1 13V11h4V8h4V5h4V2h6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/></svg>';
   const FD_R = '<svg viewBox="0 0 20 14" style="width:18px;height:13px;vertical-align:-2px"><path d="M19 13V11h-4V8h-4V5h-4V2H1" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/></svg>';
   const FD = FD_R;
+  /* A clip can die at both ends at once: the left stair and the right stair are two independent
+     switches, each remembering the marker of the moment it was turned on. Pressing one must never
+     put the other out - that is what the two arrows on the block are for. Old saved states carried
+     one side, and they still work: the reader moves that single side into the new shape. */
+  const fadeOf = i => {
+    const f = (MT.fades || [])[i] || {};
+    if (f.dir) { const o = { l: null, r: null }; o[f.dir] = (f.at == null ? null : f.at); return o; }
+    return { l: (f.l == null ? null : f.l), r: (f.r == null ? null : f.r) };
+  };
+  const fadeHas = i => { const f = fadeOf(i); return !!(f.l != null || f.r != null); };
   MT.fadeMode = false; MT.fades = MT.fades || [];
   { const fb = $('.mt-fade', root); if (fb) fb.innerHTML = FD + ' Затухание аудио'; }   // once: the caption never changes later
   const hidden = () => { try { return JSON.parse(localStorage.getItem('h3-mt-hide') || '[]'); } catch { return []; } };
@@ -11011,7 +11021,7 @@ applyZoom();
     ? inOf(i).toFixed(1).replace('.0', '') + '\u2009–\u2009' + endOf(i).toFixed(1).replace('.0', '')   // a piece cut from the middle: show its edges
     : durOf(i).toFixed(1).replace('.0', ''))                                                          // whole, or cut only at the end
     + ' с' + (MT.cuts[i] != null || inOf(i) > 0.05 ? ' ✂' : '')
-    + ((MT.fades || [])[i] && (MT.fades || [])[i].dir ? ((MT.fades[i].dir === 'r' ? ' ↘' : ' ↙') + (MT.fades[i].at || 0).toFixed(1).replace('.0', '')) : '');   // the fade the clip carries, seen from the strip
+    + (() => { const f = fadeOf(i), p = []; if (f.l != null) p.push('↙' + (+f.l).toFixed(1).replace('.0', '')); if (f.r != null) p.push('↘' + (+f.r).toFixed(1).replace('.0', '')); return p.length ? ' ' + p.join(' ') : ''; })();   // both ends, if both are on
   const lenTxt = it => it.len ? it.len.toFixed(1).replace('.0', '') + ' с' : '';
   function render() {
     const keep = MT.ids.map(id => !!get(id) && !get(id).missing); MT.cuts = MT.cuts.filter((_, i) => keep[i]); MT.ins = MT.ins.filter((_, i) => keep[i]); MT.fades = (MT.fades || []).filter((_, i) => keep[i]); MT.ids = MT.ids.filter((_, i) => keep[i]);
@@ -11033,12 +11043,12 @@ applyZoom();
       + '<i class="mt-cut out" data-cut="out">' + (MT.fadeMode ? FD_R : '✂') + '</i>');
     if (MT.fadeMode) $$('.mt-cut', root).forEach(b => {
       b.classList.add('fd');
-      b.title = b.dataset.cut === 'in'
-        ? 'Звук стихает от метки к началу клипа. Метка - где спуск начинается; то же нажатие снимает затухание.'
-        : 'Звук стихает от метки к концу клипа. Метка - где спуск начинается; то же нажатие снимает затухание.';
-      // no permanent green: the state a clip carries is already written on its block (↘, ↙), and a
-      // button that stays lit after the ribbon was redrawn looks like something is still selected
-      b.classList.remove('on');
+      const side = b.dataset.cut === 'in' ? 'l' : 'r', on2 = fadeOf(mkAt().i)[side] != null;
+      b.title = (side === 'l' ? 'Спуск к НАЧАЛУ клипа' : 'Спуск к КОНЦУ клипа') + ' - ' + (on2 ? 'включён, нажми ещё раз, чтобы выключить только его' : 'выключен') +
+        '. Метка - где спуск начинается. Левый и правый переключаютя независимо, можно держать оба.';
+      // the stair of a side that is on stays lit - that is what tells an armed switch from a plain
+      // scissors - and goes out when the same stair is pressed again
+      b.classList.toggle('on', fadeOf(mkAt().i)[b.dataset.cut === 'in' ? 'l' : 'r'] != null);
     });
     syncPlayer(); paintTrim();
     queueThumbs();                      // the frames arrive one by one, the interface stays responsive
@@ -11160,6 +11170,12 @@ applyZoom();
     items.forEach((x, k) => x.classList.toggle('cur', k === P.i));
     if (P.i >= items.length) { P.i = Math.max(0, items.length - 1); P.g = Math.min(P.g, totalLen()); }
     const mk = mkAt();
+    // the stairs stand at the marker and must tell the truth about the clip the marker is on NOW:
+    // a step to the next clip does not redraw the strip, and the colour of the previous clip stayed
+    if (MT.fadeMode) {
+      const st2 = fadeOf(mk.i);
+      $$('.mt-cut', root).forEach(b => b.classList.toggle('on', st2[b.dataset.cut === 'in' ? 'l' : 'r'] != null));
+    }
     const mkEl = $('.mt-mk', root);
     if (mkEl) mkEl.textContent = 'маркер ' + (Math.round(mk.off * 100) / 100 + '').replace('.', ',') +
       ' с · кадр ' + Math.round(mk.off / frameStep()) + ' · клип ' + (mk.i + 1);
@@ -11221,8 +11237,11 @@ applyZoom();
     // the sound of the WHOLE strip as it stands now: every clip, its own cut, in the montage order -
     // that is the work the person made, and a sound of one clip would be something else
     const parts = MT.ids.map((id, i) => {
-        const fd = (MT.fades || [])[i], p = { id, start: inOf(i) || 0, end: (inOf(i) || 0) + durOf(i) };
-        if (fd && fd.dir) { p.fade = fd.dir; p.fade_at = +Math.max(0, Math.min(p.end - p.start, (fd.at || 0) - (inOf(i) || 0))).toFixed(3); }
+        const fd = fadeOf(i), p = { id, start: inOf(i) || 0, end: (inOf(i) || 0) + durOf(i) };
+        const rel = x => +Math.max(0, Math.min(p.end - p.start, x - p.start)).toFixed(3);
+        // a clip may die at both ends, so both are sent; the old single-side words stay for safety
+        if (fd.r != null) { p.fade = 'r'; p.fade_at = rel(fd.r); }
+        if (fd.l != null) { p.fade_in = rel(fd.l); }
         return p;
       });
     const total = parts.reduce((a, p) => a + (p.end - p.start), 0);
@@ -11266,13 +11285,20 @@ applyZoom();
      the same descent, the same side. The marker is where it begins, the end of the kept piece is
      where the sound is gone; toward the beginning the piece starts silent and fills up to the marker. */
   function fadeVolume(i, t) {
-    const fd = (MT.fades || [])[i];
-    if (!fd || !fd.dir) return null;
+    const fd = fadeOf(i);
+    if (fd.l == null && fd.r == null) return null;
     const from = inOf(i), len = Math.max(0.05, durOf(i));
     const p = Math.min(1, Math.max(0, (t - from) / len));
-    const at = Math.min(1, Math.max(0, ((fd.at || 0) - from) / len));
-    if (fd.dir === 'r') return Math.max(0, 1 - (p <= at ? 0 : (p - at) / Math.max(0.02, 1 - at)));
-    return Math.max(0, Math.min(1, at <= 0.02 ? 1 : p / at));
+    let v = 1;
+    if (fd.r != null) {
+      const at = Math.min(1, Math.max(0, (fd.r - from) / len));
+      v = Math.min(v, Math.max(0, 1 - (p <= at ? 0 : (p - at) / Math.max(0.02, 1 - at))));
+    }
+    if (fd.l != null) {
+      const at = Math.min(1, Math.max(0, (fd.l - from) / len));
+      v = Math.min(v, Math.max(0, at <= 0.02 ? 1 : p / at));
+    }
+    return v;
   }
   function tick() {
     if (!P.playing) return;
@@ -11348,18 +11374,20 @@ applyZoom();
       if (!MT.ids.length) { toast('Лента пуста'); return; }
       const mk = mkAt(), i = mk.i, dir = cut.dataset.cut === 'in' ? 'l' : 'r';
       MT.fades = MT.fades || [];
-      const at = +(inOf(i) + mk.off).toFixed(2);
-      const prev = MT.fades[i];
-      if (prev && prev.dir === dir) { delete MT.fades[i]; toast('Затухание снято'); }
-      else {
-        // the whole sound of the clip takes part: the descent runs from the marker to that end of the clip
-        MT.fades[i] = { dir: dir, at: Math.max(inOf(i), Math.min(endOf(i), at)) };
-        toast(dir === 'r' ? 'Весь звук клипа стихает от метки до его конца' : 'Весь звук клипа стихает от метки до его начала');
-      }
+      const at = +Math.max(inOf(i), Math.min(endOf(i), inOf(i) + mk.off)).toFixed(2);
+      // two independent switches: the left stair and the right one, each remembering where the
+      // marker stood when it was turned on; pressing one must never put the other out
+      const cur = fadeOf(i);
+      cur[dir] = (cur[dir] != null) ? null : at;
+      MT.fades[i] = (cur.l == null && cur.r == null) ? null : cur;
+      const other = cur[dir === 'r' ? 'l' : 'r'];
+      toast((cur[dir] != null
+        ? (dir === 'r' ? 'Весь звук клипа стихает от метки до его конца' : 'Весь звук клипа стихает от метки до его начала')
+        : (dir === 'r' ? 'Спуск к концу клипа выключен' : 'Спуск к началу клипа выключен'))
+        + (other != null ? ' · вторая сторона осталась включена' : ''));
       render();
-      // a blink on the button that was pressed: it answers, then returns to its ordinary look
-      const back = [...$$('.mt-cut', root)].find(x => x.dataset.cut === cut.dataset.cut);
-      if (back) { back.classList.add('on'); setTimeout(() => back.classList.remove('on'), 700); }
+      // the stair of a side that is on stays lit: it is a switch, not a momentary answer
+      $$('.mt-cut', root).forEach(b => b.classList.toggle('on', fadeOf(i)[b.dataset.cut === 'in' ? 'l' : 'r'] != null));
       return;
     }
     if (cut) {                               // one click of the scissors cuts the clip at the marker
@@ -11542,11 +11570,11 @@ applyZoom();
       if (b) {
         b.classList.toggle('on', MT.fadeMode);
         b.title = MT.fadeMode
-          ? 'Затухание включено: метка в клипе - где спуск начинается, лесенка у метки - в какую сторону стихать. Нажми ещё раз, чтобы вернуться к ножницам.'
-          : 'Режим затухания: ножницы в ленте становятся лесенками. Поставьте метку в клипе и нажмите лесенку - звук начнёт стихать от метки в эту сторону.';
+          ? 'Затухание включено: метка в клипе - где спуск начинается. Левая лесенка гасит звук к началу клипа, правая - к его концу; стороны включаются независимо, можно держать обе. Повторное нажатие выключает только свою сторону, включённая сторона горит.'
+          : 'Режим затухания: ножницы в ленте становятся двумя лесенками. Метка - где спуск начинается, левая лесенка - стихать к началу клипа, правая - к его концу. Нажимать можно обе.';
       }
       render();
-      toast(MT.fadeMode ? 'Затухание включено: метка в клипе - где начинать стихать, лесенка у метки - в какую сторону' : 'Снова ножницы');
+      toast(MT.fadeMode ? 'Затухание включено: метка - где начинать стихать; левая лесенка к началу клипа, правая к концу, можно обе' : 'Снова ножницы');
       return;
     }
 if (e.target.closest('.mt-clear')) {
@@ -11649,13 +11677,16 @@ if (e.target.closest('.mt-clear')) {
   $('.mt-go', root).onclick = () => { if (+$('.mt-grain', root).value > 0) chain('none'); else joinNow(MT.ids.slice(), durList(), inList()); };
   async function applyStripFades(id, ids, durs, ins) {
     const plan = (ids || []).map((_, i) => {
-      const fd = (MT.fades || [])[i] || {};
+      const fd = fadeOf(i);
       const dur = +(durs && durs[i] ? durs[i] : 0) || 0;
       const from = +((ins && ins[i]) || 0) || 0;
-      const rel = fd.dir ? Math.max(0, Math.min(dur, (fd.at || 0) - from)) : 0;
-      return { dur: dur, dir: fd.dir || '', at: +rel.toFixed(3) };
+      const rel = x => +Math.max(0, Math.min(dur, x - from)).toFixed(3);
+      const seg = { dur: dur };
+      if (fd.l != null) seg.at_in = rel(fd.l);
+      if (fd.r != null) seg.at_out = rel(fd.r);
+      return seg;
     }).filter((x, i) => x.dur > 0 || x.dir);
-    if (!plan.some(x => x.dir)) return;
+    if (!plan.some(x => x.at_in != null || x.at_out != null)) return;
     const st = $('.mt-status', root);
     try {
       const r = await fetch('/api/montage/fade', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, timeline: plan }) });
@@ -11934,7 +11965,7 @@ if (e.target.closest('.mt-clear')) {
       B('Аудио сцены', 'до трёх файлов на сцену: это образцы - голос, ритм, атмосфера. Модель слушает их и звук создаёт сама; в тексте сцены они значатся как &lt;Audio 10&gt;, &lt;Audio 11&gt;, &lt;Audio 12&gt; (во второй сцене - 20, 21, 22).'),
       B('Аудио на весь ролик', 'до трёх файлов в карточке «Аудио»: первый - звук ролика (&lt;Audio 1&gt;), его модель перекладывает в видео; второй и третий - образцы (&lt;Audio 2&gt;, &lt;Audio 3&gt;): голос, ритм, атмосфера. Обрезать и глушить лесенкой можно каждый, длина не ограничена.'),
       B('Три тега - и хватит', 'модель за раз слушает не больше трёх аудио, поэтому в сцене работает три тега: вставили три - остальные чипи гаснут. Что лежит в сцене, но не упомянуто тегом, в этот раз не участвует; четвёртый тег программа уберёт и скажет об этом.'),
-      B('Затухание', 'в любом редакторе аудио есть режим «Затухание»: на краях выделенного появляются лесенки, и звук плавно стихает в выбранную сторону. В «Монтаже» кнопка «Затухание аудио» меняет ножницы на лесенки: метка - где начинать стихать, лесенка - в какую сторону.'),
+      B('Затухание', 'в любом редакторе аудио есть режим «Затухание»: на краях выделенного появляются лесенки, и звук плавно стихает в выбранную сторону. В «Монтаже» кнопка «Затухание аудио» делает из ножниц две лесенки: метка - где начинать стихать, <b>левая лесенка - к началу клипа, правая - к его концу</b>. Стороны переключаются <b>независимо, можно держать обе сразу</b>; включённая горит, повторное нажатие выключает только её, на блоке видно ↙ и ↘. Спуск ложится на собранный звук и на сохранённый ролик - сами клипы не меняются.'),
       B('Склейка', 'сцены соединяются подряд в один файл; длина ролика - сумма сцен.'),
     ]),
     action: () => H('<b>Экшн-видео - одно динамичное видео</b>') + UL([
