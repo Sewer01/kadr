@@ -10975,8 +10975,12 @@ applyZoom();
       <div class="mt-pipe" hidden></div>
       <div class="status mt-status"></div>
     </div></div>`;
-  const FD_L = '<svg viewBox="0 0 20 14" style="width:18px;height:13px;vertical-align:-2px"><path d="M19 13V11h-4V8h-4V5H7V2H1" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/></svg>';
-  const FD_R = '<svg viewBox="0 0 20 14" style="width:18px;height:13px;vertical-align:-2px"><path d="M1 13V11h4V8h4V5h4V2h6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/></svg>';
+  /* The picture is the signal itself: the baseline is at the bottom, a taller step is a louder step.
+     So the stairs must go DOWN toward the side where the sound is dying: the left button fades toward
+     the beginning of the clip, the right one toward its end. These are the same two drawings the audio
+     editor uses - one language everywhere. */
+  const FD_L = '<svg viewBox="0 0 20 14" style="width:18px;height:13px;vertical-align:-2px"><path d="M1 13V11h4V8h4V5h4V2h6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/></svg>';
+  const FD_R = '<svg viewBox="0 0 20 14" style="width:18px;height:13px;vertical-align:-2px"><path d="M19 13V11h-4V8h-4V5h-4V2H1" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/></svg>';
   const FD = FD_R;
   MT.fadeMode = false; MT.fades = MT.fades || [];
   const hidden = () => { try { return JSON.parse(localStorage.getItem('h3-mt-hide') || '[]'); } catch { return []; } };
@@ -11225,6 +11229,7 @@ applyZoom();
 
   function setPlaying(on) {
     P.playing = on; playBtn.textContent = on ? '⏸' : '▶'; clearInterval(P.raf);
+    if (!on) { try { pv.volume = 1; } catch (e) { } }   // nobody should hear a leftover half-volume clip later
     if (on) { P.raf = setInterval(tick, 40); return; }
     try { pv.pause(); } catch { }
     const rv = $('.mt-res', root); try { if (rv && !rv.paused) rv.pause(); } catch { }   // nothing keeps running behind the preview
@@ -11240,8 +11245,28 @@ applyZoom();
     if (P.i < MT.ids.length - 1) { P.i++; P.g = startOf(P.i); loadAt(P.i, 0, true); }
     else { setPlaying(false); P.g = totalLen(); updateUI(); }
   }
+  /* The fade is heard while the strip plays, not only in the file the montage later assembles:
+     the same descent, the same side. The marker is where it begins, the end of the kept piece is
+     where the sound is gone; toward the beginning the piece starts silent and fills up to the marker. */
+  function fadeVolume(i, t) {
+    const fd = (MT.fades || [])[i];
+    if (!fd || !fd.dir) return null;
+    const from = inOf(i), len = Math.max(0.05, durOf(i));
+    const p = Math.min(1, Math.max(0, (t - from) / len));
+    const at = Math.min(1, Math.max(0, ((fd.at || 0) - from) / len));
+    if (fd.dir === 'r') return Math.max(0, 1 - (p <= at ? 0 : (p - at) / Math.max(0.02, 1 - at)));
+    return Math.max(0, Math.min(1, at <= 0.02 ? 1 : p / at));
+  }
   function tick() {
     if (!P.playing) return;
+    // the descent follows the ribbon's own clock: it moves whether or not the frame decoder is ready,
+    // so the person hears the fade exactly where the marker stands
+    {
+      const from = inOf(P.i), t = from + Math.max(0, P.g - startOf(P.i));
+      const want = fadeVolume(P.i, t);
+      if (want !== null) { if (Math.abs(pv.volume - want) > 0.008) pv.volume = Math.min(1, Math.max(0, want)); }
+      else if (pv.volume !== 1) pv.volume = 1;
+    }
     if (P.lim && P.g >= P.lim[1] - 0.03) { setPlaying(false); P.g = P.lim[1]; P.lim = null; updateUI(); return; }   // a preview of one side stops at the marker
     if (pv.readyState >= 2) {
       const d = durOf(P.i), t = pv.currentTime, from = inOf(P.i);   // the video counts from the whole file, we keep a piece of it

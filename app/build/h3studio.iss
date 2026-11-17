@@ -1,6 +1,6 @@
 ; Inno Setup script: ISCC.exe app\build\h3studio.iss  (after the PyInstaller build)
 #define AppName "Kadr"
-#define AppVersion "2.0.6"
+#define AppVersion "2.0.7"
 #define AppExe "Kadr.exe"
 
 [Setup]
