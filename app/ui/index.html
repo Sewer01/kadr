@@ -961,15 +961,10 @@ body.dropping::after{content:'Отпустите — программа разл
 .mt-cut{position:absolute;top:50%;transform:translateY(-50%);z-index:6;width:26px;height:26px;border-radius:9px;background:rgba(0,0,0,.78);
   border:1px solid var(--pink);color:#fff;font-size:13px;line-height:1;display:grid;place-items:center;cursor:pointer}
 .mt-cut.out{transform:translateY(-50%) scaleX(-1)}
+.mt-cut.fd{padding:0;display:grid;place-items:center}
+.mt-cut.fd.out{transform:translateY(-50%)}
+.mt-cut.fd.on{background:var(--accent);color:#08110d;box-shadow:0 0 0 2px rgba(255,255,255,.28)}
 .mt-cut:hover{background:var(--pink);color:#111}
-.mt-item .mt-fd{position:absolute;top:50%;transform:translateY(-50%);width:28px;height:30px;z-index:8;
-  display:grid;place-items:center;border-radius:9px;background:rgba(6,8,10,.82);border:1px solid var(--accent);
-  color:var(--accent);cursor:pointer}
-.mt-item .mt-fd.l{left:3px}
-.mt-item .mt-fd.r{right:3px}
-.mt-item .mt-fd svg{width:19px;height:13px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linejoin:round;stroke-linecap:round}
-.mt-item .mt-fd:hover{background:var(--accent);color:#08110d}
-.mt-item .mt-fd.on{background:var(--accent);color:#08110d;box-shadow:0 0 0 2px rgba(255,255,255,.28)}
 .mt-bar{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-top:8px}.mt-bar[hidden],.mt-tabs[hidden]{display:none}
 .mt-b button:disabled{opacity:.3;cursor:default}
 .mt-bar .mt-play{min-width:44px;font-size:16px;padding:4px 12px}
@@ -10980,7 +10975,9 @@ applyZoom();
       <div class="mt-pipe" hidden></div>
       <div class="status mt-status"></div>
     </div></div>`;
-  const FD = '<svg viewBox="0 0 20 14" style="width:18px;height:13px;vertical-align:-2px"><path d="M1 13V11h4V8h4V5h4V2h6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/></svg>';
+  const FD_L = '<svg viewBox="0 0 20 14" style="width:18px;height:13px;vertical-align:-2px"><path d="M19 13V11h-4V8h-4V5H7V2H1" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/></svg>';
+  const FD_R = '<svg viewBox="0 0 20 14" style="width:18px;height:13px;vertical-align:-2px"><path d="M1 13V11h4V8h4V5h4V2h6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/></svg>';
+  const FD = FD_R;
   MT.fadeMode = false; MT.fades = MT.fades || [];
   const hidden = () => { try { return JSON.parse(localStorage.getItem('h3-mt-hide') || '[]'); } catch { return []; } };
   const hideSet = a => { try { localStorage.setItem('h3-mt-hide', JSON.stringify(a)); } catch {} };
@@ -11004,12 +11001,7 @@ applyZoom();
       : '<div class="hint">В Библиотеке пока нет видео. Сначала сгенерируйте клипы.</div>';
     $('.mt-strip', root).innerHTML = MT.ids.length ? MT.ids.map((id, i) => { const it = get(id), d = durOf(i); return `<div class="mt-item${wOf(d) < 92 ? ' narrow' : ''}" draggable="true" data-i="${i}" style="width:${wOf(d)}px" data-w="${wOf(d)}"><canvas class="mt-cv" aria-hidden="true"></canvas><span class="mt-n">${i + 1}</span>${window.mtPipeDone && window.mtPipeDone(id) ? '<span class="mt-ok" title="Клип обработан">✓</span>' : ''}<span class="mt-len">${trimTxt(i)}</span><div class="mt-b"><button type="button" data-mv="-1" ${i === 0 ? "disabled" : ""} title="Порядок склейки: переставить левее">◀</button><button type="button" data-rm title="Убрать из монтажа (в Библиотеке клип останется)">✕</button><button type="button" data-mv="1" ${i === MT.ids.length - 1 ? "disabled" : ""} title="Порядок склейки: переставить правее">▶</button></div><i class="mt-rhl" title="Потяните, чтобы отрезать начало клипа"></i><i class="mt-rh" title="Потяните, чтобы отрезать конец клипа (длиннее оригинала нельзя). Двойной щелчок по клипу - вернуть целое"></i></div>`; }).join('')
       : '<div class="hint">Пока пусто: нажмите на клипы сверху.</div>';
-    if (MT.fadeMode) $$('.mt-item', root).forEach((el, i) => {
-      const fd = (MT.fades || [])[i] || {};
-      el.insertAdjacentHTML('beforeend',
-        '<i class="mt-fd l' + (fd.dir === 'l' ? ' on' : '') + '" data-fd="l" data-i="' + i + '" title="Звук стихает от метки к НАЧАЛУ этого клипа. Метка на ленте - где спуск начинается; нажатие второй раз снимает.">' + FD + '</i>' +
-        '<i class="mt-fd r' + (fd.dir === 'r' ? ' on' : '') + '" data-fd="r" data-i="' + i + '" title="Звук стихает от метки к КОНЦУ этого клипа. Метка на ленте - где спуск начинается; нажатие второй раз снимает.">' + FD + '</i>');
-    });
+
     const total = MT.ids.reduce((a, id, i) => a + durOf(i), 0);
     $('.mt-total', root).textContent = MT.ids.length ? `${clipsW(MT.ids.length)} · ≈ ${Math.round(total)} с` : '';
     if (MT.ids.length) $('.mt-strip', root).insertAdjacentHTML('beforeend',
@@ -11017,8 +11009,16 @@ applyZoom();
       + '<i class="mt-ph" title="Потяните за этот треугольник: метка встанет туда, где нужен рез. Слева показывается кадр, на который она указывает"></i><i class="mt-line"></i>'
       + `<i class="mt-fr" data-fr="1" title="На один кадр правее (${frameStep().toFixed(3)} с)">▶</i>`
       + '<i class="mt-run"></i>'
-      + '<i class="mt-cut" data-cut="in" title="Отрезать начало: убрать всё до метки">✂</i>'
-      + '<i class="mt-cut out" data-cut="out" title="Отрезать конец: убрать всё после метки">✂</i>');
+      + '<i class="mt-cut" data-cut="in">' + (MT.fadeMode ? FD_L : '✂') + '</i>'
+      + '<i class="mt-cut out" data-cut="out">' + (MT.fadeMode ? FD_R : '✂') + '</i>');
+    if (MT.fadeMode) $$('.mt-cut', root).forEach(b => {
+      b.classList.add('fd');
+      b.title = b.dataset.cut === 'in'
+        ? 'Звук стихает от метки к началу клипа. Метка - где спуск начинается; то же нажатие снимает затухание.'
+        : 'Звук стихает от метки к концу клипа. Метка - где спуск начинается; то же нажатие снимает затухание.';
+      const i = mkAt().i, fd = (MT.fades || [])[i] || {};
+      b.classList.toggle('on', fd.dir === (b.dataset.cut === 'in' ? 'l' : 'r'));
+    });
     syncPlayer(); paintTrim();
     queueThumbs();                      // the frames arrive one by one, the interface stays responsive
     if (window.mtSaveState) { window.mtSaveState(); window.mtPipePaint(); }
@@ -11158,8 +11158,15 @@ applyZoom();
     $$('.mt-cut', strip).forEach(b => {
       const out = b.dataset.cut === 'out';
       let want = mx + (out ? 10 : -36);
-      if (want < 2) want = Math.max(2, mx + (out ? -36 : 10));    // no room outside - stand on the other side
-      b.style.left = Math.max(0, Math.min((strip.clientWidth || 1) - 26, want)) + 'px';
+      // At the very beginning of a block there is no room to the left of the marker. The old answer
+      // moved the left button to the right side with the same offset as the right one, so both stood
+      // in one place and became a smudge - that is what looked like "the scissors got stuck at the
+      // start". Now the second one steps aside instead of landing on top of its brother.
+      if (!out && mx - 36 < L0 + 2) want = mx + 44;               // no room left of the marker - stand to its right, past the other one
+      if (out && mx + 36 > R0 - 2) want = mx - 44;
+      // the ribbon scrolls: clamping to its width left the buttons behind at the far edge while the
+      // marker had moved on - they stay inside what a person can actually see
+      b.style.left = Math.max(L0, Math.min(R0 - 28, want)) + 'px';
     });
     const gx = xOf(P.i, P.g - startOf(P.i));     // the running playhead: this one may move
     if (run) run.style.left = gx + 'px';
@@ -11293,25 +11300,23 @@ applyZoom();
     return { i: 0, g: 0 };
   };
   root.addEventListener('pointerdown', e => {
-    const stair = e.target.closest('.mt-fd');
-    if (stair) {                            // a stair on the edge of a clip: the marker says where the descent starts
+    const cut = e.target.closest('.mt-cut');
+    if (cut && MT.fadeMode) {                // the same two buttons, another meaning: the marker is where the sound starts dying
       e.preventDefault(); e.stopPropagation();
-      const i = +stair.dataset.i, dir = stair.dataset.fd;
-      if (!MT.ids[i]) return;
+      if (!MT.ids.length) { toast('Лента пуста'); return; }
+      const mk = mkAt(), i = mk.i, dir = cut.dataset.cut === 'in' ? 'l' : 'r';
       MT.fades = MT.fades || [];
-      const mk = mkAt();
-      // measured inside this clip: the clip's own seconds, so a fade follows the clip even after a cut
-      const at = +(mk.i === i ? inOf(i) + mk.off : (dir === 'r' ? inOf(i) : endOf(i))).toFixed(2);
+      const at = +(inOf(i) + mk.off).toFixed(2);
       const prev = MT.fades[i];
       if (prev && prev.dir === dir) { delete MT.fades[i]; toast('Затухание снято'); }
       else {
+        // the whole sound of the clip takes part: the descent runs from the marker to that end of the clip
         MT.fades[i] = { dir: dir, at: Math.max(inOf(i), Math.min(endOf(i), at)) };
-        toast((dir === 'r' ? 'Весь звук клипа стихает от ' : 'Весь звук клипа стихает к ') + MT.fades[i].at.toFixed(1).replace('.0', '') + ' с');
+        toast(dir === 'r' ? 'Весь звук клипа стихает от метки до его конца' : 'Весь звук клипа стихает от метки до его начала');
       }
       render();
       return;
     }
-    const cut = e.target.closest('.mt-cut');
     if (cut) {                               // one click of the scissors cuts the clip at the marker
       e.preventDefault(); e.stopPropagation();
       const mk = mkAt(), i = mk.i, at = mk.off;      // the cut happens where the marker stands
