@@ -87,8 +87,15 @@ async def check(session, comfy_root, installed_running=None, data_dir=None):
             applied = ((folder / pack["name"] / ".h3-applied").read_text(encoding="utf-8").split() or [""])[0][:10]
         except (OSError, TypeError):
             pass
-        out["packs"].append({"name": pack["name"], "repo": pack["repo"], "pinned": pack["commit"][:10], "applied": applied,
-                             "latest": sha[:10], "newer": bool(sha) and sha[:10] != (applied or pack["commit"][:10]), "date": when,
+        want = pack.get("commit") or ""
+        have = applied or want      # a folder the program filled itself carries exactly this commit
+        # "есть новое" may only mean something the button can really put in place: the commit the
+        # program waits for. What the repository published since is shown separately, without a button.
+        unmarked = bool(olds) and not applied      # rolled back by hand: the folder is a mystery
+        newer = bool(want) and (unmarked or want[:10] != have[:10])
+        out["packs"].append({"name": pack["name"], "repo": pack["repo"], "pinned": want[:10], "applied": applied,
+                             "latest": sha[:10], "newer": newer, "ahead": bool(sha) and sha[:10] != want[:10],
+                             "date": when,
                              "installed": bool(folder and (folder / pack["name"]).exists()),
                              "backup": olds[-1].name if olds else None})
     return out

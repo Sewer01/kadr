@@ -444,6 +444,12 @@ async def install_core_requirements(comfy_root, timeout=900):
                 top = z.namelist()[0].split("/")[0]
                 z.extractall(nodes_dir)
             (nodes_dir / top).rename(target)
+            # what the folder really holds is written down at once: without this mark the screen has
+            # nothing to compare against and calls the repository's newest commit "новее"
+            try:
+                (target / ".h3-applied").write_text(pack["commit"] + "\n", encoding="utf-8")
+            except OSError:
+                pass
             zpath.unlink(missing_ok=True)
             req = target / "requirements.txt"
             if req.exists() and req.read_text(encoding="utf-8", errors="ignore").strip():

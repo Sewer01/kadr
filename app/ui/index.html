@@ -5571,8 +5571,8 @@ setTimeout(fitTopBar, 700);   // the pills are built a moment after the page ope
     catch (e) { box.innerHTML = `<div class="note warn"><span>Интернет не отвечает: ${esc(e.message)}</span></div>`; b.disabled = false; return; }
     b.disabled = false;
     const packs = c.packs || [];
-    box.innerHTML = `<b style="font-size:13px">Ноды: что вышло новее</b><div class="hint" style="margin:2px 0 8px">Программа держит ноды на проверенных коммитах. Новее — не значит лучше: если после обновления перестанет считываться раздел, жмите «Вернуть».</div>` +
-      packs.map(p => `<div class="m"><b>${esc(p.name)}<small>${p.installed ? 'установлена' : 'не установлена'}${p.applied ? ' · вы обновили её до ' + esc(p.applied) : p.backup ? ' · обновлялась вручную, программа ждёт версию ' + esc(p.pinned) : ' · программа ждёт версию ' + esc(p.pinned)}${p.backup ? ' · прежняя копия цела' : ''}</small></b><span class="hint sz">${p.newer ? 'вышла ' + esc(p.date || '') : ''}</span><span class="st ${p.newer ? 'miss' : 'ok'}">${p.newer ? 'есть новее: ' + esc(p.latest) : 'актуальна'}</span><div class="m-btns" style="grid-column:1/-1;display:flex;gap:8px;flex-wrap:wrap">${p.newer && p.installed ? `<button class="btn mini" data-np="${esc(p.name)}" type="button">Обновить ноду</button>` : ''}${p.backup ? `<button class="btn mini" data-nb="${esc(p.name)}" type="button">Вернуть прежнюю</button>` : ''}</div></div>`).join('');
+    box.innerHTML = `<b style="font-size:13px">Ноды: версия, которую ждёт программа</b><div class="hint" style="margin:2px 0 8px">Каждая нода закреплена за коммитом, с которым программа собрана и проверена. Кнопка «Обновить ноду» ставит именно его, а не самый свежий коммит репозитория: свежий нод может зарегистрировать те же маршруты, что уже есть в ядре, и тогда ComfyUI вообще не запустится. Если после обновления раздел перестанет считываться, жмите «Вернуть прежнюю».</div>` +
+      packs.map(p => `<div class="m"><b>${esc(p.name)}<small>${p.installed ? 'установлена' : 'не установлена'}${p.applied ? ' · вы обновили её до ' + esc(p.applied) : p.backup ? ' · обновлялась вручную, программа ждёт версию ' + esc(p.pinned) : ' · программа ждёт версию ' + esc(p.pinned)}${p.backup ? ' · прежняя копия цела' : ''}</small></b><span class="hint sz">${p.newer ? ('программа ждёт коммит ' + esc(p.pinned) + (p.ahead ? ', в репозитории уже ' + esc(p.latest) + ' от ' + esc(p.date || '') + ' - его программа не предлагает' : '')) : (p.ahead ? 'в репозитории есть новее: ' + esc(p.latest) + ' от ' + esc(p.date || '') + ' - программа его не предлагает' : 'стоит та версия, которую программа просила')}</span><span class="st ${p.newer ? 'miss' : 'ok'}">${p.newer ? 'есть что ставить' : 'актуальна'}</span><div class="m-btns" style="grid-column:1/-1;display:flex;gap:8px;flex-wrap:wrap">${p.newer && p.installed ? `<button class="btn mini" data-np="${esc(p.name)}" type="button">Обновить ноду</button>` : ''}${p.backup ? `<button class="btn mini" data-nb="${esc(p.name)}" type="button">Вернуть прежнюю</button>` : ''}</div></div>`).join('');
     box.onclick = async e => {
       const u = e.target.closest('[data-np]'), r = e.target.closest('[data-nb]');
       if (u) {
@@ -5580,7 +5580,7 @@ setTimeout(fitTopBar, 700);   // the pills are built a moment after the page ope
         u.disabled = true; u.textContent = 'Обновляем…';
         try {
           const j = await postJSON('/api/updates/pack', { name: u.dataset.np });
-          toast(j.already ? 'Эта нода уже стоит на самой новой версии' : `Нода ${u.dataset.np} на коммите ${j.commit}`);
+          toast(j.already ? `Нода уже на коммите ${j.commit}: его программа считает проверенным` : `Нода ${u.dataset.np} на коммите ${j.commit}`);
           b.onclick();
         }
         catch (err) { toast(err.message); u.disabled = false; u.textContent = 'Обновить ноду'; }
