@@ -964,6 +964,7 @@ body.dropping::after{content:'Отпустите — программа разл
 .mt-cut.fd{padding:0;display:grid;place-items:center}
 .mt-cut.fd.out{transform:translateY(-50%)}
 .mt-cut.fd.on{background:var(--accent);color:#08110d;box-shadow:0 0 0 2px rgba(255,255,255,.28)}
+.mt-fade.on{background:var(--grad);color:#fff;border-color:transparent;box-shadow:0 4px 14px rgba(var(--accent-rgb),.32)}
 .mt-cut:hover{background:var(--pink);color:#111}
 .mt-bar{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-top:8px}.mt-bar[hidden],.mt-tabs[hidden]{display:none}
 .mt-b button:disabled{opacity:.3;cursor:default}
@@ -2106,6 +2107,20 @@ const paintRange = r => {
 };
 document.addEventListener('input', e => { if (e.target && e.target.type === 'range') paintRange(e.target); }, true);
 addEventListener('load', () => $$('input[type=range]').forEach(paintRange));
+/* The mouse and the keys fire 'input', so a hand always saw the fill follow the handle. A program does
+   not: assigning .value fires no event in a browser, and every slider moved by a button - the scale of
+   the strip, the seconds of a scene, a value restored from a saved project - left its green part behind
+   the knob. Rather than teaching each caller to remember the repaint, the property itself now repaints:
+   one place, every slider, including the ones written tomorrow. */
+(function () {
+  const d = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value');
+  if (!d || !d.set) return;
+  Object.defineProperty(HTMLInputElement.prototype, 'value', {
+    configurable: true,
+    get() { return d.get.call(this); },
+    set(v) { d.set.call(this, v); if (this.type === 'range' && typeof paintRange === 'function') paintRange(this); },
+  });
+})();
 
 /* a wall of empty plates is noise: show the filled ones plus one free slot, the rest appear as they
    get filled (the long mode and references had up to twelve plates from the start) */
@@ -10983,6 +10998,7 @@ applyZoom();
   const FD_R = '<svg viewBox="0 0 20 14" style="width:18px;height:13px;vertical-align:-2px"><path d="M19 13V11h-4V8h-4V5h-4V2H1" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/></svg>';
   const FD = FD_R;
   MT.fadeMode = false; MT.fades = MT.fades || [];
+  { const fb = $('.mt-fade', root); if (fb) fb.innerHTML = FD + ' Сделать затухание'; }   // once: the caption never changes later
   const hidden = () => { try { return JSON.parse(localStorage.getItem('h3-mt-hide') || '[]'); } catch { return []; } };
   const hideSet = a => { try { localStorage.setItem('h3-mt-hide', JSON.stringify(a)); } catch {} };
   const fullOf = i => get(MT.ids[i]).len || 5;
@@ -11020,8 +11036,9 @@ applyZoom();
       b.title = b.dataset.cut === 'in'
         ? 'Звук стихает от метки к началу клипа. Метка - где спуск начинается; то же нажатие снимает затухание.'
         : 'Звук стихает от метки к концу клипа. Метка - где спуск начинается; то же нажатие снимает затухание.';
-      const i = mkAt().i, fd = (MT.fades || [])[i] || {};
-      b.classList.toggle('on', fd.dir === (b.dataset.cut === 'in' ? 'l' : 'r'));
+      // no permanent green: the state a clip carries is already written on its block (↘, ↙), and a
+      // button that stays lit after the ribbon was redrawn looks like something is still selected
+      b.classList.remove('on');
     });
     syncPlayer(); paintTrim();
     queueThumbs();                      // the frames arrive one by one, the interface stays responsive
@@ -11340,6 +11357,9 @@ applyZoom();
         toast(dir === 'r' ? 'Весь звук клипа стихает от метки до его конца' : 'Весь звук клипа стихает от метки до его начала');
       }
       render();
+      // a blink on the button that was pressed: it answers, then returns to its ordinary look
+      const back = [...$$('.mt-cut', root)].find(x => x.dataset.cut === cut.dataset.cut);
+      if (back) { back.classList.add('on'); setTimeout(() => back.classList.remove('on'), 700); }
       return;
     }
     if (cut) {                               // one click of the scissors cuts the clip at the marker
@@ -11517,9 +11537,16 @@ applyZoom();
     if (e.target.closest('.mt-fade')) {
       MT.fadeMode = !MT.fadeMode;
       const b = $('.mt-fade', root);
-      if (b) { b.classList.toggle('on', MT.fadeMode); b.innerHTML = MT.fadeMode ? (FD + ' Затухание: ' + (MT.ids.length ? 'выберите клип и метку' : 'лента пуста')) : (FD + ' Сделать затухание'); }
+      // the caption stays: a button that grows with every press pushes the row around and the whole
+      // strip jumps. What changes is the fill - on means on - and the tooltip, which costs no pixels.
+      if (b) {
+        b.classList.toggle('on', MT.fadeMode);
+        b.title = MT.fadeMode
+          ? 'Затухание включено: метка в клипе - где спуск начинается, лесенка у метки - в какую сторону стихать. Нажми ещё раз, чтобы вернуться к ножницам.'
+          : 'Режим затухания: ножницы в ленте становятся лесенками. Поставьте метку в клипе и нажмите лесенку - звук начнёт стихать от метки в эту сторону.';
+      }
       render();
-      toast(MT.fadeMode ? 'Ножницы стали лесенками: метка в клипе - куда начинать стихать, лесенка - в какую сторону' : 'Снова ножницы');
+      toast(MT.fadeMode ? 'Затухание включено: метка в клипе - где начинать стихать, лесенка у метки - в какую сторону' : 'Снова ножницы');
       return;
     }
 if (e.target.closest('.mt-clear')) {
