@@ -760,8 +760,11 @@ img.pr-media{object-position:center 38%}
 .ag-h:hover button{opacity:1;background:var(--surface)}
 .ag-h button:hover{background:var(--accent)!important}
 .ag-hempty{font-size:12px;color:var(--dim);text-align:center;padding:20px 6px}
-.ag-chat{display:flex;flex-direction:column;height:calc(calc(var(--vh,1vh)*100) - 182px);min-height:480px;padding:0;overflow:hidden}
-.ag-msgs{flex:1;overflow:auto;padding:18px;display:flex;flex-direction:column;gap:14px}
+/* Ten pictures and four audios are taller than the window: the column used to clip them and scroll
+   only the messages, so the buttons at the bottom fell out of reach and nothing could bring them back.
+   The whole column scrolls now, and the row of buttons stays pinned to its bottom edge. */
+.ag-chat{display:flex;flex-direction:column;height:calc(calc(var(--vh,1vh)*100) - 182px);min-height:480px;padding:0;overflow-y:auto;overscroll-behavior:contain}
+.ag-msgs{flex:1 0 auto;overflow:visible;padding:18px;display:flex;flex-direction:column;gap:14px}
 .ag-empty{margin:auto;display:grid;gap:8px;text-align:center;color:var(--muted);max-width:460px}
 .ag-empty b{color:var(--text);font-size:15px}
 .ag-empty span{font-size:13px;padding:8px 12px;border-radius:10px;background:var(--bg-2);border:1px solid var(--line);cursor:pointer}
@@ -787,7 +790,7 @@ img.pr-media{object-position:center 38%}
 .msg .vidtile{position:relative;display:inline-block;width:104px;height:104px;border-radius:10px;overflow:hidden;vertical-align:top}
 .msg .vidtile img{width:100%;height:100%;object-fit:cover;display:block}
 .msg .vidtile b{position:absolute;left:6px;bottom:6px;right:6px;font-weight:700;font-size:10px;font-family:var(--mono);padding:2px 5px;border-radius:6px;background:rgba(var(--ov-rgb),.8);color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.ag-att>div{position:relative;width:104px;height:104px;flex:0 0 104px;border-radius:10px;overflow:hidden;background:var(--surface-2)}
+.ag-att>div{position:relative;cursor:pointer;width:104px;height:104px;flex:0 0 104px;border-radius:10px;overflow:hidden;background:var(--surface-2)}
 .ag-att div{position:relative}
 .ag-att img{width:100%;height:100%;object-fit:cover;display:block}
 .ag-att b{position:absolute;left:6px;bottom:6px;font-size:10.5px;font-weight:700;font-family:var(--mono);background:rgba(var(--ov-rgb),.8);padding:2px 6px;border-radius:6px;color:#fff}
@@ -795,7 +798,8 @@ img.pr-media{object-position:center 38%}
 .ag-att .vid{width:100%;height:100%;overflow:hidden;background:var(--bg-2)}
 .ag-att .vid img{width:100%;height:100%;object-fit:cover;display:block}
 /* while a video is dragged into the chat, the screen splits in two: where it lands decides what it becomes */
-.ag-comp{display:flex;flex-wrap:wrap;gap:8px 10px;align-items:flex-end;padding:12px 18px 14px}
+/* the row of buttons stays where the hand expects it while the column above is scrolled */
+.ag-comp{display:flex;flex-wrap:wrap;gap:8px 10px;align-items:flex-end;padding:12px 18px 14px;position:sticky;bottom:0;z-index:4;background:var(--bg);border-top:1px solid var(--line)}
 /* below the conversation there is a fixed height: the previews, the mode line and the field
    must take their own room, or the column squashes them into each other and they overlap */
 .ag-chat>.ag-att,.ag-chat>.ag-edit,.ag-chat>.ag-audio,.ag-chat>.ag-comp{flex:none}
@@ -820,6 +824,10 @@ img.pr-media{object-position:center 38%}
 .ag-audio-h b{flex:1;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ag-audio-h small{font-family:var(--mono);color:var(--muted)}
 .ag-audio-h button{width:24px;height:24px;border-radius:7px;background:var(--surface-2);font-size:11px}
+/* a name or a tile that carries a tag says so: it brightens under the pointer */
+.ag-tagb{cursor:pointer;border-bottom:1px dotted var(--line-2)}
+.ag-tagb:hover{color:var(--accent)}
+.ag-att>div:hover b{filter:brightness(1.25)}
 .ag-audio textarea{height:30px;min-height:30px;max-height:30px;resize:none;overflow:auto;font-size:13px}
 /* What a message carries - the audios, the pictures and the video frames - is put away by default:
    four audios with a window each used to eat the whole column, the prompt field fell out of the
@@ -835,7 +843,7 @@ img.pr-media{object-position:center 38%}
 .ag-fold>summary small{font-family:var(--mono);color:var(--muted);font-weight:500}
 .ag-fold>summary button{width:24px;height:24px;border-radius:7px;background:var(--surface-2);font-size:11px;flex:none}
 .ag-fold[hidden]{display:none}
-.ag-fold-body{padding:0 12px 10px;max-height:30vh;overflow:auto;display:grid;gap:6px}
+.ag-fold-body{padding:0 12px 10px;max-height:46vh;overflow:auto;display:grid;gap:6px}
 .ag-fold .ag-att{padding:0;margin:0}
 .ag-fold.ag-audio{display:block;padding:0}
 /* is the next message a fix of what was written, or the next scene of the same story? */
@@ -8650,9 +8658,13 @@ const fileToDataURL = (file, max = 1024) => new Promise(res => {
 function agImgCount() { return AG.msgs.reduce((n, m) => n + (m.images?.length || 0) - (m.nframes || 0), 0); }   // frames of a video are not pictures of heroes
 function renderAtt() {
   const base = agImgCount(); let k = 0;
+  // every tile carries the tag it stands for; a video is named to the model as <Video 1>, <Video 2>…
+  // in the order the videos appeared, so a frame's tag is its video's number, not the frame's own
+  const vnames = [];
+  AG.att.forEach(a => { if (a.frame && !vnames.includes(a.vname)) vnames.push(a.vname); });
   $('#agAtt').innerHTML = AG.att.map((a, i) => a.frame
-    ? `<div title="Кадр из видео «${esc(a.vname)}»"><img src="${a.url}"><b style="background:#3a5a8c">🎞 ${esc(a.label)}</b><button data-i="${i}">✕</button></div>`
-      : `<div${a.note ? ` title="${esc(a.note)}"` : ''}><img src="${a.url}"><b>Picture ${base + (++k)}</b><button data-i="${i}">✕</button></div>`).join('');
+    ? `<div data-tag="&lt;Video ${vnames.indexOf(a.vname) + 1}&gt;" title="Кадр из видео «${esc(a.vname)}» · нажмите, чтобы вставить тег"><img src="${a.url}"><b style="background:#3a5a8c">🎞 ${esc(a.label)}</b><button data-i="${i}">✕</button></div>`
+      : `<div data-tag="&lt;Picture ${base + (++k)}&gt;" title="${a.note ? esc(a.note) + ' · ' : ''}нажмите, чтобы вставить тег"><img src="${a.url}"><b>Picture ${base + k}</b><button data-i="${i}">✕</button></div>`).join('');
   { const fold = $('#agAttFold'); if (fold) { fold.hidden = !AG.att.length;
       const nm = $('#agAttN'); if (nm) nm.textContent = AG.att.length === 1 ? 'Картинка или кадр' : ('Картинки и кадры: ' + AG.att.length); } }
   agVidBtn();   // the video button lives or sleeps with the tray
@@ -8768,7 +8780,10 @@ $('#agAtt').addEventListener('drop', async e => {
   for (const f of e.dataTransfer.files) await agAttachFile(f);
 });
 $('#agAtt').onclick = async e => {
-  const b = e.target.closest('button[data-i]'); if (b) { AG.att.splice(+b.dataset.i, 1); renderAtt(); }
+  const b = e.target.closest('button[data-i]'); if (b) { AG.att.splice(+b.dataset.i, 1); renderAtt(); return; }
+  // the tile is the tag it shows: a press writes it into the field at the cursor, so nobody has to
+  // retype <Picture 3> or remember which number a scene's own photo got
+  const t = e.target.closest('[data-tag]'); if (t) agInsertTag(t.dataset.tag);
 };
 $('#agFile').onchange = async e => {
   for (const f of e.target.files) {
@@ -8910,7 +8925,7 @@ function showAudioBox() {
   $('#agAudioDur').textContent = list.length === 1 ? (list[0].dur.toFixed(1) + ' с') : (list.reduce((s, a) => s + a.dur, 0).toFixed(1) + ' с всего');
   const esc3 = s => String(s).replace(/[<>&"]/g, ch => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[ch]));
   inside.innerHTML = list.map((a, i) => `<div class="ag-audio-item" style="padding:6px 0;border-top:1px solid rgba(255,255,255,.08)">
-      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><b>${i + 1}. ${esc3(a.name)}</b>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><b${(a.where || '').match(/<Audio\s*\d+>/i) ? ` data-ins="${esc3(a.where.match(/<Audio\s*\d+>/i)[0])}" class="ag-tagb" title="Нажмите - и тег ${esc3(a.where.match(/<Audio\s*\d+>/i)[0])} впишется в текст сцены"` : ''}>${i + 1}. ${esc3(a.name)}</b>
         <span style="opacity:.8">${a.dur.toFixed(1)} с</span>${a.where ? `<span style="opacity:.7">${esc3(a.where)}</span>` : ''}
         <button class="btn mini" type="button" data-k="${i}" title="Убрать это аудио из сообщения">×</button></div>
       <textarea data-t="${i}" rows="1" style="width:100%;margin-top:4px" ${a.busy ? 'disabled' : ''}
@@ -8923,6 +8938,8 @@ $('#agAudioBox').addEventListener('input', e => {
   const a = (AG.audios || [])[+ta.dataset.t]; if (a) a.text = ta.value;
 });
 $('#agAudioBox').addEventListener('click', e => {
+  const ins = e.target.closest('[data-ins]');
+  if (ins) { agInsertTag(ins.dataset.ins); return; }
   const b = e.target.closest('[data-k]'); if (!b) return;
   (AG.audios || []).splice(+b.dataset.k, 1);
   AG.audio = (AG.audios || [])[0] || null;
@@ -9003,6 +9020,19 @@ $('#agAudioFile').onchange = async e => {
   } catch { toast('Не удалось прочитать аудиофайл'); }
 };
 // attach something from the Library to the chat: a picture (or the last frame of a video), or the sound of a video
+/* A tile, a frame or a song's title is a tag you can point at: pressing it writes that tag into the
+   field at the cursor, so nobody has to type <Picture 3> by hand or guess which number a scene got. */
+function agInsertTag(tag) {
+  const ta = $('#agIn'); if (!ta || !tag) return;
+  const s = typeof ta.selectionStart === 'number' ? ta.selectionStart : ta.value.length;
+  const e = typeof ta.selectionEnd === 'number' ? ta.selectionEnd : s;
+  const lead = s > 0 && !/[\s(,[;]/.test(ta.value[s - 1]) ? ' ' : '';
+  ta.value = ta.value.slice(0, s) + lead + tag + ' ' + ta.value.slice(e);
+  const p = s + lead.length + tag.length + 1;
+  ta.focus();
+  try { ta.setSelectionRange(p, p); } catch (e2) { }
+  toast('Вставлено в текст: ' + tag);
+}
 const agAttachFile = async (f, note) => {
   if (fileKind(f) === 'video') return agFramesFromFile(f);   // a video is always frames: this was the reason a second clip vanished
   const u = await fileToDataURL(f); if (!u) { toast('Картинка не открылась: ' + f.name); return false; }
