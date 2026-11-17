@@ -8,7 +8,10 @@ a = Analysis(
     pathex=[str(APP)],
     datas=[(str(APP / "ui" / "index.html"), "ui"), (str(APP / "ui" / "previews"), "ui/previews"), (str(APP / "skills"), "skills"), (str(APP / "bin"), "bin")],
     hiddenimports=["webview.platforms.edgechromium", "webview.platforms.winforms", "clr", "certifi"],
-    excludes=["tkinter", "matplotlib", "numpy", "PIL", "pandas", "scipy", "IPython"],
+    # the builder and its friends must not ride along: the program imports none of them,
+    # and a fresh PyInstaller otherwise drags setuptools and pydantic into the download
+    excludes=["tkinter", "matplotlib", "numpy", "PIL", "pandas", "scipy", "IPython",
+              "setuptools", "pkg_resources", "pydantic", "pydantic_core", "PyInstaller", "pip"],
 )
 pyz = PYZ(a.pure)
 exe = EXE(
