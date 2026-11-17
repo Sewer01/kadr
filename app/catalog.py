@@ -495,18 +495,18 @@ def is_action_dmad(name):
 ROLE_TITLES = {
     "h3img_unet": "Основная модель — Изображения MiniMax H3 Image (по тексту и правка по референсам)",
     "h3img_vae": "VAE для MiniMax H3 Image",
-    "fast_unet": "Основная модель — Image-to-Video (FastH3)",
-    "lipsync_unet": "Основная модель — Lipsync (Singularity)",
+    "fast_unet": "Основная модель — «Видео» (FastH3)",
+    "lipsync_unet": "Основная модель — «Клип» (Singularity)",
     "text_encoder": "Текстовый энкодер (Qwen3-VL 32B)",
     "video_vae": "Видео VAE",
     "audio_vae": "Аудио VAE",
-    "ref2v_turbo_lora": "LoRA ускорения для Lipsync",
+    "ref2v_turbo_lora": "LoRA ускорения для «Клипа»",
     "upscaler": "Апскейлер второго прохода",
     "2d_fp16": "2D-свёртка (новее, мягче цвет, есть резкость)",
     "2d_bf16": "2D-свёртка в bf16",
     "v1.1_8step": "Ref2V Turbo 8 шагов v1.1 (светлее по шагам, свежее)",
     "preview": "Декодер живого превью",
-    "action_unet": "Основная модель — Экшн-сцены (Hybrid FL2VA/Ref2VA)",
+    "action_unet": "Основная модель — «Экшн-видео» (Hybrid FL2VA/Ref2VA)",
     "speed_slider_lora": "LoRA Speed Slider (экшн)",
     "action_upscaler": "Апскейлер SelfLift (экшн, точный режим)",
     "vocal_model": "Отделение голоса от музыки (MelBand RoFormer)",
@@ -514,29 +514,29 @@ ROLE_TITLES = {
     "dmad_lora": "Ускорение черновика (DMAD, 4 шага, по желанию)",
     "motion_repair_lora": "LoRA «Исправление движения» (по желанию)",
     "swap_lora": "LoRA «Замена персонажа» (akatz-ai)",
-    "pika_lora": "LoRA Pika H3 Flex Turbo (ускорение для Референсов, хороший звук)",
-    "sla_lora": "LoRA Turbo-SLA (быстрое ускорение для Image-to-Video)",
-    "seedvr_unet": "Увеличение видео и изображений — модель SeedVR2 (3B)",
-    "seedvr_vae": "Увеличение видео и изображений — VAE SeedVR2",
-    "relayvsr_unet": "Быстрое увеличение видео — модель RelayVSR ×2",
-    "relayvsr_vae": "Быстрое увеличение видео — VAE RelayVSR ×2",
+    "pika_lora": "LoRA Pika H3 Flex Turbo (ускорение для «Видеостудии», хороший звук)",
+    "sla_lora": "LoRA Turbo-SLA (быстрое ускорение для «Видео»)",
+    "seedvr_unet": "Апскейлинг видео и изображений — модель SeedVR2 (3B)",
+    "seedvr_vae": "Апскейлинг видео и изображений — VAE SeedVR2",
+    "relayvsr_unet": "Апскейлинг видео быстро — модель RelayVSR ×2",
+    "relayvsr_vae": "Апскейлинг видео быстро — VAE RelayVSR ×2",
     "krea_unet": "Основная модель — Изображение по тексту (Krea 2)",
     "krea_clip": "Текстовый энкодер Krea 2 (Qwen3-VL 4B)",
     "krea_vae": "VAE для Krea 2",
     "kreareal_unet": "Основная модель — Изображение: реализм (RedCraft, Krea 2)",
     "kreareal_lora": "LoRA Realism Engine для Krea 2 (реализм)",
-    "qwen_unet": "Основная модель — Правка изображения (Qwen Image 2.1)",
+    "qwen_unet": "Основная модель — «Изменение изображения» (Qwen Image 2.1)",
     "qwen_clip": "Текстовый энкодер Qwen (Qwen3-VL 8B)",
     "qwen_vae": "VAE для Qwen Image 2.1",
-    "flux_unet": "Основная модель — Правка изображения (FLUX klein)",
+    "flux_unet": "Основная модель — «Изменение изображения» (FLUX klein)",
     "flux_clip": "Текстовый энкодер этой модели (Qwen3 4B)",
     "flux_vae": "VAE этого семейства",
 }
 
-MODE_TITLES = {"video": "Image-to-Video", "lipsync": "Lipsync", "refs": "Референсы", "actor": "Актёрская игра", "swap": "Замена персонажа", "action": "Экшн-сцены",
-               "krea": "Изображение по тексту", "kreareal": "Изображение: реализм", "qwen": "Правка изображения", "flux": "Правка изображения: FLUX klein", "h3img": "Изображения MiniMax H3 Image (по тексту и по референсам)",
-               "upscale": "Увеличение видео и изображений", "relayvsr": "Быстрое увеличение видео (RelayVSR)", "long": "Длинное видео",
-    "actionsc": "Экшн-видеостудия (сцены подряд)"}
+MODE_TITLES = {"video": "Видео", "lipsync": "Клип", "refs": "Видеостудия", "actor": "Актёр", "swap": "Замена", "action": "Экшн-видео",
+               "krea": "Изображение по тексту", "kreareal": "Изображение по тексту: реализм", "qwen": "Изменение изображения", "flux": "Изменение изображения: FLUX klein", "h3img": "Изображения MiniMax H3 Image (по тексту и по референсам)",
+               "upscale": "Апскейлинг видео и изображений", "relayvsr": "Апскейлинг видео быстро (RelayVSR)", "long": "Киностудия",
+    "actionsc": "Экшн-студия (сцены подряд)"}
 
 # Which roles each mode needs.
 MODE_ROLES = {
@@ -670,7 +670,7 @@ MAIN_ROLE = {"video": "fast_unet", "lipsync": "lipsync_unet", "refs": "lipsync_u
               "h3img": "h3img_unet"}
 ROLE_FAMILY = {"lipsync_unet": "ref2", "fast_unet": "fast", "action_unet": "hybrid",
                "ref2v_turbo_lora": "ref2", "pika_lora": "ref2", "swap_lora": "ref2", "sla_lora": "fast", "speed_slider_lora": "hybrid"}
-FAMILY_TITLE = {"ref2": "Ref2V / Singularity (референсы, Lipsync, студия)", "fast": "FastH3 (Image-to-Video)", "hybrid": "Hybrid FL2VA/Ref2VA (экшн)"}
+FAMILY_TITLE = {"ref2": "Ref2V / Singularity (Видеостудия, «Клип», Актёр)", "fast": "FastH3 («Видео»)", "hybrid": "Hybrid FL2VA/Ref2VA (экшн)"}
 
 
 def model_family(filename):

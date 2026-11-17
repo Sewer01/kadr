@@ -594,7 +594,7 @@ class App:
         if 0 < vram < 24:
             self._weak_warned = True
             text = (f"Выбрана самая тяжёлая модель (профиль «Максимум»), а у видеокарты {vram:g} ГБ памяти: "
-                    "генерация может зависать на первом шаге. Откройте «Настройки», выберите для Lipsync/Референсов "
+                    "генерация может зависать на первом шаге. Откройте «Настройки», выберите для «Клипа» и «Видеостудии» "
                     "облегчённую версию (pruned) и скачайте её.")
             self.note_error(text)
             await self.broadcast({"type": "notice", "text": text})
@@ -2417,7 +2417,7 @@ class App:
             graph, stages = wf.h3img_edit_graph(self.model_names, prompt, [image] + list(form.get("_extra") or ()),
                                                 mp, seed, size, min(mp, 4.0))
             return await self.queue(graph, stages, {
-                "mode": "qwen", "sub": "Правка изображения (MiniMax H3 Image)", "prompt": prompt, "aspect": "",
+                "mode": "qwen", "sub": "Изменение изображения (MiniMax H3 Image)", "prompt": prompt, "aspect": "",
                 "q": "", "len": 0.0, "res": "%d×%d" % size if size else "", "seed": seed})
         if flux:
             prompt = form.get("prompt", "").strip()
@@ -2426,7 +2426,7 @@ class App:
             mp = wf.QWEN_MP.get(form.get("size", "1"), 1.0)
             graph, stages = wf.flux_edit_graph(self.model_names, prompt, image, mp, seed, form.get("_extra") or (), round_size(form))
             return await self.queue(graph, stages, {
-                "mode": "qwen", "sub": "Правка изображения (FLUX.2)", "prompt": prompt, "aspect": "",
+                "mode": "qwen", "sub": "Изменение изображения (FLUX.2)", "prompt": prompt, "aspect": "",
                 "q": "", "len": 0.0, "res": "", "seed": seed})
         if form.get("kind") == "sheet" and h3:
             panels = 6 if form.get("panels") == "6" else 4
@@ -2454,7 +2454,7 @@ class App:
             mp = wf.QWEN_MP.get(form.get("size", "1"), 1.0)
             size = round_size(form) or wf.qwen_edit_size(form.get("aspect", ""), mp)
             graph, stages = wf.qwen_edit_graph(self.model_names, prompt, image, mp, seed, size, form.get("_extra") or ())
-            sub, res = "Правка изображения", ("%d×%d" % size if size else "")
+            sub, res = "Изменение изображения", ("%d×%d" % size if size else "")
         return await self.queue(graph, stages, {
             "mode": "qwen", "sub": sub, "prompt": prompt, "aspect": form.get("aspect", "") if form.get("kind") != "sheet" else "",
             "q": "", "len": 0.0, "res": res, "seed": seed})
