@@ -197,6 +197,20 @@ def window_mode():
         return "geo"
 
 
+def desktop_rect():
+    """(left, top, right, bottom) of the whole desktop - every monitor that exists right now.
+    A remembered corner is only trustworthy while a screen is actually there."""
+    try:
+        u = ctypes.windll.user32
+        x, y = u.GetSystemMetrics(76), u.GetSystemMetrics(77)      # SM_[XY]VIRTUALSCREEN
+        cx, cy = u.GetSystemMetrics(78), u.GetSystemMetrics(79)    # SM_[CX]YVIRTUALSCREEN
+        if cx > 400 and cy > 300:
+            return x, y, x + cx, y + cy
+    except Exception:
+        pass
+    return None
+
+
 def window_geo():
     """(width, height, x, y, state) the window was last left in. The tab strip needs width to keep the
     names on its buttons, and starting at 1440 every time threw away the width you had chosen.
@@ -209,6 +223,16 @@ def window_geo():
             x, y = g.get("x"), g.get("y")
             x = int(x) if isinstance(x, (int, float)) and -20000 < x < 20000 else None
             y = int(y) if isinstance(y, (int, float)) and -20000 < y < 20000 else None
+            # A monitor can be unplugged, a screen rescaled, a remote desktop end: the saved corner
+            # then sits where nobody can see it, and the program looks dead although it works.
+            # So the place is trusted only while it is on a screen that exists now.
+            rect = desktop_rect()
+            if rect:
+                L, T, R, B = rect
+                if x is not None and y is not None and not (L - 40 <= x <= R - 240 and T - 40 <= y <= B - 140):
+                    print("окно: памятное место %d,%d вне нынешних экранов - окно встанет в виду" % (x, y), flush=True)
+                    x = y = None
+                w, h = min(w, R - L - 40), min(h, B - T - 40)
             return w, h, x, y, state
     except Exception:
         pass
@@ -423,8 +447,22 @@ def main():
         threading.Timer(4.0, remember_geo).start()   # a plain size on the very first start
         webview.start(gui="edgechromium", private_mode=False,
                       storage_path=str(server.DATA_DIR / "webview"))
-    except Exception:
-        # no WebView2: use the browser and keep running until the console/process is closed
+    except Exception as exc:
+        # no WebView2: use the browser and keep running until the console/process is closed.
+        # This used to happen in silence: the window never appeared, the address opened in a
+        # browser, and both the person and the log were left without a word about why.
+        why = "%s: %s" % (type(exc).__name__, exc)
+        print("ОКНО НЕ ПОЛУЧИЛОСЬ - " + why, flush=True)
+        try:
+            server.applog("окно не создано (" + why[:300] + "): открываю адрес в браузере")
+        except Exception:
+            pass
+        try:
+            ctypes.windll.user32.MessageBoxW(
+                0, "Программа не смогла создать окно и открыла адрес в браузере.\n\n%s\n\n"                   "Чаще всего это помогает: закрыть все окна Kadr, подождать полминуты и запустить снова.\n"                   "Если повторяется - перезагрузите компьютер: иногда держится папка профиля окна." % why[:400],
+                "Kadr: окно не создалось", 0x40 | 0x4000)
+        except Exception:
+            pass
         webbrowser.open(url)
         threading.Event().wait()
     finally:
