@@ -3440,8 +3440,8 @@ class App:
             return web.json_response({"error": "собранный ролик не найден на диске"}, status=422)
         if path.suffix.lower() not in (".mp4", ".mov", ".mkv", ".webm"):
             return web.json_response({"error": "ролик не похож на видеофайл"}, status=422)
-        # the strip says what every clip keeps and where the marker stood inside it
-        filters, t0, total = [], 0.0, 0.0
+        # What the strip says: what every clip keeps, and where the marker stood inside it
+        segs, t0 = [], 0.0
         for seg in (body.get("timeline") or [])[:40]:
             try:
                 dur = float(seg.get("dur") or 0)
@@ -3451,32 +3451,49 @@ class App:
                 continue
             if dur <= 0:
                 continue
-            total += dur
-            # both ends may fade on the same clip: out from the marker to the end, in from the
-            # beginning up to the marker (the single "dir" word is still understood)
-            ends = []
+            # a clip may die at both ends (the single "dir" word of an older page is still read)
+            fo = fi = None
             if way == "r" or seg.get("at_out") is not None:
-                ends.append(("out", max(0.0, min(dur, at if seg.get("at_out") is None else float(seg["at_out"])))))
+                fo = max(0.0, min(dur, at if seg.get("at_out") is None else float(seg["at_out"])))
             if way == "l" or seg.get("at_in") is not None:
-                ends.append(("in", max(0.0, min(dur, at if seg.get("at_in") is None else float(seg["at_in"])))))
-            for kind, pos in ends:
-                if kind == "out" and dur - pos > 0.05:
-                    filters.append("afade=t=out:st=%.3f:d=%.3f" % (t0 + pos, dur - pos))
-                elif kind == "in" and pos > 0.05:
-                    filters.append("afade=t=in:st=%.3f:d=%.3f" % (t0, pos))
+                fi = max(0.0, min(dur, at if seg.get("at_in") is None else float(seg["at_in"])))
+            if fo is not None and dur - fo <= 0.05:
+                fo = None      # the marker stands at the end: no room to descend
+            if fi is not None and fi <= 0.05:
+                fi = None      # the marker stands at the start: nothing to fill up to
+            segs.append({"s": t0, "e": t0 + dur, "out": fo, "in": fi})
             t0 += dur
+        total = t0
+        filters = [x for x in segs if x["out"] is not None or x["in"] is not None]
         why = ""
-        if not filters:
-            bad = [s for s in (body.get("timeline") or []) if (s.get("at_in") is not None or s.get("at_out") is not None)]
-            why = (" · сегментов со спуском %d" % len(bad)
-                   + (", но длина у них %s" % ", ".join(str(s.get("dur")) for s in bad[:5]) if bad else ""))
+        if not filters and segs:
+            asked = [s for s in (body.get("timeline") or []) if (s.get("at_in") is not None or s.get("at_out") is not None)]
+            why = (" · спуск просили на %d сегмент(ах), но не на одном нет места: длины %s"
+                   % (len(asked), ", ".join(str(s.get("dur")) for s in asked[:5]) or "нет"))
         applog("монтаж: прошу затухание на %s - план %d сегмент(а), спусков %d%s"
                % (item.get("id"), len(body.get("timeline") or []), len(filters), why))
         if not filters:
             return web.json_response({"ok": True, "fades": 0, "seconds": round(total, 2)})
+        # A descent written once over the joined file would be wrong: ffmpeg's "fade out" does not
+        # stop when the clip ends, it keeps the sound silent to the end of the file - a fade at the
+        # end of the first clip had killed the second one whole. So the sound is cut at the clip
+        # borders, every piece descends only inside its own borders, and the pieces are glued back.
+        # The picture is still copied, frame for frame.
+        chain = ["[0:a]asplit=%d%s" % (len(segs), "".join("[sp%d]" % k for k in range(len(segs))))]
+        for k, x in enumerate(segs):
+            f = ("atrim=start=%.3f:end=%.3f,asetpts=PTS-STARTPTS,"
+                 "aformat=sample_rates=44100:channel_layouts=stereo" % (x["s"], x["e"]))
+            if x["in"] is not None:
+                f += ",afade=t=in:st=0:d=%.3f" % x["in"]
+            if x["out"] is not None:
+                f += ",afade=t=out:st=%.3f:d=%.3f" % (x["out"], max(0.05, (x["e"] - x["s"]) - x["out"]))
+            chain.append("[sp%d]%s[a%d]" % (k, f, k))
+        chain.append("".join("[a%d]" % k for k in range(len(segs))) + "concat=n=%d:v=0:a=1[aout]" % len(segs))
+        graph = ";".join(chain)
         out = path.with_name(path.stem + "-fade" + path.suffix)
         cmd = [str(ff), "-hide_banner", "-loglevel", "error", "-y", "-i", str(path),
-               "-af", ",".join(filters), "-c:v", "copy", "-c:a", "aac", "-b:a", "192k", str(out)]
+               "-filter_complex", graph, "-map", "0:v", "-map", "[aout]",
+               "-c:v", "copy", "-c:a", "aac", "-b:a", "192k", str(out)]
         try:
             proc = await asyncio.create_subprocess_exec(*cmd, stdout=asyncio.subprocess.DEVNULL,
                                                         stderr=asyncio.subprocess.PIPE)
