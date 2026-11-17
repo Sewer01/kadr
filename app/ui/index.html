@@ -1614,7 +1614,7 @@ body.dropping::after{content:'Отпустите — программа разл
             </div>
           </div>
           <details class="ag-fold" id="agAttFold" hidden>
-            <summary>🖼 <b id="agAttN">Картинки и кадры</b><small id="agAttHint">нажмите, чтобы посмотреть</small></summary>
+            <summary>🖼 <b id="agAttN">Картинки и кадры</b><button type="button" id="agAttX" title="Убрать все картинки и кадры из сообщения">✕</button></summary>
             <div class="ag-fold-body"><div class="ag-att" id="agAtt"></div></div>
           </details>
           <details class="ag-fold ag-audio" id="agAudioBox" hidden>
@@ -8665,7 +8665,7 @@ function renderAtt() {
   $('#agAtt').innerHTML = AG.att.map((a, i) => a.frame
     ? `<div data-tag="&lt;Video ${vnames.indexOf(a.vname) + 1}&gt;" title="Кадр из видео «${esc(a.vname)}» · нажмите, чтобы вставить тег"><img src="${a.url}"><b style="background:#3a5a8c">🎞 ${esc(a.label)}</b><button data-i="${i}">✕</button></div>`
       : `<div data-tag="&lt;Picture ${base + (++k)}&gt;" title="${a.note ? esc(a.note) + ' · ' : ''}нажмите, чтобы вставить тег"><img src="${a.url}"><b>Picture ${base + k}</b><button data-i="${i}">✕</button></div>`).join('');
-  { const fold = $('#agAttFold'); if (fold) { fold.hidden = !AG.att.length;
+  { const fold = $('#agAttFold'); if (fold) { fold.hidden = !AG.att.length; if (!AG.att.length) fold.open = false;
       const nm = $('#agAttN'); if (nm) nm.textContent = AG.att.length === 1 ? 'Картинка или кадр' : ('Картинки и кадры: ' + AG.att.length); } }
   agVidBtn();   // the video button lives or sleeps with the tray
 }
@@ -8919,7 +8919,7 @@ function showAudioBox() {
   }
   const box = $('#agAudioBox'), inside = $('#agAudioList', box);
   box.hidden = !list.length;
-  if (!list.length) { AG.audio = null; return; }
+  if (!list.length) { box.open = false; AG.audio = null; return; }   // an emptied fold comes back closed
   // the heading is the whole block while it is folded, so it has to say how many there are
   $('#agAudioName').textContent = list.length === 1 ? (list[0].name || 'аудио') : ('Аудио в сообщении: ' + list.length);
   $('#agAudioDur').textContent = list.length === 1 ? (list[0].dur.toFixed(1) + ' с') : (list.reduce((s, a) => s + a.dur, 0).toFixed(1) + ' с всего');
@@ -9079,6 +9079,10 @@ $('#agFromLip').onclick = () => {
   setChatAudio(wavSlice(abuf, L.start, L.end), 'фрагмент из Lipsync', L.len());
 };
 $('#agAudioText').oninput = e => { if (AG.audio) AG.audio.text = e.target.value; };
+$('#agAttX').onclick = e => { e.preventDefault();   // the same cross as on the audio fold - and it too must not open the fold
+  if (!AG.att.length) { toast('Картинки и кадры из сообщения уже убраны'); return; }
+  AG.att = []; renderAtt(); agCtx(); toast('Все картинки и кадры убраны из сообщения');
+};
 $('#agAudioX').onclick = e => { e.preventDefault();        // the cross stands on the heading: without this it would also open the fold
   AG.audios = []; AG.audio = null; showAudioBox(); };   // and it clears the whole list, not one line
 
