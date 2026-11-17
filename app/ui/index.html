@@ -11647,6 +11647,26 @@ if (e.target.closest('.mt-clear')) {
   };
 
   $('.mt-go', root).onclick = () => { if (+$('.mt-grain', root).value > 0) chain('none'); else joinNow(MT.ids.slice(), durList(), inList()); };
+  async function applyStripFades(id, ids, durs, ins) {
+    const plan = (ids || []).map((_, i) => {
+      const fd = (MT.fades || [])[i] || {};
+      const dur = +(durs && durs[i] ? durs[i] : 0) || 0;
+      const from = +((ins && ins[i]) || 0) || 0;
+      const rel = fd.dir ? Math.max(0, Math.min(dur, (fd.at || 0) - from)) : 0;
+      return { dur: dur, dir: fd.dir || '', at: +rel.toFixed(3) };
+    }).filter((x, i) => x.dur > 0 || x.dir);
+    if (!plan.some(x => x.dir)) return;
+    const st = $('.mt-status', root);
+    try {
+      const r = await fetch('/api/montage/fade', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, timeline: plan }) });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok || !j.ok) { toast('Затухание наложить не удалось: ' + (j.error || r.status)); if (st) st.textContent = 'Ролик сохранён, но затухание не леглось: ' + (j.error || r.status); return; }
+      if (!j.fades) return;
+      toast('Затухание легло на собранный ролик - ' + j.fades + ' спуск(ов); клипы не тронуты');
+      if (st) st.textContent = 'Ролик сохранён · затухание наложено на него (' + j.fades + ') · исходные клипы не менялись';
+      const rv = $('.mt-res', root); if (rv && MT.res) { const s = rv.src; rv.removeAttribute('src'); rv.src = s + (s.includes('?') ? '&' : '?') + 'fade=1'; }
+    } catch (err) { toast('Затухание наложить не удалось: ' + err.message); }
+  }
   async function joinNow(ids, durs, ins) {
     const st = $('.mt-status', root);
     if (MT.busy && !MT.chaining) return;
@@ -11668,6 +11688,7 @@ if (e.target.closest('.mt-clear')) {
           offPrompt(res.prompt_id); MT.busy = false; MT.joining = false; MT.chaining = false; $('.mt-go', root).disabled = false;
           PIPE.joined = { id: ev.item.id, key }; pipeSave();
           showDone(byId(ev.item.id) || normItem(ev.item));
+          applyStripFades(ev.item.id, ids, durs, ins);   // the fade belongs to the joined film, never to its clips
         } else if (ev.type === 'error') fail('Сохранить не удалось: ' + ev.message);
         else if (ev.type === 'interrupted') fail('Сохранение остановлено');
       });

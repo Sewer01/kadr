@@ -3413,6 +3413,70 @@ class App:
             asyncio.get_running_loop().call_later(60, shutil.rmtree, work, True)
 
 
+    async def h_montage_fade(self, request):
+        """The fade of the strip lands on the joined film - and nowhere else. The clips the film was
+        made of are not read for writing at all: this takes the file the montage has just produced,
+        copies its picture without re-encoding and rewrites only its sound, so the frames a person
+        has already approved stay byte for byte the same."""
+        ff = self._ffmpeg()
+        if not ff:
+            return web.json_response({"error": "декодер не найден: затухание наложить нечем"}, status=404)
+        try:
+            body = await request.json()
+        except Exception:
+            return web.json_response({"error": "не разобран план затухания"}, status=400)
+        item = self.library.get(str(body.get("id") or ""))
+        path = self.file_path(item) if item else None
+        if not path or not path.exists():
+            return web.json_response({"error": "собранный ролик не найден на диске"}, status=422)
+        if path.suffix.lower() not in (".mp4", ".mov", ".mkv", ".webm"):
+            return web.json_response({"error": "ролик не похож на видеофайл"}, status=422)
+        # the strip says what every clip keeps and where the marker stood inside it
+        filters, t0, total = [], 0.0, 0.0
+        for seg in (body.get("timeline") or [])[:40]:
+            try:
+                dur = float(seg.get("dur") or 0)
+                at = float(seg.get("at") or 0)
+                way = str(seg.get("dir") or "")
+            except (TypeError, ValueError):
+                continue
+            if dur <= 0:
+                continue
+            total += dur
+            if way not in ("l", "r"):
+                continue
+            pos = max(0.0, min(dur, at))
+            if way == "r" and dur - pos > 0.05:
+                filters.append("afade=t=out:st=%.3f:d=%.3f" % (t0 + pos, dur - pos))
+            elif way == "l" and pos > 0.05:
+                filters.append("afade=t=in:st=%.3f:d=%.3f" % (t0, pos))
+            t0 += dur
+        if not filters:
+            return web.json_response({"ok": True, "fades": 0, "seconds": round(total, 2)})
+        out = path.with_name(path.stem + "-fade" + path.suffix)
+        cmd = [str(ff), "-hide_banner", "-loglevel", "error", "-y", "-i", str(path),
+               "-af", ",".join(filters), "-c:v", "copy", "-c:a", "aac", "-b:a", "192k", str(out)]
+        try:
+            proc = await asyncio.create_subprocess_exec(*cmd, stdout=asyncio.subprocess.DEVNULL,
+                                                        stderr=asyncio.subprocess.PIPE)
+            _, err = await asyncio.wait_for(proc.communicate(), timeout=600)
+        except asyncio.TimeoutError:
+            out.unlink(missing_ok=True)
+            return web.json_response({"error": "затухание не успело закончиться"}, status=500)
+        except OSError as exc:
+            return web.json_response({"error": "декодер не запустился: " + str(exc)[:120]}, status=500)
+        if proc.returncode != 0 or not out.exists() or out.stat().st_size < 1024:
+            out.unlink(missing_ok=True)
+            return web.json_response({"error": "затухание не леглось: " + (err or b"")[-200:].decode("utf-8", "replace")[-160:]},
+                                     status=422)
+        out.replace(path)   # only the film the montage made is rewritten; its sources stay as they were
+        if isinstance(item.get("size"), int):
+            item["size"] = path.stat().st_size
+        self.library.save()
+        applog("монтаж: затухание легло на собранный ролик - %d спуск(ов) на %.1f с" % (len(filters), total))
+        return web.json_response({"ok": True, "fades": len(filters), "seconds": round(total, 2)})
+
+
     async def h_library_add(self, request):
         """A frame taken in the video bench becomes a library item. People pull a frame out of one video to
         put it into another, and they clear projects on the way: what was made by hand must not disappear
@@ -4263,6 +4327,7 @@ def build_app(comfy_override=None):
         web.post("/api/audio/separate", state.h_audio_separate),
         web.post("/api/video/lastframe", state.h_video_lastframe),   # the browser cannot decode everything
         web.post("/api/video/cut", state.h_video_cut),
+        web.post("/api/montage/fade", state.h_montage_fade),  # the fade lands on the joined film, not on its clips
         web.post("/api/montage/sound", state.h_montage_sound),   # the sound of the whole strip   # the sound of a piece, to keep it
         web.post("/api/library/add", state.h_library_add),   # a frame from the bench becomes a keepsake   # reference video is trimmed here, not in the browser
         web.get("/api/setup/info", state.h_setup_info),
