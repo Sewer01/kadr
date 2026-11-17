@@ -3465,8 +3465,13 @@ class App:
                 elif kind == "in" and pos > 0.05:
                     filters.append("afade=t=in:st=%.3f:d=%.3f" % (t0, pos))
             t0 += dur
-        applog("монтаж: прошу затухание на %s - план %d сегмент(а), спусков %d"
-               % (item.get("id"), len(body.get("timeline") or []), len(filters)))
+        why = ""
+        if not filters:
+            bad = [s for s in (body.get("timeline") or []) if (s.get("at_in") is not None or s.get("at_out") is not None)]
+            why = (" · сегментов со спуском %d" % len(bad)
+                   + (", но длина у них %s" % ", ".join(str(s.get("dur")) for s in bad[:5]) if bad else ""))
+        applog("монтаж: прошу затухание на %s - план %d сегмент(а), спусков %d%s"
+               % (item.get("id"), len(body.get("timeline") or []), len(filters), why))
         if not filters:
             return web.json_response({"ok": True, "fades": 0, "seconds": round(total, 2)})
         out = path.with_name(path.stem + "-fade" + path.suffix)

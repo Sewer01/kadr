@@ -11678,14 +11678,19 @@ if (e.target.closest('.mt-clear')) {
   async function applyStripFades(id, ids, durs, ins) {
     const plan = (ids || []).map((_, i) => {
       const fd = fadeOf(i);
-      const dur = +(durs && durs[i] ? durs[i] : 0) || 0;
-      const from = +((ins && ins[i]) || 0) || 0;
+      // the snapshot of lengths says "null" for a clip nobody trimmed - that means the WHOLE clip
+      // goes into the film, so the live length of the strip is the truth here, not the snapshot
+      let dur = 0, from = 0;
+      try { dur = +durOf(i); from = +inOf(i) || 0; } catch (e) { }
+      if (!(dur > 0)) dur = +(durs && durs[i] ? durs[i] : 0) || 0;
+      if (!(dur > 0)) dur = Math.max(0.3, +((MT.info && MT.info[i] && MT.info[i].len) || 0)) || 0;
+      if (!(from > 0)) from = +((ins && ins[i]) || 0) || 0;
       const rel = x => +Math.max(0, Math.min(dur, x - from)).toFixed(3);
-      const seg = { dur: dur };
+      const seg = { dur: +dur.toFixed(3) };
       if (fd.l != null) seg.at_in = rel(fd.l);
       if (fd.r != null) seg.at_out = rel(fd.r);
       return seg;
-    }).filter((x, i) => x.dur > 0 || x.dir);
+    }).filter(x => x.dur > 0 && (x.at_in != null || x.at_out != null));
     if (!plan.some(x => x.at_in != null || x.at_out != null)) return;
     const st = $('.mt-status', root);
     try {
