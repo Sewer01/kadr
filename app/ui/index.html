@@ -4115,6 +4115,18 @@ class AudioRow {
         if (this._tr && this._tr._slot === j) { this._tr.clear(); this._tr._slot = -1; this.trim.hidden = true; }
       } else if (b.dataset.a === 'trim') this.openTrim(j);
     };
+    // a file may also be dragged onto the row, as the old single loader accepted it
+    this.el.addEventListener('dragover', e => { e.preventDefault(); this.el.style.outline = '1px dashed var(--accent)'; });
+    this.el.addEventListener('dragleave', () => { this.el.style.outline = ''; });
+    this.el.addEventListener('drop', e => {
+      e.preventDefault(); this.el.style.outline = '';
+      const got = [...((e.dataTransfer && e.dataTransfer.files) || [])].find(x => /^audio\//.test(x.type) || /\.(mp3|wav|m4a|ogg|flac|aac)$/i.test(x.name));
+      if (!got) { toast('Перетащите аудиофайл: mp3, wav, m4a, ogg или flac'); return; }
+      const j = this.files.findIndex(x => !x);
+      if (j < 0) { toast('Больше трёх аудио здесь нельзя'); return; }
+      this.set(j, got);
+      toast('Аудио <Audio ' + (this.base + j) + '>: ' + got.name);
+    });
     this.paint();
   }
   set(j, f) { this.files[j] = f; this.src[j] = f; this.sel[j] = null; this.dur[j] = null; this.paint(); this.onChange(j, f); }
@@ -4174,7 +4186,7 @@ function audioTokens(c, bs, film) {
   const ta = c.querySelector('textarea'), text = ta ? ta.value : '';
   const used = new Set((text.match(/<Audio\s*\d+>/g) || []).map(s => +s.replace(/\D+/g, '')));
   const list = [];
-  (film || []).forEach((f, j) => { if (f) list.push({ tag: 1 + j, name: f.name, own: false }); });
+  (film || []).forEach((f, j) => { if (f && j > 0) list.push({ tag: 1 + j, name: f.name, own: false }); });   // №1 is the film's own sound, not a sample
   (c._auds || []).forEach((f, j) => { if (f) list.push({ tag: bs + j, name: f.name, own: true }); });
   const full = used.size >= 3;
   return list.map(x => {
@@ -4193,7 +4205,7 @@ function audioTokens(c, bs, film) {
 function sceneAudioPlan(c, film, bs) {
   const ta = c.querySelector('textarea'), raw = ta ? ta.value : '';
   const byTag = new Map();
-  (film || []).forEach((f, j) => { if (f) byTag.set(1 + j, f); });
+  (film || []).forEach((f, j) => { if (f && j > 0) byTag.set(1 + j, f); });   // the background has its own road to the model
   (c._auds || []).forEach((f, j) => { if (f) byTag.set(bs + j, f); });
   const seen = (raw.match(/<Audio\s*\d+/g) || []).map(s => +s.replace(/\D+/g, ''));
   const picked = [];
@@ -7712,23 +7724,86 @@ function makeRefMode(cfg) {
       // pictures right after the settings, then the scenes
       $('h3', refsCard).innerHTML = '<span class="n">1</span>Изображения героя и места';
       $('h3', musCard).innerHTML = '<span class="n">2</span>Аудио';
-      if (!$('.mus-film', musCard)) {   // three samples for the whole film, on the same terms as a scene's
+      if (!$('.mus-film', musCard)) {   // three files for the whole film, on the same terms as a scene's
         const fw = document.createElement('div');
         fw.className = 'mus-film';
         fw.style.cssText = 'margin:0 0 10px';
-        fw.innerHTML = '<div class="sub-l"><span>Общие аудио на весь ролик</span></div>' +
+        fw.innerHTML = '<div class="sub-l"><span>Аудио на весь ролик</span></div>' +
           '<div class="mus-filmrow"></div>' +
-          '<small class="hint" style="display:block;margin-top:6px">До трёх файлов на весь ролик: голос, ритм, атмосфера.' +
-          ' Тег у каждого свой - <b>&lt;Audio 1&gt;</b>, <b>&lt;Audio 2&gt;</b>, <b>&lt;Audio 3&gt;</b> - и вставляется он в текст той сцены, где нужен.' +
-          ' Модель за раз слушает <b>не больше трёх аудио</b>: сколько тегов стоит в сцене, столько и работает, остальные лежат в запасе.' +
-          ' Обрезать можно любой файл, длина не ограничена.</small>';
+          '<div class="mus-extra"></div>' +
+          '<small class="hint" style="display:block;margin-top:6px"><b>Первый файл - звук ролика</b> (тег &lt;Audio 1&gt;): модель перекладывает его в видео,' +
+          ' правило 15 секунд на него не действует. <b>Второй и третий - образцы</b> (теги &lt;Audio 2&gt; и &lt;Audio 3&gt;): голос, ритм, атмосфера,' +
+          ' которые можно сослать в тексте любой сцены. Обрезать и глушить лесенкой можно каждый.</small>';
         $('.card-h', musCard).insertAdjacentElement('afterend', fw);
+        // the old tile stays in the tree - the calculation reads its field - but it is not shown:
+        // the row above is what the person sees and uses
+        const media = $('.rm-media', musCard);
+        if (media) { const cp = $('.sub-l', media), hn = $('.media-hint', media); if (cp) cp.hidden = true; if (hn) hn.hidden = true; }
+        const audsRow = $('.rm-auds', root); if (audsRow) audsRow.hidden = true;
         const frow = new AudioRow({
           mount: $('.mus-filmrow', fw), base: 1, limit: 0,
-          whereLabel: j => 'общее аудио ролика, аудио ' + (j + 1) + ', тег <Audio ' + (1 + j) + '>',
-          onChange: () => { if (root._save) root._save(); $$('.sc', root).forEach(cc => { try { cc._paintRefs && cc._paintRefs(); } catch (e) { } }); },
+          whereLabel: j => (j === 0 ? 'фон всего ролика' : 'образец ролика номер ' + j) + ', аудио ' + (j + 1) + ', тег <Audio ' + (1 + j) + '>',
+          onChange: j => { syncFilm(j); if (root._save) root._save(); $$('.sc', root).forEach(cc => { try { cc._paintRefs && cc._paintRefs(); } catch (e) { } }); },
         });
-        root._faudRow = frow; root._fauds = frow.files;
+        root._faudRow = frow;
+        // the calculation still reads the old field: the first file of the row is written into it,
+        // so every flag above the row (start, voice, music, loop) keeps working off the same file
+        const slotInp = () => { const s = $('.rm-auds .slot', root); return s && $('input', s); };
+        root._fauds = [null, frow.files[1], frow.files[2]];
+        const keepMirror = () => {
+          root._fauds = [null, frow.files[1], frow.files[2]];
+          const i2 = slotInp(), f = frow.files[0];
+          if (!i2 || frow._mirrored === (f && f.name + f.size)) return;
+          frow._mirrored = f ? f.name + f.size : null;
+          try {
+            if (f) { const dt = new DataTransfer(); dt.items.add(f); i2.files = dt.files; }
+            else i2.files = new DataTransfer().files;
+            i2.dispatchEvent(new Event('change', { bubbles: true }));
+          } catch (e) { }
+        };
+        const chipRow = () => $('.rm-tokens', root);
+        const syncFilm = () => {
+          const f = frow.files[0];
+          const s = $('.rm-auds .slot', root);
+          const want = f ? 'own' : 'none';
+          if (root._snd !== want) { try { setSnd(want); } catch (e) { } }
+          const row = chipRow();
+          if (row) {
+            let ch = row.querySelector('.tok-aud');
+            if (f && !ch) {
+              ch = document.createElement('button'); ch.type = 'button'; ch.className = 'token tok-aud'; ch.dataset.audio = '1';
+              ch.innerHTML = '&lt;Audio 1&gt;';
+              ch.title = '<Audio 1> - звук ролика: модель возьмёт его как фоновый звук сцены';
+              row.append(ch);
+            } else if (!f && ch) ch.remove();
+          }
+          // the counters belong to a block built later than this one, so the refresh waits a step
+          queueMicrotask(() => { try { recount(); } catch (e) { } });
+          const lp = $('.at-loop', mus), ab = $('.at-all', mus);
+          if (lp) lp.hidden = !f;
+          if (ab) ab.hidden = !f;
+          keepMirror();
+        };
+        const extra = $('.mus-extra', fw);
+        const lp = document.createElement('label');
+        lp.className = 'at-loop';
+        lp.hidden = true;
+        lp.style.cssText = 'display:flex;gap:8px;align-items:flex-start;font-size:12.5px;color:var(--muted);cursor:pointer;margin:8px 0 0';
+        lp.innerHTML = '<input type="checkbox" class="lm-loop"><span>Пустой фон по кругу - если ваш трек короче ролика, остаток заполняется им же, без тишины</span>';
+        const ab = document.createElement('button');
+        ab.type = 'button'; ab.className = 'btn mini at-all'; ab.hidden = true;
+        ab.textContent = '🤖 Всё аудио в агент';
+        ab.title = 'Отправить в Агент сразу всё готовое: фон ролика, его образцы и аудио всех сцен - Агент увидит их списком, а не одно включение';
+        extra.append(lp, ab);
+        const voc = $('.lm-vocals', root), vocRow = voc && voc.closest('label');
+        if (vocRow) extra.append(vocRow);   // «музыка в готовом ролике целиком» - флаг остаётся на виду
+        lp.querySelector('input').checked = root._loop !== false;
+        lp.onchange = e => { root._loop = e.target.checked; if (root._save) root._save(); };
+        Object.defineProperty(root, '_trim', { get: () => frow._tr, configurable: true });
+        root._faudsSync = syncFilm;
+        root._filmFiles = () => frow.files.slice();
+        const s0 = $('.rm-auds .slot', root);   // a restored project may already carry the film's sound
+        if (s0 && s0._file) { frow.set(0, s0._file); } else { syncFilm(); }
       }
       if (!$('.mus-cap', musCard)) {   // how many pieces of audio this place allows, said once and in words
         const cap = document.createElement('div'); cap.className = 'hint mus-cap';
@@ -7855,112 +7930,13 @@ function makeRefMode(cfg) {
         <label style="display:flex;gap:6px;align-items:center;margin-top:10px" title="Видео подстраивается под голос, а в готовом ролике играет музыка целиком"><input type="checkbox" class="lm-vocals"> Музыку в ролике оставить, но модель слушает только голос (точнее губы)</label>
       </div>`;
     $('.mus-slot', mus).append($('.rm-media', root));
-    /* Полноценная работа со звуком прямо в карточке «Аудио» - тот же прибор, что в Липсинке,
-       только собранный в один объект. Готовый файл кладётся обратно в тот же слот, поэтому
-       расчёт ничего не знает о правке: для него это обычный загруженный файл. */
-    try {
-      const slot = $('.rm-auds .slot', root), inp = slot && $('input', slot);
-      const wrap = document.createElement('div'); wrap.className = 'lm-trimwrap';
-      // громоздкую плитку заменяет одна строка: кнопка, перетаскивание, имя файла, и под ними флаг
-      const pick = document.createElement('div'); pick.className = 'at-pick';
-      pick.innerHTML = '<div class="at-pickrow"><button class="btn pri at-pickb" type="button">Загрузить аудио</button>' +
-        '<button class="btn at-pickx" type="button" hidden>Убрать</button>' +
-        '<span class="at-who hint">или перетащите файл на эту строку</span></div>' +
-        '<button class="btn mini at-all" type="button" hidden title="Отправить в Агент сразу всё готовое: фон ролика и аудио всех сцен - Агент увидит их списком, а не одно вместо другого">🤖 Все аудио в агент</button>' +
-        '<label class="at-loop" hidden style="display:flex;gap:8px;align-items:flex-start;font-size:12.5px;color:var(--muted);cursor:pointer;margin:0"><input type="checkbox" class="at-loopb" checked> Пустой фон по кругу: если трек короче ролика, он начнётся сначала, а не оборвётся</label>';
-      wrap.append(pick);
-      mus.append(wrap);
-      const who = pick.querySelector('.at-who'), pickb = pick.querySelector('.at-pickb'), pickx = pick.querySelector('.at-pickx');
-      // the field stays where the program put it: its slots are addressed by selectors, and a
-      // programmatic click opens the dialog even from a hidden tile
-      const liveInp = () => ($('.rm-auds .slot input', root) || $('.rm-auds input', root) || inp);
-      const tr = root._trim = new AudioTrimmer({
-        mount: wrap, limit: 0,
-        whereLabel: () => 'фон всего ролика, тег <Audio 1> - одно аудио на весь ролик',          // the soundtrack of the whole film: no fifteen-second cap here
-        pick: () => { const x = liveInp(); if (x) x.click(); },
-        agentTarget: cfg.mode,          // what the agent must write into: this studio, not the last used
-        onState: tr2 => {
-          const s = $('.rm-auds .slot', root), x = s && s._file;
-          // the row of chips is built from the slot, so when the file appears or leaves we redraw it
-          const now = !!x;
-          if (now !== tr2._hadFile) {
-            tr2._hadFile = now;
-            try { recount(); } catch (e) {}
-            // the row is rebuilt by the media block, not by us: so we put the chip in ourselves,
-            // once, and the listener on the parent keeps working through any rebuild
-            const row = $('.rm-tokens', root);
-            if (row) {
-              let ch = row.querySelector('.tok-aud');
-              if (now && !ch) {
-                ch = document.createElement('button');
-                ch.type = 'button'; ch.className = 'token tok-aud'; ch.dataset.audio = '1';
-                ch.innerHTML = '&lt;Audio 1&gt;';
-                ch.title = '<Audio 1> - ссылка на ваше аудио: модель возьмёт его как фоновый звук сцены';
-                row.append(ch);
-              } else if (!now && ch) ch.remove();
-            }
-          }
-          who.textContent = x ? x.name + ' · ' + (x.size / 1048576).toFixed(2) + ' МБ' : 'или перетащите файл на эту строку';
-          pickb.textContent = x ? 'Заменить аудио' : 'Загрузить аудио';
-          pickx.hidden = !x;
-          const lp = pick.querySelector('.at-loop');
-          const ab = pick.querySelector('.at-all');
-          if (ab) ab.hidden = !x;
-          if (lp) { lp.hidden = !x; lp.querySelector('input').checked = root._loop = (root._loop === undefined ? true : root._loop); }
-        },
-        onFile: f => {
-          if (tr._writing) return;
-          const s = $('.rm-auds .slot', root), i2 = s && $('input', s);
-          if (!i2) return;
-          // the program writes slot._file only after its own awaits, so we stay "busy" a moment and
-          // do not let the watcher pull the previous file back in
-          tr._writing = true; tr._last = f;
-          try { const dt = new DataTransfer(); dt.items.add(f); i2.files = dt.files; i2.dispatchEvent(new Event('change')); }
-          finally { setTimeout(() => { tr._writing = false; }, 1800); }
-        },
-      });
-      // the program empties the file field right after reading it, so the truth lives on the slot:
-      // the same place the calculation takes the audio from
-      // the slot is what the calculation reads, so the panel watches the slot itself: listeners on the
-      // file field are lost whenever the tiles are repainted, and a plain poll cannot miss the value
-      const sync = () => {
-        if (tr._writing || !document.body.contains(mus)) return;
-        const s = $('.rm-auds .slot', root), x = s && s._file;
-        // the switch is gone, so the file is the only truth: a restored project could still carry the
-        // old choice with no file in it, which would make the program promise your music and have none
-        const want = x ? 'own' : 'none';
-        if (root._snd !== want) { try { setSnd(want); } catch (e) {} }
-        const same = x && tr._last && x.name === tr._last.name && x.size === tr._last.size;
-        if (x && !same) { tr._last = x; tr.setFile(x, true); }
-        else if (!x && tr.dur0) { tr._last = null; tr.clear(); }
-      };
-      // hidden, not removed: the slots and their fields must stay addressable for the program, and
-      // these nodes are built later than this point, so we retry until they are here. It has to be
-      // defined before the watch below: the watch calls it, and calling it earlier than it exists
-      // broke the whole set-up at that line
-      let tucked = false;
-      const tuck = () => {
-        if (tucked) return;
-        const media = $('.rm-media', root), auds = $('.rm-auds', root), voc = $('.lm-vocals', root);
-        if (!media || !auds || !voc) return;
-        const cap = $('.sub-l', media), hint = $('.media-hint', media);
-        if (cap) cap.hidden = true;
-        if (hint) hint.hidden = true;
-        auds.hidden = true;
-        const vocRow = voc.closest('label');
-        if (vocRow) pick.append(vocRow);   // the flag about the music in the video stands under the button
-        tucked = true;
-      };
-      tuck();
-      const vb = $('#lmVoice', root); if (vb) vb.hidden = true;   // the same action lives in the panel now
-      mus.addEventListener('change', () => sync(), true);
-      root._trimWatch = setInterval(() => { tuck(); sync(); }, 700);
-      sync();
-      pickb.onclick = () => { const x = liveInp(); if (x) x.click(); };
-      $('.at-all', pick).onclick = async () => {
+      const atAll = $('.at-all', mus);   // this is the card being built; musCard belongs to a later scope
+      if (atAll) atAll.onclick = async () => {
         const items = [];
-        const tr0 = root._trim;
-        if (tr0 && tr0.dur0 && tr0.buf) items.push({ buf: tr0.buf, s: tr0.start, e: tr0.end, name: tr0.name, where: 'фон всего ролика, тег <Audio 1>' });
+        const f0 = (root._filmFiles ? root._filmFiles() : [])[0];
+        if (f0) items.push({ file: f0, name: f0.name, where: 'фон всего ролика, тег <Audio 1>' });
+        const ff = root._fauds || [];
+        ff.forEach((f, j) => { if (f && j > 0) items.push({ file: f, name: f.name, where: 'образец ролика, тег <Audio ' + (1 + j) + '>' }); });
         $$('.sc', root).forEach((cc, i) => (cc._auds || []).forEach((f, j) => { if (f) items.push({ file: f, name: f.name, where: 'сцена ' + (i + 1) + ', тег <Audio ' + (10 * (i + 1) + j) + '>' }); }));
         if (!items.length) { toast('Готового аудио нет: сначала загрузите файл'); return; }
         if (!AG.status || !AG.status.speech_ready) { try { await agStatus(); } catch (e) {} }
@@ -7984,41 +7960,6 @@ function makeRefMode(cfg) {
         }
         toast(ok ? ('В Агент передано аудио: ' + ok + ' из ' + items.length) : 'Агент не принял аудио - проверьте распознавание речи');
       };
-      {   // the loop flag must follow the box, otherwise the film is promised a repeat that was refused
-        const lb = pick.querySelector('.at-loopb');
-        if (lb) lb.onchange = () => { root._loop = lb.checked; if (root._save) root._save(); };
-      }
-      pickx.onclick = () => { const x = $('.rm-auds .slot .x', root); if (x) x.click(); else sync(); };
-      pick.addEventListener('dragover', e => { e.preventDefault(); pick.classList.add('over'); });
-      pick.addEventListener('dragleave', () => pick.classList.remove('over'));
-      pick.addEventListener('drop', e => {
-        e.preventDefault(); pick.classList.remove('over');
-        const got = [...((e.dataTransfer && e.dataTransfer.files) || [])].find(x => /^audio\//.test(x.type) || /\.(mp3|wav|m4a|ogg|flac|aac)$/i.test(x.name));
-        if (!got) { toast('Перетащите аудиофайл: mp3, wav, m4a, ogg или flac'); return; }
-        const live = liveInp();
-        if (!live) return;
-        tr._writing = true;
-        const dt = new DataTransfer(); dt.items.add(got); live.files = dt.files; live.dispatchEvent(new Event('change'));
-        // we must not claim this file as ours: the editor has to read it from the slot like any other
-        setTimeout(() => { tr._writing = false; sync(); }, 900);
-      });
-      // the row «Начать с …» and «Отделить голос от музыки» repeated the editor below it: the editor
-      // cuts the file itself, so the offset field would only confuse
-      const hideDup = () => {
-        const x = $('.lm-start', root); if (!x) return false;
-        let d = x.closest('div[style]');
-        // never swallow the strip with «Новые сцены / Продолжить видео»: it carries an inline style of
-        // its own, and once the offset field stood near it the whole choice disappeared with it
-        while (d && (d.classList.contains('lm-base') || d.querySelector('.lm-base'))) {
-          d = d.parentElement ? d.parentElement.closest('div[style]') : null;
-        }
-        if (!d) return false;
-        d.style.display = 'none';
-        return true;
-      };
-      if (!hideDup()) { let k = 0; const iv = setInterval(() => { if (hideDup() || ++k > 20) clearInterval(iv); }, 200); }
-        } catch (e) { toast('Панель работы со звуком не встроилась: ' + e.message); }
-
     c1.after(mus);
     queueMicrotask(() => { const pc = $('.rm-params', root), hw = $('details.agvar', pc); if (hw) $('.card-h', pc).after(hw); const nt = document.createElement('div'); nt.className = 'note lm-qnote'; nt.style.margin = '10px 0'; $('.card-h', pc).after(nt); root._paintQ?.(); });   // "how it works" goes to the top of the parameters
     c1.after($('.rm-params', root));   // size and quality first: they are chosen before the scenes are written
