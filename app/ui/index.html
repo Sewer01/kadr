@@ -7967,8 +7967,7 @@ function makeRefMode(cfg) {
         <label style="display:flex;gap:6px;align-items:center;margin-top:10px" title="Видео подстраивается под голос, а в готовом ролике играет музыка целиком"><input type="checkbox" class="lm-vocals"> Музыку в ролике оставить, но модель слушает только голос (точнее губы)</label>
       </div>`;
     $('.mus-slot', mus).append($('.rm-media', root));
-      const atAll = $('.at-all', mus);   // this is the card being built; musCard belongs to a later scope
-      if (atAll) atAll.onclick = async () => {
+      const sendAllToAgent = async () => {
         const items = [];
         const f0 = (root._filmFiles ? root._filmFiles() : [])[0];
         if (f0) items.push({ file: f0, name: f0.name, where: 'фон всего ролика, тег <Audio 1>' });
@@ -7997,6 +7996,18 @@ function makeRefMode(cfg) {
         }
         toast(ok ? ('В Агент передано аудио: ' + ok + ' из ' + items.length) : 'Агент не принял аудио - проверьте распознавание речи');
       };
+      /* The button is created by the block above, which runs later than this code: looking it up here
+         found nothing, the press found no handler and stayed silent. The click is caught where it
+         bubbles instead - whoever creates the button, and whenever, the press works. */
+      if (!root._atAllWire) {
+        root._atAllWire = true;
+        root.addEventListener('click', e => {
+          const b = e.target.closest && e.target.closest('.at-all');
+          if (!b) return;
+          e.preventDefault();
+          sendAllToAgent();
+        });
+      }
     c1.after(mus);
     queueMicrotask(() => { const pc = $('.rm-params', root), hw = $('details.agvar', pc); if (hw) $('.card-h', pc).after(hw); const nt = document.createElement('div'); nt.className = 'note lm-qnote'; nt.style.margin = '10px 0'; $('.card-h', pc).after(nt); root._paintQ?.(); });   // "how it works" goes to the top of the parameters
     c1.after($('.rm-params', root));   // size and quality first: they are chosen before the scenes are written
