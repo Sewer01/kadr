@@ -11661,7 +11661,7 @@ if (e.target.closest('.mt-clear')) {
       const r = await fetch('/api/montage/fade', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, timeline: plan }) });
       const j = await r.json().catch(() => ({}));
       if (!r.ok || !j.ok) { toast('Затухание наложить не удалось: ' + (j.error || r.status)); if (st) st.textContent = 'Ролик сохранён, но затухание не леглось: ' + (j.error || r.status); return; }
-      if (!j.fades) return;
+      if (!j.fades) { if (st) st.textContent = 'Ролик сохранён, но затухание не наложилось: ни один спуск не лёг'; return; }
       toast('Затухание легло на собранный ролик - ' + j.fades + ' спуск(ов); клипы не тронуты');
       if (st) st.textContent = 'Ролик сохранён · затухание наложено на него (' + j.fades + ') · исходные клипы не менялись';
       const rv = $('.mt-res', root); if (rv && MT.res) { const s = rv.src; rv.removeAttribute('src'); rv.src = s + (s.includes('?') ? '&' : '?') + 'fade=1'; }

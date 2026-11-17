@@ -3451,6 +3451,8 @@ class App:
             elif way == "l" and pos > 0.05:
                 filters.append("afade=t=in:st=%.3f:d=%.3f" % (t0, pos))
             t0 += dur
+        applog("монтаж: прошу затухание на %s - план %d сегмент(а), спусков %d"
+               % (item.get("id"), len(body.get("timeline") or []), len(filters)))
         if not filters:
             return web.json_response({"ok": True, "fades": 0, "seconds": round(total, 2)})
         out = path.with_name(path.stem + "-fade" + path.suffix)
@@ -3470,6 +3472,15 @@ class App:
             return web.json_response({"error": "затухание не леглось: " + (err or b"")[-200:].decode("utf-8", "replace")[-160:]},
                                      status=422)
         out.replace(path)   # only the film the montage made is rewritten; its sources stay as they were
+        # the program keeps its own copy of every finished film, and that is what a browser may be
+        # served after ComfyUI's output folder is cleaned: an unfaded copy there would quietly
+        # undo the work, so it gets the same file
+        other = item.get("local")
+        if other and Path(other).exists() and Path(other) != path:
+            try:
+                shutil.copy2(path, other)
+            except OSError:
+                pass
         if isinstance(item.get("size"), int):
             item["size"] = path.stat().st_size
         self.library.save()
