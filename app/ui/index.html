@@ -10953,10 +10953,11 @@ applyZoom();
         <div class="mt-scale"><span>1 секунда</span><input type="range" class="mt-px" min="8" max="90" step="1" title="Крупнее масштаб - точнее резать по времени"><span class="mt-px-x">26 px</span><span class="hint">этот ползунок и кнопки «−» «+» меняют только ширину ленты</span>
               <span class="mt-mk" title="где стоит метка реза: секунды внутри клипа и номер кадра">маркер —</span>
       <span class="mt-acts"><button type="button" class="btn mini mt-shot" title="Сохранить кадр на метке в Библиотеку">📷 Сделать кадр</button>
-      <button type="button" class="btn mini mt-snd" title="Сохранить звук этого клипа в Библиотеку">🎧 Сделать звук</button></span>
+      <button type="button" class="btn mini mt-snd" title="Сохранить звук этого клипа в Библиотеку">🎧 Сделать звук</button>
+       <button type="button" class="btn mini mt-fade" title="Режим затухания: ножницы в ленте становятся лесенками. Поставьте метку в клипе и нажмите лесенку - звук начнёт стихать от метки в эту сторону">Сделать затухание</button></span>
 <button type="button" class="btn mini mt-clear" title="Убрать из ленты все клипы (сами видео останутся в Библиотеке)">Очистить ленту</button></div>
         <div class="mt-trim" hidden></div>
-        <div class="hint mt-hint" style="margin-top:8px">Нажмите на клип в ленте - он сразу заиграет справа с этого места. Ширина блока равна длине клипа. Порядок меняется перетаскиванием или стрелками ◀ ▶ (они именно переставляют, а не играют), крестик убирает клип из монтажа. Край блока тянется внутрь: левый отрезает начало, правый - конец; на клипе появится отметка вида 2.5–8 с. Двойной щелчок по клипу возвращает его целиком. Метка реза (треугольник сверху) стоит там, куда её поставили, и не убегает во время показа; голубая линия - это бегунок воспроизведения. Клик по клипу слева от метки играет от начала оставленного куска до метки, клик справа - от метки до конца куска. Ножницы: левая убирает всё до метки, правая - всё после неё. Потяните правый край блока, чтобы сделать клип короче (или вернуть длину). Клипы разного размера приводятся к размеру первого.</div></div>
+        <div class="hint mt-hint" style="margin-top:8px">Нажмите на клип в ленте - он сразу заиграет справа с этого места. Ширина блока равна длине клипа. Порядок меняется перетаскиванием или стрелками ◀ ▶ (они именно переставляют, а не играют), крестик убирает клип из монтажа. Край блока тянется внутрь: левый отрезает начало, правый - конец; на клипе появится отметка вида 2.5–8 с. Двойной щелчок по клипу возвращает его целиком. Кнопка «Сделать затухание» меняет ножницы у метки на лесенки: метка ставится туда, где звук начинает стихать, лесенка выбирает сторону - к началу клипа или к его концу; на блоке появляется отметка ↘ или ↙, и затухание уйдёт в сохранённый звук монтажа. Метка реза (треугольник сверху) стоит там, куда её поставили, и не убегает во время показа; голубая линия - это бегунок воспроизведения. Клик по клипу слева от метки играет от начала оставленного куска до метки, клик справа - от метки до конца куска. Ножницы: левая убирает всё до метки, правая - всё после неё. Потяните правый край блока, чтобы сделать клип короче (или вернуть длину). Клипы разного размера приводятся к размеру первого.</div></div>
     </div><div class="preview">
       <div class="screen"><div class="frame" style="aspect-ratio:16/9;width:100%"><div class="res mt-empty"><b>Монтаж пуст</b>добавьте клип из Библиотеки (или несколько, если хотите склеить) - они появятся в ленте, и здесь сразу покажется кадр, на который указывает метка реза. Кнопка «▶» играет всю ленту по порядку, после склейки тут же встанет готовый ролик.</div><video class="result mt-pv" playsinline hidden></video><video class="result mt-res" controls loop playsinline hidden></video></div></div>
       <div class="mt-bar" hidden><button type="button" class="btn mt-restart" title="Смотреть с начала ленты">⏮</button><button type="button" class="btn mt-play" title="Играть / пауза (пробел)">▶</button><input type="range" class="mt-seek" min="0" max="0" value="0" title="Перемотка"><span class="mt-time">0:00 / 0:00</span></div>
@@ -10971,6 +10972,8 @@ applyZoom();
       <div class="mt-pipe" hidden></div>
       <div class="status mt-status"></div>
     </div></div>`;
+  const FD = '<svg viewBox="0 0 20 14" style="width:18px;height:13px;vertical-align:-2px"><path d="M1 13V11h4V8h4V5h4V2h6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/></svg>';
+  MT.fadeMode = false; MT.fades = MT.fades || [];
   const hidden = () => { try { return JSON.parse(localStorage.getItem('h3-mt-hide') || '[]'); } catch { return []; } };
   const hideSet = a => { try { localStorage.setItem('h3-mt-hide', JSON.stringify(a)); } catch {} };
   const fullOf = i => get(MT.ids[i]).len || 5;
@@ -10982,10 +10985,11 @@ applyZoom();
   const trimTxt = i => (inOf(i) > 0.05
     ? inOf(i).toFixed(1).replace('.0', '') + '\u2009–\u2009' + endOf(i).toFixed(1).replace('.0', '')   // a piece cut from the middle: show its edges
     : durOf(i).toFixed(1).replace('.0', ''))                                                          // whole, or cut only at the end
-    + ' с' + (MT.cuts[i] != null || inOf(i) > 0.05 ? ' ✂' : '');
+    + ' с' + (MT.cuts[i] != null || inOf(i) > 0.05 ? ' ✂' : '')
+    + ((MT.fades || [])[i] && (MT.fades || [])[i].dir ? ((MT.fades[i].dir === 'r' ? ' ↘' : ' ↙') + (MT.fades[i].at || 0).toFixed(1).replace('.0', '')) : '');   // the fade the clip carries, seen from the strip
   const lenTxt = it => it.len ? it.len.toFixed(1).replace('.0', '') + ' с' : '';
   function render() {
-    const keep = MT.ids.map(id => !!get(id) && !get(id).missing); MT.cuts = MT.cuts.filter((_, i) => keep[i]); MT.ins = MT.ins.filter((_, i) => keep[i]); MT.ids = MT.ids.filter((_, i) => keep[i]);
+    const keep = MT.ids.map(id => !!get(id) && !get(id).missing); MT.cuts = MT.cuts.filter((_, i) => keep[i]); MT.ins = MT.ins.filter((_, i) => keep[i]); MT.fades = (MT.fades || []).filter((_, i) => keep[i]); MT.ids = MT.ids.filter((_, i) => keep[i]);
     const hid = hidden(), all = LIB.filter(it => it.kind !== 'image' && !it.missing && it.url), vids = all.filter(it => !hid.includes(it.id)), nh = all.length - vids.length;
     $('.mt-hid', root).innerHTML = nh ? `Убрано из списка: ${nh} · <button type="button" class="a-change" data-showall>Вернуть все</button>` : '';
     $('.mt-lib', root).innerHTML = vids.length ? vids.map(it => `<button type="button" class="mt-card" data-id="${it.id}" title="${esc(it.prompt || '')}"><video src="${it.url}#t=0.5" preload="metadata" muted playsinline></video><span class="mt-plus">+</span><span class="mt-x" data-hide="${it.id}" role="button" title="Убрать из этого списка (в Библиотеке клип останется)">✕</span><span class="mt-len">${lenTxt(it)}</span><small>${esc(it.prompt || MODE_NAME[it.mode] || '')}</small></button>`).join('')
@@ -10999,8 +11003,10 @@ applyZoom();
       + '<i class="mt-ph" title="Потяните за этот треугольник: метка встанет туда, где нужен рез. Слева показывается кадр, на который она указывает"></i><i class="mt-line"></i>'
       + `<i class="mt-fr" data-fr="1" title="На один кадр правее (${frameStep().toFixed(3)} с)">▶</i>`
       + '<i class="mt-run"></i>'
-      + '<i class="mt-cut" data-cut="in" title="Отрезать начало: убрать всё до метки">✂</i>'
-      + '<i class="mt-cut out" data-cut="out" title="Отрезать конец: убрать всё после метки">✂</i>');
+      + (MT.fadeMode
+        ? '<i class="mt-cut fd" data-cut="l" title="Звук стихает от метки к началу клипа">' + FD + '</i><i class="mt-cut fd out" data-cut="r" title="Звук стихает от метки к концу клипа">' + FD + '</i>'
+        : '<i class="mt-cut" data-cut="in" title="Отрезать начало: убрать всё до метки">✂</i>'
+      + '<i class="mt-cut out" data-cut="out" title="Отрезать конец: убрать всё после метки">✂</i>'))
     syncPlayer(); paintTrim();
     queueThumbs();                      // the frames arrive one by one, the interface stays responsive
     if (window.mtSaveState) { window.mtSaveState(); window.mtPipePaint(); }
@@ -11174,7 +11180,11 @@ applyZoom();
     if (!MT.ids.length) { toast('Лента пуста'); return; }
     // the sound of the WHOLE strip as it stands now: every clip, its own cut, in the montage order -
     // that is the work the person made, and a sound of one clip would be something else
-    const parts = MT.ids.map((id, i) => ({ id, start: inOf(i) || 0, end: (inOf(i) || 0) + durOf(i) }));
+    const parts = MT.ids.map((id, i) => {
+        const fd = (MT.fades || [])[i], p = { id, start: inOf(i) || 0, end: (inOf(i) || 0) + durOf(i) };
+        if (fd && fd.dir) { p.fade = fd.dir; p.fade_at = +Math.max(0, Math.min(p.end - p.start, (fd.at || 0) - (inOf(i) || 0))).toFixed(3); }
+        return p;
+      });
     const total = parts.reduce((a, p) => a + (p.end - p.start), 0);
     if (total < 0.3) { toast('В ленте почти ничего не осталось: сначала отрежьте меньше'); return; }
     toast('Собираю звук монтажа из ' + parts.length + ' клип(ов)…');
@@ -11272,6 +11282,18 @@ applyZoom();
   };
   root.addEventListener('pointerdown', e => {
     const cut = e.target.closest('.mt-cut');
+    if (cut && MT.fadeMode) {              // the stairs: the fade starts where the marker stands
+      e.preventDefault(); e.stopPropagation();
+      const mk = mkAt();
+      if (!MT.ids.length) { toast('Лента пуста'); return; }
+      MT.fades = MT.fades || [];
+      const at = +(inOf(mk.i) + mk.off).toFixed(2);
+      const prev = MT.fades[mk.i];
+      if (prev && prev.dir === cut.dataset.cut && Math.abs((prev.at || 0) - at) < 0.05) { delete MT.fades[mk.i]; toast('Затухание снято'); }
+      else { MT.fades[mk.i] = { dir: cut.dataset.cut, at: at }; toast(cut.dataset.cut === 'r' ? 'Звук стихает от метки к концу клипа' : 'Звук стихает от метки к началу клипа'); }
+      render();
+      return;
+    }
     if (cut) {                               // one click of the scissors cuts the clip at the marker
       e.preventDefault(); e.stopPropagation();
       const mk = mkAt(), i = mk.i, at = mk.off;      // the cut happens where the marker stands
@@ -11444,6 +11466,14 @@ applyZoom();
   root.addEventListener('click', e => {
                             if (e.target.closest('.mt-shot')) { mtShot(); return; }
                         if (e.target.closest('.mt-snd')) { mtSound(); return; }
+    if (e.target.closest('.mt-fade')) {
+      MT.fadeMode = !MT.fadeMode;
+      const b = $('.mt-fade', root);
+      if (b) { b.classList.toggle('on', MT.fadeMode); b.innerHTML = MT.fadeMode ? (FD + ' Затухание: ' + (MT.ids.length ? 'выберите клип и метку' : 'лента пуста')) : (FD + ' Сделать затухание'); }
+      render();
+      toast(MT.fadeMode ? 'Ножницы стали лесенками: метка в клипе - куда начинать стихать, лесенка - в какую сторону' : 'Снова ножницы');
+      return;
+    }
 if (e.target.closest('.mt-clear')) {
       if (!MT.ids.length) { toast('Лента уже пуста'); return; }
       const wipe = () => { MT.ids = []; MT.cuts = []; MT.ins = []; P.picked = false; P.lim = null; render(); toast('Лента очищена: клипы остались в Библиотеке'); };
@@ -11806,9 +11836,9 @@ if (e.target.closest('.mt-clear')) {
       B('Плюс под сценой', 'добавляет ещё одну сцену; номер карточки слева - это и есть её место.'),
       B('Картинки сцены', 'до 9 на каждую сцену; свои медиа нумеруются десятками по номеру сцены.'),
       B('Аудио сцены', 'до трёх файлов на сцену: это образцы - голос, ритм, атмосфера. Модель слушает их и звук создаёт сама; в тексте сцены они значатся как &lt;Audio 10&gt;, &lt;Audio 11&gt;, &lt;Audio 12&gt; (во второй сцене - 20, 21, 22).'),
-      B('Общие аудио на весь ролик', 'до трёх файлов в карточке «Аудио»: те же плитки и ножницы, теги &lt;Audio 1&gt;, &lt;Audio 2&gt;, &lt;Audio 3&gt;. Вставляют в ту сцену, где звук нужен; длина не ограничена.'),
+      B('Аудио на весь ролик', 'до трёх файлов в карточке «Аудио»: первый - звук ролика (&lt;Audio 1&gt;), его модель перекладывает в видео; второй и третий - образцы (&lt;Audio 2&gt;, &lt;Audio 3&gt;): голос, ритм, атмосфера. Обрезать и глушить лесенкой можно каждый, длина не ограничена.'),
       B('Три тега - и хватит', 'модель за раз слушает не больше трёх аудио, поэтому в сцене работает три тега: вставили три - остальные чипи гаснут. Что лежит в сцене, но не упомянуто тегом, в этот раз не участвует; четвёртый тег программа уберёт и скажет об этом.'),
-      B('Общее аудио', 'фоновый звук всего ролика, тег &lt;Audio 1&gt;.'),
+      B('Затухание', 'в любом редакторе аудио есть режим «Затухание»: на краях выделенного появляются лесенки, и звук плавно стихает в выбранную сторону. В «Монтаже» кнопка «Сделать затухание» меняет ножницы на лесенки: метка - где начинать стихать, лесенка - в какую сторону.'),
       B('Склейка', 'сцены соединяются подряд в один файл; длина ролика - сумма сцен.'),
     ]),
     action: () => H('<b>Экшн-видео - одно динамичное видео</b>') + UL([

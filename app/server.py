@@ -3370,17 +3370,33 @@ class App:
                 return web.json_response({"error": "не разобраны границы куска"}, status=400)
             if e - s < 0.05:
                 return web.json_response({"error": "один из кусков пустой: сначала отрежьте меньше"}, status=400)
-            picked.append((path, s, e))
+            # a fade of this clip, asked for in the strip: from the marker to the far end ('r')
+            # or from the marker back to the beginning ('l'); measured inside the kept piece
+            fade, fade_at = str(p.get("fade") or ""), max(0.0, float(p.get("fade_at") or 0))
+            if fade not in ("", "l", "r"):
+                fade = ""
+            if fade == "r" and (e - s) - fade_at < 0.05:
+                fade = ""            # the marker stands at the very end: nothing to fade over
+            if fade == "l" and fade_at < 0.05:
+                fade = ""
+            picked.append((path, s, e, fade, fade_at))
         work = Path(os.environ.get("TEMP", ".")) / ("h3mtsnd-" + uuid.uuid4().hex)
         work.mkdir(parents=True, exist_ok=True)
         out = work / "montage.mp3"
         try:
             cmd = [str(ff), "-hide_banner", "-loglevel", "error", "-y"]
-            for path, s, e in picked:
+            for path, s, e, fade, fade_at in picked:
                 cmd += ["-ss", "%.3f" % s, "-to", "%.3f" % e, "-i", str(path)]
-            # the same sample rate and channels everywhere: pieces of different clips must stitch silently
-            chain = "".join("[%d:a]aformat=sample_rates=44100:channel_layouts=stereo[a%d];" % (i, i)
-                            for i in range(len(picked)))
+            # the same sample rate and channels everywhere: pieces of different clips must stitch silently.
+            # A fade rides on the same chain: out to the right end, in from the left one.
+            def seg(i, path, s, e, fade, fade_at):
+                f = "[%d:a]aformat=sample_rates=44100:channel_layouts=stereo" % i
+                if fade == "r":
+                    f += ",afade=t=out:st=%.3f:d=%.3f" % (fade_at, max(0.05, (e - s) - fade_at))
+                elif fade == "l":
+                    f += ",afade=t=in:st=0:d=%.3f" % max(0.05, fade_at)
+                return f + "[a%d];" % i
+            chain = "".join(seg(i, *p) for i, p in enumerate(picked))
             chain += "".join("[a%d]" % i for i in range(len(picked))) + "concat=n=%d:v=0:a=1[out]" % len(picked)
             cmd += ["-filter_complex", chain, "-map", "[out]", "-c:a", "libmp3lame", "-q:a", "3", str(out)]
             err = b""
