@@ -162,6 +162,14 @@
 .atrim .at-modes button{padding:8px 6px;border-radius:9px;font-weight:700;font-size:13px;color:var(--muted);text-align:center}
 .atrim .at-modes button small{display:block;font-weight:500;font-size:11px;color:var(--dim)}
 .atrim .at-modes button.on{background:var(--grad);color:#fff}
+.atrim .at-fade{position:absolute;inset:0;pointer-events:none}
+.atrim .at-fade[hidden]{display:none}
+.atrim .at-fd{position:absolute;top:50%;transform:translateY(-50%);width:34px;height:30px;padding:0;
+  display:grid;place-items:center;border-radius:9px;background:rgba(10,14,14,.82);border:1px solid var(--accent);
+  pointer-events:auto;cursor:pointer}
+.atrim .at-fd svg{width:20px;height:14px;fill:none;stroke:var(--accent);stroke-width:2.2;stroke-linejoin:round;stroke-linecap:round}
+.atrim .at-fd:hover{background:var(--accent)}
+.atrim .at-fd:hover svg{stroke:#fff}
 .atrim .at-modes button.on small{color:rgba(255,255,255,.8)}
 .atrim .at-hint{color:var(--dim);font-size:12.5px}
 .atrim .at-acts{display:flex;gap:8px;flex-wrap:wrap}
@@ -4225,9 +4233,14 @@ class AudioTrimmer {
       '<div class="at-wave"><canvas class="at-cv" height="86"></canvas>' +
       '<div class="at-sel" hidden><i class="at-h" data-h="l"></i><i class="at-h" data-h="r"></i></div>' +
       '<div class="at-cut" hidden><i class="at-h" data-h="cl"></i><i class="at-h" data-h="cr"></i></div>' +
+      '<div class="at-fade" hidden>' +
+      '<button class="at-fd" type="button" data-f="l" title="Звук стихает к левому краю выделенного"><svg viewBox="0 0 20 14" aria-hidden="true"><path d="M1 13V11h4V8h4V5h4V2h6"/></svg></button>' +
+      '<button class="at-fd" type="button" data-f="r" title="Звук стихает к правому краю выделенного"><svg viewBox="0 0 20 14" aria-hidden="true"><path d="M19 13V11h-4V8h-4V5h-4V2H1"/></svg></button>' +
+      '</div>' +
       '<div class="at-ph" hidden></div></div>' +
-      '<div class="at-modes"><button class="on" type="button" data-m="clip">Выбор фрагмента<small>что пойдёт в клип</small></button>' +
-      '<button type="button" data-m="cut">Вырезание<small>убрать кусок из аудио</small></button></div>' +
+      '<div class="at-modes"><button class="on" type="button" data-m="clip" title="Выбор фрагмента: то, что выделено, пойдёт в клип">Выбор фрагмента</button>' +
+      '<button type="button" data-m="cut" title="Вырезание: убрать выделенный кусок из аудио, остальное склеить">Вырезание</button>' +
+      '<button type="button" data-m="fade" title="Затухание: на краях выделенного появятся лесенки - нажмите ту, в какую сторону звук должен стихать">Затухание</button></div>' +
       '<div class="at-hint"></div>' +
       '<div class="at-acts"><button class="btn pri at-keep" type="button" disabled>Оставить выделенное</button>' +
       '<button class="btn at-paus" type="button" disabled>Убрать паузы</button>' +
@@ -4259,7 +4272,9 @@ class AudioTrimmer {
   fracAt(t) { const [a, b] = this.view(); return (t - a) / Math.max(.001, b - a); }
   tAt(p) { const [a, b] = this.view(); return a + p * (b - a); }
   _hint() {
-    this.q('.at-hint').textContent = this.mode === 'cut'
+    this.q('.at-hint').textContent = this.mode === 'fade'
+      ? 'Выделите, где звук должен стихать, и нажмите лесенку: ◤ к левому краю, ◢ к правому. За краем выделенного тишина, внутри - плавный спуск.'
+      : this.mode === 'cut'
       ? 'Проведите мышью по волне, чтобы выделить кусок, который нужно убрать, и нажмите «Удалить выделенное».'
       : 'Выделите, что оставить в клипе, и нажмите «Оставить выделенное» - остальное аудио уберётся.';
   }
@@ -4304,6 +4319,17 @@ class AudioTrimmer {
     } else sel.hidden = true;
     if (this.cut) { cu.hidden = false; cu.style.left = px(this.cut.a) + 'px'; cu.style.width = (px(this.cut.b) - px(this.cut.a)) + 'px'; }
     else cu.hidden = true;
+    // the two stairs of the fade mode stand on the edges of what is marked, not in the corner
+    const fd = this.q('.at-fade');
+    if (fd) {
+      const show = this.mode === 'fade' && !!this.dur0;
+      fd.hidden = !show;
+      if (show) {
+        const lim = Math.max(0, W - 34);
+        fd.querySelector('[data-f="l"]').style.left = Math.max(0, Math.min(px(this.start) - 17, lim)) + 'px';
+        fd.querySelector('[data-f="r"]').style.left = Math.max(0, Math.min(px(this.end) - 17, lim)) + 'px';
+      }
+    }
   }
   _sync() {
     const on = !!this.dur0;
@@ -4427,12 +4453,22 @@ class AudioTrimmer {
       this._drag(e); this._anchor = null; this._t0 = undefined;
       if (this.mode === 'clip') this.out();
     });
+    this.q('.at-fade').onclick = e => {
+      const b = e.target.closest('[data-f]'); if (!b) return;
+      if (!this.dur0) { this.say('Сначала загрузите аудио'); return; }
+      if (this.len() < .3) { this.say('Выделите участок длиннее полсекунды'); return; }
+      this.undo.push({ buf: this.buf, start: this.start, end: this.end });
+      if (this.undo.length > 8) this.undo.shift();
+      actx = actx || new AudioContext();
+      this._commit(fadeRange(this.buf, actx, this.start, this.end, b.dataset.f), x => x);
+      this.say(b.dataset.f === 'r' ? 'Затихает к правому краю' : 'Затихает к левому краю');
+    };
     this.q('.at-modes').onclick = e => {
       const b = e.target.closest('button[data-m]'); if (!b || !this.dur0) return;
       this.mode = b.dataset.m;
       [...this.el.querySelectorAll('.at-modes button')].forEach(x => x.classList.toggle('on', x === b));
       if (this.mode === 'clip') this.cut = null;
-      this._hint(); this._sync();
+      this._hint(); this._sync(); this._paint();   // the stairs of the fade mode stand on the wave
     };
     this.q('.at-play').onclick = () => this.src ? this.stop() : this.play();
     this.q('.at-keep').onclick = () => {
@@ -4585,6 +4621,27 @@ function syncCut() {
   btn.title = `Уберёт ${sec} с внутри рамки, остальное аудио останется`;
 }
 // the pieces [a,b] (seconds) of buf that stay, joined with tiny fades so the joins do not click
+/* A fade inside one stretch of the wave: 'r' dies away to the right edge, 'l' to the left one.
+   The rest of the audio is left exactly as it was, so a fade never touches what the person did not
+   mark. The ramp is straight - that is what an ear calls "плавно" at these lengths. */
+function fadeRange(buf, ctx, a, b, dir) {
+  const sr = buf.sampleRate, ch = buf.numberOfChannels, N = buf.length;
+  const i0 = Math.max(0, Math.floor(a * sr)), i1 = Math.min(N, Math.ceil(b * sr));
+  const out = ctx.createBuffer(ch, N, sr);
+  const span = Math.max(1, i1 - i0);
+  for (let c = 0; c < ch; c++) {
+    const src = buf.getChannelData(c), dst = out.getChannelData(c);
+    dst.set(src);
+    for (let i = i0; i < i1; i++) {
+      const p = (i - i0) / span;                       // 0 at the left edge, 1 at the right one
+      dst[i] = src[i] * (dir === 'r' ? 1 - p : p);
+    }
+    if (dir === 'r') for (let i = i1; i < N; i++) dst[i] = 0;   // silence past the fade, no cliff
+    if (dir === 'l') for (let i = 0; i < i0; i++) dst[i] = 0;
+  }
+  return out;
+}
+
 function keepRanges(buf, ranges) {
   const sr = buf.sampleRate, chs = buf.numberOfChannels, fade = Math.round(0.004 * sr);
   const lens = ranges.map(([a, b]) => Math.max(0, Math.round((b - a) * sr)));
