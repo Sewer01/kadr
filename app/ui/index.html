@@ -6818,21 +6818,31 @@ function makeRefMode(cfg) {
     const imgAll = document.createElement('button');
     imgAll.type = 'button'; imgAll.className = 'btn mini agall-h';
     imgAll.textContent = '🖼 Все изображения в агент';
-    imgAll.title = 'Сложить в чат Агента все изображения этого раздела - он их увидит и допишет к тому, что уже лежит; ничего не очищается';
+    imgAll.title = 'Сложить в чат Агента все изображения - и общие, и те, что лежат в отдельных сценах; он допишет их к тому, что уже есть, и ничего не очистит';
     $('.card-h', c1).append(imgAll);
     imgAll.addEventListener('click', e => e.stopPropagation());   // a press here must not fold the card
     imgAll.onclick = async () => {
-      const files = $$('label.ref.filled', imgsEl).map(r => r._file).filter(Boolean);
-      if (!files.length) { toast('Изображений в разделе нет - сначала добавьте их'); return; }
-      let added = 0, again = 0;
+      // every picture the film can stand on: the common places first (<Picture 1..9>), then each
+      // scene's own places in the order of their tags (<Picture 10..>, <Picture 20..>) - the Agent
+      // receives them in the same order a person reads them on the screen
+      const want = [];
+      // the number of the tag is the place the picture stands in, not its rank among the filled ones
+      $$('label.ref', imgsEl).forEach((r, j) => { if (r._file) want.push({ f: r._file, note: 'общий референс, тег <Picture ' + (j + 1) + '>' }); });
+      $$('.sc', root).forEach((cc, i) => (cc._files || []).forEach((f, j) => { if (f) want.push({ f, note: 'сцена ' + (i + 1) + ', своё фото, тег <Picture ' + (10 * (i + 1) + j) + '>' }); }));
+      if (!want.length) { toast('Изображений нет - добавьте их в общий раздел или в сцену'); return; }
+      let added = 0, again = 0, own = 0;
       try {
-        for (const f of files) {
-          if (AG.att.some(a => a.file && a.file.name === f.name && a.file.size === f.size)) { again++; continue; }
-          await agAttachFile(f); added++;
+        for (const it of want) {
+          if (AG.att.some(a => a.file && a.file.name === it.f.name && a.file.size === it.f.size)) { again++; continue; }
+          await agAttachFile(it.f, it.note); added++;
+          if (it.note.startsWith('сцена')) own++;
         }
         goTo('agent');   // the current target stays as it is: the chat is filled, never restarted
-        toast(added ? ('В чат агента добавлено изображений: ' + added + (again ? ' · ' + again + ' уже лежало' : ''))
-                    : 'Все эти изображения уже лежат в чате агента');
+        const common = added - own;
+        toast(added ? ('В чат агента добавлено изображений: ' + added
+            + (common && own ? ' (общих ' + common + ', из сцен ' + own + ')' : own ? ' (все из сцен)' : '')
+            + (again ? ' · ' + again + ' уже лежало' : ''))
+            : 'Все эти изображения уже лежат в чате агента');
       } catch { toast('Не удалось передать изображения агенту'); }
     };
     const box = $('.lm-scenes', root);
@@ -8642,7 +8652,7 @@ function renderAtt() {
   const base = agImgCount(); let k = 0;
   $('#agAtt').innerHTML = AG.att.map((a, i) => a.frame
     ? `<div title="Кадр из видео «${esc(a.vname)}»"><img src="${a.url}"><b style="background:#3a5a8c">🎞 ${esc(a.label)}</b><button data-i="${i}">✕</button></div>`
-      : `<div><img src="${a.url}"><b>Picture ${base + (++k)}</b><button data-i="${i}">✕</button></div>`).join('');
+      : `<div${a.note ? ` title="${esc(a.note)}"` : ''}><img src="${a.url}"><b>Picture ${base + (++k)}</b><button data-i="${i}">✕</button></div>`).join('');
   { const fold = $('#agAttFold'); if (fold) { fold.hidden = !AG.att.length;
       const nm = $('#agAttN'); if (nm) nm.textContent = AG.att.length === 1 ? 'Картинка или кадр' : ('Картинки и кадры: ' + AG.att.length); } }
   agVidBtn();   // the video button lives or sleeps with the tray
@@ -8993,10 +9003,10 @@ $('#agAudioFile').onchange = async e => {
   } catch { toast('Не удалось прочитать аудиофайл'); }
 };
 // attach something from the Library to the chat: a picture (or the last frame of a video), or the sound of a video
-const agAttachFile = async f => {
+const agAttachFile = async (f, note) => {
   if (fileKind(f) === 'video') return agFramesFromFile(f);   // a video is always frames: this was the reason a second clip vanished
   const u = await fileToDataURL(f); if (!u) { toast('Картинка не открылась: ' + f.name); return false; }
-  AG.att.push({ file: f, url: u }); renderAtt(); agCtx(); return true;
+  AG.att.push({ file: f, url: u, note: note || '' }); renderAtt(); agCtx(); return true;
 };
 $('#agLib').onclick = () => {
   let m = $('#agLibM'); if (!m) { m = document.createElement('div'); m.className = 'modal'; m.id = 'agLibM'; document.body.append(m); }
