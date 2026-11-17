@@ -808,6 +808,11 @@ img.pr-media{object-position:center 38%}
 .ag-comp .ag-clip,.ag-comp #agClear{padding:6px 10px;min-height:0;font-size:12.5px;border-radius:9px}
 .ag-comp .ag-clip svg{width:15px;height:15px}
 .ag-clip{padding:12px;display:grid;place-items:center}
+/* the button that sits in a card heading: same small size, pushed to the right edge, quiet until
+   the pointer reaches it */
+.agall-h{margin-left:auto;flex:none;font-size:12px;padding:5px 11px;min-height:0;border-radius:9px;background:var(--surface-2);border:1px solid var(--line-2);color:var(--muted)}
+.agall-h:hover{border-color:var(--accent);color:var(--text)}
+.card.fold.collapsed>.card-h .agall-h{background:rgba(var(--accent-rgb),.12);border-color:var(--accent);color:var(--text)}
 .ag-clip.rec{background:rgba(var(--accent-rgb),.25);border-color:var(--accent);color:#fff;animation:pulse 1s infinite}
 .ag-audio{margin:0 18px;padding:10px 12px;border-radius:12px;background:var(--bg-2);border:1px solid var(--line);display:grid;gap:6px}
 .ag-audio-h{display:flex;align-items:center;gap:10px}
@@ -7790,7 +7795,7 @@ function makeRefMode(cfg) {
           '<div class="mus-extra"></div>' +
           '<small class="hint" style="display:block;margin-top:6px"><b>Первый файл - звук ролика</b> (тег &lt;Audio 1&gt;): модель перекладывает его в видео,' +
           ' правило 15 секунд на него не действует. <b>Второй и третий - образцы</b> (теги &lt;Audio 2&gt; и &lt;Audio 3&gt;): голос, ритм, атмосфера,' +
-          ' которые можно сослать в тексте любой сцены. Обрезать и глушить лесенкой можно каждый.</small>';
+          ' которые можно сослать в тексте любой сцены. Обрезать и глушить лесенкой можно каждый. Кнопка «🤖 Всё аудио в агент» живёт в заголовке этой карточки - она видна, даже когда карточка свёрнута.</small>';
         $('.card-h', musCard).insertAdjacentElement('afterend', fw);
         // the old tile stays in the tree - the calculation reads its field - but it is not shown:
         // the row above is what the person sees and uses
@@ -7836,9 +7841,8 @@ function makeRefMode(cfg) {
           }
           // the counters belong to a block built later than this one, so the refresh waits a step
           queueMicrotask(() => { try { recount(); } catch (e) { } });
-          const lp = $('.at-loop', mus), ab = $('.at-all', mus);
+          const lp = $('.at-loop', mus);
           if (lp) lp.hidden = !f;
-          if (ab) ab.hidden = !f;
           keepMirror();
         };
         const extra = $('.mus-extra', fw);
@@ -7848,10 +7852,14 @@ function makeRefMode(cfg) {
         lp.style.cssText = 'display:flex;gap:8px;align-items:flex-start;font-size:12.5px;color:var(--muted);cursor:pointer;margin:8px 0 0';
         lp.innerHTML = '<input type="checkbox" class="lm-loop"><span>Пустой фон по кругу - если ваш трек короче ролика, остаток заполняется им же, без тишины</span>';
         const ab = document.createElement('button');
-        ab.type = 'button'; ab.className = 'btn mini at-all'; ab.hidden = true;
+        ab.type = 'button'; ab.className = 'btn mini at-all agall-h';
         ab.textContent = '🤖 Всё аудио в агент';
         ab.title = 'Отправить в Агент сразу всё готовое: фон ролика, его образцы и аудио всех сцен - Агент увидит их списком, а не одно включение';
-        extra.append(lp, ab);
+        // the button belongs to the card's heading, not to its body: the audio card is folded most
+        // of the time, and a control hidden inside a fold is a control nobody finds
+        const head = $('.card-h', musCard);
+        (head || extra).append(ab);
+        extra.append(lp);
         const voc = $('.lm-vocals', root), vocRow = voc && voc.closest('label');
         if (vocRow) extra.append(vocRow);   // «музыка в готовом ролике целиком» - флаг остаётся на виду
         lp.querySelector('input').checked = root._loop !== false;
@@ -8021,12 +8029,15 @@ function makeRefMode(cfg) {
          bubbles instead - whoever creates the button, and whenever, the press works. */
       if (!root._atAllWire) {
         root._atAllWire = true;
+        // caught on the way down, not on the way up: the same click reaches the card heading, which
+        // would fold the card the person is looking at. Stopping it here runs the transfer once and
+        // leaves the card exactly as it was.
         root.addEventListener('click', e => {
           const b = e.target.closest && e.target.closest('.at-all');
           if (!b) return;
-          e.preventDefault();
+          e.preventDefault(); e.stopPropagation();
           sendAllToAgent();
-        });
+        }, true);
       }
     c1.after(mus);
     queueMicrotask(() => { const pc = $('.rm-params', root), hw = $('details.agvar', pc); if (hw) $('.card-h', pc).after(hw); const nt = document.createElement('div'); nt.className = 'note lm-qnote'; nt.style.margin = '10px 0'; $('.card-h', pc).after(nt); root._paintQ?.(); });   // "how it works" goes to the top of the parameters
@@ -8855,6 +8866,14 @@ function needSpeech() {
 }
 function showAudioBox() {
   const list = AG.audios || [];
+  /* The rows stand in the order of their tags, not in the order they happened to arrive: a person
+     reads <Audio 1>, then <Audio 2>, then the scenes' tens, and looks for a line by that number.
+     The array itself is sorted, so the prompt the agent assembles lists them the same way. Files
+     whose tag is unknown go to the end, and never jump around between equal tags. */
+  const tagNo = a => { const m = /<Audio\s*(\d+)>/i.exec((a && a.where) || ''); return m ? +m[1] : 1e6; };
+  if (list.length > 1 && list.some((a, i) => tagNo(a) > tagNo(list[i + 1] || a))) {
+    list.sort((x, y) => (tagNo(x) - tagNo(y)) || String(x.name).localeCompare(String(y.name)));
+  }
   const box = $('#agAudioBox'), inside = $('#agAudioList', box);
   box.hidden = !list.length;
   if (!list.length) { AG.audio = null; return; }
