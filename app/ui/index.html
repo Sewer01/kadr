@@ -6476,6 +6476,28 @@ function makeRefMode(cfg) {
     refCard.after(card);
     const row = $('.ra-row', card), host = newEl('ra-host'); host.hidden = true;
     card.append(host);
+    // the button stands on this card, not on the old caption row: the row is storage only and hidden
+    {
+      const vb = agMakeBtn($('.card-h', card), '🎞', 'видео-пример - Агент получит его кадрами');
+      if (vb) {
+        vb._agCount = () => slots.filter(s => s._src || s._file).length;
+        vb.onclick = async () => {
+          const list = slots.map(s => s._src || s._file).filter(Boolean);
+          if (!list.length) { toast('Референс-видео нет - сначала добавьте его'); return; }
+          let added = 0, again = 0;
+          const moved = agTargetForVideo(cfg.mode, cfg.title);
+          try {
+            for (const f of list) {
+              if (AG.att.some(a => a.frame && a.vname === f.name)) { again++; continue; }
+              if (await agAttachFile(f)) added++; else again++;
+            }
+            goTo('agent');
+            toast(added ? ('В чат агента добавлено видео (кадрами): ' + added + (again ? ' · ' + again + ' уже лежало' : '') + moved)
+                        : 'Это видео уже лежит в чате агента');
+          } catch (err) { toast('Не удалось передать видео агенту: ' + (err && err.message ? err.message : '')); }
+        };
+      }
+    }
     const inp = document.createElement('input');
     inp.type = 'file'; inp.accept = 'video/*,.mp4,.mov,.mkv,.webm,.m4v'; inp.hidden = true; card.append(inp);
     // a clip dragged from the library panel lands on this card and goes through the same input
@@ -6624,6 +6646,33 @@ function makeRefMode(cfg) {
     refCard.after(card);
     const row = $('.ra-row', card), host = newEl('ra-host'); host.hidden = true;
     card.append(host);
+    // same here: this card is what the person sees, the old row is hidden storage
+    {
+      const ab = agMakeBtn($('.card-h', card), '🎧', 'весь референс-аудио: Агент распознает слова и вставит их в промпт');
+      if (ab) {
+        ab._agCount = () => slots.filter(s => s._file).length;
+        ab.onclick = async () => {
+          const list = slots.map(s => s._file).filter(Boolean);
+          if (!list.length) { toast('Референс-аудио нет - сначала добавьте его'); return; }
+          if (await speechReady()) return;
+          let added = 0, again = 0;
+          for (let j = 0; j < list.length; j++) {
+            const f = list[j];
+            try {
+              const ac = actx = actx || new AudioContext();
+              const buf = await ac.decodeAudioData(await f.arrayBuffer());
+              const e = Math.min(buf.duration, 15);
+              const where = 'референс-аудио ' + (j + 1) + ', тег <Audio ' + (j + 1) + '>'
+                + (buf.duration > 15 ? ' (берём первые 15 с)' : '');
+              if (await setChatAudio(wavSlice(buf, 0, e), f.name, e, where)) added++; else again++;
+            } catch (err) { toast('Не удалось передать «' + f.name + '»: ' + (err && err.message ? err.message : '')); }
+          }
+          goTo('agent');
+          toast(added ? ('В чат агента добавлено аудио: ' + added + (again ? ' · ' + again + ' уже лежало' : ''))
+                      : 'Всё это аудио уже лежит в чате агента');
+        };
+      }
+    }
     const inp = document.createElement('input');
     inp.type = 'file'; inp.accept = 'audio/*,.wav,.mp3,.ogg,.flac,.m4a'; inp.hidden = true; card.append(inp);
     let tr = null, cur = -1, pick = -1;               // pick: the chip whose button opened the dialog
@@ -8391,6 +8440,8 @@ function makeRefMode(cfg) {
     // this button takes it too; elsewhere the video has its own button and must not be doubled
     if (cfg.videos && cfg.swap) $$('.slot', vidsEl).forEach((s, j) => { const f = s._src || s._file; if (f) want.push({ f, vid: true, note: 'видео, в котором меняем, тег <Video ' + (j + 1) + '>' }); });
     if (!want.length) { toast('Изображений нет - сначала добавьте их'); return; }
+    // in «Замена» the button carries a video too, and a video needs a mode that watches it
+    const moved = want.some(x => x.vid) ? agTargetForVideo(cfg.mode, cfg.title) : '';
     let added = 0, again = 0, own = 0;
     try {
       for (const it of want) {
@@ -8411,12 +8462,13 @@ function makeRefMode(cfg) {
   // ···· reference videos: the Agent receives them as frames, which is how a video reaches the model
   if (cfg.videos && !cfg.swap) {
     const vb = $('.rm-vids', root);
-    const vidBtn = agHeadBtn(vb && vb.parentElement && $('.sub-l', vb.parentElement), '🎞',
-      'референс-видео - модель получит их кадрами');
+    const vidBtn = (vb && !vb.closest('.ra-tiles')) ? agHeadBtn($('.sub-l', vb.parentElement), '🎞',
+      'референс-видео - модель получит их кадрами') : null;
     if (vidBtn) agCount(vidBtn, () => $$('.slot', vidsEl).filter(s => s._src || s._file).length);
     if (vidBtn) vidBtn.onclick = async () => {
       const list = $$('.slot', vb).map(s => s._src || s._file).filter(Boolean);
       if (!list.length) { toast('Референс-видео нет - сначала добавьте его'); return; }
+      const moved = agTargetForVideo(cfg.mode, cfg.title);
       let added = 0, again = 0;
       try {
         for (const f of list) {
@@ -8425,6 +8477,7 @@ function makeRefMode(cfg) {
         }
         goTo('agent');
         agSay('видео (кадрами)', added, again);
+        if (moved) toast('Готово' + moved);
       } catch (err) { toast('Не удалось передать видео агенту: ' + (err && err.message ? err.message : '')); }
     };
   }
@@ -8432,13 +8485,13 @@ function makeRefMode(cfg) {
   // ···· reference audio (the studios have their own audio card and its button)
   if (!cfg.scenes) {
     const ab = $('.rm-auds', root);
-    const audBtn = agHeadBtn(ab && ab.parentElement && $('.sub-l', ab.parentElement), '🎧',
-      'весь референс-аудио: Агент распознает слова и вставит их в промпт');
+    const audBtn = (ab && !ab.closest('.ra-tiles')) ? agHeadBtn($('.sub-l', ab.parentElement), '🎧',
+      'весь референс-аудио: Агент распознает слова и вставит их в промпт') : null;
     if (audBtn) agCount(audBtn, () => $$('.slot', audsEl).filter(s => s._file).length);
     if (audBtn) audBtn.onclick = async () => {
       const list = $$('.slot', ab).map(s => s._file).filter(Boolean);
       if (!list.length) { toast('Референс-аудио нет - сначала добавьте его'); return; }
-      if (needSpeech()) return;
+      if (await speechReady()) return;
       let added = 0, again = 0;
       for (let j = 0; j < list.length; j++) {
         const f = list[j];
@@ -8995,6 +9048,13 @@ async function transcribeWav(blob, lang = 'auto') {
   const r = await fetch('/api/speech/transcribe', { method: 'POST', body: fd });
   const j = await r.json(); if (!r.ok) throw new Error(j.error || 'Не удалось распознать');
   return j;
+}
+/* The person may press the button before the page ever asked the server what is installed: an
+   answer that was never fetched is not a missing model, so the status is fetched on the spot. */
+async function speechReady() {
+  if (AG.status && AG.status.speech_ready) return false;
+  try { await agStatus(); } catch (e) { }
+  return needSpeech();
 }
 function needSpeech() {
   if (AG.status?.speech_ready) return false;
@@ -12492,6 +12552,28 @@ if (e.target.closest('.mt-clear')) {
    Одно правило на всю программу: каждая карточка, в которой лежат файлы, предлагает их Агенту -
    сколько бы файлов там ни было, хоть одно видео. Иконка говорит, что за вид; кнопка спит, пока
    брать нечего, и просыпается, как только файл появился. */
+/* Hoisted on purpose: the rebuilt cards of a mode are created while the mode is still being
+   assembled, long before the wiring at the end of this file runs. */
+/* A video is only useful to the modes that watch it. If the Agent is set to write for another one,
+   a press on «Все в агент» above a video moves the Agent to the mode of this card - that is what the
+   person meant - instead of refusing with a lecture. */
+function agTargetForVideo(mode, title) {
+  try { if (typeof agVideoMax === 'function' && agVideoMax()) return ''; } catch (e) { return ''; }
+  const t = $('#agTarget [data-t="' + mode + '"]');
+  if (!t || t.classList.contains('on')) return '';
+  t.click();
+  return ' · «Промт для» переключено на «' + title + '»';
+}
+function agMakeBtn(host, icon, what) {
+  if (!host) return null;
+  const b = document.createElement('button');
+  b.type = 'button'; b.className = 'btn mini agall-h';
+  b.textContent = icon + ' Все в агент';
+  b.title = 'Сложить в чат Агента ' + what + ' - он допишет к тому, что уже лежит, и ничего не очистит';
+  b.addEventListener('click', e => e.stopPropagation());   // a press here must not fold the card
+  host.append(b);
+  return b;
+}
 function agWireOtherWindows() {
   if (window._agWired) return;      // called once now and once later: the windows are wired once
   window._agWired = 1;
@@ -12563,7 +12645,7 @@ function agWireOtherWindows() {
         () => (typeof L !== 'undefined' && L.dur0) ? 1 : 0,
         async () => {
           if (!L.dur0) { toast('Сначала загрузите аудио'); return; }
-          if (needSpeech()) return;
+          if (await speechReady()) return;
           const piece = wavSlice(abuf, L.start, L.end), dur = Math.max(0.1, L.len());
           const ok = await setChatAudio(piece, (typeof audioName === 'string' ? audioName : 'аудио из Клипа').replace(/\.[^.]+$/, ''), dur, 'аудио из «Клипа», тег <Audio 1>');
           goTo('agent');
