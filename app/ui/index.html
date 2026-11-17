@@ -5535,10 +5535,27 @@ setTimeout(fitTopBar, 700);   // the pills are built a moment after the page ope
     b.disabled = false;
     const core = c.core || {}; lastCore = core;
     if (!core.installed) { say('Не видно, какая версия ядра установлена: ComfyUI не запущен.' + roll(core)); wire(); toast('Не видно версии ComfyUI: он сейчас не запущен'); return; }
-    if (!core.newer) { say(`ComfyUI у вас ${esc(core.installed)} — это последняя версия, обновлять нечего.${roll(core)}`); wire(); toast(`ComfyUI ${esc(core.installed)} — обновлений нет`); return; }
-    toast(`Вышел ComfyUI ${esc(core.latest)} — можно обновить`);
-    say(`Вышел ComfyUI <b>${esc(core.latest)}</b> (у вас ${esc(core.installed)}). Обновим только код ядра (несколько десятков мегабайт): модели, ноды и папка вывода не меняются, а перезаписываемые файлы уйдут в резерв, из которого можно вернуть.
-      <button class="btn pri mini" id="mdEngGo" type="button" style="margin-left:6px">Обновить движок</button>${roll(core)}`);
+    /* The program answers for one core version: the one it is built and checked with. A newer release
+       of ComfyUI is not offered as an update, it is mentioned, and the button for it asks first: a
+       fresh core can disagree with the node packs this program pins, and then sections stop working. */
+    const risky = `<button class="btn mini" id="mdEngRisky" type="button" style="margin-left:6px" title="Обновить до версии, с которой нодами программы не проверялись">Всё равно обновить до ${esc(core.latest)}</button>`;
+    const ahead = core.ahead ? ` В репозитории вышел ComfyUI ${esc(core.latest)} — программа его не предлагает.` : '';
+    if (!core.newer && !core.ahead) {
+      if (core.unknown) {   // silence from GitHub is not news of its own
+        say(`ComfyUI у вас ${esc(core.installed)} — это версия, с которой программа собрана и проверена (${esc(core.pinned || core.installed)}). Проверить по GitHub не удалось: он не ответил, так что о новых версиях ничего не знаю.${roll(core)}`);
+        wire(); toast('GitHub не ответил: свежую версию проверить не удалось'); return;
+      }
+      say(`ComfyUI у вас ${esc(core.installed)} — это версия, с которой программа собрана и проверена (${esc(core.pinned || core.installed)}); новее такой нет, обновлять нечего.${roll(core)}`);
+      wire(); toast(`ComfyUI ${esc(core.installed)} — обновлений нет`); return;
+    }
+    if (!core.newer) {   // nothing we answer for, but upstream moved: say so, offer it behind a warning
+      say(`ComfyUI у вас ${esc(core.installed)} — это версия, с которой программа собрана и проверена; она работает с закрепленными нодами.${ahead} Если нужна именно свежая — обновим, но с оговоркой: с нодами программы она не проверялась.
+      ${risky}${roll(core)}`);
+      wire(); return;
+    }
+    toast(`Есть проверенная версия ComfyUI ${esc(core.pinned)} — можно обновить`);
+    say(`Программа проверена с ComfyUI <b>${esc(core.pinned)}</b>, у вас ${esc(core.installed)}. Обновим только код ядра (несколько десятков мегабайт): модели, ноды и папка вывода не меняются, а перезаписываемые файлы уйдут в резерв, из которого можно вернуть.${ahead}
+      <button class="btn pri mini" id="mdEngGo" type="button" style="margin-left:6px">Обновить до ${esc(core.pinned)}</button>${core.ahead ? risky : ''}${roll(core)}`);
     const bat = $('#mdEngBat');
   if (bat) bat.onclick = async e => {
     if ((window.QUEUE || []).some(j => j.state === 'queued' || j.state === 'running')) { toast('Идёт генерация: дождитесь конца'); return; }
@@ -5557,9 +5574,21 @@ setTimeout(fitTopBar, 700);   // the pills are built a moment after the page ope
   $('#mdEngGo').onclick = async e => {
       if ((window.QUEUE || []).some(j => j.state === 'queued' || j.state === 'running')) { toast('Идёт генерация: дождитесь конца'); return; }
       e.target.disabled = true;
-      try { await postJSON('/api/updates/core', { version: core.latest }); poll(); }
+      try { await postJSON('/api/updates/core', { version: core.pinned }); poll(); }
       catch (err) { say('Не получилось начать: ' + esc(err.message)); }
     };
+    const rk = $('#mdEngRisky');
+    if (rk) rk.onclick = () => {
+      if ((window.QUEUE || []).some(j => j.state === 'queued' || j.state === 'running')) { toast('Идёт генерация: дождитесь конца'); return; }
+      confirmBox('Обновить ядро до непроверенной версии?',
+        `Программа собрана и проверена с ComfyUI ${core.pinned || 'вашей версии'}. Версия ${core.latest} вышла позже и с нодами программы не проверялась: свежее ядро может разойтись с закрепленными нодами, и тогда разделы перестанут запускаться. Обновление трогает только код ядра, копии перезаписанных файлов остаются, их можно вернуть кнопкой «Откатить». Обновлять?`,
+        async () => {
+          rk.disabled = true;
+          try { await postJSON('/api/updates/core', { version: core.latest, ack: 1 }); poll(); }
+          catch (err) { say('Не получилось начать: ' + esc(err.message)); rk.disabled = false; }
+        }, { ok: 'Обновить', cancel: 'Отмена' });
+    };
+    wire();
   };
 })();
 (() => {   // node packs: the program pins a commit on purpose, so this only reports and offers a swap

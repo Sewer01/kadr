@@ -1736,7 +1736,11 @@ class App:
             body = await req.json()
         except Exception:
             pass                      # an empty body is fine: the newest release is the target
-        self.core_update_task = asyncio.create_task(self.run_core_update(str(body.get("version") or "")))
+        want = str(body.get("version") or "")
+        if want and want != catalog.COMFY_VERSION and not body.get("ack"):
+            return web.json_response({"error": f"ComfyUI {want} не проверен с нодами программы: "
+                                               f"программа отвечает за {catalog.COMFY_VERSION}"}, status=409)
+        self.core_update_task = asyncio.create_task(self.run_core_update(want))
         return web.json_response({"ok": True})
 
     async def h_updates_core_rollback(self, _req):
@@ -1759,11 +1763,8 @@ class App:
         st = self.update_state = {"stage": "checking", "pct": 0, "error": None, "version": want}
         try:
             if not st["version"]:
-                rel = await updates.gh_json(self.session, "/repos/Comfy-Org/ComfyUI/releases/latest")
-                ver = updates.version_of((rel or {}).get("tag_name"))
-                if not ver:
-                    raise RuntimeError("GitHub не отдал версию")
-                st["version"] = ".".join(map(str, ver))
+                # no version asked for: the one the program is built and checked with, not the newest
+                st["version"] = catalog.COMFY_VERSION
             st["stage"] = "downloading"
             archive = DATA_DIR / "tmp" / f"comfyui-{st['version']}.tar.gz"
             archive.parent.mkdir(parents=True, exist_ok=True)

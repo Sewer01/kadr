@@ -70,10 +70,18 @@ async def check(session, comfy_root, installed_running=None, data_dir=None):
     prev = None
     if last:
         prev = version_of(last.replace("comfyui-", ""))
+    pinned = version_of(catalog.COMFY_VERSION)
     out["core"] = {"installed": ".".join(map(str, mine or ())),
                    "backup": last, "backup_version": ".".join(map(str, prev or ())),
+                   "pinned": catalog.COMFY_VERSION,
                    "latest": ".".join(map(str, latest or ())),
-                   "newer": bool(latest and mine and latest > mine),
+                   # the update the program answers for is the core version it is built and checked
+                   # with, not whatever Comfy-Org published yesterday: a newer core can disagree with
+                   # the node packs the program pins, so that one goes only behind a warning
+                   "newer": bool(pinned and mine and pinned > mine),
+                   "ahead": bool(latest and pinned and latest > pinned),
+                   # no answer from GitHub is not the same as "there is nothing newer"
+                   "unknown": not bool(latest),
                    "url": (rel or {}).get("html_url") or "https://github.com/Comfy-Org/ComfyUI/releases",
                    "asset": portable_asset(rel)}
     for pack in catalog.NODE_PACKS:
