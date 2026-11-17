@@ -810,7 +810,8 @@ img.pr-media{object-position:center 38%}
 .ag-clip{padding:12px;display:grid;place-items:center}
 /* the button that sits in a card heading: same small size, pushed to the right edge, quiet until
    the pointer reaches it */
-.agall-h{margin-left:auto;flex:none;font-size:12px;padding:5px 11px;min-height:0;border-radius:9px;background:var(--surface-2);border:1px solid var(--line-2);color:var(--muted)}
+.rm-clr{margin-left:auto}
+.agall-h{margin-left:0;flex:none;font-size:12px;padding:5px 11px;min-height:0;border-radius:9px;background:var(--surface-2);border:1px solid var(--line-2);color:var(--muted)}
 .agall-h:hover{border-color:var(--accent);color:var(--text)}
 .card.fold.collapsed>.card-h .agall-h{background:rgba(var(--accent-rgb),.12);border-color:var(--accent);color:var(--text)}
 .ag-clip.rec{background:rgba(var(--accent-rgb),.25);border-color:var(--accent);color:#fff;animation:pulse 1s infinite}
@@ -6810,19 +6811,28 @@ function makeRefMode(cfg) {
     $$('.rm-imgs .plus', root).forEach((pl, i) => { pl.lastChild.textContent = 'Референс'; });
     $('.rm-media .sub-l span', root).textContent = 'Песня или фрагмент';
     $('.rm-media .media-hint', root).textContent = 'любой длины: каждая сцена берёт свой кусок по порядку';
-    // the pictures of this section go to the agent in one press (no screenshots), the agent writes the scenes for them
-    const toAg = document.createElement('button'); toAg.type = 'button'; toAg.className = 'btn'; toAg.style.marginTop = '10px';
-    toAg.textContent = 'Написать сцены в «Агенте» по этим изображениям'; toAg.title = 'Откроет «Агента» с этими референсами в чате: опишите историю, он разобьёт её на сцены, а кнопка вставит их сюда';
-    c1.append(toAg);
-    toAg.onclick = async () => {
+    /* One press puts every picture of this section into the Agent's chat - and nothing else. The
+       button that used to stand here also switched the Agent's target and opened a fresh context, so
+       what a person had already typed or attached disappeared; the Agent is a basket to fill, not a
+       form to reset. The heading is where the control lives: the card is folded most of the time. */
+    const imgAll = document.createElement('button');
+    imgAll.type = 'button'; imgAll.className = 'btn mini agall-h';
+    imgAll.textContent = '🖼 Все изображения в агент';
+    imgAll.title = 'Сложить в чат Агента все изображения этого раздела - он их увидит и допишет к тому, что уже лежит; ничего не очищается';
+    $('.card-h', c1).append(imgAll);
+    imgAll.addEventListener('click', e => e.stopPropagation());   // a press here must not fold the card
+    imgAll.onclick = async () => {
       const files = $$('label.ref.filled', imgsEl).map(r => r._file).filter(Boolean);
+      if (!files.length) { toast('Изображений в разделе нет - сначала добавьте их'); return; }
+      let added = 0, again = 0;
       try {
         for (const f of files) {
-          if (AG.att.some(a => a.file && a.file.name === f.name && a.file.size === f.size)) continue;
-          await agAttachFile(f);
+          if (AG.att.some(a => a.file && a.file.name === f.name && a.file.size === f.size)) { again++; continue; }
+          await agAttachFile(f); added++;
         }
-        $('#agTarget [data-t="long"]').click(); goTo('agent');
-        toast(files.length ? `В чат агента добавлено изображений: ${files.length}. Опишите историю по сценам.` : 'Откройте «Агента» и опишите историю по сценам.');
+        goTo('agent');   // the current target stays as it is: the chat is filled, never restarted
+        toast(added ? ('В чат агента добавлено изображений: ' + added + (again ? ' · ' + again + ' уже лежало' : ''))
+                    : 'Все эти изображения уже лежат в чате агента');
       } catch { toast('Не удалось передать изображения агенту'); }
     };
     const box = $('.lm-scenes', root);
@@ -7712,6 +7722,14 @@ function makeRefMode(cfg) {
         baseSeg.style.marginBottom = '0';
         baseSeg.style.gridTemplateColumns = '';   // the inline halves made the buttons as wide as the strip
         baseRow.append(baseSeg);
+        /* «Очистить всё» belongs to this row of choices, not to the pictures' card. The button cannot
+           simply be written here in the markup: its handler is attached while the first template is
+           still the whole page, long before this row exists - the markup variant left the handler with
+           nothing to attach to and the entire section failed to open. Carrying the node here keeps the
+           handler on it. In the action studio this row is hidden, and there the button stays in the
+           card, where it is still reachable. */
+        { const cbtn = $('.rm-clear', root);
+          if (cbtn && cfg.mode !== 'actionsc') { cbtn.style.marginLeft = 'auto'; cbtn.style.flex = 'none'; baseRow.append(cbtn); } }
         if (ownBox) ownBox.style.marginTop = '8px';   // appended after the guide button, see below
         root._baseHost = baseRow;   // put above the first card once the whole set-up is done
       // the video you continue is part of this choice, so the note with «Убрать» stands right here
@@ -8006,7 +8024,7 @@ function makeRefMode(cfg) {
         if (!AG.status || !AG.status.speech_ready) { try { await agStatus(); } catch (e) {} }
         goTo('agent');
         const host = $('#agTarget [data-t="' + (cfg.mode || 'long') + '"]');
-        if (host) host.click();
+        if (host && !host.classList.contains('on')) host.click();   // an already chosen target is left alone
         let ok = 0;
         for (const it of items) {
           try {
