@@ -416,12 +416,12 @@ textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft
 .token:hover{border-color:var(--accent)}
     /* the audio row of a scene: one box for every element in it, and the loading button is filled,
        so it reads as the action it is and not as one more label */
-    .sc-auds{gap:8px}
-    .sc-auds>.btn.mini,.sc-auds>.token{height:30px;padding:0 11px;font-size:12px;line-height:1;border-radius:8px;display:inline-flex;align-items:center}
-    .sc-auds>.btn.mini{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:700}
-    .sc-auds>.btn.mini:hover{filter:brightness(1.1)}
-    .sc-auds>.btn.mini:disabled{background:var(--surface-2);border-color:var(--line-2);color:var(--muted);filter:none;opacity:.6}
-    .sc-auds>.token .btn.mini{height:22px;padding:0 8px;font-size:11px;line-height:1}
+    .sc-auds,.mus-filmrow{gap:8px}
+    .sc-auds>.btn.mini,.sc-auds>.token,.mus-filmrow>.btn.mini,.mus-filmrow>.token{height:30px;padding:0 11px;font-size:12px;line-height:1;border-radius:8px;display:inline-flex;align-items:center}
+    .sc-auds>.btn.mini,.mus-filmrow>.btn.mini{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:700}
+    .sc-auds>.btn.mini:hover,.mus-filmrow>.btn.mini:hover{filter:brightness(1.1)}
+    .sc-auds>.btn.mini:disabled,.mus-filmrow>.btn.mini:disabled{background:var(--surface-2);border-color:var(--line-2);color:var(--muted);filter:none;opacity:.6}
+    .sc-auds>.token .btn.mini,.mus-filmrow>.token .btn.mini{height:22px;padding:0 8px;font-size:11px;line-height:1}
 
 /* params */
 .row{display:grid;gap:9px;margin-bottom:18px}
@@ -4190,9 +4190,10 @@ class AudioRow {
       ' title="До трёх файлов. Модель получает их как образцы и применяет там, где вы упомянули файл тегом в тексте">+ Загрузить аудио</button>' +
       '<span class="counter" title="Аудио здесь: не больше трёх">' + this.used() + ' / 3</span>' +
       this.files.map((f, j) => f ? '<span class="token" style="display:inline-flex;gap:6px;align-items:center">&lt;Audio ' +
-        (this.base + j) + '&gt; ' + e2(f.name.slice(0, 18)) + '</span>' +
-        '<button class="btn mini" type="button" data-a="trim" data-j="' + j + '" title="Обрезать: в модель пойдёт выделенный кусок">Обрезать</button>' +
-        '<button class="btn mini" type="button" data-a="del" data-j="' + j + '" title="Убрать это аудио">×</button>' : '').join('') +
+        (this.base + j) + '&gt; ' + e2(f.name.slice(0, 18)) +
+        (this.sel[j] && this.sel[j].start != null && this.sel[j].end != null ? ' <small style="opacity:.75">с ' + (+this.sel[j].start).toFixed(1).replace('.', ',') + ' по ' + (+this.sel[j].end).toFixed(1).replace('.', ',') + ' с</small>' : '') +
+        ' <button class="btn mini" type="button" data-a="trim" data-j="' + j + '" title="Послушать и обрезать: прибор под строкой">Обрезать</button>' +
+        '<button class="btn mini" type="button" data-a="del" data-j="' + j + '" title="Убрать это аудио">×</button></span>' : '').join('') +
       (full ? '<span class="hint" style="font-size:12px">три аудио - максимум</span>' : '');
   }
 }
@@ -4264,18 +4265,18 @@ class AudioTrimmer {
       '<div class="at-sel" hidden><i class="at-h" data-h="l"></i><i class="at-h" data-h="r"></i></div>' +
       '<div class="at-cut" hidden><i class="at-h" data-h="cl"></i><i class="at-h" data-h="cr"></i></div>' +
       '<div class="at-fade" hidden>' +
-      '<button class="at-fd" type="button" data-f="l" title="Звук стихает к левому краю выделенного"><svg viewBox="0 0 20 14" aria-hidden="true"><path d="M1 13V11h4V8h4V5h4V2h6"/></svg></button>' +
-      '<button class="at-fd" type="button" data-f="r" title="Звук стихает к правому краю выделенного"><svg viewBox="0 0 20 14" aria-hidden="true"><path d="M19 13V11h-4V8h-4V5h-4V2H1"/></svg></button>' +
+      '<button class="at-fd" type="button" data-f="l" title="Плавно набирает силу: тишина у левого маркера - полная громкость у правого. За краями выделенного звук не меняется."><svg viewBox="0 0 20 14" aria-hidden="true"><path d="M1 13V11h4V8h4V5h4V2h6"/></svg></button>' +
+      '<button class="at-fd" type="button" data-f="r" title="Плавно стихает: полная громкость у левого маркера - тишина у правого. За краями выделенного звук не меняется."><svg viewBox="0 0 20 14" aria-hidden="true"><path d="M19 13V11h-4V8h-4V5h-4V2H1"/></svg></button>' +
       '</div>' +
       '<div class="at-ph" hidden></div></div>' +
       '<div class="at-modes"><button class="on" type="button" data-m="clip" title="Выбор фрагмента: то, что выделено, пойдёт в клип">Выбор фрагмента</button>' +
       '<button type="button" data-m="cut" title="Вырезание: убрать выделенный кусок из аудио, остальное склеить">Вырезание</button>' +
-      '<button type="button" data-m="fade" title="Затухание: на краях выделенного появятся лесенки - нажмите ту, в какую сторону звук должен стихать">Затухание</button></div>' +
+      '<button type="button" data-m="fade" title="Затухание: внутри выделенного появятся две лесенки - спуск или подъём от одного маркера до другого">Затухание</button></div>' +
       '<div class="at-hint"></div>' +
       '<div class="at-acts"><button class="btn pri at-keep" type="button" disabled>Оставить выделенное</button>' +
       '<button class="btn at-paus" type="button" disabled>Убрать паузы</button>' +
       '<button class="btn at-voc" type="button" disabled>Отделить голос</button>' +
-      '<button class="btn at-und" type="button" disabled>Отменить</button>' +
+      '<button class="btn at-und" type="button" disabled title="Вернуть аудио ровно таким, каким оно было загружено: все спуски, разрезы и чистки пауз отменятся">Откат</button>' +
       '<button class="btn at-ag" type="button" disabled title="Выделенный кусок уйдёт в Агент: он послушает слова и ответит с учётом них">🤖 В агент</button></div>' +
       '<div class="at-zoom"><span>Резать удобнее с приближением:</span><button class="btn mini at-zm" type="button">−</button>' +
       '<input type="range" class="at-zr" min="1" max="40" step="1" value="1"><button class="btn mini at-zp" type="button">+</button>' +
@@ -4303,7 +4304,7 @@ class AudioTrimmer {
   tAt(p) { const [a, b] = this.view(); return a + p * (b - a); }
   _hint() {
     this.q('.at-hint').textContent = this.mode === 'fade'
-      ? 'Выделите, где звук должен стихать, и нажмите лесенку: ◤ к левому краю, ◢ к правому. За краем выделенного тишина, внутри - плавный спуск.'
+      ? 'Выделите участок и нажмите лесенку ВНУТРИ него: правая - звук плавно стихает от левого маркера до правого, левая - наоборот, набирает силу. За краями выделенного звук остаётся как был.'
       : this.mode === 'cut'
       ? 'Проведите мышью по волне, чтобы выделить кусок, который нужно убрать, и нажмите «Удалить выделенное».'
       : 'Выделите, что оставить в клипе, и нажмите «Оставить выделенное» - остальное аудио уберётся.';
@@ -4314,6 +4315,7 @@ class AudioTrimmer {
     try { this.buf = await (actx = actx || new AudioContext()).decodeAudioData(await f.arrayBuffer()); }
     catch { this.say('Не удалось прочитать этот аудиофайл'); return; }
     this.name = f.name; this.dur0 = this.buf.duration;
+    this.buf0 = this.buf; this.name0 = f.name;   // what the file was when it came in: «Откат» returns to this
     this.start = 0; this.end = this.limit > 0 ? Math.min(this.dur0, this.limit) : this.dur0; this.cut = null; this.undo = [];
     this.zoom = 1; this.q('.at-zr').value = 1; paintRange(this.q('.at-zr'));
     this._loaded = { start: this.start, end: this.end };   // closing must apply only what the person changed
@@ -4355,9 +4357,14 @@ class AudioTrimmer {
       const show = this.mode === 'fade' && !!this.dur0;
       fd.hidden = !show;
       if (show) {
-        const lim = Math.max(0, W - 34);
-        fd.querySelector('[data-f="l"]').style.left = Math.max(0, Math.min(px(this.start) - 17, lim)) + 'px';
-        fd.querySelector('[data-f="r"]').style.left = Math.max(0, Math.min(px(this.end) - 17, lim)) + 'px';
+        // both stairs stand INSIDE the marked piece, near its edges: sitting on the markers they
+        // covered them and looked like one control, and a narrow selection merged them together
+        const x0 = px(this.start), x1 = px(this.end), bw = 34, gap = 5;
+        let lx = x0 + gap, rx = x1 - bw - gap;
+        if (rx - lx < bw + 6) { const mid = (x0 + x1) / 2; lx = mid - bw - 2; rx = mid + 2; }   // too narrow: split around the middle
+        lx = Math.max(0, Math.min(lx, W - bw)); rx = Math.max(0, Math.min(rx, W - bw));
+        fd.querySelector('[data-f="l"]').style.left = lx + 'px';
+        fd.querySelector('[data-f="r"]').style.left = rx + 'px';
       }
     }
   }
@@ -4378,7 +4385,7 @@ class AudioTrimmer {
       : (whole ? '✂ Оставить выделенное' : '✂ Оставить выделенное - убрать ' + away.toFixed(1).replace('.', ','));
     this.q('.at-paus').disabled = this.q('.at-voc').disabled = !on;
     this.q('.at-ag').disabled = !on;
-    this.q('.at-und').disabled = !this.undo.length;
+    this.q('.at-und').disabled = !(on && this.buf0 && this.buf !== this.buf0);   // live only while the sound differs from the original
     this.q('.at-zl').textContent = this.zoom > 1.02 ? this.view()[1] - this.view()[0] > 0 ? Math.round(this.view()[1] - this.view()[0]) + ' с' : '—' : 'весь фрагмент';
     const body = this.q('.at-body'), empty = this.q('.at-empty');
     if (body) body.hidden = !on;
@@ -4473,6 +4480,8 @@ class AudioTrimmer {
     });
     el.addEventListener('pointerdown', e => {
       if (!this.dur0 || this._grab) return;
+      if (e.target.closest('.at-fd')) return;   // pressing a stair is a press, not a drag: the markers
+                                                // used to jump together and the fade then had nothing to cover
       const t = at(e);
       if (this.mode === 'cut') { this._t0 = t; this.cut = { a: t, b: t }; } else this._anchor = t;
       el.setPointerCapture(e.pointerId); this._drag(e);
@@ -4487,11 +4496,9 @@ class AudioTrimmer {
       const b = e.target.closest('[data-f]'); if (!b) return;
       if (!this.dur0) { this.say('Сначала загрузите аудио'); return; }
       if (this.len() < .3) { this.say('Выделите участок длиннее полсекунды'); return; }
-      this.undo.push({ buf: this.buf, start: this.start, end: this.end });
-      if (this.undo.length > 8) this.undo.shift();
-      actx = actx || new AudioContext();
+      actx = actx || new AudioContext();   // _commit keeps the previous sound itself - no second copy
       this._commit(fadeRange(this.buf, actx, this.start, this.end, b.dataset.f), x => x);
-      this.say(b.dataset.f === 'r' ? 'Затихает к правому краю' : 'Затихает к левому краю');
+      this.say(b.dataset.f === 'r' ? 'Готово: звук плавно стихает от левого маркера до правого' : 'Готово: звук плавно набирает силу от левого маркера до правого');
     };
     this.q('.at-modes').onclick = e => {
       const b = e.target.closest('button[data-m]'); if (!b || !this.dur0) return;
@@ -4561,10 +4568,14 @@ class AudioTrimmer {
       if (box && box.hidden) this.say('Аудио не принято: Агент не смог его взять'); else this.say('Фрагмент отправлен в Агент: ' + this.len().toFixed(1).replace('.', ',') + ' с');
     };
     this.q('.at-und').onclick = () => {
-      const s = this.undo.pop(); if (!s) return;
-      this.stop(); this.buf = s.buf; this.dur0 = s.buf.duration; this.start = s.start; this.end = s.end; this.cut = null;
-      this._peaks(); this._sync(); this.out();
-      this.q('.at-und').disabled = !this.undo.length;
+      if (!this.buf0 || this.buf === this.buf0) { this.say('Аудио и так целое - откатывать нечего'); return; }
+      // one button, one meaning: the sound exactly as it arrived, every cut and every descent gone
+      this.stop(); this.buf = this.buf0; this.dur0 = this.buf0.duration; this.name = this.name0 || this.name;
+      this.start = 0; this.end = this.limit > 0 ? Math.min(this.dur0, this.limit) : this.dur0;
+      this.cut = null; this.undo = []; this.zoom = 1;
+      const zr = this.q('.at-zr'); zr.value = 1; paintRange(zr);
+      this._peaks(); this._paint(); this._sync(); this.out();
+      this.say('Откат: аудио снова такое, каким оно было загружено');
     };
     const setZoom = v => {
       this.zoom = Math.min(40, Math.max(1, v));
@@ -4666,8 +4677,9 @@ function fadeRange(buf, ctx, a, b, dir) {
       const p = (i - i0) / span;                       // 0 at the left edge, 1 at the right one
       dst[i] = src[i] * (dir === 'r' ? 1 - p : p);
     }
-    if (dir === 'r') for (let i = i1; i < N; i++) dst[i] = 0;   // silence past the fade, no cliff
-    if (dir === 'l') for (let i = 0; i < i0; i++) dst[i] = 0;
+    // nothing outside the marked piece is touched: the right stair brings the sound from full at the
+    // left marker down to silence at the right one, the left stair does the same the other way round.
+    // Silence beyond the markers used to eat the rest of the track, which felt like a broken tool.
   }
   return out;
 }
