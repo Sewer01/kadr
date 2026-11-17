@@ -814,7 +814,24 @@ img.pr-media{object-position:center 38%}
 .ag-audio-h b{flex:1;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ag-audio-h small{font-family:var(--mono);color:var(--muted)}
 .ag-audio-h button{width:24px;height:24px;border-radius:7px;background:var(--surface-2);font-size:11px}
-.ag-audio textarea{min-height:56px;font-size:13px}
+.ag-audio textarea{height:30px;min-height:30px;max-height:30px;resize:none;overflow:auto;font-size:13px}
+/* What a message carries - the audios, the pictures and the video frames - is put away by default:
+   four audios with a window each used to eat the whole column, the prompt field fell out of the
+   window and could not be reached at all. A folded block is one line; its own scroll is capped,
+   so opening it never pushes the composer away either. */
+.ag-fold{margin:0 18px 8px;border:1px solid var(--line);border-radius:12px;background:var(--bg-2)}
+.ag-fold>summary{cursor:pointer;list-style:none;display:flex;align-items:center;gap:8px;padding:7px 12px;
+  font-size:12.5px;font-weight:700;color:var(--muted);user-select:none}
+.ag-fold>summary::-webkit-details-marker{display:none}
+.ag-fold>summary::before{content:'\25B8';color:var(--dim);transition:transform .15s}
+.ag-fold[open]>summary::before{transform:rotate(90deg)}
+.ag-fold>summary b{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:700}
+.ag-fold>summary small{font-family:var(--mono);color:var(--muted);font-weight:500}
+.ag-fold>summary button{width:24px;height:24px;border-radius:7px;background:var(--surface-2);font-size:11px;flex:none}
+.ag-fold[hidden]{display:none}
+.ag-fold-body{padding:0 12px 10px;max-height:30vh;overflow:auto;display:grid;gap:6px}
+.ag-fold .ag-att{padding:0;margin:0}
+.ag-fold.ag-audio{display:block;padding:0}
 /* is the next message a fix of what was written, or the next scene of the same story? */
 .ag-edit{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 18px 8px}
 .ag-edit button{border:1px solid var(--line-2);background:var(--bg-2);border-radius:999px;padding:4px 12px;font-size:12px;color:var(--muted)}
@@ -1582,12 +1599,15 @@ body.dropping::after{content:'Отпустите — программа разл
               <span>«Клип: рыцарь поёт у костра, вот текст куплета…»</span>
             </div>
           </div>
-          <div class="ag-att" id="agAtt"></div>
-          <div class="ag-audio" id="agAudioBox" hidden>
-            <div class="ag-audio-h"><b id="agAudioName"></b><small id="agAudioDur"></small><button type="button" id="agAudioX" title="Убрать аудио">✕</button></div>
-            <label class="hint" for="agAudioText">Слова из аудио — проверьте и поправьте, агент вставит их в промпт дословно</label>
-            <textarea id="agAudioText" rows="2" placeholder="Распознаём слова…"></textarea>
-          </div>
+          <details class="ag-fold" id="agAttFold" hidden>
+            <summary>🖼 <b id="agAttN">Картинки и кадры</b><small id="agAttHint">нажмите, чтобы посмотреть</small></summary>
+            <div class="ag-fold-body"><div class="ag-att" id="agAtt"></div></div>
+          </details>
+          <details class="ag-fold ag-audio" id="agAudioBox" hidden>
+            <summary>🎧 <b id="agAudioName">Аудио</b><small id="agAudioDur"></small><button type="button" id="agAudioX" title="Убрать всё аудио из сообщения">✕</button></summary>
+            <textarea id="agAudioText" rows="1" hidden placeholder="Распознаём слова…"></textarea>
+            <div class="ag-fold-body" id="agAudioList"></div>
+          </details>
           <div class="ag-edit" id="agEdit" role="group" aria-label="Как понимать следующее сообщение">
             <button type="button" data-edit="1" class="on">Правка</button><button type="button" data-edit="0">Продолжить сюжет</button>
             <small id="agEditHint">Вернёт весь промпт с заменой; «Picture 1, 2…» — картинки этого сообщения</small>
@@ -8594,6 +8614,8 @@ function renderAtt() {
   $('#agAtt').innerHTML = AG.att.map((a, i) => a.frame
     ? `<div title="Кадр из видео «${esc(a.vname)}»"><img src="${a.url}"><b style="background:#3a5a8c">🎞 ${esc(a.label)}</b><button data-i="${i}">✕</button></div>`
       : `<div><img src="${a.url}"><b>Picture ${base + (++k)}</b><button data-i="${i}">✕</button></div>`).join('');
+  { const fold = $('#agAttFold'); if (fold) { fold.hidden = !AG.att.length;
+      const nm = $('#agAttN'); if (nm) nm.textContent = AG.att.length === 1 ? 'Картинка или кадр' : ('Картинки и кадры: ' + AG.att.length); } }
   agVidBtn();   // the video button lives or sleeps with the tray
 }
 // a video cannot be shown to the model as a file: several frames are cut out of it and sent as pictures, with the seconds written down
@@ -8833,15 +8855,18 @@ function needSpeech() {
 }
 function showAudioBox() {
   const list = AG.audios || [];
-  const box = $('#agAudioBox');
+  const box = $('#agAudioBox'), inside = $('#agAudioList', box);
   box.hidden = !list.length;
   if (!list.length) { AG.audio = null; return; }
+  // the heading is the whole block while it is folded, so it has to say how many there are
+  $('#agAudioName').textContent = list.length === 1 ? (list[0].name || 'аудио') : ('Аудио в сообщении: ' + list.length);
+  $('#agAudioDur').textContent = list.length === 1 ? (list[0].dur.toFixed(1) + ' с') : (list.reduce((s, a) => s + a.dur, 0).toFixed(1) + ' с всего');
   const esc3 = s => String(s).replace(/[<>&"]/g, ch => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[ch]));
-  box.innerHTML = list.map((a, i) => `<div class="ag-audio-item" style="padding:6px 0;border-top:1px solid rgba(255,255,255,.08)">
+  inside.innerHTML = list.map((a, i) => `<div class="ag-audio-item" style="padding:6px 0;border-top:1px solid rgba(255,255,255,.08)">
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><b>${i + 1}. ${esc3(a.name)}</b>
         <span style="opacity:.8">${a.dur.toFixed(1)} с</span>${a.where ? `<span style="opacity:.7">${esc3(a.where)}</span>` : ''}
         <button class="btn mini" type="button" data-k="${i}" title="Убрать это аудио из сообщения">×</button></div>
-      <textarea data-t="${i}" style="width:100%;margin-top:4px" ${a.busy ? 'disabled' : ''}
+      <textarea data-t="${i}" rows="1" style="width:100%;margin-top:4px" ${a.busy ? 'disabled' : ''}
         placeholder="${a.busy ? 'Распознаём слова…' : 'Слов не найдено — впишите сами или оставьте пустым (музыка)'}">${esc3(a.text)}</textarea>
     </div>`).join('');
   AG.audio = list[0];
@@ -8977,7 +9002,8 @@ $('#agFromLip').onclick = () => {
   setChatAudio(wavSlice(abuf, L.start, L.end), 'фрагмент из Lipsync', L.len());
 };
 $('#agAudioText').oninput = e => { if (AG.audio) AG.audio.text = e.target.value; };
-$('#agAudioX').onclick = () => { AG.audio = null; showAudioBox(); };
+$('#agAudioX').onclick = e => { e.preventDefault();        // the cross stands on the heading: without this it would also open the fold
+  AG.audios = []; AG.audio = null; showAudioBox(); };   // and it clears the whole list, not one line
 
 let micRec = null, micTimer = null;
 $('#agMic').onclick = async () => {
