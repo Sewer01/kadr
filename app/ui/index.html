@@ -1163,13 +1163,14 @@ body.dropping::after{content:'Отпустите — программа разл
 
     /* thumbnails of the reference videos: they stand right under the heading of the card, and the
        same grip as under the pictures makes them bigger; the size comes from the window's scale */
-     .vthumbs{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:2px}
+     .vthumbs{display:flex;flex-wrap:wrap;align-items:flex-start;gap:10px;margin-bottom:2px}
      .vthumbs[hidden]{display:none}
-     .vt2{position:relative;width:calc(160px * var(--tk,1));border:1px solid var(--line-2);border-radius:12px;overflow:hidden;background:#000;cursor:pointer}
+     .vt2{position:relative;border:1px solid var(--line-2);border-radius:12px;overflow:hidden;background:#000;cursor:pointer}
      .vt2:hover{border-color:var(--accent)}
-     .vt2 video{display:block;width:100%;aspect-ratio:16/9;object-fit:cover;background:#000}
+     .vt2 video{display:block;height:calc(112px * var(--tk,1));width:auto;max-width:calc(400px * var(--tk,1));min-width:calc(64px * var(--tk,1));object-fit:contain;background:#000}
+     .vt2 b{max-width:calc(100% - 8px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
      .vt2 b{position:absolute;left:6px;top:6px;font-size:11px;font-weight:700;color:#fff;background:rgba(10,12,18,.82);border:1px solid var(--line);border-radius:6px;padding:1px 6px}
-     .vt2 small{display:block;padding:5px 7px;font-size:11.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;background:var(--surface-2)}
+     .vt2 small{display:block;max-width:100%;padding:5px 7px;font-size:11.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;background:var(--surface-2)}
 
     /* reference audio in Референсы / Актёр / Экшн-видео: windows like in the studio, one height for
        everything in the row, and the loading button filled - the bare tiles only showed a file name */
