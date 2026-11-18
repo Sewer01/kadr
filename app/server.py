@@ -2856,7 +2856,16 @@ class App:
             if not dmad:
                 raise web.HTTPBadRequest(text="Для черновика нужен файл ускорения DMAD на 4 шага. Скачайте его в разделе «Настройки», в списке моделей "
                                               "(он помечен «по желанию»), или положите в папку loras вашего ComfyUI. Без него делайте сцену сразу в хорошем качестве.")
-        scenes = [(wf.lipsync_prompt(p, len(own or images)), sec, own) for p, sec, own in scenes]
+        # The head of the structured prompt must count the pictures that REALLY travel to the node.
+        # Both rows are kept with their holes on purpose - a hole keeps its number, so the tags in
+        # the texts stay true - and len() of such a row said 9 while a single file was sent. The
+        # model was told nine references exist, and it answered with invented faces and its own song.
+        filled_common = [i + 1 for i, x in enumerate(images or []) if x]
+        wrapped = []
+        for idx, (p, sec, own) in enumerate(scenes):
+            tags = (filled_common + [10 * (idx + 1) + j for j, x in enumerate(own or []) if x])[:9]
+            wrapped.append((wf.lipsync_prompt(p, 0, ref_tags=tags), sec, own))
+        scenes = wrapped
         part = form.get("part", "")
         if part.isdigit():  # one scene at a time: scene k continues from the saved tail of scene k-1
             k = int(part)
@@ -3700,6 +3709,19 @@ class App:
         return {k: s[k] for k in ("id", "name", "description", "builtin", "mode", "keywords")} | \
                {"refs": [r.name for r in s["refs"]]}
 
+    async def h_comfy_free(self, req):
+        """Hand the video memory back. After a generation ComfyUI keeps its models resident, and the
+        agent's model needs the same gigabytes: while they are held, the agent answers «Остановлено»."""
+        if getattr(self, "jobs", None):
+            return web.json_response({"error": "Задание ещё идёт: память освободится, когда оно кончится"}, status=409)
+        try:
+            await self.comfy_json("POST", "/free", json={"unload_models": True, "free_memory": True})
+        except Exception as e:
+            return web.json_response({"error": "ComfyUI не ответил: " + str(e)[:90]}, status=502)
+        await asyncio.sleep(1.2)
+        gpu = await asyncio.to_thread(self.monitor.gpu)
+        return web.json_response({"used": (gpu or {}).get("vram_used_gb")})
+
     async def h_agent_status(self, _req):
         variant = await self.llm_variant()
         v = ag.LLM_VARIANTS[variant]
@@ -4463,6 +4485,7 @@ def build_app(comfy_override=None):
         web.post("/api/speech/transcribe", state.h_transcribe),
         web.post("/api/speech/folder", state.h_speech_folder),
         web.post("/api/agent/chat", state.h_agent_chat),
+        web.post("/api/comfy/free", state.h_comfy_free),
         web.get("/api/agent/chats", state.h_chats),
         web.delete("/api/agent/chats", state.h_chats_clear),
         web.get("/api/agent/chats/{id}", state.h_chat_get),

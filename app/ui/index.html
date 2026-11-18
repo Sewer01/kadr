@@ -4619,6 +4619,7 @@ class AudioTrimmer {
         if (this.start <= .001 && this.end >= this.dur0 - .001) { this.say('Выделено всё аудио: убирать нечего'); return; }
         const left = this.dur0 - this.len(), from = this.start;
         this._commit(keepRanges(this.buf, [[from, this.end]]), x => x - from);
+        setZoom(1);   // the kept piece is what you want to see whole, not a zoomed-out leftover of the old length
         this.say('Оставлено ' + this.len().toFixed(1).replace('.', ',') + ' с · убрано ' + left.toFixed(1).replace('.', ',') + ' с');
         return;
       }
@@ -4629,6 +4630,7 @@ class AudioTrimmer {
       if (!rest.length) { this.say('Нельзя вырезать всё аудио'); return; }
       const seam = Math.min(a, Math.max(0, this.dur0 - (b - a) - 1.5));
       this._commit(keepRanges(this.buf, rest), [seam, Math.min(this.dur0 - (b - a), seam + 1.5)]);
+      setZoom(1);   // the same: after a cut the whole remainder stands in front of the person
       this.say('Вырезано ' + (b - a).toFixed(1).replace('.', ',') + ' с · маркеры на месте склейки, «Шаг назад» вернёт');
     };
     // the pauses panel keeps its own numbers: the same two knobs the person could set before
@@ -7005,7 +7007,7 @@ function makeRefMode(cfg) {
     const chainNext = () => {
       const all = $$('.sc', root), k = readyUpTo();
       if (root._chainEnd != null && k > root._chainEnd) { root._chainPart = null; root._chainEnd = null; return; }
-      if (k >= all.length) { root._chainPart = null; toast('Все сцены готовы. Клипы лежат в Библиотеке: склейте их в «Монтаже».'); return; }
+      if (k >= all.length) { root._chainPart = null; toast('Все сцены готовы. Клипы лежат в Библиотеке: склейте их в «Монтаже». Память всё ещё держит ComfyUI - «Освободить память» в карточке сцен.'); return; }
       if (!all[k].querySelector('textarea').value.trim()) { root._chainPart = null; toast(`Сцена ${k + 1} пустая: опишите её, и нажмите «Сделать все сцены подряд» снова.`); return; }
       root._chainPart = k; root._target = k; $('.go', $('.rm-preview', root)).click();
     };
@@ -7150,14 +7152,25 @@ function makeRefMode(cfg) {
       const keep = $$('.sc', root).map(c => ({
         files: (c._files || []).slice(), auds: (c._auds || []).slice(), src: (c._audSrc || []).slice(),
         sel: (c._audSel || []).slice(), dur: (c._audDur || []).slice(), fresh: !!$('.sc-fresh', c)?.checked,
-        base: c._baseFixed || 0,
+        base: c._baseFixed || 0, prompt: ($('textarea', c) || {}).value || "",
       }));
       $$('.sc', root).forEach(c => c.remove());
       list.slice(0, 20).forEach((x, i) => addScene(x.prompt, Math.min(15, Math.max(3, Math.round(x.sec) || 10)),
         x.fresh === undefined ? !!(keep[i] && keep[i].fresh) : !!x.fresh, (keep[i] && keep[i].base) || 0));
-      let back = 0;
+      let back = 0; const lostBack = [];
       $$('.sc', root).forEach((c, i) => {
         const k = keep[i]; if (!k) return;
+        /* The rewritten text often forgets the media tags of the scene it came from: the agent
+           answers beautifully and the song or the object disappears with the tag. Tags the draft
+           carried and the answer dropped are put back - the files are still on the shelves, so a
+           text without their numbers would leave them unused. */
+        const tags = s => new Set(((s || '').match(/<(?:Audio|Picture)\s*\d+>/g) || []));
+        const had = tags(k.prompt), got = tags((list[i] && list[i].prompt) || '');
+        const lost = Array.from(had).filter(x => !got.has(x));
+        if (lost.length) {
+          const ta = $('textarea', c);
+          if (ta) { ta.value = (ta.value.trim() + ' ' + lost.join(' ')).trim(); lostBack.push('сцена ' + (i + 1) + ': ' + lost.join(', ')); c._paint?.(); }
+        }
         if ((k.files || []).some(Boolean)) { c._files = k.files.slice(0, 9); c._paint?.(); back++; }
         if ((k.auds || []).some(Boolean)) {
           c._auds = k.auds.slice(); c._audSrc = (k.src || []).slice(); c._audSel = (k.sel || []).slice();
@@ -7167,6 +7180,7 @@ function makeRefMode(cfg) {
       });
       root._sel = 0;
       root._run = Math.random().toString(36).slice(2, 12); recount(); refreshStates();
+      if (lostBack.length) toast('Возврат из чата дописал потерянные теги: ' + lostBack.join(' · '));
       return back;
     };
     /* Клип мог вернуться уже после того, как страница пересобралась: номер прогона живой, а карточки
@@ -8222,7 +8236,13 @@ function makeRefMode(cfg) {
       $('#lmAdd', root).hidden = true;   // the plus on the ribbon is the way to add a scene
       // the base choice and its file button were placed in the settings card above
     }));
-    $('#lmAdd', root).onclick = () => { if ($$('.sc', root).length >= 20) { toast('Не больше 20 сцен — это уже полчаса расчёта'); return; } addScene('', 10); };
+    $('#lmAdd', root).onclick = () => {
+      if ($$('.sc', root).length >= 20) { toast('Не больше 20 сцен — это уже полчаса расчёта'); return; }
+      addScene('', 10);
+      // the scene you asked for is the scene you want to write: it opens right away
+      root._sel = $$('.sc', root).length - 1; root._target = root._sel;
+      renderTL(); showClip(); refreshStates();
+    };
     queueMicrotask(() => { addScene('', 10); });   // a blank start holds ONE scene; «+» in the ribbon makes the next  // after the rest of the set-up is done
     // the «Очистить» button of the section: in this mode the scenes are the text
     root._hasText = () => $$('.sc textarea', root).some(t => t.value.trim());
@@ -8734,6 +8754,23 @@ function makeRefMode(cfg) {
     gg.onclick = () => agGenerate(gg, { mode: cfg.mode, scenes: true, text: () => agScenesText(root) });
     pcard.querySelector('.card-h').append(gg);
     gg._agCount = () => $$('.sc', root).filter(c => ($('textarea', c) || {}).value.trim()).length;
+    /* After a run ComfyUI keeps its models in the card's memory - that is a cache, not a leak, but
+       the agent's model needs the same gigabytes and answers «Остановлено» while they are held. */
+    const fz = document.createElement('button');
+    fz.type = 'button'; fz.className = 'btn mini';
+    fz.textContent = 'Освободить память';
+    fz.title = 'Отдать видеопамять, которую после генерации держит ComfyUI: модель Агента не влезает, пока она занята';
+    fz.onclick = async () => {
+      fz.disabled = true; const keep2 = fz.textContent; fz.textContent = 'Освобождаю…';
+      try {
+        const r = await fetch('/api/comfy/free', { method: 'POST' });
+        const j = await r.json().catch(() => ({}));
+        toast(!r.ok ? (j.error || 'Память не освободилась')
+          : (j.used != null ? 'Видеопамять освобождена: занято ' + j.used + ' ГБ' : 'Видеопамять освобождена'));
+      } catch (e) { toast('ComfyUI не ответил'); }
+      fz.textContent = keep2; fz.disabled = false;
+    };
+    pcard.querySelector('.card-h').append(fz);
   }
   go.textContent = cfg.scenes ? '🤖 Все промты в агента' : '🤖 Промпт в агента';
       go.title = cfg.scenes

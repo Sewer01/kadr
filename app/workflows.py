@@ -1246,7 +1246,7 @@ def lipsync_scale(quality):
     return 2.0 if QUALITY.get(quality, 0) >= 1824 * 1024 else 1.5
 
 
-def lipsync_prompt(text, n_refs, n_videos=0):
+def lipsync_prompt(text, n_refs, n_videos=0, ref_tags=None):
     """Wrap free text into H3's structured prompt unless the user already wrote one.
     Reference videos are tagged <Video N> as the official workflow asks; with pictures present the face comes from the pictures.
     Nothing here is added twice: if the text already carries the alignment line the model does not get a second one, and the
@@ -1254,11 +1254,14 @@ def lipsync_prompt(text, n_refs, n_videos=0):
     ambience and music, and "N/A" under such a scene contradicts it, which is the failure this model punishes hardest."""
     if "integrated_multimodal_description" in text:
         return text
-    refs = " ".join(f"<Picture {i}> (from [Shot 1]) is fully referenced." for i in range(1, n_refs + 1))
+    # The head must name the numbers the text really carries BEFORE the places are recounted:
+    # a range 1..n lied whenever a row had a hole, and the model trusted it and invented faces.
+    tags = list(ref_tags) if ref_tags else list(range(1, (n_refs or 0) + 1))
+    refs = " ".join(f"<Picture {i}> (from [Shot 1]) is fully referenced." for i in tags)
     if n_videos:
         vids = ", ".join(f"<Video {i}>" for i in range(1, n_videos + 1))
         refs += f" {vids} {'is' if n_videos == 1 else 'are'} referenced for motion, camera and setting only."
-        if n_refs:
+        if tags:
             refs += " The faces and identities must match the reference pictures exactly."
     low = text.lower()
     fields = []
