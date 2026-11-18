@@ -116,9 +116,9 @@
 #view-actionsc .lm-mode,#view-actionsc .lm-mode-hint,#view-actionsc .lm-q,#view-actionsc .lm-qnote{display:none!important}
 #view-actionsc .rm-imgs{display:flex!important;gap:10px;flex-wrap:wrap}
 #view-actionsc .rm-imgs .ref{width:var(--refw,112px);height:var(--refh,148px);aspect-ratio:auto;flex:0 0 var(--refw,112px)}
-#view-actionsc .slots{--refh:104px;--refw:104px}
-#view-long .rm-imgs{display:flex!important;gap:10px;flex-wrap:wrap}.srf{position:relative;flex:0 0 104px;width:104px;height:104px;border-radius:10px;overflow:hidden;border:1.5px dashed rgba(232,38,79,.7)}.srf img{width:100%;height:100%;object-fit:cover;display:block}.srfl{position:absolute;left:4px;bottom:4px;font-style:normal;font-size:10px;padding:2px 6px;border-radius:6px;background:rgba(232,38,79,.92);color:#fff}#view-long .rm-imgs .ref{width:var(--refw,112px);height:var(--refh,148px);aspect-ratio:auto;flex:0 0 var(--refw,112px)}
-#view-long .slots{--refh:104px;--refw:104px}   // the studio keeps its small squares: its audio place must not tower over them
+#view-actionsc .slots{--refh:calc(104px * var(--tk,1));--refw:calc(104px * var(--tk,1))}
+#view-long .rm-imgs{display:flex!important;gap:10px;flex-wrap:wrap}.srf{position:relative;flex:0 0 calc(104px * var(--tk,1));width:calc(104px * var(--tk,1));height:calc(104px * var(--tk,1));border-radius:10px;overflow:hidden;border:1.5px dashed rgba(232,38,79,.7)}.srf img{width:100%;height:100%;object-fit:cover;display:block}.srfl{position:absolute;left:4px;bottom:4px;font-style:normal;font-size:10px;padding:2px 6px;border-radius:6px;background:rgba(232,38,79,.92);color:#fff}#view-long .rm-imgs .ref{width:var(--refw,112px);height:var(--refh,148px);aspect-ratio:auto;flex:0 0 var(--refw,112px)}
+#view-long .slots{--refh:calc(104px * var(--tk,1));--refw:calc(104px * var(--tk,1))}   // the studio keeps its small squares: its audio place must not tower over them
 /* the hints of the settings card are shown here as in the other sections */
 #view-long .seg button.need{outline:1px dashed var(--warn);outline-offset:-3px}
 @media (max-width:1100px){}
@@ -588,7 +588,7 @@ body.sys-folded .sys-body{display:none}
 .drop.filled .cnt{right:40px}
 /* зоны, которые начали принимать перетаскивание, подсвечиваются так же, как рамки */
 .slot.over,.ref.over,#agAtt.over{outline:2px dashed var(--accent);outline-offset:-2px}
-.refs{--refh:148px;--refw:112px;display:flex;flex-wrap:wrap;gap:10px;align-items:flex-start}
+.refs{--refh:calc(148px * var(--tk,1));--refw:calc(112px * var(--tk,1));display:flex;flex-wrap:wrap;gap:10px;align-items:flex-start}
 .ref{position:relative;height:var(--refh,148px);width:var(--refw,112px);border-radius:12px;border:1.5px dashed var(--line-2);background:var(--bg-2);display:grid;place-items:center;cursor:pointer;overflow:hidden;transition:.15s}
 .ref:hover{border-color:var(--accent)}
 .ref .plus{display:grid;justify-items:center;gap:4px;color:var(--dim);font-size:11.5px}
@@ -889,7 +889,7 @@ body.dropping::after{content:'Отпустите — программа разл
 /* refs & action */
 /* reference videos / audios: small squares, video and audio side by side */
 .rm-media{display:flex;flex-wrap:wrap;gap:6px 28px;align-items:flex-start}
-.slots{--refh:148px;--refw:112px;display:grid;grid-template-columns:repeat(3,var(--refw));gap:10px}
+.slots{--refh:calc(148px * var(--tk,1));--refw:calc(112px * var(--tk,1));display:grid;grid-template-columns:repeat(3,var(--refw));gap:10px}
 .slot{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;width:var(--refw,112px);height:var(--refh,148px);padding:8px 6px;border-radius:12px;background:var(--bg-2);border:1.5px dashed var(--line-2);cursor:pointer;font-size:11.5px;text-align:center;overflow:hidden}
 .slot:hover{border-color:var(--accent)}
 .slot.filled{border-style:solid;border-color:var(--line)}
@@ -3573,7 +3573,7 @@ for (let i = 1; i <= MAX_REFS; i++) {
   };
 }
 // ряд референсов «Клипа» тоже можно растянуть, как кадры в «Видео»
-hGripAfter(refsEl, 'h3.refh.lipsync', { h: '--refh', w: 112 / 148, min: 110, max: 420 });
+hGripAfter(refsEl, 'h3.refh.lipsync', { h: '--tk', base: 148, min: 110, max: 420, host: $('#view-lipsync') });
 function refsChanged() {
   // H3 numbers references without gaps, so tags follow the order of filled slots
   const slots = $$('.ref.filled', refsEl);
@@ -6261,7 +6261,7 @@ function makeRefMode(cfg) {
     };
   }
   wireSlotSwap($$('.ref', imgsEl), changed);
-  hGripAfter(imgsEl, 'h3.refh.' + cfg.mode, { h: '--refh', w: 112 / 148, min: 110, max: 420 });
+  hGripAfter(imgsEl, 'h3.refh.' + cfg.mode, { h: '--tk', base: 148, min: 110, max: 420, host: root });
   $('.rm-clr', root)?.addEventListener('click', () => clearSlots($$('.ref', imgsEl)));
 
   // video / audio slots
@@ -9805,10 +9805,15 @@ $('.nav[data-view="agent"]').addEventListener('click', () => { agStatus(); agCtx
 function hGrip(bar, host, key, o) {
   if (!bar || !host || host._hGrip) return;
   host._hGrip = 1;
-  const min = o.min || 96, max = o.max || 460;
+  const min = o.min || 96, max = o.max || 460, base = o.base || 0, tgt = o.host || host;
+  let last = 0;
+  // base: the drag is written in pixels of one tile, but stored as one scale for the whole section,
+  // so the video and audio squares next to the pictures grow along with them
   const set = h => {
-    host.style.setProperty(o.h, Math.round(h) + 'px');
-    if (o.w) host.style.setProperty(o.w, Math.round(h * (o.w || 1)) + 'px');   // the tile keeps its shape
+    last = h;
+    if (base) { tgt.style.setProperty(o.h, (h / base).toFixed(4)); return; }
+    tgt.style.setProperty(o.h, Math.round(h) + 'px');
+    if (o.w) tgt.style.setProperty(o.w, Math.round(h * (o.ratio || 1)) + 'px');   // the tile keeps its shape
   };
   try {
     const v = +localStorage.getItem(key) || (o.old ? +localStorage.getItem(o.old) : 0);
@@ -9826,11 +9831,12 @@ function hGrip(bar, host, key, o) {
   bar.addEventListener('pointerup', e => {
     try { bar.releasePointerCapture(e.pointerId); } catch (e) { }
     bar.classList.remove('drag');
-    try { localStorage.setItem(key, parseInt(host.style.getPropertyValue(o.h)) || 0); } catch (e) { }
+    try { localStorage.setItem(key, Math.round(last) || 0); } catch (e) { }
   });
   bar.addEventListener('dblclick', () => {
-    host.style.removeProperty(o.h);
-    if (o.w) host.style.removeProperty(o.w);
+    tgt.style.removeProperty(o.h);
+    if (o.w) tgt.style.removeProperty(o.w);
+    last = 0;
     try { localStorage.removeItem(key); } catch (e) { }
   });
 }
