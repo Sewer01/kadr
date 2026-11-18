@@ -142,7 +142,6 @@
 .atrim .at-wave{position:relative;height:86px;border:1px solid var(--line);border-radius:12px;background:var(--bg-2);cursor:crosshair;overflow:hidden}
 .atrim .at-cv{display:block}
 .atrim .at-sel{position:absolute;top:0;bottom:0;background:rgba(var(--accent-rgb),.16);border-left:2px solid var(--accent);border-right:2px solid var(--accent);pointer-events:none}
-.atrim .at-cut{position:absolute;top:0;bottom:0;background:rgba(255,120,120,.20);border-left:2px dashed #f08080;border-right:2px dashed #f08080;pointer-events:none}
 .atrim .at-ph{position:absolute;top:0;bottom:0;width:2px;background:#fff;pointer-events:none}
 .atrim .at-wave{touch-action:none}
 .atrim .at-h{position:absolute;top:-4px;bottom:-4px;width:20px;cursor:ew-resize;display:grid;place-items:center;background:none;border:0;padding:0;pointer-events:auto;z-index:3}
@@ -151,8 +150,6 @@
 .atrim .at-h:hover::after,.atrim .at-h:active::after{background:#fff}
 .atrim .at-sel > .at-h:first-child{left:-10px}
 .atrim .at-sel > .at-h:last-child{right:-10px}
-.atrim .at-cut > .at-h:first-child{left:-8px}
-.atrim .at-cut > .at-h:last-child{right:-8px}
 .atrim .at-body{display:grid;gap:10px}
 .at-pick{display:grid;gap:8px;margin-bottom:10px;padding:10px 12px;border:1px solid var(--line-2);border-radius:12px;background:var(--surface-2)}
 .at-pick.over{border-style:dashed;border-color:var(--accent);background:rgba(var(--accent-rgb),.08)}
@@ -4270,7 +4267,7 @@ class AudioTrimmer {
     this.warnOver = o.warnOver || 0;
     this.canVocals = o.canVocals || null;
     this.lenLabel = o.lenLabel || 'Длина аудио';
-    this.dur0 = 0; this.start = 0; this.end = 0; this.cut = null;
+    this.dur0 = 0; this.start = 0; this.end = 0;
     this.zoom = 1; this.undo = []; this.buf = null; this.name = '';
     this.mode = 'clip'; this.src = null; this.raf = 0; this.busy = false;
     this.el = document.createElement('div'); this.el.className = 'atrim';
@@ -4280,14 +4277,13 @@ class AudioTrimmer {
       '<div class="at-body" hidden>' +
       '<div class="at-wave"><canvas class="at-cv" height="86"></canvas>' +
       '<div class="at-sel" hidden><i class="at-h" data-h="l"></i><i class="at-h" data-h="r"></i></div>' +
-      '<div class="at-cut" hidden><i class="at-h" data-h="cl"></i><i class="at-h" data-h="cr"></i></div>' +
       '<div class="at-fade" hidden>' +
       '<button class="at-fd" type="button" data-f="l" title="Плавно набирает силу: тишина у левого маркера - полная громкость у правого. За краями выделенного звук не меняется."><svg viewBox="0 0 20 14" aria-hidden="true"><path d="M1 13V11h4V8h4V5h4V2h6"/></svg></button>' +
       '<button class="at-fd" type="button" data-f="r" title="Плавно стихает: полная громкость у левого маркера - тишина у правого. За краями выделенного звук не меняется."><svg viewBox="0 0 20 14" aria-hidden="true"><path d="M19 13V11h-4V8h-4V5h-4V2H1"/></svg></button>' +
       '</div>' +
       '<div class="at-ph" hidden></div></div>' +
       '<div class="at-modes"><button class="on" type="button" data-m="clip" title="Выбор фрагмента: то, что выделено, пойдёт в клип">Выбор фрагмента</button>' +
-      '<button type="button" data-m="cut" title="Вырезание: убрать выделенный кусок из аудио, остальное склеить">Вырезание</button>' +
+      '<button type="button" data-m="cut" title="Вырезание: отметить кусок теми же маркерами, убрать его и склеить остаток">Вырезание</button>' +
       '<button type="button" data-m="fade" title="Затухание: внутри выделенного появятся две лесенки - спуск или подъём от одного маркера до другого">Затухание</button></div>' +
       '<div class="at-hint"></div>' +
       '<div class="at-acts"><button class="btn pri at-keep" type="button" disabled>Оставить выделенное</button>' +
@@ -4337,7 +4333,7 @@ class AudioTrimmer {
     this.q('.at-hint').textContent = this.mode === 'fade'
       ? 'Выделите участок и нажмите лесенку ВНУТРИ него: правая - звук плавно стихает от левого маркера до правого, левая - наоборот, набирает силу. За краями выделенного звук остаётся как был.'
       : this.mode === 'cut'
-      ? 'Проведите мышью по волне, чтобы выделить кусок, который нужно убрать, и нажмите «Удалить выделенное».'
+      ? 'Тем же выделением отметьте кусок, который нужно убрать: маркеры слева и справа - начало и конец. Нажмите «Вырезать и склеить» - остаток склеится, а маркеры встанут на место склейки.'
       : 'Выделите, что оставить в клипе, и нажмите «Оставить выделенное» - остальное аудио уберётся.';
   }
   async setFile(f, silent) {
@@ -4349,7 +4345,7 @@ class AudioTrimmer {
     this.buf0 = this.buf; this.name0 = f.name;   // what the file was when it came in: «Откат» returns to this
     const cap = this.preselect ? Math.min(this.dur0, this.preselect)
       : (this.limit > 0 ? Math.min(this.dur0, this.limit) : this.dur0);
-    this.start = 0; this.end = cap; this.cut = null; this.undo = []; this._pan = null;
+    this.start = 0; this.end = cap; this.undo = []; this._pan = null;
     this.zoom = 1; this.q('.at-zr').value = 1; paintRange(this.q('.at-zr'));
     if (this.q('.at-pm')) { this.q('.at-pm').value = '0,6'; this.q('.at-pk').value = '0,25'; }
     if (this.q('.at-pz')) this.q('.at-pz').hidden = true;
@@ -4379,13 +4375,11 @@ class AudioTrimmer {
       g.fillRect(x, mid - h / 2, 1, h);
     }
     g.globalAlpha = 1;
-    const sel = this.q('.at-sel'), cu = this.q('.at-cut'), px = t => this.fracAt(t) * W;
+    const sel = this.q('.at-sel'), px = t => this.fracAt(t) * W;
     if (this.dur0) {
       sel.hidden = false; sel.style.left = Math.max(0, px(this.start)) + 'px';
       sel.style.width = Math.max(0, px(this.end) - px(this.start)) + 'px';
     } else sel.hidden = true;
-    if (this.cut) { cu.hidden = false; cu.style.left = px(this.cut.a) + 'px'; cu.style.width = (px(this.cut.b) - px(this.cut.a)) + 'px'; }
-    else cu.hidden = true;
     // the two stairs of the fade mode stand on the edges of what is marked, not in the corner
     const fd = this.q('.at-fade');
     if (fd) {
@@ -4414,10 +4408,13 @@ class AudioTrimmer {
     if (document.activeElement !== this.q('.at-a')) this.q('.at-a').value = on ? this.start.toFixed(1).replace('.', ',') : '';
     if (document.activeElement !== this.q('.at-b')) this.q('.at-b').value = on ? this.end.toFixed(1).replace('.', ',') : '';
     const keep = this.q('.at-keep');
-    keep.disabled = !on || (this.mode === 'clip' ? (whole || this.len() < .05) : !(this.cut && this.cut.b - this.cut.a >= .05));
+    keep.disabled = !on || this.len() < .05 || (this.mode !== 'cut' && whole);
     keep.textContent = this.mode === 'cut'
-      ? (this.cut ? '✂ Удалить выделенное - ' + (this.cut.b - this.cut.a).toFixed(1).replace('.', ',') + ' с' : '✂ Удалить выделенное')
+      ? '✂ Вырезать ' + this.len().toFixed(1).replace('.', ',') + ' с и склеить'
       : (whole ? '✂ Оставить выделенное' : '✂ Оставить выделенное - убрать ' + away.toFixed(1).replace('.', ','));
+    keep.title = this.mode === 'cut'
+      ? 'Убрать то, что между маркерами, и склеить остаток; маркеры встанут на место склейки'
+      : 'Оставить то, что между маркерами, а остальное аудио убрать';
     this.q('.at-paus').disabled = this.q('.at-voc').disabled = !on;
     this.q('.at-ag').disabled = !on;
     this.q('.at-und').disabled = !(on && this.buf0 && this.buf !== this.buf0);   // live only while the sound differs from the original
@@ -4451,9 +4448,13 @@ class AudioTrimmer {
     this.undo.push({ buf: this.buf, start: this.start, end: this.end });
     if (this.undo.length > 15) this.undo.shift();
     this.buf = newBuf; this.dur0 = newBuf.duration;
-    this.start = Math.min(mapT(this.start), Math.max(0, this.dur0 - .1));
-    this.end = Math.min(Math.max(mapT(this.end), this.start + .1), this.dur0);
-    this.cut = null; this._peaks(); this._sync(); this.out();
+    // a mapper over the old markers, or the new markers themselves: cutting the marked piece out
+    // leaves the markers nowhere, so that edit hands them over by hand and they stand on the seam
+    const pair = Array.isArray(mapT) ? mapT : [mapT(this.start), mapT(this.end)];
+    this.start = Math.min(Math.max(0, pair[0]), Math.max(0, this.dur0 - .1));
+    this.end = Math.min(Math.max(pair[1], this.start + .1), this.dur0);
+    this._pan = null;
+    this._peaks(); this._sync(); this.out();
   }
   /* the file the rest of the program should use: the audio as it stands now, cut to the selection */
   out() {
@@ -4469,9 +4470,10 @@ class AudioTrimmer {
     const s = this.undo.pop();
     if (!s) { this.say('Отменять нечего'); return; }
     this.stop();
-    this.buf = s.buf;
-    this.start = s.start; this.end = s.end; this.cut = null;
-    this._sync(); this.out();
+    this.buf = s.buf; this.dur0 = s.buf.duration;   // the length must come back with the sound itself
+    this.start = Math.min(s.start, this.dur0); this.end = Math.min(s.end, this.dur0);
+    this._pan = null;
+    this._peaks(); this._sync(); this.out();
     this.say(this.undo.length ? 'Вернул последнее изменение' : 'Вернул последнее изменение: аудио как было');
   }
   clear() { this.stop(); this.buf = null; this.dur0 = 0; this.start = this.end = 0; this.cut = null; this.undo = []; this.name = ''; this.zoom = 1; this._sync(); }
@@ -4501,8 +4503,10 @@ class AudioTrimmer {
     if (!this.dur0 || this._grab) return;   // while a handle is held, the wave must not restart the selection
     const r = this.q('.at-wave').getBoundingClientRect(), px = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width));
     const t = this.tAt(px);
-    if (this.mode === 'cut') { this.cut = { a: Math.min(this._t0, t), b: Math.max(this._t0, t) }; }
-    else if (this._anchor === null) this._anchor = t;
+    if (this._move) {                       // the whole frame follows the hand, its width is kept
+      const a = Math.max(0, Math.min(this.dur0 - this._move.len, t - this._move.off));
+      this.start = a; this.end = a + this._move.len;
+    } else if (this._anchor === null) this._anchor = t;
     else { this.start = Math.min(this._anchor, t); this.end = Math.max(this._anchor, t); }
     this._sync();
   }
@@ -4518,7 +4522,7 @@ class AudioTrimmer {
         if (!this.dur0) return;
         e.stopPropagation(); e.preventDefault();
         this._grab = h.dataset.h;
-        h.setPointerCapture(e.pointerId);
+        try { h.setPointerCapture(e.pointerId); } catch (err) { }   // a released pointer is not an error: the drag still works
       });
       h.addEventListener('pointermove', e => {
         const g = this._grab; if (!g) return;
@@ -4526,8 +4530,6 @@ class AudioTrimmer {
         this._pan = null;                       // the window follows the marker the person moved
         if (g === 'l') this.start = Math.min(v, this.end - .1);
         else if (g === 'r') this.end = Math.max(v, this.start + .1);
-        else if (g === 'cl' && this.cut) this.cut = { a: Math.min(v, this.cut.b - .05), b: this.cut.b };
-        else if (g === 'cr' && this.cut) this.cut = { a: this.cut.a, b: Math.max(v, this.cut.a + .05) };
         this._sync();
       });
       h.addEventListener('pointerup', e => {
@@ -4537,35 +4539,23 @@ class AudioTrimmer {
       });
       h.addEventListener('pointercancel', () => { this._grab = null; });
     });
-    // the body of the selection moves the whole frame: grabbing it used to restart the selection
-    const sel = this.q('.at-sel');
-    sel.addEventListener('pointerdown', e => {
-      if (!this.dur0 || e.target.closest('.at-h') || this.mode === 'cut') return;
-      e.stopPropagation(); e.preventDefault();
-      this._move = { grab: at(e) - this.start, len: this.len() };
-      sel.setPointerCapture(e.pointerId);
-    });
-    sel.addEventListener('pointermove', e => {
-      if (!this._move) return;
-      const t = at(e), a = Math.max(0, Math.min(this.dur0 - this._move.len, t - this._move.grab));
-      this.start = a; this.end = a + this._move.len; this._sync();
-    });
-    const endMove = () => { if (this._move) { this._move = null; this.out(); } };
-    sel.addEventListener('pointerup', endMove);
-    sel.addEventListener('pointercancel', endMove);
     el.addEventListener('pointerdown', e => {
       if (!this.dur0 || this._grab) return;
       if (e.target.closest('.at-fd')) return;   // pressing a stair is a press, not a drag: the markers
                                                 // used to jump together and the fade then had nothing to cover
       const t = at(e);
-      if (this.mode === 'cut') { this._t0 = t; this.cut = { a: t, b: t }; } else this._anchor = t;
-      el.setPointerCapture(e.pointerId); this._drag(e);
+      // pressing inside the marked piece moves it whole; on its edges or outside it starts a new mark
+      const inside = t > this.start + .2 && t < this.end - .2 && !e.target.closest('.at-fd');
+      if (inside && this.mode !== 'fade') this._move = { off: t - this.start, len: this.len() };
+      else this._anchor = t;
+      try { el.setPointerCapture(e.pointerId); } catch (err) { }      // a released pointer is not an error
+      this._drag(e);
     });
-    el.addEventListener('pointermove', e => { if (this._anchor !== null || this._t0 !== undefined) this._drag(e); });
+    el.addEventListener('pointermove', e => { if (this._anchor !== null || this._move) this._drag(e); });
     el.addEventListener('pointerup', e => {
       if (this._grab) return;
-      this._drag(e); this._anchor = null; this._t0 = undefined;
-      if (this.mode === 'clip') this.out();
+      this._drag(e); this._anchor = null; this._move = null;
+      this.out();
     });
     this.q('.at-fade').onclick = e => {
       const b = e.target.closest('[data-f]'); if (!b) return;
@@ -4579,25 +4569,27 @@ class AudioTrimmer {
       const b = e.target.closest('button[data-m]'); if (!b || !this.dur0) return;
       this.mode = b.dataset.m;
       [...this.el.querySelectorAll('.at-modes button')].forEach(x => x.classList.toggle('on', x === b));
-      if (this.mode === 'clip') this.cut = null;
       this._hint(); this._sync(); this._paint();   // the stairs of the fade mode stand on the wave
     };
     this.q('.at-play').onclick = () => this.src ? this.stop() : this.play();
     this.q('.at-keep').onclick = () => {
       if (!this.dur0) return;
+      if (this.len() < .05) return;
       if (this.mode !== 'cut') {
         if (this.start <= .001 && this.end >= this.dur0 - .001) { this.say('Выделено всё аудио: убирать нечего'); return; }
-        if (this.len() < .05) return;
         const left = this.dur0 - this.len(), from = this.start;
         this._commit(keepRanges(this.buf, [[from, this.end]]), x => x - from);
         this.say('Оставлено ' + this.len().toFixed(1).replace('.', ',') + ' с · убрано ' + left.toFixed(1).replace('.', ',') + ' с');
         return;
       }
-      if (!this.cut || this.cut.b - this.cut.a < .05) return;
-      const a = this.cut.a, b = this.cut.b, keep = [[0, a], [b, this.dur0]].filter(([x, y]) => y - x > .001);
-      if (!keep.length) { this.say('Нельзя вырезать всё аудио'); return; }
-      this._commit(keepRanges(this.buf, keep), shiftAfter([[a, b]]));
-      this.say('Вырезано ' + (b - a).toFixed(1).replace('.', ',') + ' с');
+      // the marked piece goes out, the rest is glued, the markers land on the seam: a selection
+      // squeezed to nothing by the cut would only wake the warning about a piece under a second
+      const a = this.start, b = this.end;
+      const rest = [[0, a], [b, this.dur0]].filter(([x, y]) => y - x > .001);
+      if (!rest.length) { this.say('Нельзя вырезать всё аудио'); return; }
+      const seam = Math.min(a, Math.max(0, this.dur0 - (b - a) - 1.5));
+      this._commit(keepRanges(this.buf, rest), [seam, Math.min(this.dur0 - (b - a), seam + 1.5)]);
+      this.say('Вырезано ' + (b - a).toFixed(1).replace('.', ',') + ' с · маркеры на месте склейки, «Шаг назад» вернёт');
     };
     // the pauses panel keeps its own numbers: the same two knobs the person could set before
     this.q('.at-paus').onclick = () => {
