@@ -9457,7 +9457,9 @@ async function sendPrompt(blk, to) {
   };
   if (to === 'story' && (AG.storyFrames || (files.length && AG.storyModel !== 'krea'))) {
     IMG.qwen.fill({ prompt, kind: 'story', engine: AG.storyFrames && AG.storyModel === 'krea' ? 'flux' : AG.storyModel, frames: AG.storyFrames });
-    for (const [i, sel] of ['#qwDrop', '#qwDrop2', '#qwDrop3', '#qwDrop4', '#qwDrop5'].entries()) {
+    // a draft coming home belongs to the pictures that are already here: clearing them threw the
+    // person's own photos away, because the round trip deliberately carries no files
+    if (!back) for (const [i, sel] of ['#qwDrop', '#qwDrop2', '#qwDrop3', '#qwDrop4', '#qwDrop5'].entries()) {
       $(sel + ' .x')?.click();
       if (files[i]) await setDropFile($(sel + ' input'), files[i]);
     }
@@ -9470,7 +9472,9 @@ async function sendPrompt(blk, to) {
     IMG.krea.fill({ prompt, engine, aspect: six ? '21:9' : AG.target === 'sheet' || to === 'sheet' || AG.target === 'story' ? '16:9' : undefined }); to = 'krea';
   } else if (to === 'qwen' || to === 'h3e') {
     IMG.qwen.fill(to === 'h3e' || AG.target === 'h3e' ? { prompt, engine: 'h3img' } : { prompt });
-    for (const [i, sel] of ['#qwDrop', '#qwDrop2', '#qwDrop3', '#qwDrop4', '#qwDrop5'].entries()) {
+    // a draft coming home belongs to the pictures that are already here: clearing them threw the
+    // person's own photos away, because the round trip deliberately carries no files
+    if (!back) for (const [i, sel] of ['#qwDrop', '#qwDrop2', '#qwDrop3', '#qwDrop4', '#qwDrop5'].entries()) {
       $(sel + ' .x')?.click();
       if (files[i]) await setDropFile($(sel + ' input'), files[i]);
     }
@@ -10015,9 +10019,14 @@ async function memFile(op, key, value) {
   });
 }
 const memStates = () => ({ video: [V, $('#vPrompt'), vUpd], lipsync: [L, $('#lPrompt'), lUpd],
+  // the two picture windows were the only ones the program forgot: their text and photos vanished
+  // on the next start, while every studio remembered everything
+  ...(IMG.qwen ? { qwen: [IMG.qwen.S, IMG.qwen.ta(), IMG.qwen.upd] } : {}),
+  ...(IMG.krea ? { krea: [IMG.krea.S, IMG.krea.ta(), IMG.krea.upd] } : {}),
   ...Object.fromEntries(Object.entries(RM).map(([m, r]) => [m, [r.S, r.prompt(), r.upd]])) });
 function memSlots() {
   const out = [['video/first', $('#dFirst')], ['video/last', $('#dLast')]];
+  ['#qwDrop', '#qwDrop2', '#qwDrop3', '#qwDrop4', '#qwDrop5'].forEach((s, i) => { const el = $(s); if (el) out.push([`qwen/img${i}`, el]); });
   $$('.ref', refsEl).forEach((r, i) => out.push([`lipsync/ref${i}`, r]));
   Object.entries(RM).forEach(([m, r]) => {
     $$('.ref', r.root).forEach((x, i) => out.push([`${m}/img${i}`, x]));
@@ -10080,7 +10089,9 @@ async function memRestore() {
 }
 setInterval(memSave, 5000);   // a net against a crash; cheap now that nothing is rewritten in idle
 addEventListener('beforeunload', memSave);
-memRestore();
+/* The picture windows are built further down this same script, and a photo is restored by putting
+   it into a real file input: running before them meant the nodes simply were not there. */
+if (document.readyState === 'complete') memRestore(); else addEventListener('load', memRestore);
 
 /* ---------- закладки: сохранить состояние раздела и вернуться к нему позже ---------- */
 const BM = { KEY: 'h3-bookmarks', MODES: ['video', 'lipsync', 'refs', 'actor', 'action', 'long'], MAX: 15 };
@@ -10835,6 +10846,7 @@ const imgSeedForm = (S, fd) => { if (S.seedFixed && S.seed) fd.append('seed', S.
   agPromptButton($('.card-h', $('.kr-prompt', root).closest('.card')), 'промпт', () => $('.kr-prompt', root).value,
     () => ({ kreareal: 'krea', flux: 'fluxt', h3img: 'h3t', qwen: 'qwent' }[S.engine] || 'krea'));
   IMG.krea = { fillList, fill: it => { if (it.engine) S.engine = it.engine; else if (/^(Картинка|Изображение) \(FLUX/.test(it.sub || '')) S.engine = 'flux'; else if (/^(Картинка|Изображение) \(Qwen/.test(it.sub || '')) S.engine = 'qwen'; else S.engine = 'krea'; $('.kr-prompt', root).value = it.prompt || ''; $('.kr-prompt', root).oninput({ target: $('.kr-prompt', root) }); if (IMG_SIZES[it.aspect]) S.aspect = it.aspect; upd(); } };
+  IMG.krea.S = S; IMG.krea.upd = upd; IMG.krea.ta = () => $('.kr-prompt', root);
 })();
 
 /* --- Qwen Image 2.1: edit a picture, character sheet --- */
@@ -10856,8 +10868,9 @@ const imgSeedForm = (S, fd) => { if (S.seedFixed && S.seed) fd.append('seed', S.
         <div class="hint qw-morehint" style="margin-top:8px"></div></div>
       <div class="card"><div class="card-h"><h3><span class="n">2</span>Промпт</h3><span class="hint">можно написать в разделе «Агент»</span></div>
         <div class="qw-edit">
+          <div class="tokens qw-tokens" style="margin-bottom:8px"></div>
           <textarea class="qw-prompt" placeholder="Что изменить и что оставить. Например: Этот человек сидит в кафе у окна и пьёт кофе. Лицо, причёска и одежда как на изображении."></textarea>
-          <div class="ta-foot"><span class="hint">Скажите и что поменять, и что оставить прежним — так результат точнее</span></div></div></div>
+          <div class="ta-foot"><span class="hint">нажмите на тег над полем, чтобы вставить его в текст</span></div></div></div>
       <div class="card"><div class="card-h"><h3><span class="n">3</span>Параметры</h3></div>
           <div class="row qw-storyopts" hidden style="margin-bottom:12px"><div class="row-l">Как рисовать</div>
             <div class="seg qw-fr" style="grid-template-columns:minmax(0,1fr) minmax(0,1fr)"><button data-fr="1">По кадрам<small>каждый кадр отдельно, лист склеит программа</small></button><button data-fr="0">Одним листом<small>одно изображение сразу</small></button></div>
@@ -10898,6 +10911,10 @@ const imgSeedForm = (S, fd) => { if (S.seedFixed && S.seed) fd.append('seed', S.
   };
   szWire($('.qw-szwrap', root), S, () => upd(), () => IMG_SIZES[S.aspect] || [1376, 768]);
   wireDrop(drop2, () => {}); wireDrop(drop3, () => {}); wireDrop(drop4, () => {}); wireDrop(drop5, () => {});
+  /* The slots paint their own picture but never call the window's repaint, so the row of tags under
+     the prompt stayed asleep: a photo arrived, the chip went on saying «no photo here». */
+  $('.qw-slots', root).addEventListener('change', () => setTimeout(upd, 0), true);
+  $('.qw-slots', root).addEventListener('click', () => setTimeout(upd, 0), true);
   const P = imgPanel($('.qw-prev', root), {
     mode: 'qwen', url: '/api/generate/qwen',
     promptText: () => S.kind === 'sheet' ? 'Лист персонажа' : $('.qw-prompt', root).value.trim(),
@@ -10939,6 +10956,21 @@ const imgSeedForm = (S, fd) => { if (S.seedFixed && S.seed) fd.append('seed', S.
       : (h3
         ? 'MiniMax H3 Image: до 5 изображений. <b>&lt;Picture 1&gt;</b> — то, что меняем (или главный образец), остальные — стиль, герой, предмет, место. Каждое называйте в тексте по номеру.'
         : 'Референсы (по желанию): 1-е изображение — то, что меняем, 2-я и 3-я — например, герой, предмет или одежда. В тексте они называются <b>&lt;image2&gt;</b>, <b>&lt;image3&gt;</b> (для FLUX.2: «image 2», «image 3»).');
+    /* The same chips as in the studios: the person should not remember how each model names a
+       picture. H3 Image takes <Picture N>, Qwen <imageN>, FLUX.2 «image N», and a storyboard says
+       it with a space, exactly as the hint of the card puts it. */
+    {
+      const tagOf = i => S.engine === 'h3img' ? '<Picture ' + i + '>'
+        : (S.kind === 'story' || S.engine === 'flux') ? 'image ' + i : '<image' + i + '>';
+      const tk = $('.qw-tokens', root);
+      if (tk) {
+        const lit = t => t.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        tk.innerHTML = ['#qwDrop', '#qwDrop2', '#qwDrop3', '#qwDrop4', '#qwDrop5']
+          .map(s => $(s, root)).filter(d => d && !d.hidden)
+          .map((d, i) => `<button class="token" type="button"${d._file ? '' : ' disabled'} title="${d._file ? 'Вставить в текст: ' + lit(tagOf(i + 1)) : 'В это место ещё не загружено фото'}">${lit(tagOf(i + 1))}</button>`)
+          .join('') + (S.kind === 'story' ? '<span class="hint">кадры считываются по порядку, без тега</span>' : '');
+      }
+    }
     $('.qw-storyopts', root).hidden = S.kind !== 'story';
     $('.qw-lnrow', root).hidden = !S.frames;
     $$('.qw-fr button', root).forEach(b => b.classList.toggle('on', (b.dataset.fr === '1') === S.frames));
@@ -10981,9 +11013,20 @@ const imgSeedForm = (S, fd) => { if (S.seedFixed && S.seed) fd.append('seed', S.
     } catch {}
   }
   imgSeedWire(root, S); upd();
+  $('.qw-tokens', root).onclick = e => {
+    const t = e.target.closest('.token'); if (!t) return;
+    if (t.disabled) { toast('В это место ещё не загружено фото'); return; }
+    const ta = $('.qw-prompt', root), p = ta.selectionStart == null ? ta.value.length : ta.selectionStart;
+    // a tag glued to the previous word reads badly and is harder to fix later
+    const txt = (p > 0 && !/[\s>]/.test(ta.value[p - 1]) ? ' ' : '') + t.textContent + ' ';
+    ta.value = ta.value.slice(0, p) + txt + ta.value.slice(ta.selectionEnd || p);
+    ta.focus(); ta.selectionStart = ta.selectionEnd = p + txt.length;
+    ta.dispatchEvent(new Event('input'));
+  };
   agPromptButton($('.card-h', $('.qw-prompt', root).closest('.card')), 'текст правки', () => $('.qw-prompt', root).value,
     () => ({ h3img: 'h3e' }[S.engine] || 'qwen'));
   IMG.qwen = { fill: it => { if (it.engine) S.engine = it.engine; if (it.frames !== undefined) S.frames = !!it.frames; if (String(it.sub || '').startsWith('Раскадровка по кадрам')) S.frames = true; else if (String(it.sub || '').startsWith('Раскадровка')) S.frames = false; if (it.kind === 'story' || String(it.sub || '').startsWith('Раскадровка')) { S.kind = 'story'; $('.qw-prompt', root).value = it.prompt || ''; } else if (it.sub === 'Лист персонажа') S.kind = 'sheet'; else { S.kind = 'edit'; $('.qw-prompt', root).value = it.prompt || ''; } upd(); } };
+  IMG.qwen.S = S; IMG.qwen.upd = upd; IMG.qwen.ta = () => $('.qw-prompt', root);
 })();
 
 
