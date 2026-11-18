@@ -84,7 +84,7 @@
 .cmp-fs:hover{background:var(--accent)}
 #cmpFull{position:fixed;inset:0;z-index:80;background:rgba(0,0,0,.96);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:2vh 2vw}
 #cmpFull .cmp-in{height:88vh;width:auto;max-width:96vw;max-height:none;margin:0}
-.tl{display:flex;gap:5px;align-items:stretch;margin:6px 0 12px;overflow-x:auto;padding-bottom:4px}
+.tl{display:grid;grid-template-columns:repeat(2,minmax(0,240px));gap:6px;align-items:stretch;margin:6px 0 8px;padding-bottom:2px}
 .tl-b{position:relative;box-sizing:border-box;height:34px;border-radius:9px;border:1.5px solid var(--line-2);background:var(--surface-2);padding:0 8px;cursor:pointer;display:flex;align-items:center;gap:8px;font-size:12px}
 .tl-l{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1}
 .tl-x{flex:none;width:18px;height:18px;border-radius:5px;display:grid;place-items:center;font-size:10px;font-style:normal;color:var(--muted)}
@@ -92,6 +92,8 @@
 .tl-b.sel{border-color:var(--accent);box-shadow:0 0 0 2px rgba(var(--accent-rgb),.3)}
 .tl-b.stale{background:rgba(150,150,150,.14);border-style:dashed}.tl-b.done{background:rgba(47,191,113,.18)}.tl-b.draft{background:rgba(232,163,23,.18)}
 .tl-b.cut{border-left:4px solid var(--accent)}
+.tl-b[draggable="true"]{cursor:grab}.tl-b[draggable="true"]:active{cursor:grabbing}
+.tl-b.dragging{opacity:.45}.tl-b.over{outline:2px dashed var(--accent);outline-offset:2px}
 .tl-h{position:absolute;right:-4px;top:4px;bottom:4px;width:10px;cursor:ew-resize;z-index:2}.tl-h::after{content:'';position:absolute;left:3px;top:10px;bottom:10px;width:4px;border-radius:3px;background:var(--accent);opacity:.55}.tl-b:hover .tl-h::after,.tl-b.sel .tl-h::after{opacity:1}
 .tl{touch-action:pan-x;user-select:none}
 .tl-add{border-style:dashed;min-width:56px;font-size:20px;font-weight:800;color:var(--muted)}
@@ -6890,8 +6892,8 @@ function makeRefMode(cfg) {
     card.innerHTML = `<div class="card-h"><h3><span class="n">4</span>Сцены</h3><span class="counter lm-total"></span></div>
       <div class="tl-player"><video class="tl-vid" controls playsinline loop hidden></video><div class="hint tl-empty">Здесь покажется готовая сцена. Выберите фрагмент на ленте ниже и нажмите «Сделать эту сцену».</div></div>
       <div style="display:flex;gap:8px;margin-bottom:6px;flex-wrap:wrap"><button class="btn pri tl-all" type="button" title="Готовые сцены подряд, как один ролик: первая, вторая, третья...">▶ Смотреть готовые сцены подряд</button><button class="btn pri tl-join" type="button" title="Все готовые сцены по порядку отправляются в «Монтаж»: там остаётся нажать «Склеить», и весь ролик одним файлом появится в Библиотеке, откуда его можно сохранить">⇩ Собрать весь ролик и сохранить</button><span class="hint tl-note" style="align-self:center"></span></div>
-      <div class="tl" title="Фрагменты ролика по порядку. Нажмите на фрагмент, чтобы настроить его. Потяните его правый край, чтобы изменить длину"></div>
-      <div class="hint" style="margin:-6px 0 10px;font-size:12px">Нажмите на фрагмент, чтобы открыть его. Потяните правый край фрагмента, чтобы сделать его короче или длиннее.</div>
+      <div class="tl" title="Фрагменты ролика по порядку. Нажмите на фрагмент, чтобы настроить его. Потяните его правый край, чтобы изменить длину. Перетащите фрагмент на другое место, чтобы поменять порядок сцен"></div>
+      <div class="hint" style="margin:-6px 0 10px;font-size:12px">Нажмите на фрагмент, чтобы открыть его. Потяните правый край фрагмента, чтобы сделать его короче или длиннее. Перетащите фрагмент мышкой на другое место, чтобы поменять порядок сцен; крестик на фрагменте убирает сцену целиком.</div>
       <div class="lm-scenes"></div>
       <div class="seg lm-q" style="grid-template-columns:minmax(0,1fr) minmax(0,1fr);margin:10px 0 6px"><button type="button" data-mq="draft">Черновик<small>4 шага, быстро: посмотреть, что получится</small></button><button type="button" data-mq="final">Хорошее качество<small>8 шагов: итоговые сцены</small></button></div>
       <div class="hint lm-q-hint" style="margin-bottom:10px"></div>
@@ -7657,7 +7659,20 @@ function makeRefMode(cfg) {
       };
       $('textarea', c).addEventListener('input', () => { refreshStates(); c._counter?.(); });   // first the rebuild, then the count and the lock
       $('textarea', c).addEventListener('focus', e => { root._ta = e.target; c._counter?.(); });   // the row of common chips follows the scene you picked up
-      $('input[type=range]', c).oninput = recount; $('.x', c).onclick = () => { root._pushUndo?.(); c.remove(); recount(); };
+      $('input[type=range]', c).oninput = recount;
+      /* The cross beside the scene used to throw the whole scene away, so one careless click cost
+         minutes of writing. It now empties the text of THIS scene - the thing people actually reach
+         for it to do. A scene is still removable: its cross on the ribbon above takes the card out. */
+      $('.x', c).onclick = () => {
+        const ta = $('textarea', c);
+        if (!ta || !ta.value.trim()) { toast('В этой сцене текст и так пустой'); return; }
+        root._pushUndo?.();
+        ta.value = ''; ta.dispatchEvent(new Event('input', { bubbles: true }));
+        c._paint?.(); recount(); refreshStates();
+        if (root._save && !root._restoring) root._save();
+        toast('Текст сцены очищен · её фото и песни остались на местах');
+      };
+      $('.x', c).title = 'Очистить текст этой сцены (фото и песни останутся)';
       recount();
     };
 
@@ -7673,8 +7688,8 @@ function makeRefMode(cfg) {
       all.forEach((c, j) => c.classList.toggle('sel', j === root._sel));
       tl.innerHTML = all.map((c, i) => {
         const sec = +$('input[type=range]', c).value, done = sigOk(c), draft = root._q === 'draft', old = !done && !!(c._old || {})[root._q];
-        return `<div class="tl-b${i === root._sel ? ' sel' : ''}${done ? (draft ? ' draft' : ' done') : old ? ' stale' : ''}${fr[i] ? ' cut' : ''}" data-i="${i}" style="flex:0 0 ${sec * TL_PPS}px" title="${fr[i] ? 'Новый план (смена кадра). ' : ''}Потяните правый край, чтобы изменить длину"><div class="tl-l"><b>${i + 1}</b> · ${sec} с${done ? (draft ? ' · черновик ✓' : ' · готово ✓') : old ? ' · старая версия' : ''}${fr[i] ? ' · ✂ новый план' : ''}</div><i class="tl-x" data-scdel="${i}" title="Удалить эту сцену">✕</i><i class="tl-h"></i></div>`;
-      }).join('') + '<div class="tl-b tl-add" data-add="1" style="flex:0 0 56px;align-items:center;justify-content:center" title="Добавить фрагмент">+</div>';
+        return `<div class="tl-b${i === root._sel ? ' sel' : ''}${done ? (draft ? ' draft' : ' done') : old ? ' stale' : ''}${fr[i] ? ' cut' : ''}" data-i="${i}" draggable="true" title="${fr[i] ? 'Новый план (смена кадра). ' : ''}Потяните правый край, чтобы изменить длину · тащите мышкой на другое место, чтобы поменять порядок сцен"><div class="tl-l"><b>${i + 1}</b> · ${sec} с${done ? (draft ? ' · черновик ✓' : ' · готово ✓') : old ? ' · старая версия' : ''}${fr[i] ? ' · ✂ новый план' : ''}</div><i class="tl-x" data-scdel="${i}" title="Удалить эту сцену">✕</i><i class="tl-h"></i></div>`;
+      }).join('') + '<div class="tl-b tl-add" data-add="1" style="align-items:center;justify-content:center" title="Добавить фрагмент">+</div>';
       const dmb = $('.lm-q button[data-mq="draft"]', root);
       dmb.disabled = false;   // pressing it is how you find out you need a file - and how you get it
       dmb.classList.toggle('need', root._dmad === false);
@@ -7703,6 +7718,51 @@ function makeRefMode(cfg) {
     });
     tl.addEventListener('pointerup', () => { root._drag = null; });
     tl.addEventListener('pointercancel', () => { root._drag = null; });
+    /* The order of the scenes is the order of the film, and the hand wants to change it without
+       dragging whole cards around: chips of the ribbon carry their scene number, and dropping one
+       onto another moves the scene there. Everything keyed by the card itself - its text, photos,
+       songs, ready clips - travels with it. */
+    let tlDrag = -1;
+    const moveScene = (from, to) => {
+      const cards = $$('.sc', root), c = cards[from];
+      if (!c || from === to || to < 0 || to >= cards.length) return;
+      const box = $('.lm-scenes', root) || root, keep = cards[root._sel];
+      box.insertBefore(c, to > from ? (cards[to].nextSibling || null) : cards[to]);
+      root._sel = Math.max(0, $$('.sc', root).indexOf(keep));
+      renderTL(); showClip(); recount(); refreshStates();
+      const vw = root.closest('.view');
+      if (vw && vw._h3Renumber) { try { vw._h3Renumber(); } catch (e) { } }
+      if (root._save && !root._restoring) root._save();
+      toast('Сцена ' + (from + 1) + ' переставлена на место ' + (to + 1));
+    };
+    tl.addEventListener('dragstart', e => {
+      const b = e.target.closest('.tl-b');
+      if (!b || b.dataset.add || e.target.closest('.tl-h') || e.target.closest('.tl-x')) { e.preventDefault(); return; }
+      tlDrag = +b.dataset.i;
+      b.classList.add('dragging');
+      try { e.dataTransfer.setData('text/h3scene', String(tlDrag)); e.dataTransfer.effectAllowed = 'move'; } catch (err) { }
+    });
+    tl.addEventListener('dragend', () => {
+      tlDrag = -1; $$('.tl-b', tl).forEach(x => x.classList.remove('dragging', 'over'));
+    });
+    tl.addEventListener('dragover', e => {
+      const b = e.target.closest('.tl-b');
+      if (!b || b.dataset.add || tlDrag < 0) return;
+      e.preventDefault();
+      try { e.dataTransfer.dropEffect = 'move'; } catch (err) { }
+      $$('.tl-b', tl).forEach(x => x.classList.toggle('over', x === b));
+    });
+    tl.addEventListener('drop', e => {
+      const b = e.target.closest('.tl-b');
+      if (!b || b.dataset.add) return;
+      let from = tlDrag;
+      try { const v = +e.dataTransfer.getData('text/h3scene'); if (!isNaN(v) && v >= 0) from = v; } catch (err) { }
+      e.preventDefault(); e.stopPropagation();
+      $$('.tl-b', tl).forEach(x => x.classList.remove('dragging', 'over'));
+      tlDrag = -1;
+      if (from < 0) return;
+      moveScene(from, +b.dataset.i);
+    });
     tl.onclick = e => {
       if (e.target.closest('.tl-h')) return;
       const x = e.target.closest('[data-scdel]');
@@ -7710,7 +7770,10 @@ function makeRefMode(cfg) {
         e.stopPropagation();
         if ($$('.sc', root).length < 2) { toast('Оставлена одна сцена - из одной ролик не соберёшь'); return; }
         const c = $$('.sc', root)[+x.dataset.scdel]; if (!c) return;
-        $('.x', c)?.click(); renderTL(); showClip(); return;
+        // the card's own cross now only empties its text, so the ribbon removes the card itself
+        root._pushUndo?.(); c.remove(); recount(); renderTL(); showClip(); refreshStates();
+        if (root._save && !root._restoring) root._save();
+        return;
       }
       const b = e.target.closest('.tl-b'); if (!b) return;
       if (b.dataset.add) { $('#lmAdd', root).click(); return; }
