@@ -84,9 +84,13 @@
 .cmp-fs:hover{background:var(--accent)}
 #cmpFull{position:fixed;inset:0;z-index:80;background:rgba(0,0,0,.96);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:2vh 2vw}
 #cmpFull .cmp-in{height:88vh;width:auto;max-width:96vw;max-height:none;margin:0}
-.tl{display:grid;grid-template-columns:repeat(2,minmax(0,240px));gap:6px;align-items:stretch;margin:6px 0 8px;padding-bottom:2px}
-.tl-b{position:relative;box-sizing:border-box;height:34px;border-radius:9px;border:1.5px solid var(--line-2);background:var(--surface-2);padding:0 8px;cursor:pointer;display:flex;align-items:center;gap:8px;font-size:12px}
-.tl-l{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1}
+.tl{display:grid;grid-template-columns:repeat(2,minmax(0,200px));gap:6px;align-items:stretch;margin:6px 0 8px;padding-bottom:2px}
+.tl-b{position:relative;box-sizing:border-box;height:40px;overflow:hidden;border-radius:9px;border:1.5px solid var(--line-2);background:var(--surface-2);padding:0 8px;cursor:pointer;display:flex;align-items:center;gap:8px;font-size:12px}
+.tl-l{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;position:relative;z-index:1}
+.tl-fill{position:absolute;left:0;top:0;bottom:0;background:rgba(var(--accent-rgb),.22);pointer-events:none}
+.tl-fill::after{content:'';position:absolute;right:0;top:0;bottom:0;width:2px;background:rgb(var(--accent-rgb));opacity:.9}
+.tl-grip{flex:none;width:16px;align-self:stretch;display:grid;place-items:center;font-size:12px;color:var(--muted);cursor:grab;z-index:1}
+.tl-grip:hover{color:var(--accent)}
 .tl-x{flex:none;width:18px;height:18px;border-radius:5px;display:grid;place-items:center;font-size:10px;font-style:normal;color:var(--muted)}
 .tl-x:hover{background:#c0303f;color:#fff}
 .tl-b.sel{border-color:var(--accent);box-shadow:0 0 0 2px rgba(var(--accent-rgb),.3)}
@@ -4250,28 +4254,44 @@ function audioTokens(c, bs, film) {
    always. The copy handed to the model gets the tags renumbered to the places the files took - the
    numbers on the screen stay the ones the person wrote. */
 function sceneAudioPlan(c, film, bs) {
+  /* Numbers written on the cards belong to the SCENE, not to the place it happens to stand in:
+     the person moved a scene and its text kept <Picture 30>, while the server waits for the decade
+     of the new place and leaves a foreign number exactly as written - the model then invents what
+     the missing picture should show, and a fox becomes a sack. Here every number of this scene's
+     own decade is moved onto the place the file really takes; a number with no file behind it in
+     THIS scene is taken out of the text and named in the report, because a tag with nothing behind
+     it is a lie to the model. */
   const ta = c.querySelector('textarea'), raw = ta ? ta.value : '';
+  const own = (c && c._baseFixed) || bs;      // the decade written on the cards of this scene
   const byTag = new Map();
   (film || []).forEach((f, j) => { if (f && j > 0) byTag.set(1 + j, f); });   // the background has its own road to the model
-  (c._auds || []).forEach((f, j) => { if (f) byTag.set(bs + j, f); });
+  (c._auds || []).forEach((f, j) => { if (f) byTag.set(own + j, f); });
   const seen = (raw.match(/<Audio\s*\d+/g) || []).map(s => +s.replace(/\D+/g, ''));
   const picked = [];
   seen.forEach(t => { if (byTag.has(t) && picked.indexOf(t) < 0 && picked.length < 3) picked.push(t); });
-  // a tag that is not sent must not stay in the text: the model would read a number with no file
-  // behind it, and that is worse than no tag at all. Dropped ones are reported, not hidden.
   const left = [];
-  const text = raw.replace(/<Audio\s*(\d+)>/g, (whole, t) => {
+  let text = raw.replace(/<Audio\s*(\d+)>/g, (whole, t) => {
     const k = picked.indexOf(+t);
     if (k >= 0) return '<Audio ' + (bs + k) + '>';
     if (byTag.has(+t)) { left.push(+t); return ''; }   // the fourth and further: the quota is three, the tag goes
     return whole;                              // a number of another scene or one typed by hand stays
   });
+  const slots = (c && c._files) || [];
+  const lostP = [];
+  text = text.replace(/<Picture\s*(\d+)>/g, (whole, t) => {
+    t = +t;
+    if (t < 10) return whole;                  // the common references count by their own places
+    const j = t - own;
+    if (j >= 0 && j < 9 && slots[j]) return '<Picture ' + (bs + j) + '>';
+    lostP.push(t); return '';                  // no such photo in this scene: the model must not guess one
+  });
   const dropped = left.filter((v, i) => left.indexOf(v) === i);
-  if (!picked.length) return { files: (c._auds || []).slice(0, 3), text: raw, rewritten: false, dropped: [] };
-  const out = text.replace(/ {2,}/g, ' ').replace(/\s+([,.;!?])/g, '$1').trim();
-  return { files: picked.map(t => byTag.get(t)), text: out, rewritten: out !== raw.trim(), dropped: dropped };
+  const lostPics = lostP.filter((v, i) => lostP.indexOf(v) === i);
+  const tidy = s => s.replace(/ {2,}/g, ' ').replace(/\s+([,.;!?])/g, '$1').trim();
+  const out = tidy(text);
+  if (!picked.length) return { files: (c._auds || []).slice(0, 3), text: out, rewritten: out !== raw.trim(), dropped: [], lostPics: lostPics };
+  return { files: picked.map(t => byTag.get(t)), text: out, rewritten: out !== raw.trim(), dropped: dropped, lostPics: lostPics };
 }
-
 
 class AudioTrimmer {
   constructor(o = {}) {
@@ -6892,8 +6912,8 @@ function makeRefMode(cfg) {
     card.innerHTML = `<div class="card-h"><h3><span class="n">4</span>Сцены</h3><span class="counter lm-total"></span></div>
       <div class="tl-player"><video class="tl-vid" controls playsinline loop hidden></video><div class="hint tl-empty">Здесь покажется готовая сцена. Выберите фрагмент на ленте ниже и нажмите «Сделать эту сцену».</div></div>
       <div style="display:flex;gap:8px;margin-bottom:6px;flex-wrap:wrap"><button class="btn pri tl-all" type="button" title="Готовые сцены подряд, как один ролик: первая, вторая, третья...">▶ Смотреть готовые сцены подряд</button><button class="btn pri tl-join" type="button" title="Все готовые сцены по порядку отправляются в «Монтаж»: там остаётся нажать «Склеить», и весь ролик одним файлом появится в Библиотеке, откуда его можно сохранить">⇩ Собрать весь ролик и сохранить</button><span class="hint tl-note" style="align-self:center"></span></div>
-      <div class="tl" title="Фрагменты ролика по порядку. Нажмите на фрагмент, чтобы настроить его. Потяните его правый край, чтобы изменить длину. Перетащите фрагмент на другое место, чтобы поменять порядок сцен"></div>
-      <div class="hint" style="margin:-6px 0 10px;font-size:12px">Нажмите на фрагмент, чтобы открыть его. Потяните правый край фрагмента, чтобы сделать его короче или длиннее. Перетащите фрагмент мышкой на другое место, чтобы поменять порядок сцен; крестик на фрагменте убирает сцену целиком.</div>
+      <div class="tl" title="Фрагменты ролика по порядку. Тяните внутри фрагмента, чтобы задать его длину. Ручкой слева переставляйте сцены"></div>
+      <div class="hint" style="margin:-6px 0 10px;font-size:12px">Нажмите на фрагмент, чтобы открыть его. Тяните внутри фрагмента - задаёте время сцены, за правый край - тоже, но с шагом. Ручка слева переставляет сцены местами, крестик убирает сцену целиком.</div>
       <div class="lm-scenes"></div>
       <div class="seg lm-q" style="grid-template-columns:minmax(0,1fr) minmax(0,1fr);margin:10px 0 6px"><button type="button" data-mq="draft">Черновик<small>4 шага, быстро: посмотреть, что получится</small></button><button type="button" data-mq="final">Хорошее качество<small>8 шагов: итоговые сцены</small></button></div>
       <div class="hint lm-q-hint" style="margin-bottom:10px"></div>
@@ -7130,10 +7150,11 @@ function makeRefMode(cfg) {
       const keep = $$('.sc', root).map(c => ({
         files: (c._files || []).slice(), auds: (c._auds || []).slice(), src: (c._audSrc || []).slice(),
         sel: (c._audSel || []).slice(), dur: (c._audDur || []).slice(), fresh: !!$('.sc-fresh', c)?.checked,
+        base: c._baseFixed || 0,
       }));
       $$('.sc', root).forEach(c => c.remove());
       list.slice(0, 20).forEach((x, i) => addScene(x.prompt, Math.min(15, Math.max(3, Math.round(x.sec) || 10)),
-        x.fresh === undefined ? !!(keep[i] && keep[i].fresh) : !!x.fresh));
+        x.fresh === undefined ? !!(keep[i] && keep[i].fresh) : !!x.fresh, (keep[i] && keep[i].base) || 0));
       let back = 0;
       $$('.sc', root).forEach((c, i) => {
         const k = keep[i]; if (!k) return;
@@ -7315,7 +7336,7 @@ function makeRefMode(cfg) {
         const run = root._run, slotA = $('.rm-auds .slot', root);
         const proj = { run, t: Date.now(), sec: cfg.mode, mode: root._mode, qm: root._q, qBy: { ...(root._qBy || {}), [root._q]: S.q }, snd: root._snd, loop: root._loop !== false, start: $('.lm-start', root).value, vocals: $('.lm-vocals', root).checked,
           aspect: S.aspect, q: S.q, cw: S.cw || 0, ch: S.ch || 0, src: root._src ? { id: root._src.id || '', name: root._src.name } : null,
-          scenes: $$('.sc', root).map(c => ({ prompt: $('textarea', c).value, sec: +$('input[type=range]', c).value, fresh: !!$('.sc-fresh', c)?.checked, nimg: 9, var: c._var || 0,
+          scenes: $$('.sc', root).map(c => ({ prompt: $('textarea', c).value, sec: +$('input[type=range]', c).value, fresh: !!$('.sc-fresh', c)?.checked, nimg: 9, var: c._var || 0, base: c._baseFixed || 0,
             done: c._dn.final ? { sig: c._dn.final.sig, url: c._dn.final.url, id: c._dn.final.id, text: c._dn.final.text } : null,
             draftDone: c._dn.draft ? { sig: c._dn.draft.sig, url: c._dn.draft.url, id: c._dn.draft.id, text: c._dn.draft.text } : null })) };
         const all = loadAll(); all[run] = proj;
@@ -7360,7 +7381,7 @@ function makeRefMode(cfg) {
       const aud = await getRef('aud0'); if (aud instanceof File) await putInto($('input', slotA), aud);
       root._loop = p.loop !== false; setSnd(p.snd || 'none'); $('.lm-start', root).value = p.start || '0'; $('.lm-vocals', root).checked = !!p.vocals;
       $$('.sc', root).forEach(c => c.remove());
-      for (const x of p.scenes) addScene(x.prompt, x.sec, !!x.fresh);
+      for (const x of p.scenes) addScene(x.prompt, x.sec, !!x.fresh, x.base || 0);
       $$('.sc', root).forEach((c, i) => { c._var = (p.scenes[i] || {}).var || 0; });
       root._sel = 0;
       const cards = $$('.sc', root);
@@ -7420,7 +7441,19 @@ function makeRefMode(cfg) {
     rst.title = 'Забыть сделанные сцены. Нужно, если меняете изображения героя, размер или звук: следующие сцены не должны продолжать старые.';
     rst.onclick = () => { root._run = Math.random().toString(36).slice(2, 12); $$('.sc', root).forEach(c => { c._dn = { draft: null, final: null }; }); refreshStates(); toast('Начинаем сначала'); };
     $('#lmAdd', root).after(rst);
-    const addScene = (txt = '', sec = 10, fresh = false) => {
+    /* A scene's decade is given once and never taken back: numbers in the texts stay true after
+       the person adds, removes or moves scenes, and the send step translates them into positions. */
+    const guessBase = txt => {
+      const t = {};
+      ((txt || '').match(/<Picture\s*(\d+)>|<Audio\s*(\d+)>/g) || []).forEach(s => {
+        const v = +s.replace(/\D+/g, ''); if (v >= 10) { const b = Math.floor(v / 10) * 10; t[b] = (t[b] || 0) + 1; }
+      });
+      let best = 0, k = 0;
+      Object.keys(t).forEach(x => { if (t[x] > best) { best = t[x]; k = +x; } });
+      return k;
+    };
+    const nextBase = () => { let b = 10; $$('.sc', root).forEach(x => { const v = +x._baseFixed || 0; if (v >= b) b = v + 10; }); return b; };
+    const addScene = (txt = '', sec = 10, fresh = false, base = 0) => {
       const c = document.createElement('div'); c.className = 'sc'; c._dn = { draft: null, final: null };
       Object.defineProperty(c, '_done', { get: () => c._dn[root._q || 'final'], set: v => { c._dn[root._q || 'final'] = v; }, configurable: true });
       c.style.cssText = 'margin:0 0 10px;padding:12px;border:1px solid var(--line);border-radius:12px';
@@ -7457,7 +7490,8 @@ function makeRefMode(cfg) {
       $('.sc-tests', c).onclick = e => { const b = e.target.closest('.sc-tt'); const t = b && c._tests[+b.dataset.j]; if (!t) return; root._sel = $$('.sc', root).indexOf(c); const v = $('.tl-vid', root); v.src = t.url; v.hidden = false; $('.tl-empty', root).hidden = true; v.play().catch(() => {}); };
       $('.sc-tbtn', c).onclick = () => { root._test = { q: $('.sc-tq', c).value }; root._chainPart = null; root._target = $$('.sc', root).indexOf(c); $('.go', $('.rm-preview', root)).click(); };
       c._files = new Array(9).fill(null);   // nine places of their own, an empty one keeps its number
-      const ownBase = () => { const all = $$('.sc', root); const ix = all.indexOf(c); return 10 * ((ix < 0 ? all.length : ix) + 1); };
+      c._baseFixed = +base > 0 ? +base : (guessBase(txt) || nextBase());
+      const ownBase = () => c._baseFixed || (c._baseFixed = nextBase());   // the scene's own decade, not its place
       const paintRefs = c._paint = () => {
         const bsHere = ownBase();   // номер места: в первой сцене 10-е, во второй 20-е; подпись плитки обязана
                                     // показывать ровно то число, которое вставляется в текст, а не вечную десятку
@@ -7688,7 +7722,9 @@ function makeRefMode(cfg) {
       all.forEach((c, j) => c.classList.toggle('sel', j === root._sel));
       tl.innerHTML = all.map((c, i) => {
         const sec = +$('input[type=range]', c).value, done = sigOk(c), draft = root._q === 'draft', old = !done && !!(c._old || {})[root._q];
-        return `<div class="tl-b${i === root._sel ? ' sel' : ''}${done ? (draft ? ' draft' : ' done') : old ? ' stale' : ''}${fr[i] ? ' cut' : ''}" data-i="${i}" draggable="true" title="${fr[i] ? 'Новый план (смена кадра). ' : ''}Потяните правый край, чтобы изменить длину · тащите мышкой на другое место, чтобы поменять порядок сцен"><div class="tl-l"><b>${i + 1}</b> · ${sec} с${done ? (draft ? ' · черновик ✓' : ' · готово ✓') : old ? ' · старая версия' : ''}${fr[i] ? ' · ✂ новый план' : ''}</div><i class="tl-x" data-scdel="${i}" title="Удалить эту сцену">✕</i><i class="tl-h"></i></div>`;
+        // the filled part of the chip is the scene's length: 3 s at the left edge, 15 s at the right
+      const pct = Math.round((sec - 3) / 12 * 100);
+      return `<div class="tl-b${i === root._sel ? ' sel' : ''}${done ? (draft ? ' draft' : ' done') : old ? ' stale' : ''}${fr[i] ? ' cut' : ''}" data-i="${i}" title="${fr[i] ? 'Новый план (смена кадра). ' : ''}Тяните внутри фрагмента - время сцены · за правый край - точно · ручкой слева - порядок"><i class="tl-grip" draggable="true" data-grip="${i}" title="Тащите, чтобы переставить сцену">⠿</i><i class="tl-fill" style="width:${pct}%"></i><div class="tl-l"><b>${i + 1}</b> · ${sec} с${done ? (draft ? ' · черновик ✓' : ' · готово ✓') : old ? ' · старая версия' : ''}${fr[i] ? ' · ✂ новый план' : ''}</div><i class="tl-x" data-scdel="${i}" title="Убрать эту сцену">✕</i><i class="tl-h" title="Тяните: длина сцены"></i></div>`;
       }).join('') + '<div class="tl-b tl-add" data-add="1" style="align-items:center;justify-content:center" title="Добавить фрагмент">+</div>';
       const dmb = $('.lm-q button[data-mq="draft"]', root);
       dmb.disabled = false;   // pressing it is how you find out you need a file - and how you get it
@@ -7711,13 +7747,36 @@ function makeRefMode(cfg) {
       const i = +h.closest('.tl-b').dataset.i, sl = $('input[type=range]', $$('.sc', root)[i]);
       root._drag = { i, x0: e.clientX, sec0: +sl.value, sl }; tl.setPointerCapture(e.pointerId);
     });
+    tl.addEventListener('pointerdown', e => {
+      // a press on the body of a chip is a hand on the scene's time: the filled part follows the finger
+      const b = e.target.closest('.tl-b');
+      if (!b || b.dataset.add || e.target.closest('.tl-h') || e.target.closest('.tl-x') || e.target.closest('[data-grip]')) return;
+      const c = $$('.sc', root)[+b.dataset.i]; if (!c) return;
+      const sl = $('input[type=range]', c); if (!sl) return;
+      e.preventDefault();
+      root._dragSec = { i: +b.dataset.i, sl: sl, x0: e.clientX, moved: 0 };
+      try { tl.setPointerCapture(e.pointerId); } catch (err) { }
+    });
+    const secAt = (b, clientX) => {
+      const r = b.getBoundingClientRect();
+      const p = r.width ? Math.min(1, Math.max(0, (clientX - r.left) / r.width)) : 0;
+      return Math.max(3, Math.min(15, Math.round(3 + p * 12)));
+    };
     tl.addEventListener('pointermove', e => {
+      const s = root._dragSec;
+      if (s) {
+        s.moved += Math.abs(e.clientX - s.x0); s.x0 = e.clientX;
+        const b = $$('.tl-b', tl)[s.i]; if (!b) return;
+        const sec = secAt(b, e.clientX);
+        if (+s.sl.value !== sec) { s.sl.value = sec; s.sl.dispatchEvent(new Event('input')); }
+        return;
+      }
       const d = root._drag; if (!d) return;
       const sec = Math.max(3, Math.min(15, Math.round(d.sec0 + (e.clientX - d.x0) / TL_PPS)));
       if (+d.sl.value !== sec) { d.sl.value = sec; d.sl.dispatchEvent(new Event('input')); }
     });
-    tl.addEventListener('pointerup', () => { root._drag = null; });
-    tl.addEventListener('pointercancel', () => { root._drag = null; });
+    tl.addEventListener('pointerup', () => { root._drag = null; root._dragSec = null; });
+    tl.addEventListener('pointercancel', () => { root._drag = null; root._dragSec = null; });
     /* The order of the scenes is the order of the film, and the hand wants to change it without
        dragging whole cards around: chips of the ribbon carry their scene number, and dropping one
        onto another moves the scene there. Everything keyed by the card itself - its text, photos,
@@ -7730,14 +7789,15 @@ function makeRefMode(cfg) {
       box.insertBefore(c, to > from ? (cards[to].nextSibling || null) : cards[to]);
       root._sel = Math.max(0, $$('.sc', root).indexOf(keep));
       renderTL(); showClip(); recount(); refreshStates();
-      const vw = root.closest('.view');
-      if (vw && vw._h3Renumber) { try { vw._h3Renumber(); } catch (e) { } }
+      // the decades travel with the scenes, so nothing in the texts has to be rewritten here
       if (root._save && !root._restoring) root._save();
       toast('Сцена ' + (from + 1) + ' переставлена на место ' + (to + 1));
     };
     tl.addEventListener('dragstart', e => {
-      const b = e.target.closest('.tl-b');
-      if (!b || b.dataset.add || e.target.closest('.tl-h') || e.target.closest('.tl-x')) { e.preventDefault(); return; }
+      const g = e.target.closest('[data-grip]');
+      if (!g) { e.preventDefault(); return; }   // the body of a chip belongs to the time, not to the move
+      const b = g.closest('.tl-b');
+      if (!b || b.dataset.add) { e.preventDefault(); return; }
       tlDrag = +b.dataset.i;
       b.classList.add('dragging');
       try { e.dataTransfer.setData('text/h3scene', String(tlDrag)); e.dataTransfer.effectAllowed = 'move'; } catch (err) { }
@@ -8129,13 +8189,13 @@ function makeRefMode(cfg) {
       root._undo = [];
       const refsFiles = () => $$('.ref', imgsEl).map(r => r._file || null);
       root._pushUndo = () => {
-        root._undo.push({ run: root._run, sel: root._sel, refs: refsFiles(), scenes: $$('.sc', root).map(c => ({ prompt: $('textarea', c).value, sec: +$('input[type=range]', c).value, fresh: !!$('.sc-fresh', c)?.checked, files: [...c._files], dn: { ...c._dn }, old: c._old, tests: [...c._tests], var: c._var || 0 })) });
+        root._undo.push({ run: root._run, sel: root._sel, refs: refsFiles(), scenes: $$('.sc', root).map(c => ({ prompt: $('textarea', c).value, sec: +$('input[type=range]', c).value, fresh: !!$('.sc-fresh', c)?.checked, base: c._baseFixed || 0, files: [...c._files], dn: { ...c._dn }, old: c._old, tests: [...c._tests], var: c._var || 0 })) });
         if (root._undo.length > 10) root._undo.shift();
       };
       root._doUndo = async () => {
         const u = root._undo.pop(); if (!u) return;
         $$('.sc', root).forEach(c => c.remove()); root._run = u.run;
-        u.scenes.forEach(x => { addScene(x.prompt, x.sec, x.fresh); const c = $$('.sc', root).pop(); c._files = x.files; c._paint(); c._dn = x.dn; c._old = x.old; c._tests = x.tests; c._paintTests(); c._var = x.var; });
+        u.scenes.forEach(x => { addScene(x.prompt, x.sec, x.fresh, x.base || 0); const c = $$('.sc', root).pop(); c._files = x.files; c._paint(); c._dn = x.dn; c._old = x.old; c._tests = x.tests; c._paintTests(); c._var = x.var; });
         const names = a => JSON.stringify(a.map(f => f && f.name));
         if (names(refsFiles()) !== names(u.refs)) { $$('.ref .x', imgsEl).forEach(x => x.click()); for (let i = 0; i < u.refs.length; i++) if (u.refs[i]) await putInto($$('.ref input', imgsEl)[i], u.refs[i]); }
         root._sel = u.sel; recount(); refreshStates(); toast('Действие отменено');
@@ -8192,7 +8252,7 @@ function makeRefMode(cfg) {
         if (f0) items.push({ file: f0, name: f0.name, where: 'фон всего ролика, тег <Audio 1>' });
         const ff = root._fauds || [];
         ff.forEach((f, j) => { if (f && j > 0) items.push({ file: f, name: f.name, where: 'образец ролика, тег <Audio ' + (1 + j) + '>' }); });
-        $$('.sc', root).forEach((cc, i) => (cc._auds || []).forEach((f, j) => { if (f) items.push({ file: f, name: f.name, where: 'сцена ' + (i + 1) + ', тег <Audio ' + (10 * (i + 1) + j) + '>' }); }));
+        $$('.sc', root).forEach((cc, i) => (cc._auds || []).forEach((f, j) => { if (f) items.push({ file: f, name: f.name, where: 'сцена ' + (i + 1) + ', тег <Audio ' + ((cc._baseFixed || cc._base || 10 * (i + 1)) + j) + '>' }); }));
         if (!items.length) { toast('Готового аудио нет: сначала загрузите файл'); return; }
         if (!AG.status || !AG.status.speech_ready) { try { await agStatus(); } catch (e) {} }
         agGo();
@@ -8406,11 +8466,20 @@ function makeRefMode(cfg) {
           }
         }
         if (cfg.scenes && root._mode !== 'parts') { fd.append('run', root._run); if (root._q === 'draft') fd.append('draft', '1'); }
-        if (cfg.scenes) { fd.append('scenes', JSON.stringify(sceneList())); $$('.sc', root).forEach((c, i) => c._files.forEach((f, j) => { if (f) fd.append(`simg${i}_${j}`, f); }));
-          $$('.sc', root).forEach((c, i) => {
-            const plan = sceneAudioPlan(c, root._fauds || [], c._base || 10 * (i + 1));
+        if (cfg.scenes) {
+          /* The server numbers a scene's media by the decade of its PLACE, so what leaves the app is
+             not what stands on the card: the cards keep the scene's own numbers, the text gets the
+             numbers of the places. The person sees his numbers, the model gets the right files. */
+          const sCards = $$('.sc', root);
+          const sPlans = sCards.map((c, i) => sceneAudioPlan(c, root._fauds || [], 10 * (i + 1)));
+          fd.append('scenes', JSON.stringify(sceneList().map((x, i) => Object.assign({}, x, { prompt: (sPlans[i] || {}).text || x.prompt }))));
+          sCards.forEach((c, i) => c._files.forEach((f, j) => { if (f) fd.append(`simg${i}_${j}`, f); }));
+          sCards.forEach((c, i) => {
+            const plan = sPlans[i];
             plan.files.forEach((f, j) => { if (f) fd.append(`saudio${i}_${j}`, f); });
             if (plan.rewritten && root._sentText) root._sentText[i] = plan.text;   // the model gets the numbers of the places
+            if (plan.lostPics && plan.lostPics.length) toast('Сцена ' + (i + 1) + ': под тегами ' + plan.lostPics.map(t => '<Picture ' + t + '>').join(', ')
+              + ' в этой сцене нет фото - они убраны из текста, чтобы модель не рисовала наугад');
             if (plan.dropped && plan.dropped.length) toast('Сцена ' + (i + 1) + ': модель слушает три аудио, поэтому ' + plan.dropped.map(t => '<Audio ' + t + '>').join(', ') + ' в этот раз не пойдёт - уберите лишний тег или замените его');
           }); fd.append('start', $('.lm-start', root).value || '0'); if (root._loop !== false) fd.append('music_loop', '1'); if (root._adur) fd.append('audio_dur', String(Math.round(root._adur * 1000) / 1000)); fd.append('vocals', root._snd === 'own' && $('.lm-vocals', root).checked ? '1' : '0'); if (cfg.mode === 'actionsc') loraForm(S, fd); }
         else loraForm(S, fd);
@@ -8568,7 +8637,7 @@ function makeRefMode(cfg) {
     const want = [];
     // the number of a tag is the place the picture stands in, not its rank among the filled ones
     $$('label.ref', imgsEl).forEach((r, j) => { if (r._file) want.push({ f: r._file, note: 'общий референс, тег <Picture ' + (j + 1) + '>' }); });
-    $$('.sc', root).forEach((cc, i) => (cc._files || []).forEach((f, j) => { if (f) want.push({ f, note: 'сцена ' + (i + 1) + ', своё фото, тег <Picture ' + (10 * (i + 1) + j) + '>' }); }));
+    $$('.sc', root).forEach((cc, i) => (cc._files || []).forEach((f, j) => { if (f) want.push({ f, note: 'сцена ' + (i + 1) + ', своё фото, тег <Picture ' + ((cc._baseFixed || cc._base || 10 * (i + 1)) + j) + '>' }); }));
     // in «Замена» the video stands in the same row as the pictures and has no heading of its own, so
     // this button takes it too; elsewhere the video has its own button and must not be doubled
     if (cfg.videos && cfg.swap) $$('.slot', vidsEl).forEach((s, j) => { const f = s._src || s._file; if (f) want.push({ f, vid: true, note: 'видео, в котором меняем, тег <Video ' + (j + 1) + '>' }); });
