@@ -5070,7 +5070,7 @@ async function agCarry(mode) {
   if (typeof window._agSync === 'function') { try { window._agSync(); } catch (e) { } }
   // the text button is not a file: the draft goes into the field below, not into the tray
   const btns = Array.prototype.slice.call(root.querySelectorAll('.agall-h'))
-    .filter(b => !/Промпт в агента|Все промты/.test(b.textContent) && !b.disabled);
+    .filter(b => !/Промпт в агента|Все промты|Генерация/.test(b.textContent) && !b.disabled);
   if (!btns.length) return 0;
   let made = 0;
   window.__agQuiet = 1;   // these buttons would otherwise walk the person to the chat
@@ -5095,9 +5095,11 @@ async function agGenerate(btn, gen) {
     const t = $('#agTarget [data-t="' + mode + '"]') || $('#agTarget2 [data-t="' + mode + '"]');
     if (t && !t.classList.contains('on')) t.click();   // the Agent writes for this mode
     AG.draft = { to: mode, at: Date.now() };           // and the answer has to come back to this field
-    if (chat) chat.value = 'Черновик промпта из раздела ' + name + '. Сделай из него готовый промпт этого режима: '
-      + 'сохрани все теги (<Picture N>, <Video N>, <Audio N>) и их номера, не добавляй того, чего в черновике нет, '
-      + 'и верни ВЕСЬ промпт одним блоком.\n\n' + draft;
+    if (chat) chat.value = (gen.scenes
+      // a scene sheet is one document: the answer has to come back with the same headings, or the
+      // texts would not know which card they belong to
+      ? 'Сцены из раздела ' + name + '. Перепиши каждую сцену как готовый промпт этого режима. Верни ровно те же заголовки SCENE N с той же длительностью, не объединяй и не теряй сцены, сохрани все теги (<Picture N>, <Video N>, <Audio N>) и их номера, от себя ничего не добавляй.\n\n'
+      : 'Черновик промпта из раздела ' + name + '. Сделай из него готовый промпт этого режима: сохрани все теги (<Picture N>, <Video N>, <Audio N>) и их номера, не добавляй того, чего в черновике нет, и верни ВЕСЬ промпт одним блоком.\n\n') + draft;
     await agSend();
     const last = AG.msgs[AG.msgs.length - 1];
     if (!last || last.role !== 'assistant' || last.error) {
@@ -5111,8 +5113,8 @@ async function agGenerate(btn, gen) {
     if (!blk) { toast('В ответе Агента нет оформленного промпта: посмотрите чат'); return; }
     AG.draft = { to: mode, at: Date.now() };
     await sendPrompt(blk, mode);   // the round trip: text back into this field, files left alone
-    toast('Промпт готов и заменил текст в разделе' + (carried ? ' · в чат перенесено файлов: ' + carried : '')
-      + ' · черновик и ответ остались в истории «Агента»');
+    toast((gen.scenes ? 'Тексты сцен переписаны и встали в свои карточки' : 'Промпт готов и заменил текст в разделе')
+      + (carried ? ' · в чат перенесено файлов: ' + carried : '') + ' · черновик и ответ остались в истории «Агента»');
   } catch (e) {
     toast('Не вышло: ' + (e && e.message ? e.message : e));
   } finally {
@@ -7118,11 +7120,31 @@ function makeRefMode(cfg) {
       } catch (err) { toast(err.message); }
     };
     root._setScenes = list => {   // from the agent: replace all scenes
-      if (!list.length) return;
+      if (!list.length) return 0;
+      /* The person's own photos and songs hang on the scene cards. Rebuilding the list without
+         saving them threw everything away: a draft sent to the Agent came back without a single
+         picture, and the numbers in the text pointed at nothing. Cards are matched by their place,
+         so the usual round trip - the same scenes with better texts - keeps every shelf filled. */
+      const keep = $$('.sc', root).map(c => ({
+        files: (c._files || []).slice(), auds: (c._auds || []).slice(), src: (c._audSrc || []).slice(),
+        sel: (c._audSel || []).slice(), dur: (c._audDur || []).slice(), fresh: !!$('.sc-fresh', c)?.checked,
+      }));
       $$('.sc', root).forEach(c => c.remove());
-      list.slice(0, 20).forEach(x => addScene(x.prompt, Math.min(15, Math.max(3, Math.round(x.sec) || 10)), !!x.fresh));
+      list.slice(0, 20).forEach((x, i) => addScene(x.prompt, Math.min(15, Math.max(3, Math.round(x.sec) || 10)),
+        x.fresh === undefined ? !!(keep[i] && keep[i].fresh) : !!x.fresh));
+      let back = 0;
+      $$('.sc', root).forEach((c, i) => {
+        const k = keep[i]; if (!k) return;
+        if ((k.files || []).some(Boolean)) { c._files = k.files.slice(0, 9); c._paint?.(); back++; }
+        if ((k.auds || []).some(Boolean)) {
+          c._auds = k.auds.slice(); c._audSrc = (k.src || []).slice(); c._audSel = (k.sel || []).slice();
+          if (c._audDur) c._audDur = (k.dur || []).slice();
+          c._paintAuds?.(); back++;
+        }
+      });
       root._sel = 0;
       root._run = Math.random().toString(36).slice(2, 12); recount(); refreshStates();
+      return back;
     };
     /* Клип мог вернуться уже после того, как страница пересобралась: номер прогона живой, а карточки
      новые. Раньше такой результат молча выбрасывался - человек видел ролик в предпросмотре, полоса
@@ -7435,14 +7457,16 @@ function makeRefMode(cfg) {
       c._files = new Array(9).fill(null);   // nine places of their own, an empty one keeps its number
       const ownBase = () => { const all = $$('.sc', root); const ix = all.indexOf(c); return 10 * ((ix < 0 ? all.length : ix) + 1); };
       const paintRefs = c._paint = () => {
+        const bsHere = ownBase();   // номер места: в первой сцене 10-е, во второй 20-е; подпись плитки обязана
+                                    // показывать ровно то число, которое вставляется в текст, а не вечную десятку
         (c._ownTiles || []).forEach((lb, j) => {
           const f = c._files[j], im0 = $('img', lb), plus = $('.plus', lb), tag = $('.tag', lb);
           im0?.remove();
           lb.classList.toggle('filled', !!f);
           if (f) {
-            const im = document.createElement('img'); im.src = URL.createObjectURL(f); im.title = `<Picture ${10 + j}>`;
+            const im = document.createElement('img'); im.src = URL.createObjectURL(f); im.title = `<Picture ${bsHere + j}>`;
             im.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:7px;display:block';
-            lb.prepend(im); plus.hidden = true; tag.hidden = false; tag.textContent = `Pic ${10 + j}`;
+            lb.prepend(im); plus.hidden = true; tag.hidden = false; tag.textContent = `Pic ${bsHere + j}`;
             tag.style.cssText = 'position:absolute;left:4px;bottom:4px;font-size:9.5px;padding:1px 4px;border-radius:6px;background:rgba(0,0,0,.68);color:#fff';
             lb.style.borderStyle = 'solid'; $('.x', lb).style.display = '';
           } else { plus.hidden = false; tag.hidden = true; lb.style.borderStyle = 'dashed'; $('.x', lb).style.display = 'none'; }
@@ -8563,7 +8587,17 @@ function makeRefMode(cfg) {
       const go = document.createElement('button');
       go.type = 'button'; go.className = 'btn mini agall-h';
       // the draft leaves the mode whole, tags and all, and the finished text is expected back here
-      go.textContent = cfg.scenes ? '🤖 Все промты в агента' : '🤖 Промпт в агента';
+      if (cfg.scenes) {
+    // the same one-click round trip the single field has, but for the whole sheet at once
+    const gg = document.createElement('button');
+    gg.className = 'btn mini agall-h';
+    gg.textContent = '🤖 Генерация агентом сцен';
+    gg.title = 'Отправить все сцены Агенту одним сообщением: он перепишет их, и каждая вернётся в свою карточку. Фото и песни сцен остаются на местах.';
+    gg.onclick = () => agGenerate(gg, { mode: cfg.mode, scenes: true, text: () => agScenesText(root) });
+    pcard.querySelector('.card-h').append(gg);
+    gg._agCount = () => $$('.sc', root).filter(c => ($('textarea', c) || {}).value.trim()).length;
+  }
+  go.textContent = cfg.scenes ? '🤖 Все промты в агента' : '🤖 Промпт в агента';
       go.title = cfg.scenes
         ? 'Перенести тексты всех сцен по порядку в чат Агента и включить «Промт для: ' + cfg.title + '»; ответ вернётся в те же сцены'
         : 'Перенести текст раздела в чат Агента целиком, с тегами, и включить «Промт для: ' + cfg.title + '»; ответ вернётся в это же поле';
@@ -8852,9 +8886,15 @@ function renderAtt() {
   // in the order the videos appeared, so a frame's tag is its video's number, not the frame's own
   const vnames = [];
   AG.att.forEach(a => { if (a.frame && !vnames.includes(a.vname)) vnames.push(a.vname); });
+  /* A photo whose text says <Picture 30> used to be labelled «Picture 4» here - its place in the
+     tray - and the person saw his own picture renamed under his hands. The tile carries the tag
+     the text really uses; the note of the section says which one that is. */
+  const ownTag = a => { const m = /<\s*(Picture|Video|Audio)\s*(\d+)\s*>/i.exec((a && a.note) || ''); return m ? m[1] + ' ' + m[2] : ''; };
+  // the number a picture answers to: the section wrote it into the text, the tray must not invent its own
+  const lab = AG.att.map(a => { if (a.frame) return ''; const own = ownTag(a); if (own) return own; k++; return 'Picture ' + (base + k); });
   $('#agAtt').innerHTML = AG.att.map((a, i) => a.frame
-    ? `<div data-tag="&lt;Video ${vnames.indexOf(a.vname) + 1}&gt;" title="Кадр из видео «${esc(a.vname)}» · нажмите, чтобы вставить тег"><img src="${a.url}"><b style="background:#3a5a8c">🎞 ${esc(a.label)}</b><button data-i="${i}">✕</button></div>`
-      : `<div data-tag="&lt;Picture ${base + (++k)}&gt;" title="${a.note ? esc(a.note) + ' · ' : ''}нажмите, чтобы вставить тег"><img src="${a.url}"><b>Picture ${base + k}</b><button data-i="${i}">✕</button></div>`).join('');
+    ? `<div data-tag="&lt;${ownTag(a) || 'Video ' + (vnames.indexOf(a.vname) + 1)}&gt;" title="Кадр из видео «${esc(a.vname)}» · нажмите, чтобы вставить тег"><img src="${a.url}"><b style="background:#3a5a8c">🎞 ${esc(a.label)}</b><button data-i="${i}">✕</button></div>`
+      : `<div data-tag="&lt;${lab[i]}&gt;" title="${a.note ? esc(a.note) + ' · ' : ''}нажмите, чтобы вставить тег"><img src="${a.url}"><b>${lab[i]}</b><button data-i="${i}">✕</button></div>`).join('');
   { const fold = $('#agAttFold'); if (fold) { fold.hidden = !AG.att.length; if (!AG.att.length) fold.open = false;
       const nm = $('#agAttN'); if (nm) nm.textContent = AG.att.length === 1 ? 'Картинка или кадр' : ('Картинки и кадры: ' + AG.att.length); } }
   agVidBtn();   // the video button lives or sleeps with the tray
