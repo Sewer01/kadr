@@ -232,9 +232,9 @@
 .cw-sw{display:flex;gap:10px;align-items:center;padding:8px 12px;background:var(--bg-2);border:1px solid var(--line);border-radius:14px;cursor:pointer}
 .cw-sw b{font-weight:600;font-size:13px}
 .cw-bt{font-weight:800;font-size:12.5px;letter-spacing:.02em;margin-bottom:7px}
-.qw-slots{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.qw-slots{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;--qwh:130px}
 .qw-slots.one{grid-template-columns:1fr}
-.qw-slots .drop{height:130px}
+.qw-slots .drop{height:var(--qwh)}
 .qw-slots .drop .ph svg{width:24px;height:24px}
 .cw-media{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px}
 .cw-file{display:grid;gap:3px;justify-items:center;text-align:center;padding:8px;border:1.5px dashed var(--line-2);border-radius:14px;background:var(--bg-2);cursor:pointer;transition:.15s}
@@ -3572,6 +3572,8 @@ for (let i = 1; i <= MAX_REFS; i++) {
     r.classList.remove('filled'); $('.plus', r).hidden = false; $('.tag', r).hidden = true; refsChanged();
   };
 }
+// ряд референсов «Клипа» тоже можно растянуть, как кадры в «Видео»
+hGripAfter(refsEl, 'h3.refh.lipsync', { h: '--refh', w: 112 / 148, min: 110, max: 420 });
 function refsChanged() {
   // H3 numbers references without gaps, so tags follow the order of filled slots
   const slots = $$('.ref.filled', refsEl);
@@ -6259,6 +6261,7 @@ function makeRefMode(cfg) {
     };
   }
   wireSlotSwap($$('.ref', imgsEl), changed);
+  hGripAfter(imgsEl, 'h3.refh.' + cfg.mode, { h: '--refh', w: 112 / 148, min: 110, max: 420 });
   $('.rm-clr', root)?.addEventListener('click', () => clearSlots($$('.ref', imgsEl)));
 
   // video / audio slots
@@ -9795,22 +9798,51 @@ $('#skUp').onchange = async e => {
 };
 $('.nav[data-view="agent"]').addEventListener('click', () => { agStatus(); agCtx(); loadChats(); });
 
-/* a grip under the first/last frames: drag to change their height, double-click to reset (remembered) */
-(() => {
-  const bar = $('#frameResize'), root = document.documentElement, KEY = 'h3.fh';
-  try { const v = +localStorage.getItem(KEY); if (v >= 80) root.style.setProperty('--fh', v + 'px'); } catch {}
-  bar.addEventListener('pointerdown', e => { e.preventDefault(); bar.setPointerCapture(e.pointerId); bar.classList.add('drag'); });
+/* A grip under a row of pictures: drag it down to look at a face closely, double-click to put the row
+   back. It used to exist only under the frames of «Видео», although the same rows in the studios, in
+   the Clip and in the edit window are just as small. Every row keeps its own size: looking closely at
+   one section does not blow up the tiles of another. */
+function hGrip(bar, host, key, o) {
+  if (!bar || !host || host._hGrip) return;
+  host._hGrip = 1;
+  const min = o.min || 96, max = o.max || 460;
+  const set = h => {
+    host.style.setProperty(o.h, Math.round(h) + 'px');
+    if (o.w) host.style.setProperty(o.w, Math.round(h * (o.w || 1)) + 'px');   // the tile keeps its shape
+  };
+  try {
+    const v = +localStorage.getItem(key) || (o.old ? +localStorage.getItem(o.old) : 0);
+    if (v >= min && v <= max) set(v);
+  } catch (e) { }
+  bar.addEventListener('pointerdown', e => {
+    e.preventDefault();
+    try { bar.setPointerCapture(e.pointerId); } catch (e) { }
+    bar.classList.add('drag');
+  });
   bar.addEventListener('pointermove', e => {
     if (!bar.hasPointerCapture(e.pointerId)) return;
-    const top = $('#dFirst').getBoundingClientRect().top;
-    root.style.setProperty('--fh', Math.round(Math.min(Math.max(e.clientY - top, 80), 520)) + 'px');
+    set(Math.min(Math.max(e.clientY - host.getBoundingClientRect().top, min), max));
   });
   bar.addEventListener('pointerup', e => {
-    bar.releasePointerCapture(e.pointerId); bar.classList.remove('drag');
-    try { localStorage.setItem(KEY, parseInt(root.style.getPropertyValue('--fh'))); } catch {}
+    try { bar.releasePointerCapture(e.pointerId); } catch (e) { }
+    bar.classList.remove('drag');
+    try { localStorage.setItem(key, parseInt(host.style.getPropertyValue(o.h)) || 0); } catch (e) { }
   });
-  bar.addEventListener('dblclick', () => { root.style.removeProperty('--fh'); try { localStorage.removeItem(KEY); } catch {} });
-})();
+  bar.addEventListener('dblclick', () => {
+    host.style.removeProperty(o.h);
+    if (o.w) host.style.removeProperty(o.w);
+    try { localStorage.removeItem(key); } catch (e) { }
+  });
+}
+// the bar of «Видео» stands in the markup; the others are made by code, one per row
+hGrip($('#frameResize'), $('#view-video .frames'), 'h3.fh.video', { h: '--fh', min: 80, max: 520, old: 'h3.fh' });
+function hGripAfter(host, key, o) {
+  if (!host) return;
+  const bar = document.createElement('div');
+  bar.className = 'hresize';
+  host.after(bar);
+  hGrip(bar, host, key, o);
+}
 
 /* a divider before the right-hand column: drag to resize, double-click to reset (width is remembered) */
 (() => {
@@ -10911,6 +10943,7 @@ const imgSeedForm = (S, fd) => { if (S.seedFixed && S.seed) fd.append('seed', S.
   };
   szWire($('.qw-szwrap', root), S, () => upd(), () => IMG_SIZES[S.aspect] || [1376, 768]);
   wireDrop(drop2, () => {}); wireDrop(drop3, () => {}); wireDrop(drop4, () => {}); wireDrop(drop5, () => {});
+  hGripAfter($('.qw-slots', root), 'h3.qwh', { h: '--qwh', min: 110, max: 460 });
   /* The slots paint their own picture but never call the window's repaint, so the row of tags under
      the prompt stayed asleep: a photo arrived, the chip went on saying «no photo here». */
   $('.qw-slots', root).addEventListener('change', () => setTimeout(upd, 0), true);
@@ -10970,6 +11003,16 @@ const imgSeedForm = (S, fd) => { if (S.seedFixed && S.seed) fd.append('seed', S.
           .map((d, i) => `<button class="token" type="button"${d._file ? '' : ' disabled'} title="${d._file ? 'Вставить в текст: ' + lit(tagOf(i + 1)) : 'В это место ещё не загружено фото'}">${lit(tagOf(i + 1))}</button>`)
           .join('') + (S.kind === 'story' ? '<span class="hint">кадры считываются по порядку, без тега</span>' : '');
       }
+    }
+    /* Бирка «1/3» была написана прямо в разметке и никогда не переписывалась: в режиме листа место
+       одно, а она обещала три. */
+    {
+      const cap = S.kind === 'sheet' ? 1 : (h3 ? 5 : 3);
+      ['#qwDrop', '#qwDrop2', '#qwDrop3', '#qwDrop4', '#qwDrop5'].forEach((s, i) => {
+        const c = $('.cnt', $(s, root)); if (!c) return;
+        c.textContent = (i + 1) + '/' + cap;
+        c.hidden = cap === 1;
+      });
     }
     $('.qw-storyopts', root).hidden = S.kind !== 'story';
     $('.qw-lnrow', root).hidden = !S.frames;
