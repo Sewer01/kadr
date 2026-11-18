@@ -1161,6 +1161,16 @@ body.dropping::after{content:'Отпустите — программа разл
        weaker rule here would lose and leave the card open */
     :is(#view-action,#view-actionsc,#view-actor,#view-agent,#view-custom,#view-krea,#view-library,#view-lipsync,#view-long,#view-models,#view-montage,#view-presets,#view-queue,#view-qwen,#view-refs,#view-swap,#view-upfile,#view-video) .card.fold.collapsed>:not(.card-h){display:none!important}
 
+    /* thumbnails of the reference videos: they stand right under the heading of the card, and the
+       same grip as under the pictures makes them bigger; the size comes from the window's scale */
+     .vthumbs{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:2px}
+     .vthumbs[hidden]{display:none}
+     .vt2{position:relative;width:calc(160px * var(--tk,1));border:1px solid var(--line-2);border-radius:12px;overflow:hidden;background:#000;cursor:pointer}
+     .vt2:hover{border-color:var(--accent)}
+     .vt2 video{display:block;width:100%;aspect-ratio:16/9;object-fit:cover;background:#000}
+     .vt2 b{position:absolute;left:6px;top:6px;font-size:11px;font-weight:700;color:#fff;background:rgba(10,12,18,.82);border:1px solid var(--line);border-radius:6px;padding:1px 6px}
+     .vt2 small{display:block;padding:5px 7px;font-size:11.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;background:var(--surface-2)}
+
     /* reference audio in Референсы / Актёр / Экшн-видео: windows like in the studio, one height for
        everything in the row, and the loading button filled - the bare tiles only showed a file name */
     /* the audio block of these modes lives in its own card now: the tiles stay in the old place
@@ -6262,6 +6272,8 @@ function makeRefMode(cfg) {
   }
   wireSlotSwap($$('.ref', imgsEl), changed);
   hGripAfter(imgsEl, 'h3.refh.' + cfg.mode, { h: '--tk', base: 148, min: 110, max: 420, host: root });
+  const vtThumbs = $('.vthumbs', root);   // the video card is built above: its grip rides the same scale
+  if (vtThumbs) hGrip($('.hresize', vtThumbs.parentElement), vtThumbs, 'h3.refh.' + cfg.mode, { h: '--tk', base: 148, min: 110, max: 420, host: root });
   $('.rm-clr', root)?.addEventListener('click', () => clearSlots($$('.ref', imgsEl)));
 
   // video / audio slots
@@ -6471,12 +6483,14 @@ function makeRefMode(cfg) {
     vidsEl.parentElement.classList.add('ra-tiles');    // the old block: storage only
     const card = newEl('card');
     card.innerHTML = '<div class="card-h"><h3><span class="n">2</span>Референс-видео</h3></div>' +
+      '<div class="vthumbs" hidden></div><div class="hresize" hidden title="Потяните вниз или вверх, чтобы рассмотреть эскизы. Двойной клик — вернуть как было"></div>' +
       '<div class="hint" style="margin-bottom:9px">Видео-пример для модели: она берёт из него движение и кадр.' +
       ' <b>Не длиннее ' + LIMIT + ' секунд</b> - дальше модель просто не смотрит, поэтому лишнее лучше отрезать.' +
       ' Кнопка «Монтаж» открывает верстак: лента кадров, маркер, ножницы с двух сторон от него и приближение.</div>' +
       '<div class="ra-row"></div>';
     refCard.after(card);
     const row = $('.ra-row', card), host = newEl('ra-host'); host.hidden = true;
+    const thumbs = $('.vthumbs', card), tbar = $('.hresize', card);
     card.append(host);
     // the button stands on this card, not on the old caption row: the row is storage only and hidden
     {
@@ -6508,6 +6522,24 @@ function makeRefMode(cfg) {
     card.addEventListener('dragleave', () => { card.style.outline = ''; });
     card.addEventListener('drop', () => { card.style.outline = ''; });
     const MODE_NAME = { refs: 'Видеостудия', actor: 'Актёр', action: 'Экшн-видео', long: 'Киностудия', actionsc: 'Экшн-студия' }[cfg.mode] || cfg.mode;
+    let turls = [];
+    const paintThumbs = () => {
+      turls.forEach(u2 => { try { URL.revokeObjectURL(u2); } catch (e) { } }); turls = [];
+      const have = slots.filter(s => s._file);
+      thumbs.hidden = tbar.hidden = !have.length;
+      if (!have.length) { thumbs.innerHTML = ''; return; }
+      thumbs.innerHTML = have.map(s => {
+        const p = slots.indexOf(s);
+        return `<div class="vt2" data-j="${p}" title="&lt;Video ${p + 1}&gt; · ${esc(s._file.name)}"><video muted playsinline preload="metadata"></video><b>&lt;Video ${p + 1}&gt;</b><small>${esc(s._file.name.slice(0, 20))}</small></div>`;
+      }).join('');
+      $$('.vt2', thumbs).forEach(el => {
+        const s = slots[+el.dataset.j], v = el.querySelector('video');
+        if (!s || !s._file || !v) return;
+        const url = URL.createObjectURL(s._file); turls.push(url); v.src = url;
+        // the first frame of a clip is usually black: step a little inside it
+        v.addEventListener('loadeddata', () => { try { v.currentTime = Math.min(0.6, (v.duration || 1) * .06); } catch (e) { } }, { once: true });
+      });
+    };
     let tr = null, cur = -1, pick = -1;
     const fmt = x => (Math.round(x * 10) / 10 + '').replace('.', ',');
     const paint = () => {
@@ -6523,6 +6555,7 @@ function makeRefMode(cfg) {
             `<button class="btn mini" type="button" data-a="del" data-j="${i}" title="Убрать этот файл">✕</button></span>`
           : '').join('') +
         (full ? '<span class="hint" style="font-size:12px">' + slots.length + ' видео - максимум</span>' : '');
+      paintThumbs();
     };
     const closeWin = () => { host.hidden = true; cur = -1; };
     const onFile = (f, q) => {                         // the cut replaces the file in the tile; the original stays
@@ -6605,6 +6638,7 @@ function makeRefMode(cfg) {
         if (root._save) root._save();
       }
     };
+    thumbs.onclick = e => { const cc = e.target.closest('.vt2'); if (cc) openTrim(+cc.dataset.j); };
     inp.onchange = () => {
       const f = inp.files && inp.files[0], i = pick; pick = -1;
       inp.value = '';
