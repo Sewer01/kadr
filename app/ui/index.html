@@ -11541,7 +11541,7 @@ applyZoom();
   }
 
   /* preview player: the clips in the chosen order play one after another; the slider, a click on a clip and the playhead seek in the whole montage */
-  const P = { g: 0, i: 0, playing: false, raf: 0, drag: false, picked: false, mode: 'seq', loading: false, tok: 0, lim: null, mkI: 0, mkFrac: {}, miss: null };
+  const P = { g: 0, i: 0, playing: false, raf: 0, drag: false, picked: false, mode: 'seq', loading: false, tok: 0, lim: null, mkI: 0, mkFrac: {}, miss: null, was: 0, stall: 0, rescue: 0, swapAt: 0, rev: 0 };
   // The marker always stands on the clip that is in focus (P.i) and remembers its own place for each
   // clip by its name: switching clips cannot leave an invisible marker somewhere and use it later.
   const mkAt = () => {
@@ -11627,6 +11627,18 @@ applyZoom();
   const totalLen = () => MT.ids.reduce((a, _, i) => a + durOf(i), 0);
   const startOf = i => { let a = 0; for (let j = 0; j < i; j++) a += durOf(j); return a; };
   function locate(g) { let a = 0; const n = MT.ids.length; for (let i = 0; i < n; i++) { const d = durOf(i); if (g < a + d - 1e-6 || i === n - 1) return { i, off: Math.min(d, Math.max(0, g - a)) }; a += d; } return { i: 0, off: 0 }; }
+  /* Starting a clip is not a one-shot affair: right after the source changes at a seam the element
+     often has no first frame yet, play() rejects once for no visible reason, and the old silent
+     catch left the ribbon frozen - the button showed «pause», nothing moved, and pressing it only
+     paused something that had already stopped. So the start is tried several times. */
+  function playNow(left) {
+    if (!P.playing) return;
+    const tries = left == null ? 3 : left;
+    try {
+      const pr = pv.play();
+      if (pr && pr.catch) pr.catch(() => { if (P.playing && tries > 1) setTimeout(() => playNow(tries - 1), 160); });
+    } catch (e) { }
+  }
   function loadAt(i, off, play) {
     const id = MT.ids[i], it = get(id);
     if (!it) {           // a clip that left the Library: never keep somebody else's video on screen
@@ -11635,9 +11647,9 @@ applyZoom();
       return;
     }
     P.miss = null;
-    const tok = ++P.tok, go = () => { if (tok !== P.tok) return; P.loading = false; try { pv.currentTime = inOf(i) + off; } catch {} if (play) pv.play().catch(() => {}); };
+    const tok = ++P.tok, go = () => { if (tok !== P.tok) return; P.loading = false; try { pv.currentTime = inOf(i) + off; } catch {} if (play) playNow(); };
     if (pv.dataset.id !== id) {
-      P.loading = true; pv.dataset.id = id; pv.src = it.url;
+      P.loading = true; P.swapAt = Date.now(); pv.dataset.id = id; pv.src = it.url;
       pv.addEventListener('loadedmetadata', () => { P.loading = false; go(); }, { once: true });
       pv.addEventListener('error', () => { P.loading = false; }, { once: true });
       setTimeout(() => { if (tok === P.tok) P.loading = false; }, 4000);   // a frame that never announces itself must not freeze the player
@@ -11750,6 +11762,7 @@ applyZoom();
 
   function setPlaying(on) {
     P.playing = on; playBtn.textContent = on ? '⏸' : '▶'; clearInterval(P.raf);
+    P.stall = 0; P.rescue = 0; P.rev = 0; P.was = pv.currentTime;   // a new start begins with a clean watchdog
     if (!on) { try { pv.volume = 1; } catch (e) { } }   // nobody should hear a leftover half-volume clip later
     if (on) { P.raf = setInterval(tick, 40); return; }
     try { pv.pause(); } catch { }
@@ -11757,13 +11770,25 @@ applyZoom();
   }
   // the button tells the truth about the element, whoever started or stopped it
   pv.addEventListener('play', () => { if (!P.playing) { P.playing = true; playBtn.textContent = '⏸'; clearInterval(P.raf); P.raf = setInterval(tick, 40); } });
-  pv.addEventListener('pause', () => { if (P.playing) setPlaying(false); });
+  /* A pause is not always the person's doing: swapping the source at a seam pauses the element by
+     itself, and treating that as «stopped» used to kill the ribbon exactly between the second clip
+     and the third, after which no button could revive it. A pause that comes while the ribbon still
+     believes it plays is answered with another start, not with a stop. */
+  pv.addEventListener('pause', () => {
+    if (!P.playing) return;
+    if (P.loading || Date.now() - P.swapAt < 1500) return;   // the ribbon itself is changing clips
+    if (pv.ended) { atEnd(pv.currentTime); return; }
+    P.rev++;
+    if (P.rev > 4) { setPlaying(false); toast('Клип встал и не отвечает: посмотрите его кнопкой ▶ в ленте или замените другим'); return; }
+    try { pv.currentTime = Math.max(inOf(P.i), inOf(P.i) + Math.max(0, P.g - startOf(P.i))); } catch (e) { }
+    playNow();
+  });
   pv.addEventListener('ended', () => { if (P.playing) atEnd(pv.currentTime); });
   const pieceEnd = i => inOf(i) + durOf(i);   // where the kept piece stops, on the clock of the file
   function atEnd(t) {                          // called by the timer and by the video itself
     if (!P.playing || P.i >= MT.ids.length) return;
     if (P.lim) { setPlaying(false); P.lim = null; updateUI(); return; }   // a look at one side stops on its own clip, it does not roll on
-    if (P.i < MT.ids.length - 1) { P.i++; P.g = startOf(P.i); loadAt(P.i, 0, true); }
+    if (P.i < MT.ids.length - 1) { P.i++; P.g = startOf(P.i); P.rev = 0; P.stall = 0; P.rescue = 0; loadAt(P.i, 0, true); }
     else { setPlaying(false); P.g = totalLen(); updateUI(); }
   }
   /* The fade is heard while the strip plays, not only in the file the montage later assembles:
@@ -11794,6 +11819,35 @@ applyZoom();
       const want = fadeVolume(P.i, t);
       if (want !== null) { if (Math.abs(pv.volume - want) > 0.008) pv.volume = Math.min(1, Math.max(0, want)); }
       else if (pv.volume !== 1) pv.volume = 1;
+    }
+    /* The seam guard. The clock of the ribbon cannot be used here: at a transition the element
+       starts a new clip from zero, which looks exactly like a freeze. What is unmistakable is the
+       element standing on pause while the ribbon still says «playing». */
+    if (!pv.paused) { P.stall = 0; P.rescue = 0; }
+    else if (P.playing && !P.loading && !pv.seeking) {
+      const now = Date.now();
+      if (!P.stall) P.stall = now;
+      else if (now - P.stall > 900) {
+        P.stall = now; P.rescue++;
+        const itCur = get(MT.ids[P.i]);
+        if (P.rescue === 1) {
+          // the same thing a person does by hand: put the clip back at its place and start again
+          try { pv.currentTime = inOf(P.i) + Math.max(0, P.g - startOf(P.i)); } catch (e) { }
+          P.rev = 0; playNow();
+        } else if (P.rescue === 2 && itCur) {
+          P.swapAt = Date.now(); pv.src = itCur.url; try { pv.load(); } catch (e) { }
+          setTimeout(() => {
+            if (!P.playing) return;
+            try { pv.currentTime = inOf(P.i) + Math.max(0, P.g - startOf(P.i)); } catch (e) { }
+            P.rev = 0; playNow();
+          }, 450);
+        } else if (P.i < MT.ids.length - 1) {
+          toast('Клип ' + (P.i + 1) + ' встал - перешёл к следующему');
+          P.rescue = 0; P.rev = 0; atEnd(pieceEnd(P.i));
+        } else {
+          setPlaying(false); toast('Клип встал и не отвечает: посмотрите его кнопкой ▶ в ленте или замените другим');
+        }
+      }
     }
     if (P.lim && P.g >= P.lim[1] - 0.03) { setPlaying(false); P.g = P.lim[1]; P.lim = null; updateUI(); return; }   // a preview of one side stops at the marker
     if (pv.readyState >= 2) {
