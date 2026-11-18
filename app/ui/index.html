@@ -8516,7 +8516,7 @@ function makeRefMode(cfg) {
     try {
       for (const it of want) {
         if (it.vid) { if (AG.att.some(a => a.frame && a.vname === it.f.name)) { again++; continue; } if (await agAttachFile(it.f)) added++; else again++; continue; }
-        if (AG.att.some(a => a.file && a.file.name === it.f.name && a.file.size === it.f.size)) { again++; continue; }
+        if (AG.att.some(a => a.file && a.file.name === it.f.name && a.file.size === it.f.size && (a.note || '') === (it.note || ''))) { again++; continue; }
         await agAttachFile(it.f, it.note); added++;
         if (it.note.startsWith('сцена')) own++;
       }
@@ -9139,12 +9139,18 @@ async function transcribeWav(blob, lang = 'auto') {
    answer that was never fetched is not a missing model, so the status is fetched on the spot. */
 async function speechReady() {
   if (AG.status && AG.status.speech_ready) return false;
+  // (the fetch below is the difference between «not downloaded» and «we did not look yet»)
   try { await agStatus(); } catch (e) { }
   return needSpeech();
 }
 function needSpeech() {
-  if (AG.status?.speech_ready) return false;
-  toast('Распознавание речи ещё не скачано — карточка «Модель» справа, кнопка «Докачать»'); return true;
+  if (AG.status && AG.status.speech_ready) return false;
+  /* A status that never arrived is not a model that was never downloaded. Saying «not downloaded»
+     sent the person to download something he already had, while the real fault was a silent
+     request - and the transfer of the scene's songs died right there. */
+  toast(AG.status ? 'Распознавание речи ещё не скачано — карточка «Модель» справа, кнопка «Докачать»'
+                  : 'Статус Агента не пришёл, проверить распознавание речи не удалось. Попробуйте ещё раз.');
+  return true;
 }
 function showAudioBox() {
   const list = AG.audios || [];
@@ -9237,11 +9243,13 @@ function audioTagFor(name, dur) {
   return '';
 }
 async function setChatAudio(wavBlob, name, dur, where) {
+  // a missing status is asked for, not guessed at: the songs of the scenes used to be dropped here
+  if (!(AG.status && AG.status.speech_ready)) { try { await agStatus(); } catch (e) { } }
   if (needSpeech()) return false;
   where = where || audioTagFor(name, dur);
   AG.audios = AG.audios || [];
   // the same file cut again replaces its own entry, a different one is added next to it
-  const at = AG.audios.findIndex(x => x.name === name && Math.abs(x.dur - dur) < .1);
+  const at = AG.audios.findIndex(x => x.name === name && Math.abs(x.dur - dur) < .1 && (x.where || '') === (where || ''));
   const a = { name, dur, where: where || '', text: '', busy: true, lang: '', langName: '', file: new File([wavBlob], name.replace(/\.[^.]+$/, '') + '.wav', { type: 'audio/wav' }) };
   if (at >= 0) AG.audios.splice(at, 1, a); else AG.audios.push(a);
   showAudioBox();
@@ -9274,8 +9282,10 @@ function agInsertTag(tag) {
 }
 const agAttachFile = async (f, note) => {
   if (fileKind(f) === 'video') return agFramesFromFile(f);   // a video is always frames: this was the reason a second clip vanished
-  // the same file twice in the tray moves Picture N onto a copy of itself: «again» means it is already there
-  if (AG.att.some(a => a.file && a.file.name === f.name && a.file.size === f.size)) return false;
+  /* The same file lying in two places is not a duplicate: the scene's text addresses it by the tag
+     of ITS place, so <Picture 10> and <Picture 30> may legitimately be the very same photo and the
+     model must still receive two files. Only the same place twice means «already there». */
+  if (AG.att.some(a => a.file && a.file.name === f.name && a.file.size === f.size && (a.note || '') === (note || ''))) return false;
   const u = await fileToDataURL(f); if (!u) { toast('Картинка не открылась: ' + f.name); return false; }
   AG.att.push({ file: f, url: u, note: note || '' }); renderAtt(); agCtx(); return true;
 };
