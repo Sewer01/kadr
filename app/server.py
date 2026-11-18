@@ -2834,6 +2834,10 @@ class App:
         if not scenes:
             raise web.HTTPBadRequest(text="Напишите хотя бы одну сцену")
         images = [files.get(f"img{i}") for i in range(5)]   # by place, not by order: the numbers in the texts stay true
+        # the reference sizing the person picked in «Параметры» ("max" keeps a face readable, "match"
+        # shrinks every reference to the frame area - a postage stamp in a draft). The scene graphs
+        # used to ignore this and always pass "match".
+        ref_size = form.get("ref_size") if form.get("ref_size") in ("match", "max") else "max"
         audio = files.get("aud0")
         try:
             start = max(0.0, float(form.get("start") or 0))
@@ -2924,7 +2928,7 @@ class App:
                             node["inputs"] = {**node.get("inputs", {}), **dict(zip(req_inputs, [1, 0.7, 0.0, "cosine"]))}
             else:
                 graph, stages = wf.long_part_graph(self.model_names, scenes, k, width, height, seed, images, audio, start,
-                                                   dmad if draft else self.model_names["pika_lora"], self.custom_loras("long"), "match", vocals, state,
+                                                   dmad if draft else self.model_names["pika_lora"], self.custom_loras("long"), ref_size, vocals, state,
                                                    await self.preview_opts(), cont, form.get("src_project") == "1", fresh, draft,
                                                    loop=form.get("music_loop") == "1", audio_dur=float(form.get("audio_dur") or 0),
                                                    scene_audios=sc_audios)
@@ -2935,7 +2939,7 @@ class App:
                 "len": round((plan[k]["total"] - plan[k]["ov"]) / wf.FPS, 1), "res": f"{width}×{height}", "seed": seed,
                 "long": {"run": run, "part": k, "n": len(scenes), "draft": draft, "test": test}})
         graph, stages = wf.long_graph(self.model_names, scenes, width, height, seed, images, audio, start,
-                                      dmad if draft else self.model_names["pika_lora"], self.custom_loras("long"), "match", vocals, await self.preview_opts(), fresh, False, draft,
+                                      dmad if draft else self.model_names["pika_lora"], self.custom_loras("long"), ref_size, vocals, await self.preview_opts(), fresh, False, draft,
                                       frame=files.get("srcframe"), loop=form.get("music_loop") == "1", audio_dur=float(form.get("audio_dur") or 0),
                                                    scene_audios=sc_audios)   # the continued video's last frame: a picture of its own
         run = re.sub(r"[^A-Za-z0-9]", "", form.get("run", ""))[:32]
