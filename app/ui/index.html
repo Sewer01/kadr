@@ -6484,7 +6484,7 @@ function makeRefMode(cfg) {
           const list = slots.map(s => s._src || s._file).filter(Boolean);
           if (!list.length) { toast('Референс-видео нет - сначала добавьте его'); return; }
           let added = 0, again = 0;
-          const moved = agTargetForVideo(cfg.mode, cfg.title);
+          const moved = agPickTarget(cfg.mode);
           try {
             for (const f of list) {
               if (AG.att.some(a => a.frame && a.vname === f.name)) { again++; continue; }
@@ -6666,9 +6666,10 @@ function makeRefMode(cfg) {
               if (await setChatAudio(wavSlice(buf, 0, e), f.name, e, where)) added++; else again++;
             } catch (err) { toast('Не удалось передать «' + f.name + '»: ' + (err && err.message ? err.message : '')); }
           }
+          const moved = agPickTarget(cfg.mode);   // цель включается до перехода: тост должен о ней сказать
           agGo();
-          toast(added ? ('В чат агента добавлено аудио: ' + added + (again ? ' · ' + again + ' уже лежало' : ''))
-                      : 'Всё это аудио уже лежит в чате агента');
+          toast(added ? ('В чат агента добавлено аудио: ' + added + (again ? ' · ' + again + ' уже лежало' : '') + moved)
+                      : 'Всё это аудио уже лежит в чате агента' + moved);
         };
       }
     }
@@ -8420,9 +8421,9 @@ function makeRefMode(cfg) {
   };
   // a button with nothing to take is a dead button: it lies grey until a file appears
   const agCount = (btn, fn) => { btn._agCount = fn; btn.dataset.agKind = '1'; return btn; };
-  const agSay = (what, added, again) => {
-    toast(added ? ('В чат агента добавлено ' + what + ': ' + added + (again ? ' · ' + again + ' уже лежало' : ''))
-                : ('Всё это ' + what + ' уже лежит в чате агента'));
+  const agSay = (what, added, again, tail) => {
+    toast(added ? ('В чат агента добавлено ' + what + ': ' + added + (again ? ' · ' + again + ' уже лежало' : '') + (tail || ''))
+                : ('Всё это ' + what + ' уже лежит в чате агента' + (tail || '')));
   };
 
   // ···· images: the common places, and in the studios also every scene's own places
@@ -8440,8 +8441,8 @@ function makeRefMode(cfg) {
     // this button takes it too; elsewhere the video has its own button and must not be doubled
     if (cfg.videos && cfg.swap) $$('.slot', vidsEl).forEach((s, j) => { const f = s._src || s._file; if (f) want.push({ f, vid: true, note: 'видео, в котором меняем, тег <Video ' + (j + 1) + '>' }); });
     if (!want.length) { toast('Изображений нет - сначала добавьте их'); return; }
-    // in «Замена» the button carries a video too, and a video needs a mode that watches it
-    const moved = want.some(x => x.vid) ? agTargetForVideo(cfg.mode, cfg.title) : '';
+    // whatever goes into the chat, the Agent writes for the section the person pressed the button in
+    const moved = agPickTarget(cfg.mode);
     let added = 0, again = 0, own = 0;
     try {
       for (const it of want) {
@@ -8454,8 +8455,8 @@ function makeRefMode(cfg) {
       const common = added - own;
       toast(added ? ('В чат агента добавлено изображений: ' + added
           + (common && own ? ' (общих ' + common + ', из сцен ' + own + ')' : own ? ' (все из сцен)' : '')
-          + (again ? ' · ' + again + ' уже лежало' : ''))
-          : 'Все эти изображения уже лежат в чате агента');
+          + (again ? ' · ' + again + ' уже лежало' : '') + moved)
+          : 'Все эти изображения уже лежат в чате агента' + moved);
     } catch { toast('Не удалось передать изображения агенту'); }
   };
 
@@ -8468,7 +8469,7 @@ function makeRefMode(cfg) {
     if (vidBtn) vidBtn.onclick = async () => {
       const list = $$('.slot', vb).map(s => s._src || s._file).filter(Boolean);
       if (!list.length) { toast('Референс-видео нет - сначала добавьте его'); return; }
-      const moved = agTargetForVideo(cfg.mode, cfg.title);
+      const moved = agPickTarget(cfg.mode);
       let added = 0, again = 0;
       try {
         for (const f of list) {
@@ -8476,8 +8477,7 @@ function makeRefMode(cfg) {
           if (await agAttachFile(f)) added++;
         }
         agGo();
-        agSay('видео (кадрами)', added, again);
-        if (moved) toast('Готово' + moved);
+        agSay('видео (кадрами)', added, again, moved);
       } catch (err) { toast('Не удалось передать видео агенту: ' + (err && err.message ? err.message : '')); }
     };
   }
@@ -8504,8 +8504,9 @@ function makeRefMode(cfg) {
           if (await setChatAudio(wavSlice(buf, 0, e), f.name, e, where)) added++; else again++;
         } catch (err) { toast('Не удалось передать «' + f.name + '»: ' + (err && err.message ? err.message : '')); }
       }
+      const moved = agPickTarget(cfg.mode);
       agGo();
-      agSay('аудио', added, again);
+      agSay('аудио', added, again, moved);
     };
   }
 
@@ -12582,12 +12583,15 @@ const agQwenMode = () => { const b = $('.qw-eng button.on', $('#view-qwen')); re
 /* A video is only useful to the modes that watch it. If the Agent is set to write for another one,
    a press on «Все в агент» above a video moves the Agent to the mode of this card - that is what the
    person meant - instead of refusing with a lecture. */
-function agTargetForVideo(mode, title) {
-  try { if (typeof agVideoMax === 'function' && agVideoMax()) return ''; } catch (e) { return ''; }
-  const t = $('#agTarget [data-t="' + mode + '"]');
-  if (!t || t.classList.contains('on')) return '';
-  t.click();
-  return ' · «Промт для» переключено на «' + title + '»';
+/* The button was pressed inside a mode, so the Agent must write for that mode: without this the chat
+   keeps the target it had (usually «Видео») and answers for another section than the one holding the
+   files that just arrived. */
+function agPickTarget(mode) {
+  if (!mode) return '';
+  const b = $('#agTarget [data-t="' + mode + '"]') || $('#agTarget2 [data-t="' + mode + '"]');
+  if (!b || b.classList.contains('on')) return '';
+  b.click();
+  return ' · «Промт для» переключено на «' + b.textContent.trim() + '»';
 }
 function agMakeBtn(host, icon, what) {
   if (!host) return null;
@@ -12696,16 +12700,17 @@ function agWireOtherWindows() {
     go.onclick = () => agDraftOut(get ? get() : '', target, 'черновик промпта');
     card.querySelector('.card-h').append(go);
   };
-  const say = (what, added, again) => toast(added ? ('В чат агента добавлено ' + what + ': ' + added + (again ? ' · ' + again + ' уже лежало' : ''))
-    : ('Всё это ' + what + ' уже лежит в чате агента'));
-  const sendPics = async list => {
+  const say = (what, added, again, tail) => toast(added ? ('В чат агента добавлено ' + what + ': ' + added + (again ? ' · ' + again + ' уже лежало' : '') + (tail || ''))
+    : ('Всё это ' + what + ' уже лежит в чате агента' + (tail || '')));
+  const sendPics = async (list, mode) => {
     if (!list.length) { toast('Файлов нет - сначала добавьте их'); return; }
     let added = 0, again = 0;
     for (const it of list) {
       if (AG.att.some(a => a.file && a.file.name === it.f.name && a.file.size === it.f.size)) { again++; continue; }
       if (await agAttachFile(it.f, it.note)) added++; else again++;
     }
-    agGo(); say('файлов', added, again);
+    const moved = agPickTarget(mode);
+    agGo(); say('файлов', added, again, moved);
   };
 
   // ···· «Видео из картинки»: кадры, из которых делают ролик (их может быть один или два)
@@ -12716,7 +12721,7 @@ function agWireOtherWindows() {
       const card = drops.length ? drops[0].closest('.card') : null;
       mk(card && card.querySelector('.card-h'), '🖼', 'кадры этого ролика - первый и последний',
         () => drops.filter(d => fileOf(d)).length,
-        () => sendPics(drops.map((d, j) => ({ f: fileOf(d), note: (j ? 'последний' : 'первый') + ' кадр видео, тег <Picture ' + (j + 1) + '>' })).filter(x => x.f)));
+        () => sendPics(drops.map((d, j) => ({ f: fileOf(d), note: (j ? 'последний' : 'первый') + ' кадр видео, тег <Picture ' + (j + 1) + '>' })).filter(x => x.f), 'video'));
       goBtn($('#vPrompt', v) && $('#vPrompt', v).closest('.card'), 'video', 'Видео', () => ($('#vPrompt') || {}).value);
     }
   }
@@ -12734,13 +12739,14 @@ function agWireOtherWindows() {
           if (await speechReady()) return;
           const piece = wavSlice(abuf, L.start, L.end), dur = Math.max(0.1, L.len());
           const ok = await setChatAudio(piece, (typeof audioName === 'string' ? audioName : 'аудио из Клипа').replace(/\.[^.]+$/, ''), dur, 'аудио из «Клипа», тег <Audio 1>');
+          const moved = agPickTarget('lipsync');
           agGo();
-          say('аудио', ok ? 1 : 0, ok ? 0 : 1);
+          say('аудио', ok ? 1 : 0, ok ? 0 : 1, moved);
         });
       const rCard = $('#refs', lv) && $('#refs', lv).closest('.card');
       mk(rCard && rCard.querySelector('.card-h'), '🖼', 'все референсы этого Клипа',
         () => $$('#refs label.ref', lv).filter(el => fileOf(el)).length,
-        () => sendPics($$('#refs label.ref', lv).map((el, j) => ({ f: fileOf(el), note: 'референс персонажа, тег <Picture ' + (j + 1) + '>' })).filter(x => x.f)));
+        () => sendPics($$('#refs label.ref', lv).map((el, j) => ({ f: fileOf(el), note: 'референс персонажа, тег <Picture ' + (j + 1) + '>' })).filter(x => x.f), 'lipsync'));
       goBtn($('#lPrompt', lv) && $('#lPrompt', lv).closest('.card'), 'lipsync', 'Клип', () => ($('#lPrompt') || {}).value);
     }
   }
@@ -12753,7 +12759,7 @@ function agWireOtherWindows() {
       const card = slots.length ? slots[0].closest('.card') : null;
       mk(card && card.querySelector('.card-h'), '🖼', 'все картинки этой правки',
         () => slots.filter(s => fileOf(s)).length,
-        () => sendPics(slots.map((s, j) => ({ f: fileOf(s), note: 'картинка для правки, тег <Picture ' + (j + 1) + '>' })).filter(x => x.f)));
+        () => sendPics(slots.map((s, j) => ({ f: fileOf(s), note: 'картинка для правки, тег <Picture ' + (j + 1) + '>' })).filter(x => x.f), agQwenMode()));
     }
   }
 
