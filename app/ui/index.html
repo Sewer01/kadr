@@ -1825,6 +1825,12 @@ body.dropping::after{content:'Отпустите — программа разл
           </label>
           <button class="btn" type="button" id="mdRestart" title="Закрыть и снова открыть программу: нужно после переключателей, которые читаются при запуске">Перезапустить программу</button>
         </div>
+        <div style="display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap;margin-top:12px">
+          <label class="hint" style="display:flex;gap:8px;align-items:flex-start;cursor:pointer;margin:0;max-width:760px">
+            <input type="checkbox" id="uiNoJumpCb" style="margin-top:3px">
+            <span>Не переходить в «Агента» самому при кнопках «Все в агент»<small style="display:block;opacity:.7">картинки, видео и аудио уйдут в чат как обычно, но вы останетесь в своём разделе и продолжите работу; «Промпт в агента» по-прежнему переносит текст и переходит, потому что для этого он и нужен</small></span>
+          </label>
+        </div>
       </div>
 
       <div class="steps" id="setupSteps">
@@ -4000,7 +4006,7 @@ class VideoTrimmer {
       if (typeof go !== 'function') { this.say('Агент пока не умеет смотреть видео'); return; }
       const tg = document.querySelector('#agTarget [data-t="' + (this.o.agentTarget || 'long') + '"]');
       if (tg) tg.click();
-      goTo('agent');
+      agGo();
       try { if (!AG.status || !AG.status.speech_ready) await agStatus(); } catch (e) {}
       const ok = await go(this.cut ? this.cutFile : this.file);
       if (ok !== false) this.say('Клип отправлен Агенту: вырежем из него кадры');
@@ -4650,7 +4656,7 @@ class AudioTrimmer {
       // does it - opening the agent alone left the previous target (for example Lipsync) in place
       const tg = document.querySelector('#agTarget [data-t="' + (this.o.agentTarget || 'long') + '"]');
       if (tg) tg.click();
-      goTo('agent');
+      agGo();
       // the agent refuses audio while it does not know whether recognition is ready: on the first press
       // in a fresh session that status was not fetched yet, and the button looked dead
       try { if (!AG.status || !AG.status.speech_ready) await agStatus(); } catch (e) {}
@@ -5030,13 +5036,94 @@ $('#upFile').onchange = e => { const f = e.target.files[0]; e.target.value = '';
 $('#upDrop').addEventListener('dragover', e => e.preventDefault());
 $('#upDrop').addEventListener('drop', e => { e.preventDefault(); upPick(e.dataTransfer.files[0]); });
 // «Показать по-русски» under any prompt field: the agent model translates it; the text is for reading only, the field is not changed
-function attachRu(ta) {
+/* ── Prompt written in a mode, finished by the Agent, without leaving the mode.
+   The person drafts the scene in the field where the tags live; this carries the draft and the mode's
+   own files into the chat (the same buttons do that by hand), asks the Agent to turn the draft into a
+   finished prompt, and puts the answer back into the very same field. The chat keeps both messages, so
+   the history shows what was asked and what came out. */
+async function agSettle(max) {
+  const t0 = Date.now();
+  await new Promise(r => setTimeout(r, 700));
+  while (Date.now() - t0 < (max || 30000)) {
+    const busy = (AG.audios || []).some(a => a && a.busy) || !!(AG.audio && AG.audio.busy);
+    if (!busy) break;
+    await new Promise(r => setTimeout(r, 500));
+  }
+}
+const agViewOf = m => (/^(krea|kreareal|fluxt|h3t|qwent)$/.test(m) ? '#view-krea'
+  : (/^(qwen|h3e|sheet|sheet6|story)$/.test(m) ? '#view-qwen' : '#view-' + m));
+async function agCarry(mode) {
+  const root = (typeof RM !== 'undefined' && RM[mode] && RM[mode].root) || document.querySelector(agViewOf(mode));
+  if (!root) return 0;
+  if (typeof window._agSync === 'function') { try { window._agSync(); } catch (e) { } }
+  // the text button is not a file: the draft goes into the field below, not into the tray
+  const btns = Array.prototype.slice.call(root.querySelectorAll('.agall-h'))
+    .filter(b => !/Промпт в агента|Все промты/.test(b.textContent) && !b.disabled);
+  if (!btns.length) return 0;
+  let made = 0;
+  window.__agQuiet = 1;   // these buttons would otherwise walk the person to the chat
+  try {
+    for (const b of btns) { b.click(); made++; await agSettle(); }
+  } finally { window.__agQuiet = 0; }
+  return made;
+}
+async function agGenerate(btn, gen) {
+  const draft = String((typeof gen.text === 'function' ? gen.text() : '') || '').trim();
+  if (!draft) { toast('Сначала напишите текст в этом поле'); return; }
+  if (AG.busy) { toast('Агент уже пишет: дождитесь ответа или остановите его в чате'); return; }
+  if (!AG.status || AG.status.installed === undefined) { try { await agStatus(); } catch (e) { } }   // the status is loaded lazily, do not cry «no model» too early
+  if (!AG.status || !AG.status.installed) { toast('Модель Агента не скачана: раздел «Агент», карточка «Модель»'); return; }
+  const mode = typeof gen.mode === 'function' ? gen.mode() : gen.mode;
+  const name = (typeof AG_NAMES !== 'undefined' && AG_NAMES[mode]) || 'этого раздела';
+  const was = btn.textContent, chat = $('#agIn'), keep = chat ? chat.value : '';
+  btn.disabled = true; btn.textContent = 'Переносим в чат…';
+  try {
+    const carried = await agCarry(mode);
+    btn.textContent = 'Агент пишет промпт…';
+    const t = $('#agTarget [data-t="' + mode + '"]') || $('#agTarget2 [data-t="' + mode + '"]');
+    if (t && !t.classList.contains('on')) t.click();   // the Agent writes for this mode
+    AG.draft = { to: mode, at: Date.now() };           // and the answer has to come back to this field
+    if (chat) chat.value = 'Черновик промпта из раздела ' + name + '. Сделай из него готовый промпт этого режима: '
+      + 'сохрани все теги (<Picture N>, <Video N>, <Audio N>) и их номера, не добавляй того, чего в черновике нет, '
+      + 'и верни ВЕСЬ промпт одним блоком.\n\n' + draft;
+    await agSend();
+    const last = AG.msgs[AG.msgs.length - 1];
+    if (!last || last.role !== 'assistant' || last.error) {
+      toast('Агент не ответил: ' + ((last && last.error) || 'пустой ответ') + '. Текст в разделе остался как был.');
+      if (chat && !chat.value.trim() && keep) chat.value = keep;
+      return;
+    }
+    const msg = $('#agMsgs .msg.a:last-child');
+    const blks = msg ? Array.prototype.slice.call(msg.querySelectorAll('.pblock')).filter(b => b.querySelector('pre[data-b]')) : [];
+    const blk = blks[blks.length - 1];
+    if (!blk) { toast('В ответе Агента нет оформленного промпта: посмотрите чат'); return; }
+    AG.draft = { to: mode, at: Date.now() };
+    await sendPrompt(blk, mode);   // the round trip: text back into this field, files left alone
+    toast('Промпт готов и заменил текст в разделе' + (carried ? ' · в чат перенесено файлов: ' + carried : '')
+      + ' · черновик и ответ остались в истории «Агента»');
+  } catch (e) {
+    toast('Не вышло: ' + (e && e.message ? e.message : e));
+  } finally {
+    btn.disabled = false; btn.textContent = was;
+  }
+}
+function attachRu(ta, gen) {
   if (!ta || ta._ru) return; ta._ru = true;
   const wrap = document.createElement('div'); wrap.className = 'ru-wrap';
   wrap.innerHTML = '<button class="btn ru-b" type="button" style="padding:4px 12px;font-size:12px" title="Русский перевод только для чтения: в модель уходит текст из поля">Показать по-русски</button><div class="ru-out" hidden></div>';
   const foot = ta.nextElementSibling?.classList.contains('ta-foot') ? ta.nextElementSibling : ta;
   foot.insertAdjacentElement('afterend', wrap);
   const btn = $('.ru-b', wrap), out = $('.ru-out', wrap);
+  if (gen) {
+    // the draft lives here, so the way to finish it lives here too: the same row under the field
+    const g = document.createElement('button');
+    g.type = 'button'; g.className = 'btn gen-b';
+    g.style.cssText = 'padding:4px 12px;font-size:12px;margin-right:8px';
+    g.textContent = '🤖 Генерация промта';
+    g.title = 'Агент сделает из этого текста готовый промпт своего режима и заменит им текст в поле. Файлы раздела и черновик уйдут в чат Агента, ответ останется в его истории.';
+    g.onclick = () => agGenerate(g, gen);
+    wrap.insertBefore(g, btn);
+  }
   btn.onclick = async () => {
     if (!out.hidden) { out.hidden = true; btn.textContent = 'Показать по-русски'; return; }
     const text = ta.value.trim();
@@ -5319,6 +5406,17 @@ $('#wzRestore').onclick = async () => {
     try { await postJSON('/api/window_mode', { mode: b.dataset.w }); paintWin(b.dataset.w); toast('При следующем запуске окно откроется так'); }
     catch (err) { toast(err.message); }
   };
+})();
+(function () {   // staying put when files go to the Agent: a habit, not a setting worth a server call
+  const nb = $('#uiNoJumpCb');
+  if (nb) {
+    try { nb.checked = localStorage.getItem('h3-ag-nojump') === '1'; } catch (e) { }
+    nb.onchange = () => {
+      try { localStorage.setItem('h3-ag-nojump', nb.checked ? '1' : '0'); } catch (e) { }
+      toast(nb.checked ? 'Кнопки «Все в агент» перестанут вас уводить: файлы уйдут в чат, а вы останетесь в разделе'
+                       : 'Кнопки «Все в агент» снова открывают чат Агента');
+    };
+  }
 })();
 (function () {   // the window without the video card + a way to restart and actually apply it
   const cb = $('#mdGpuUiCb'), rb = $('#mdRestart'); if (!cb) return;
@@ -6392,7 +6490,7 @@ function makeRefMode(cfg) {
               if (AG.att.some(a => a.frame && a.vname === f.name)) { again++; continue; }
               if (await agAttachFile(f)) added++; else again++;
             }
-            goTo('agent');
+            agGo();
             toast(added ? ('В чат агента добавлено видео (кадрами): ' + added + (again ? ' · ' + again + ' уже лежало' : '') + moved)
                         : 'Это видео уже лежит в чате агента');
           } catch (err) { toast('Не удалось передать видео агенту: ' + (err && err.message ? err.message : '')); }
@@ -6568,7 +6666,7 @@ function makeRefMode(cfg) {
               if (await setChatAudio(wavSlice(buf, 0, e), f.name, e, where)) added++; else again++;
             } catch (err) { toast('Не удалось передать «' + f.name + '»: ' + (err && err.message ? err.message : '')); }
           }
-          goTo('agent');
+          agGo();
           toast(added ? ('В чат агента добавлено аудио: ' + added + (again ? ' · ' + again + ' уже лежало' : ''))
                       : 'Всё это аудио уже лежит в чате агента');
         };
@@ -7964,7 +8062,7 @@ function makeRefMode(cfg) {
         $$('.sc', root).forEach((cc, i) => (cc._auds || []).forEach((f, j) => { if (f) items.push({ file: f, name: f.name, where: 'сцена ' + (i + 1) + ', тег <Audio ' + (10 * (i + 1) + j) + '>' }); }));
         if (!items.length) { toast('Готового аудио нет: сначала загрузите файл'); return; }
         if (!AG.status || !AG.status.speech_ready) { try { await agStatus(); } catch (e) {} }
-        goTo('agent');
+        agGo();
         const host = $('#agTarget [data-t="' + (cfg.mode || 'long') + '"]');
         if (host && !host.classList.contains('on')) host.click();   // an already chosen target is left alone
         let ok = 0;
@@ -8258,7 +8356,8 @@ function makeRefMode(cfg) {
     },
   });
   root._upd = upd;
-  $$('.rm-prompt', root).forEach(attachRu);
+  if (!cfg.scenes) $$('.rm-prompt', root).forEach(ta => attachRu(ta, { mode: cfg.mode, text: () => ta.value }));
+  else $$('.rm-prompt', root).forEach(attachRu);   // the scene studios write scene by scene, not one field
   if (cfg.swap) {
     S.sound = 'original'; S.smallRef = true;
     const SND_HINT = { lock: 'Пробный режим: модель рисует рот под звук вашего видео, голоса остаются на своих героях. Но при двух героях и смене плана вторая замена может не получиться. Нужен звук в видео.',
@@ -8351,7 +8450,7 @@ function makeRefMode(cfg) {
         await agAttachFile(it.f, it.note); added++;
         if (it.note.startsWith('сцена')) own++;
       }
-      goTo('agent');
+      agGo();
       const common = added - own;
       toast(added ? ('В чат агента добавлено изображений: ' + added
           + (common && own ? ' (общих ' + common + ', из сцен ' + own + ')' : own ? ' (все из сцен)' : '')
@@ -8376,7 +8475,7 @@ function makeRefMode(cfg) {
           if (AG.att.some(a => a.frame && a.vname === f.name)) { again++; continue; }
           if (await agAttachFile(f)) added++;
         }
-        goTo('agent');
+        agGo();
         agSay('видео (кадрами)', added, again);
         if (moved) toast('Готово' + moved);
       } catch (err) { toast('Не удалось передать видео агенту: ' + (err && err.message ? err.message : '')); }
@@ -8405,7 +8504,7 @@ function makeRefMode(cfg) {
           if (await setChatAudio(wavSlice(buf, 0, e), f.name, e, where)) added++; else again++;
         } catch (err) { toast('Не удалось передать «' + f.name + '»: ' + (err && err.message ? err.message : '')); }
       }
-      goTo('agent');
+      agGo();
       agSay('аудио', added, again);
     };
   }
@@ -9089,6 +9188,8 @@ function agInsertTag(tag) {
 }
 const agAttachFile = async (f, note) => {
   if (fileKind(f) === 'video') return agFramesFromFile(f);   // a video is always frames: this was the reason a second clip vanished
+  // the same file twice in the tray moves Picture N onto a copy of itself: «again» means it is already there
+  if (AG.att.some(a => a.file && a.file.name === f.name && a.file.size === f.size)) return false;
   const u = await fileToDataURL(f); if (!u) { toast('Картинка не открылась: ' + f.name); return false; }
   AG.att.push({ file: f, url: u, note: note || '' }); renderAtt(); agCtx(); return true;
 };
@@ -9430,7 +9531,7 @@ async function sendPrompt(blk, to) {
   goTo(to);
   const name = { video: '«Видео»', lipsync: '«Клип»', refs: '«Видеостудия»', actor: '«Актёр»', swap: '«Замена»', action: '«Экшн-видео»', actionsc: '«Экшн-студия»', long: '«Киностудия»', krea: '«Изображение по тексту»', qwen: '«Изменение изображения»' }[to];
   toast(`${back ? 'Черновик вернулся в' : 'Промпт перенесён в режим'} ${name}` + (back ? ', ваши файлы остались на местах' : '') + (files.length && to !== 'video' && to !== 'krea' ? ' вместе с изображениями' : '')
-    + (vUsed ? ` и видео: ${vUsed}` : '') + (vidFiles.length > vUsed ? ` (видео в чате ${vidFiles.length}, раздел принимает ${vAll || 1}: лишние не перенесены)` : '') + (to === 'lipsync' ? (au ? ' и аудио — выделите нужный фрагмент' : ' — добавьте аудио') : ''));
+    + (vUsed ? ` и видео: ${vUsed}` : '') + (vidFiles.length > vUsed ? ` (видео в чате ${vidFiles.length}, раздел принимает ${vAll || 1}: лишние не перенесены)` : '') + (to === 'lipsync' && !back ? (au ? ' и аудио — выделите нужный фрагмент' : ' — добавьте аудио') : ''));
 }
 // the finished prompt can be edited in place; the edit is kept when the chat is redrawn
 $('#agMsgs').addEventListener('input', e => {
@@ -10324,7 +10425,7 @@ function freeSlot(view) {
 }
 async function useInWorkflow(it, view) {
   if (view === 'agent') {  // not a slot: the picture goes into the chat
-    try { await agAttachFile(await libToFile(it)); goTo('agent'); toast('Изображение добавлена в чат агента'); return true; }
+    try { await agAttachFile(await libToFile(it)); agGo(); toast('Изображение добавлена в чат агента'); return true; }
     catch { toast('Не удалось взять файл'); return false; }
   }
   const input = freeSlot(view);
@@ -12027,7 +12128,12 @@ if (e.target.closest('.mt-clear')) {
   IMG_PANELS.push(render);
   render();
 })();
-['#vPrompt', '#lPrompt', '.kr-prompt', '.qw-prompt'].forEach(sel => $$(sel).forEach(attachRu));   // every prompt field gets «Показать по-русски»
+/* The engine chosen in the window decides which «Промт для» the Agent has to serve, and the window
+   itself decides where the finished text goes back to. */
+const agKreaMode = () => { const b = $('.kr-eng button.on', $('#view-krea')); return ({ kreareal: 'krea', flux: 'fluxt', h3img: 'h3t', qwen: 'qwent' }[((b && b.dataset.e) || 'krea')]) || 'krea'; };
+const agQwenMode = () => { const b = $('.qw-eng button.on', $('#view-qwen')); return ((b && b.dataset.e) === 'h3img') ? 'h3e' : 'qwen'; };
+[['#vPrompt', () => 'video'], ['#lPrompt', () => 'lipsync'], ['.kr-prompt', agKreaMode], ['.qw-prompt', agQwenMode]]
+  .forEach(([sel, mode]) => $$(sel).forEach(ta => attachRu(ta, { mode, text: () => ta.value })));   // «Показать по-русски» и «Генерация промта»
 
 /* width of the left menu: drag the thin line on its edge */
 (() => {
@@ -12498,6 +12604,18 @@ function agMakeBtn(host, icon, what) {
 /* A draft written inside a mode goes to the Agent exactly as it stands: the tags in it point at the
    files of THAT mode, so they must survive the trip. The Agent answers, and its answer is expected
    back in the same field - the mode is remembered as the return address, and its files stay untouched. */
+/* The export buttons used to end with a jump to the chat: a person filling a mode with pictures was
+   pulled away every single time. The setting in «Интерфейс» keeps them where they are; the toast of the
+   button itself already says what went into the chat. */
+function agNoJump() {
+  try { return localStorage.getItem('h3-ag-nojump') === '1'; } catch (e) { return false; }
+}
+function agGo() {
+  if (agNoJump() || window.__agQuiet) return false;   // __agQuiet: the program pressed the button itself
+  const where = 'agent';   // spelled aside so the helper above stays the only jump
+  goTo(where);
+  return true;
+}
 function agDraftOut(text, target, what) {
   const ta = $('#agIn');
   let t = ''; try { t = typeof target === 'function' ? target() : target; } catch (e) { t = ''; }
@@ -12587,7 +12705,7 @@ function agWireOtherWindows() {
       if (AG.att.some(a => a.file && a.file.name === it.f.name && a.file.size === it.f.size)) { again++; continue; }
       if (await agAttachFile(it.f, it.note)) added++; else again++;
     }
-    goTo('agent'); say('файлов', added, again);
+    agGo(); say('файлов', added, again);
   };
 
   // ···· «Видео из картинки»: кадры, из которых делают ролик (их может быть один или два)
@@ -12616,7 +12734,7 @@ function agWireOtherWindows() {
           if (await speechReady()) return;
           const piece = wavSlice(abuf, L.start, L.end), dur = Math.max(0.1, L.len());
           const ok = await setChatAudio(piece, (typeof audioName === 'string' ? audioName : 'аудио из Клипа').replace(/\.[^.]+$/, ''), dur, 'аудио из «Клипа», тег <Audio 1>');
-          goTo('agent');
+          agGo();
           say('аудио', ok ? 1 : 0, ok ? 0 : 1);
         });
       const rCard = $('#refs', lv) && $('#refs', lv).closest('.card');
