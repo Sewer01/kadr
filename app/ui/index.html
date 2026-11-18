@@ -124,12 +124,13 @@
 @media (max-width:1100px){}
 /* the base row of the studios, now above the first card: caption, two small buttons in one line,
    the guide behind a button at the right - it used to be two tall buttons over two rows */
-.col>.row:has(.lm-base){display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 12px;padding:8px 10px;border:1px solid var(--line-2);border-radius:12px;background:var(--surface-2)}
-.col>.row:has(.lm-base) .lm-base{flex:0 1 auto;min-width:0;margin:0!important;padding:3px;display:flex!important;gap:4px}
+.col>.row:has(.lm-base),.col>.row:has(.qw-kind){display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 12px;padding:8px 10px;border:1px solid var(--line-2);border-radius:12px;background:var(--surface-2)}
+.col>.row:has(.lm-base) .lm-base,.col>.row:has(.qw-kind) .qw-kind{flex:0 1 auto;min-width:0;margin:0!important;padding:3px;display:flex!important;gap:4px}
 /* the two choices are as small as the ordinary buttons of the cards: .seg makes them two-line and lets
    the words break anywhere, which is what made the line look swollen */
-.col>.row:has(.lm-base) .lm-base button{display:inline-flex;align-items:center;justify-content:center;padding:5px 12px;font-size:12.5px;font-weight:700;
+.col>.row:has(.lm-base) .lm-base button,.col>.row:has(.qw-kind) .qw-kind button{display:inline-flex;align-items:center;justify-content:center;padding:5px 12px;font-size:12.5px;font-weight:700;
   white-space:nowrap;overflow-wrap:normal;text-align:center;border-radius:9px;min-height:0}
+.col>.row:has(.qw-kind)>.btn.mini{margin-left:auto;flex:none}
 .col>.row:has(.lm-base) .lm-srcpick{flex:1 1 100%;margin:0!important}
 .lm-howb{flex:none;margin-left:auto}
 .lm-guide{display:grid;gap:9px}
@@ -173,6 +174,11 @@
 .atrim .at-modes button.on small{color:rgba(255,255,255,.8)}
 .atrim .at-hint{color:var(--dim);font-size:12.5px}
 .atrim .at-acts{display:flex;gap:8px;flex-wrap:wrap}
+.at-pz{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:8px 0 2px;padding:8px 10px;border:1px solid var(--line-2);border-radius:10px;background:var(--bg-2);font-size:12.5px;color:var(--muted)}
+.at-pz input{width:74px;padding:5px 8px;border-radius:8px;border:1px solid var(--line-2);background:var(--surface);color:var(--text);font-size:12.5px}
+.at-pz b{color:var(--dim);font-weight:600}
+.at-pz .at-pgo{margin-left:auto}
+.at-pp{flex:1 1 120px;min-width:90px;height:22px}
 .atrim .at-zoom{display:flex;align-items:center;gap:8px;flex-wrap:wrap;color:var(--dim);font-size:12.5px}
 .atrim .at-zoom input[type=range]{flex:1 1 140px;min-width:110px}
 .atrim .at-zl{font-weight:700;color:var(--muted)}
@@ -817,6 +823,9 @@ img.pr-media{object-position:center 38%}
 .rm-clr{margin-left:auto}
 .sub-l .agall-h{margin-left:auto}
 /* the same control, asleep: nothing to take yet */
+/* the size presets are choices, not actions: the one in force must look chosen */
+.sz-p.on{background:var(--grad);color:#fff;border-color:transparent}
+#view-qwen .card[hidden]{display:none!important}
 .agall-h:disabled{opacity:.42;cursor:not-allowed;filter:none;background:var(--surface-2);border-color:var(--line-2);color:var(--muted)}
 .agall-h{margin-left:0;flex:none;font-size:12px;padding:5px 11px;min-height:0;border-radius:9px;background:var(--surface-2);border:1px solid var(--line-2);color:var(--muted)}
 .agall-h:hover{border-color:var(--accent);color:var(--text)}
@@ -1429,51 +1438,7 @@ body.dropping::after{content:'Отпустите — программа разл
               <span class="hint">MP3, WAV, M4A · потом выделите нужный кусок</span>
             </label>
             <div class="audio-ed" id="aEd">
-              <div class="a-top">
-                <button class="play" id="aPlay" type="button" aria-label="Прослушать фрагмент">
-                  <svg viewBox="0 0 24 24" fill="currentColor" id="aPlayIc"><path d="M7 4v16l13-8z"/></svg>
-                </button>
-                <div class="a-name" id="aName">audio.mp3<small>—</small></div>
-                <button class="a-change" type="button" id="aChange">Заменить</button>
-                <button class="a-change a-del" type="button" id="aRemove" style="margin-left:8px">Удалить</button>
-              </div>
-              <div class="wave" id="wave">
-                <canvas id="waveCv"></canvas>
-                <div class="sel" id="sel"><div class="hdl l" data-h="l"></div><div class="hdl r" data-h="r"></div></div>
-                <div class="cutsel" id="cutSel" hidden><div class="hdl l" data-h="cl"></div><div class="hdl r" data-h="cr"></div></div>
-                <div class="playhead" id="ph"></div>
-              </div>
-              <div class="a-tools">
-                <div class="seg a-mode" style="grid-template-columns:minmax(0,1fr) minmax(0,1fr)">
-                  <button type="button" data-m="clip" class="on">Выбор фрагмента<small>что пойдёт в клип</small></button>
-                  <button type="button" data-m="cut">Вырезание<small>убрать кусок из аудио</small></button>
-                </div>
-                <div class="a-btnrow">
-                  <button class="btn" type="button" id="aCutDel" disabled>✂ Удалить выделенное</button>
-                  <button class="btn" type="button" id="aPauses">Убрать паузы</button>
-                  <button class="btn" type="button" id="aVocals" title="Оставить только голос, без музыки">Отделить голос</button>
-                  <button class="btn" type="button" id="aUndo" disabled>↶ Отменить</button>
-                  <button class="btn" type="button" id="aToAgent" disabled title="Выделенный кусок уйдёт в Агент: он послушает слова и ответит с учётом них">🤖 В агент</button>
-                </div>
-                <div class="a-zoom" id="aZoom">
-                  <span>Резать удобнее с приближением:</span>
-                  <button class="btn" type="button" id="azOut" title="Показать больше аудио">−</button>
-                  <input type="range" id="azPan" min="0" max="1000" value="0" step="1" title="Какую часть аудио показывает волна">
-                  <button class="btn" type="button" id="azIn" title="Приблизить, чтобы ставить метки точнее">+</button>
-                  <b id="azInfo">весь фрагмент</b>
-                  <button class="btn" type="button" id="azAll">Весь фрагмент</button>
-                </div>
-                <div class="a-pauses" id="aPausesBox" hidden>
-                  <span>Паузы длиннее</span><input type="number" id="apMin" value="0.6" step="0.1" min="0.2" max="5"><span>с сократить до</span><input type="number" id="apKeep" value="0.25" step="0.05" min="0.05" max="1"><span>с</span>
-                  <b id="apInfo"></b><button class="btn pri" type="button" id="apApply">Убрать</button>
-                </div>
-                <div class="hint" id="aToolHint"></div>
-              </div>
-              <div class="a-times">
-                <label class="field">Начало, с<input type="number" step="0.1" min="0" id="aStart"></label>
-                <label class="field">Конец, с<input type="number" step="0.1" min="0" id="aEnd"></label>
-                <div class="len"><small>Длина видео</small><b id="aLen">0.0 с</b></div>
-              </div>
+              <div id="lTrim"></div>
               <div class="note" id="aNote">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 8h0M11 12h1v5h1"/></svg>
                 <span>Оставьте небольшую паузу до и после слов — так губы начинают и заканчивают движение естественно.</span>
@@ -2939,6 +2904,10 @@ const SZ_ROW = `<div class="row sz-row"><div class="row-l">Свой размер
 function szWire(el, st, onChange, getBase) {
   const iw = $('.sz-w', el), ih = $('.sz-h', el), hint = $('.sz-hint', el), rs = $('.sz-reset', el);
   const def = hint.textContent;
+  // a preset that shows no sign of being pressed reads as a dead button: the row has to say which
+  // size is in force, and the press has to answer even when nothing needed changing
+  const mark = () => $$('.sz-p', el).forEach(b => b.classList.toggle('on',
+    b.dataset.p === '0' ? !(st.cw || st.ch) : (st.cw || st.ch) > 0 && Math.max(st.cw, st.ch) >= 1920));
   const apply = () => {
     const a = parseInt(iw.value, 10), b = parseInt(ih.value, 10);
     if (a >= 64 && b >= 64) {
@@ -2948,15 +2917,23 @@ function szWire(el, st, onChange, getBase) {
       hint.textContent = `Будет ${st.cw}×${st.ch}` + (st.cw !== a || st.ch !== b ? ` (округлено с ${a}×${b}, шаг 32)` : '') + (st.cw * st.ch > 1500000 ? '. Это больше 1,5 МП: дольше и больше видеопамяти.' : '');
     } else { st.cw = st.ch = 0; hint.textContent = def; }
     rs.hidden = !(st.cw || st.ch);
+    mark();
     onChange();
   };
   iw.onchange = ih.onchange = apply;
   $$('.sz-p', el).forEach(b => b.onclick = () => {
-    if (b.dataset.p === '0') { iw.value = ih.value = ''; apply(); return; }
+    const was = !!(st.cw || st.ch);
+    if (b.dataset.p === '0') {
+      iw.value = ih.value = ''; apply();
+      toast(was ? 'Размер сброшен на обычный: около 1 МП, рисуется быстро' : 'Размер и так обычный: около 1 МП, рисуется быстро');
+      return;
+    }
     const [bw, bh] = (getBase && getBase()) || [1376, 768], k = 2048 / Math.max(bw, bh);
     iw.value = Math.round(bw * k / 32) * 32; ih.value = Math.round(bh * k / 32) * 32; apply();
+    toast('Размер ' + iw.value + '×' + ih.value + ': длинная сторона 2048');
     if (st.engine === 'krea') toast('Krea 2 лучше всего работает около 1 МП: для неё надёжнее эскиз и потом «Увеличить до 2К» в Библиотеке');
   });
+  mark();
   rs.onclick = () => { iw.value = ih.value = ''; apply(); };
 }
 function sizeForm(st, fd) { if (st.cw && st.ch) { fd.append('width', st.cw); fd.append('height', st.ch); } }
@@ -3609,19 +3586,9 @@ $('#tokens').onclick = e => {
 };
 refsChanged();
 
-// audio editor
-let actx, abuf, peaks = [], src, raf, playStart = 0;
-const wave = $('#wave'), cv = $('#waveCv'), selEl = $('#sel'), ph = $('#ph');
+// audio editor: the decoded buffer and its name, everything else lives in the shared editor class
+let actx, abuf, peaks = [];
 const aFile = $('#aFile');
-$('#aChange').onclick = () => aFile.click();
-$('#aRemove').onclick = () => {
-  stop();
-  abuf = null; peaks = []; undoStack = []; cut = null; audioName = '';
-  L.dur0 = 0; L.start = 0; L.end = 0; MEM.audio = null; aFile.value = '';
-  $('#aEd').classList.remove('on'); aDrop.style.display = '';
-  syncCut(); lUpd(); memSave();
-  toast('Аудио удалено');
-};
 // one click: audio, pictures and the prompt of this section
 $('#lClear').onclick = () => {
   const pics = $$('.ref.filled .x', refsEl), hasAudio = !!audioName, txt = $('#lPrompt').value.trim();
@@ -3629,7 +3596,7 @@ $('#lClear').onclick = () => {
   confirmBox('Очистить «Клип»?',
     `Уберём${hasAudio ? ' аудио,' : ''}${pics.length ? ' картинки (' + pics.length + ' шт.) и' : ''} промпт. Готовые клипы в Библиотеке останутся.`,
     'Очистить', () => {
-      if (hasAudio) $('#aRemove').click();
+      if (hasAudio) removeClipAudio();   // one function, whatever the button is called today
       pics.forEach(x => x.click());
       $('#lPrompt').value = ''; $('#lPrompt').dispatchEvent(new Event('input', { bubbles: true }));
       const prev = $('#lPreview'); if (prev && prev._reset) prev._reset();
@@ -4297,6 +4264,12 @@ class AudioTrimmer {
     this.onFile = o.onFile || (() => {});
     this.whereLabel = o.whereLabel || null;   // where this file lives: the place is known here, not by name
     this.say = o.onNotice || (m => toast(m));
+    // the owner may want a calmer start than the hard cap (LipSync selects 12 s of a long song), a soft
+    // warning before that cap, its own word for the length, and its own veto on separating a voice
+    this.preselect = o.preselect || 0;
+    this.warnOver = o.warnOver || 0;
+    this.canVocals = o.canVocals || null;
+    this.lenLabel = o.lenLabel || 'Длина аудио';
     this.dur0 = 0; this.start = 0; this.end = 0; this.cut = null;
     this.zoom = 1; this.undo = []; this.buf = null; this.name = '';
     this.mode = 'clip'; this.src = null; this.raf = 0; this.busy = false;
@@ -4321,13 +4294,18 @@ class AudioTrimmer {
       '<button class="btn at-paus" type="button" disabled>Убрать паузы</button>' +
       '<button class="btn at-voc" type="button" disabled>Отделить голос</button>' +
       '<button class="btn at-und" type="button" disabled title="Вернуть аудио ровно таким, каким оно было загружено: все спуски, разрезы и чистки пауз отменятся">Откат</button>' +
+      '<button class="btn at-back" type="button" disabled title="Вернуть последнее изменение аудио - один шаг, а не всё сразу">Шаг назад</button>' +
       '<button class="btn at-ag" type="button" disabled title="Выделенный кусок уйдёт в Агент: он послушает слова и ответит с учётом них">🤖 В агент</button></div>' +
+      '<div class="at-pz" hidden><span>Паузы длиннее</span><input type="number" class="at-pm" value="0,6" step="0.1" min="0.2" max="5">' +
+      '<span>с сократить до</span><input type="number" class="at-pk" value="0,25" step="0.05" min="0.05" max="2"><span>с</span>' +
+      '<b class="at-pzi"></b><button class="btn mini pri at-pgo" type="button" disabled>Убрать</button></div>' +
       '<div class="at-zoom"><span>Резать удобнее с приближением:</span><button class="btn mini at-zm" type="button">−</button>' +
       '<input type="range" class="at-zr" min="1" max="40" step="1" value="1"><button class="btn mini at-zp" type="button">+</button>' +
+      '<input type="range" class="at-pp" min="0" max="1000" step="1" value="0" title="Какую часть аудио показывает волна: тяните, когда приближено">' +
       '<span class="at-zl">весь фрагмент</span><button class="btn mini at-z0" type="button">Весь фрагмент</button></div>' +
       '<div class="at-nums"><label>Начало, с<input type="text" inputmode="decimal" class="at-a" placeholder="0,0" disabled></label>' +
       '<label>Конец, с<input type="text" inputmode="decimal" class="at-b" placeholder="15,0" disabled></label>' +
-      '<div class="at-box"><span class="at-cap">Длина аудио</span><b class="at-dur">—</b></div></div>' +
+      '<div class="at-box"><span class="at-cap">' + this.lenLabel + '</span><b class="at-dur">—</b></div></div>' +
       '<div class="at-warn" hidden></div>' +
       '</div>' +
       '<div class="at-empty">Загрузите аудио - и здесь появится редактор: волна, выделение, паузы, голос.</div>';
@@ -4341,8 +4319,17 @@ class AudioTrimmer {
   /* window shown on the screen: the whole clip at zoom 1, a narrower piece around the selection above */
   view() {
     const d = this.dur0 || 1, span = d / this.zoom;
-    let a = this.zoom > 1.02 ? Math.min(Math.max(0, this.start - span * .15), Math.max(0, d - span)) : 0;
+    if (this.zoom <= 1.02) return [0, Math.min(d, span)];
+    const free = Math.max(0, d - span);
+    // the person may slide the window by hand; until they do, it follows the selection
+    const a = (this._pan != null) ? free * this._pan : Math.min(Math.max(0, this.start - span * .15), free);
     return [a, Math.min(d, a + span)];
+  }
+  _zinfo() {
+    if (this.zoom <= 1.02) return 'весь фрагмент';
+    const [a, b] = this.view();
+    return 'видно ' + a.toFixed(1).replace('.', ',') + '–' + b.toFixed(1).replace('.', ',') + ' с из ' +
+      Math.round(this.dur0) + ' · ×' + this.zoom;
   }
   fracAt(t) { const [a, b] = this.view(); return (t - a) / Math.max(.001, b - a); }
   tAt(p) { const [a, b] = this.view(); return a + p * (b - a); }
@@ -4360,8 +4347,12 @@ class AudioTrimmer {
     catch { this.say('Не удалось прочитать этот аудиофайл'); return; }
     this.name = f.name; this.dur0 = this.buf.duration;
     this.buf0 = this.buf; this.name0 = f.name;   // what the file was when it came in: «Откат» returns to this
-    this.start = 0; this.end = this.limit > 0 ? Math.min(this.dur0, this.limit) : this.dur0; this.cut = null; this.undo = [];
+    const cap = this.preselect ? Math.min(this.dur0, this.preselect)
+      : (this.limit > 0 ? Math.min(this.dur0, this.limit) : this.dur0);
+    this.start = 0; this.end = cap; this.cut = null; this.undo = []; this._pan = null;
     this.zoom = 1; this.q('.at-zr').value = 1; paintRange(this.q('.at-zr'));
+    if (this.q('.at-pm')) { this.q('.at-pm').value = '0,6'; this.q('.at-pk').value = '0,25'; }
+    if (this.q('.at-pz')) this.q('.at-pz').hidden = true;
     this._loaded = { start: this.start, end: this.end };   // closing must apply only what the person changed
     this.busy = !!silent;
     this._peaks(); this._paint(); this._sync();
@@ -4430,7 +4421,16 @@ class AudioTrimmer {
     this.q('.at-paus').disabled = this.q('.at-voc').disabled = !on;
     this.q('.at-ag').disabled = !on;
     this.q('.at-und').disabled = !(on && this.buf0 && this.buf !== this.buf0);   // live only while the sound differs from the original
-    this.q('.at-zl').textContent = this.zoom > 1.02 ? this.view()[1] - this.view()[0] > 0 ? Math.round(this.view()[1] - this.view()[0]) + ' с' : '—' : 'весь фрагмент';
+    const back = this.q('.at-back'); if (back) back.disabled = !(on && this.undo.length);
+    const pp = this.q('.at-pp');
+    if (pp) {
+      pp.hidden = !(on && this.zoom > 1.02);
+      const free = Math.max(1, this.dur0 - this.dur0 / this.zoom);
+      const a = this.view()[0];
+      if (document.activeElement !== pp) pp.value = String(Math.round(1000 * a / free));
+      paintRange(pp);
+    }
+    this.q('.at-zl').textContent = this._zinfo();
     const body = this.q('.at-body'), empty = this.q('.at-empty');
     if (body) body.hidden = !on;
     if (empty) empty.hidden = !!on;
@@ -4438,7 +4438,11 @@ class AudioTrimmer {
     if (on && this.limit > 0 && this.len() > this.limit + .05) {
       warn.hidden = false;
       warn.textContent = 'Максимум ' + this.limit + ' секунд — укоротите фрагмент.';
-    } else if (on && this.undo.length && !whole) { warn.hidden = false; warn.textContent = 'Аудио изменено: убрано ' + away.toFixed(1).replace('.', ',') + ' с. «Отменить» вернёт как было.'; }
+    } else if (on && this.warnOver > 0 && this.len() > this.warnOver) {
+      // the model stops listening before the hard cap: warn while there is still time to shorten
+      warn.hidden = false;
+      warn.textContent = 'Оставьте небольшую паузу: дальше ' + this.warnOver + ' с модель может не дослушать.';
+    } else if (on && this.undo.length && !whole) { warn.hidden = false; warn.textContent = 'Аудио изменено: убрано ' + away.toFixed(1).replace('.', ',') + ' с. «Шаг назад» вернёт последнее, «Откат» — всё сразу.'; }
     else warn.hidden = true;
     this._paint();
   }
@@ -4459,6 +4463,16 @@ class AudioTrimmer {
     const f = new File([wavSlice(this.buf, this.start, this.end)], stem + '-фрагмент.wav', { type: 'audio/wav' });
     this.onFile(f, this);
     return f;
+  }
+  /* One step back: every edit leaves a copy in the stack, «Откат» returns to the original at once. */
+  undoStep() {
+    const s = this.undo.pop();
+    if (!s) { this.say('Отменять нечего'); return; }
+    this.stop();
+    this.buf = s.buf;
+    this.start = s.start; this.end = s.end; this.cut = null;
+    this._sync(); this.out();
+    this.say(this.undo.length ? 'Вернул последнее изменение' : 'Вернул последнее изменение: аудио как было');
   }
   clear() { this.stop(); this.buf = null; this.dur0 = 0; this.start = this.end = 0; this.cut = null; this.undo = []; this.name = ''; this.zoom = 1; this._sync(); }
   play() {
@@ -4509,6 +4523,7 @@ class AudioTrimmer {
       h.addEventListener('pointermove', e => {
         const g = this._grab; if (!g) return;
         const v = at(e);
+        this._pan = null;                       // the window follows the marker the person moved
         if (g === 'l') this.start = Math.min(v, this.end - .1);
         else if (g === 'r') this.end = Math.max(v, this.start + .1);
         else if (g === 'cl' && this.cut) this.cut = { a: Math.min(v, this.cut.b - .05), b: this.cut.b };
@@ -4522,6 +4537,22 @@ class AudioTrimmer {
       });
       h.addEventListener('pointercancel', () => { this._grab = null; });
     });
+    // the body of the selection moves the whole frame: grabbing it used to restart the selection
+    const sel = this.q('.at-sel');
+    sel.addEventListener('pointerdown', e => {
+      if (!this.dur0 || e.target.closest('.at-h') || this.mode === 'cut') return;
+      e.stopPropagation(); e.preventDefault();
+      this._move = { grab: at(e) - this.start, len: this.len() };
+      sel.setPointerCapture(e.pointerId);
+    });
+    sel.addEventListener('pointermove', e => {
+      if (!this._move) return;
+      const t = at(e), a = Math.max(0, Math.min(this.dur0 - this._move.len, t - this._move.grab));
+      this.start = a; this.end = a + this._move.len; this._sync();
+    });
+    const endMove = () => { if (this._move) { this._move = null; this.out(); } };
+    sel.addEventListener('pointerup', endMove);
+    sel.addEventListener('pointercancel', endMove);
     el.addEventListener('pointerdown', e => {
       if (!this.dur0 || this._grab) return;
       if (e.target.closest('.at-fd')) return;   // pressing a stair is a press, not a drag: the markers
@@ -4568,19 +4599,47 @@ class AudioTrimmer {
       this._commit(keepRanges(this.buf, keep), shiftAfter([[a, b]]));
       this.say('Вырезано ' + (b - a).toFixed(1).replace('.', ',') + ' с');
     };
+    // the pauses panel keeps its own numbers: the same two knobs the person could set before
     this.q('.at-paus').onclick = () => {
       if (!this.dur0) return;
-      const found = findPauses(this.buf, .6, .25);
-      if (!found.length) { this.say('Длинных пауз не найдено'); return; }
-      const left = found.reduce((s, [x, y]) => s + y - x, 0);
+      const pz = this.q('.at-pz');
+      pz.hidden = !pz.hidden;
+      if (!pz.hidden) this._pzShow();
+    };
+    const pnum = (el, def) => { const v = parseFloat(String(el.value).replace(',', '.')); return isFinite(v) ? v : def; };
+    this._pzFind = () => findPauses(this.buf, pnum(this.q('.at-pm'), .6), pnum(this.q('.at-pk'), .25));
+    this._pzShow = () => {
+      const f = this._pzFind(), saved = f.reduce((s, [x, y]) => s + y - x, 0);
+      this.q('.at-pzi').textContent = f.length
+        ? 'найду ' + f.length + ' пауз, короче на ' + saved.toFixed(1).replace('.', ',') + ' с'
+        : 'длинных пауз нет';
+      this.q('.at-pgo').disabled = !f.length;
+    };
+    this.q('.at-pm').oninput = this.q('.at-pk').oninput = () => this._pzShow();
+    this.q('.at-pgo').onclick = () => {
+      const f = this._pzFind();
+      if (!f.length) { this.say('Длинных пауз не найдено'); return; }
+      const left = f.reduce((s, [x, y]) => s + y - x, 0);
       const gaps = []; let prev = 0;
-      found.forEach(([x, y]) => { if (x - prev > .001) gaps.push([prev, x]); prev = y; });
+      f.forEach(([x, y]) => { if (x - prev > .001) gaps.push([prev, x]); prev = y; });
       if (this.dur0 - prev > .001) gaps.push([prev, this.dur0]);
-      this._commit(keepRanges(this.buf, gaps), shiftAfter(found));
-      this.say('Пауз убрано: ' + found.length + ' · стало короче на ' + left.toFixed(1).replace('.', ',') + ' с');
+      this._commit(keepRanges(this.buf, gaps), shiftAfter(f));
+      this.q('.at-pz').hidden = true;
+      this.say('Пауз убрано: ' + f.length + ' · стало короче на ' + left.toFixed(1).replace('.', ',') + ' с');
+    };
+    this.q('.at-back').onclick = () => this.undoStep();
+    if (this.q('.at-pp')) this.q('.at-pp').oninput = e => {
+      this._pan = Math.min(1, Math.max(0, (+e.target.value || 0) / 1000));
+      paintRange(e.target); this._paint(); this.q('.at-zl').textContent = this._zinfo();
     };
     this.q('.at-voc').onclick = async () => {
       if (!this.dur0 || this.busy) return;
+      // the model that separates a voice may be absent, or the file too long for it: the owner says
+      if (this.buf.duration > 360) { this.say('Голос отделяется только от аудио длиннее 6 минут? Слишком длинное: отрежьте лишнее'); return; }
+      if (this.canVocals) {
+        const why = await this.canVocals();
+        if (why) { this.say(why); return; }
+      }
       const fd = new FormData();
       fd.append('file', new File([wavSlice(this.buf, 0, this.dur0)], 'in.wav', { type: 'audio/wav' }));   // the endpoint reads 'file'
       this.busy = true; this.q('.at-voc').disabled = true; this.q('.at-voc').textContent = 'Отделяю…';
@@ -4642,73 +4701,77 @@ class AudioTrimmer {
   }
 }
 
+/* The Clip edits sound with the same editor the studios use: one class for the wave, the markers,
+   the fades, the pauses and the voice. Only what is specific to the Clip stays here: the upload zone,
+   the 12-second pre-selection, the advice about the pause, and that the piece goes to the generator. */
+let vocalsOk = null;
+const lTrim = new AudioTrimmer({
+  mount: $('#lTrim'), limit: MAX_LEN, preselect: REC_LEN, warnOver: REC_LEN,
+  lenLabel: 'Длина видео', agentTarget: 'lipsync',
+  whereLabel: () => 'аудио из «Клипа», тег <Audio 1>',
+  // the voice model may be missing in this installation: the server knows, and says why
+  canVocals: async () => {
+    if (!API) return 'ComfyUI не запущен: отделить голос нельзя.';
+    try { vocalsOk = await (await fetch('/api/audio/info')).json(); }
+    catch { vocalsOk = { available: false, reason: 'ComfyUI не ответил.' }; }
+    return vocalsOk.available ? '' : 'Отделить голос нельзя: ' + (vocalsOk.reason || 'модель не установлена');
+  },
+  // the editor knows the selection; the Clip reads it from L, so the two stay in step
+  onState: tr => {
+    abuf = tr.buf; peaks = tr.peaks; audioName = tr.name || '';
+    L.dur0 = tr.dur0; L.start = tr.start; L.end = tr.end;
+    const nt = $('#aNote');
+    if (nt) {
+      const len = tr.len();
+      const txt = len > MAX_LEN ? 'Максимум ' + MAX_LEN + ' секунд — укоротите фрагмент.'
+        : len > REC_LEN ? 'Лучше держать фрагмент до ' + REC_LEN + ' секунд — так синхронизация губ точнее. Длиннее можно, но надёжнее короче.'
+        : 'Оставьте небольшую паузу до и после слов — так губы начинают и заканчивают движение естественно.';
+      nt.className = 'note' + (len > REC_LEN ? ' warn' : '');
+      nt.querySelector('span').textContent = txt;
+    }
+    try { lUpd(); lPrev(); } catch (e) { }
+  },
+});
+// the Clip's own two buttons stand in the editor's line: one editor, no second set of controls
+(() => {
+  const top = lTrim.el.querySelector('.at-top');
+  const mk = (cls, txt, title, fn, id) => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = cls; b.textContent = txt; b.title = title; b.id = id;
+    b.onclick = fn; top.append(b); return b;
+  };
+  mk('a-change', 'Заменить', 'Выбрать другой файл; то, что уже поправили, останется', () => aFile.click());
+  mk('a-change a-del', 'Удалить', 'Убрать аудио из этого раздела', () => { removeClipAudio(); toast('Аудио удалено'); });
+})();
+function removeClipAudio() {
+  lTrim.clear();
+  abuf = null; peaks = []; audioName = '';
+  L.dur0 = 0; L.start = 0; L.end = 0; MEM.audio = null; aFile.value = '';
+  $('#aEd').classList.remove('on'); aDrop.style.display = '';
+  lUpd(); memSave();
+}
 async function loadAudio(f) {
   if (!f) return;
   MEM.audio = f;
-  stop();
-  actx = actx || new AudioContext();
-  try { abuf = await actx.decodeAudioData(await f.arrayBuffer()); }
-  catch { alert('Не удалось прочитать этот аудиофайл'); return; }
-  L.dur0 = abuf.duration; L.start = 0; L.end = Math.min(abuf.duration, REC_LEN);
-  const fmt = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
-  audioName = f.name; undoStack = []; cut = null; setEditMode('clip'); $('#aPausesBox').hidden = true;
+  await lTrim.setFile(f);
+  if (!lTrim.dur0) return;                 // a file the browser cannot decode: the zone stays
   aDrop.style.display = 'none'; $('#aEd').classList.add('on');
-  refreshAudioInfo(); computePeaks();
-  drawWave(); syncSel(); syncCut(); checkVocals();
 }
-function computePeaks() {
-  const ch = abuf.getChannelData(0), N = 600, step = Math.max(1, Math.floor(ch.length / N));
-  peaks = Array.from({ length: N }, (_, i) => { let m = 0; for (let j = i * step; j < (i + 1) * step; j += 16) m = Math.max(m, Math.abs(ch[j] || 0)); return m; });
-  const mx = Math.max(...peaks) || 1; peaks = peaks.map(p => p / mx);
-}
-function refreshAudioInfo() {
-  const fmt = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
-  $('#aName').innerHTML = `${esc(audioName)}<small>${fmt(abuf.duration)} · ${abuf.sampleRate / 1000} кГц${undoStack.length ? ' · изменено' : ''}</small>`;
-}
-
-/* editing: cut a piece out, remove pauses, keep only the voice. Every edit makes a new buffer; "Отменить" goes back. */
-let audioName = '', editMode = 'clip', cut = null, undoStack = [];
-function setEditMode(m) {
-  editMode = m; wave.classList.toggle('cutmode', m === 'cut');
-  $$('.a-mode button').forEach(b => b.classList.toggle('on', b.dataset.m === m));
-  $('#aToolHint').textContent = m === 'cut'
-    ? 'Проведите мышью по волне, чтобы выделить кусок, который нужно убрать (края можно двигать), и нажмите «Удалить выделенное».'
-    : 'Выделите, что оставить в клипе, и нажмите «Оставить выделенное» - остальное аудио уберётся.';
-  syncCutBtn();
-  if (m === 'clip') { cut = null; syncCut(); }
-}
-function syncCutBtn() {
-  // one scissors button, two honest names: in the selection mode it keeps what is chosen, in the cut
-  // mode it removes what is chosen
-  const btn = $('#aCutDel'); if (!btn) return;
-  const ag = $('#aToAgent'); if (ag) ag.disabled = !L.dur0;
-  if (editMode === 'cut') return;                       // the cut mode paints the button itself
-  if (!L.dur0) { btn.disabled = true; btn.textContent = '✂ Оставить выделенное'; return; }
-  const whole = L.start <= 0.001 && L.end >= L.dur0 - 0.001;
-  btn.disabled = whole || L.len() < 0.05;
-  const away = (L.dur0 - L.len()).toFixed(1).replace('.', ',');
-  btn.textContent = whole ? '✂ Оставить выделенное' : `✂ Оставить выделенное - убрать ${away} с`;
-  btn.title = whole ? 'Выделите кусок, который нужно оставить'
-    : `Оставит выделенные ${L.len().toFixed(1).replace('.', ',')} с, а остальное аудио в ${away} с уберёт`;
-}
-function syncCut() {
-  const el = $('#cutSel'), btn = $('#aCutDel');
-  if (!cut || !L.dur0) {
-    el.hidden = true;
-    if (editMode === 'cut') { btn.disabled = true; btn.textContent = '✂ Удалить выделенное'; } else syncCutBtn();
-    return;
+// names the rest of the page still uses: they point at the shared editor now
+function syncSel() {
+  if (lTrim.dur0 && (Math.abs(lTrim.start - L.start) > .01 || Math.abs(lTrim.end - L.end) > .01)) {
+    lTrim.start = L.start; lTrim.end = L.end;                 // a saved selection comes back
+    lTrim._loaded = { start: L.start, end: L.end };
   }
-  const w = wave.clientWidth; el.hidden = false;
-  el.style.left = (fracAt(cut.a) * w) + 'px'; el.style.width = ((fracAt(cut.b) - fracAt(cut.a)) * w) + 'px';
-  btn.disabled = cut.b - cut.a < 0.05;
-  const sec = (cut.b - cut.a).toFixed(1).replace('.', ',');
-  btn.textContent = `✂ Удалить выделенное - ${sec} с`;
-  btn.title = `Уберёт ${sec} с внутри рамки, остальное аудио останется`;
+  lTrim._sync();
 }
-// the pieces [a,b] (seconds) of buf that stay, joined with tiny fades so the joins do not click
-/* A fade inside one stretch of the wave: 'r' dies away to the right edge, 'l' to the left one.
-   The rest of the audio is left exactly as it was, so a fade never touches what the person did not
-   mark. The ramp is straight - that is what an ear calls "плавно" at these lengths. */
+function syncCut() { lTrim._sync(); }
+function drawWave() { if (lTrim.dur0) lTrim._paint(); }
+function stop() { lTrim.stop(); }
+
+/* Sound editing, shared by every editor in the program: the studio slots, the film bench and the Clip
+   all go through AudioTrimmer, and these four functions are the arithmetic behind it. They sit next to
+   wavSlice so that cutting, fading and quiet-passing live in exactly one place. */
 function fadeRange(buf, ctx, a, b, dir) {
   const sr = buf.sampleRate, ch = buf.numberOfChannels, N = buf.length;
   const i0 = Math.max(0, Math.floor(a * sr)), i1 = Math.min(N, Math.ceil(b * sr));
@@ -4727,7 +4790,6 @@ function fadeRange(buf, ctx, a, b, dir) {
   }
   return out;
 }
-
 function keepRanges(buf, ranges) {
   const sr = buf.sampleRate, chs = buf.numberOfChannels, fade = Math.round(0.004 * sr);
   const lens = ranges.map(([a, b]) => Math.max(0, Math.round((b - a) * sr)));
@@ -4743,37 +4805,7 @@ function keepRanges(buf, ranges) {
   }
   return out;
 }
-// where a moment of the old audio ends up after the removed pieces [a,b] are taken out
 const shiftAfter = removed => t => t - removed.reduce((s, [a, b]) => s + (t >= b ? b - a : t > a ? t - a : 0), 0);
-function commitEdit(newBuf, mapT) {
-  stop();
-  undoStack.push({ buf: abuf, start: L.start, end: L.end }); if (undoStack.length > 15) undoStack.shift();
-  abuf = newBuf; L.dur0 = abuf.duration;
-  L.start = Math.min(mapT(L.start), Math.max(0, L.dur0 - 1)); L.end = Math.min(Math.max(mapT(L.end), L.start + 1), L.dur0);
-  cut = null; computePeaks(); refreshAudioInfo(); drawWave(); syncSel(); syncCut(); $('#aUndo').disabled = false;
-}
-$('.a-mode').onclick = e => { const b = e.target.closest('button[data-m]'); if (b && L.dur0) setEditMode(b.dataset.m); };
-$('#aCutDel').onclick = () => {
-  if (editMode !== 'cut') {   // the selection mode: keep the chosen piece, throw the rest away
-    if (!L.dur0 || L.len() < 0.05) return;
-    if (L.start <= 0.001 && L.end >= L.dur0 - 0.001) { toast('Выделено всё аудио: убирать нечего'); return; }
-    const left = L.dur0 - L.len(), from = L.start, to = L.end;
-    commitEdit(keepRanges(abuf, [[from, to]]), t => t - from);
-    toast(`Оставлено ${L.len().toFixed(1)} с · убрано ${left.toFixed(1)} с`);
-    return;
-  }
-  if (!cut || cut.b - cut.a < 0.05) return;
-  const { a, b } = cut, keep = [[0, a], [b, abuf.duration]].filter(([x, y]) => y - x > 0.001);
-  if (!keep.length) { toast('Нельзя вырезать всё аудио'); return; }
-  commitEdit(keepRanges(abuf, keep), shiftAfter([[a, b]]));
-  toast(`Вырезано ${(b - a).toFixed(1)} с`);
-};
-$('#aUndo').onclick = () => {
-  const s = undoStack.pop(); if (!s) return; stop();
-  abuf = s.buf; L.dur0 = abuf.duration; L.start = s.start; L.end = s.end; cut = null;
-  computePeaks(); refreshAudioInfo(); drawWave(); syncSel(); syncCut(); $('#aUndo').disabled = !undoStack.length;
-};
-// pauses: stretches quieter than the speech, longer than "min", shortened to "keep"
 function findPauses(buf, minLen, keep) {
   const sr = buf.sampleRate, win = Math.round(sr * 0.01), n = Math.floor(buf.length / win);
   const a = buf.getChannelData(0), b = buf.numberOfChannels > 1 ? buf.getChannelData(1) : a, rms = new Float32Array(n);
@@ -4786,154 +4818,6 @@ function findPauses(buf, minLen, keep) {
     if (!quiet && run >= 0) { const s = run * 0.01, e = i * 0.01; if (e - s >= minLen && e - s > keep + 0.02) found.push([s + keep / 2, e - keep / 2]); run = -1; }
   }
   return found;
-}
-function pausesPreview() {
-  if (!L.dur0) return [];
-  const f = findPauses(abuf, +$('#apMin').value || 0.6, +$('#apKeep').value || 0.25), saved = f.reduce((s, [x, y]) => s + y - x, 0);
-  $('#apInfo').textContent = f.length ? `Найдено пауз: ${f.length}, станет короче на ${saved.toFixed(1)} с` : 'Длинных пауз не найдено';
-  $('#apApply').disabled = !f.length; return f;
-}
-$('#aPauses').onclick = () => { const box = $('#aPausesBox'); box.hidden = !box.hidden; if (!box.hidden) pausesPreview(); };
-$('#apMin').oninput = $('#apKeep').oninput = pausesPreview;
-$('#apApply').onclick = () => {
-  const f = pausesPreview(); if (!f.length) return;
-  const keep = []; let pos = 0; f.forEach(([s, e]) => { keep.push([pos, s]); pos = e; }); keep.push([pos, abuf.duration]);
-  commitEdit(keepRanges(abuf, keep.filter(([x, y]) => y - x > 0.001)), shiftAfter(f));
-  $('#aPausesBox').hidden = true; toast(`Убрано пауз: ${f.length}`);
-};
-// voice only (needs the MelBand RoFormer node and model in ComfyUI)
-let vocalsOk = null;
-async function checkVocals() {
-  if (!API) return;
-  try { vocalsOk = await (await fetch('/api/audio/info')).json(); } catch { vocalsOk = { available: false, reason: 'ComfyUI не запущен.' }; }
-  const b = $('#aVocals'); b.disabled = !vocalsOk.available;
-  b.title = vocalsOk.available ? 'Оставить только голос, без музыки' : 'Недоступно: ' + vocalsOk.reason;
-}
-$('#aVocals').onclick = async () => {
-  if (!L.dur0) return;
-  if (abuf.duration > 360) { toast('Для отделения голоса аудио должно быть не длиннее 6 минут: сначала вырежьте нужное'); return; }
-  const b = $('#aVocals'), old = b.textContent; b.disabled = true; b.textContent = 'Отделяем голос…'; stop();
-  try {
-    const fd = new FormData(); fd.append('file', wavSlice(abuf, 0, abuf.duration), 'a.wav');
-    const r = await fetch('/api/audio/separate', { method: 'POST', body: fd });
-    if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || 'Не удалось отделить голос');
-    const nb = await actx.decodeAudioData(await r.arrayBuffer());
-    commitEdit(nb, t => Math.min(t, nb.duration));
-    toast('Голос отделён, музыки больше нет. Прослушайте (▶). Не понравилось — «Отменить».');
-  } catch (e) { toast(e.message); }
-  b.textContent = old; b.disabled = !(vocalsOk?.available);
-};
-function drawWave() {
-  const r = wave.getBoundingClientRect(), dpr = devicePixelRatio || 1;
-  cv.width = r.width * dpr; cv.height = r.height * dpr;
-  const c = cv.getContext('2d'); c.scale(dpr, dpr); c.clearRect(0, 0, r.width, r.height);
-  const cs = getComputedStyle(document.documentElement);
-  const wc = { accent: cs.getPropertyValue('--accent').trim(), accent2: cs.getPropertyValue('--accent-2').trim(), idle: cs.getPropertyValue('--line-2').trim() };
-  const bars = Math.floor(r.width / 3), mid = r.height / 2;
-  const a = fracAt(L.start), b = fracAt(L.end);
-  for (let i = 0; i < bars; i++) {
-    const t = i / bars;                                  // a place on the screen, 0..1
-    const p = peaks[Math.min(peaks.length - 1, Math.max(0, Math.floor((VIEW.a + t * viewSpan()) * peaks.length)))] || 0;
-    const hgt = Math.max(2, p * (r.height - 16));
-    c.fillStyle = t >= a && t <= b ? (t < (a + b) / 2 ? wc.accent : wc.accent2) : wc.idle;
-    c.fillRect(i * 3, mid - hgt / 2, 2, hgt);
-  }
-}
-function syncSel() {
-  const w = wave.clientWidth;
-  selEl.style.left = (fracAt(L.start) * w) + 'px';
-  selEl.style.width = ((fracAt(L.end) - fracAt(L.start)) * w) + 'px';
-  $('#aStart').value = L.start.toFixed(1); $('#aEnd').value = L.end.toFixed(1);
-  const len = L.len();
-  $('#aLen').textContent = `${len.toFixed(1)} с`;
-  const n = $('#aNote');
-  if (len > MAX_LEN) { n.className = 'note warn'; n.querySelector('span').textContent = `Максимум ${MAX_LEN} секунд — укоротите фрагмент.`; }
-  else if (len > REC_LEN) { n.className = 'note warn'; n.querySelector('span').textContent = `Лучше держать фрагмент до ${REC_LEN} секунд — так синхронизация губ точнее. Длинный трек можно разбить на несколько клипов.`; }
-  else { n.className = 'note'; n.querySelector('span').textContent = 'Оставьте небольшую паузу до и после слов — так губы начинают и заканчивают движение естественно.'; }
-  syncCutBtn(); drawWave(); lPrev();
-}
-let drag = null;
-// The wave can show the whole audio or a piece of it, so that the markers can be placed to a tenth of
-// a second. VIEW holds which part is shown, as fractions of the length.
-let VIEW = { a: 0, b: 1 };
-const ZOOMS = [1, 2, 4, 8, 16]; let zi = 0;
-const viewSpan = () => Math.max(0.0001, VIEW.b - VIEW.a);
-const fracAt = t => (t / L.dur0 - VIEW.a) / viewSpan();      // a moment -> a place on the wave
-const tAtFrac = f => (VIEW.a + f * viewSpan()) * L.dur0;     // a place on the wave -> a moment
-function azPaint() {
-  const box = $('#aZoom'); if (!box) return;
-  box.style.opacity = L.dur0 ? '1' : '.45';
-  $('#azOut').disabled = zi === 0;
-  $('#azIn').disabled = zi >= ZOOMS.length - 1;
-  $('#azInfo').textContent = zi === 0 ? 'весь фрагмент'
-    : `${(VIEW.a * L.dur0).toFixed(1)}–${(VIEW.b * L.dur0).toFixed(1)} с из ${L.dur0.toFixed(1)} · ×${ZOOMS[zi]}`;
-  const room = 1 - viewSpan();
-  $('#azPan').value = room > 0.0001 ? Math.round(VIEW.a / room * 1000) : 0;
-}
-function azSet(k, keep) {
-  zi = Math.min(ZOOMS.length - 1, Math.max(0, zi + k));
-  const span = 1 / ZOOMS[zi];
-  const c = keep != null ? keep / L.dur0 : (VIEW.a + VIEW.b) / 2;   // what stays in the middle
-  VIEW = { a: Math.min(Math.max(0, c - span / 2), 1 - span), b: Math.min(Math.max(span, c + span / 2), 1) };
-  if (VIEW.a < 0) VIEW = { a: 0, b: span };
-  drawWave(); syncSel(); syncCut(); azPaint();
-}
-$('#azIn').onclick = () => azSet(1, (L.start + L.end) / 2);
-$('#azOut').onclick = () => azSet(-1, (L.start + L.end) / 2);
-$('#azAll').onclick = () => { zi = 0; VIEW = { a: 0, b: 1 }; drawWave(); syncSel(); syncCut(); azPaint(); };
-$('#azPan').oninput = e => {
-  const span = viewSpan(), room = 1 - span;
-  VIEW = { a: Math.min(Math.max(0, +e.target.value / 1000 * room), room), b: Math.min(1, Math.max(span, Math.max(0, +e.target.value / 1000 * room) + span)) };
-  drawWave(); syncSel(); syncCut(); $('#azInfo').textContent = `${(VIEW.a * L.dur0).toFixed(1)}–${(VIEW.b * L.dur0).toFixed(1)} с из ${L.dur0.toFixed(1)} · ×${ZOOMS[zi]}`;
-};
-// The interface is scaled with CSS zoom, so the cursor coordinates (screen pixels) and the element's
-// own width (layout pixels) are two rulers: dividing one by the other made the markers jump aside and
-// run faster than the hand. The wave's real, on-screen width is the divisor, then VIEW turns the place
-// into a second of audio.
-const waveAt = e => {
-  const r = wave.getBoundingClientRect();
-  return Math.min(L.dur0, Math.max(0, tAtFrac((e.clientX - r.left) / (r.width || 1))));
-};
-wave.addEventListener('pointerdown', e => {
-  if (!L.dur0) return;
-  const t = waveAt(e);
-  const h = e.target.dataset.h;
-  if (editMode === 'cut' && !(h === 'cl' || h === 'cr')) { drag = { mode: 'cnew', anchor: t }; cut = { a: t, b: t }; }
-  else if (h === 'cl' || h === 'cr') drag = { mode: h };
-  else drag = h ? { mode: h } : e.target === selEl ? { mode: 'move', off: t - L.start, len: L.len() } : { mode: 'new', anchor: t };
-  wave.setPointerCapture(e.pointerId);
-});
-wave.addEventListener('pointermove', e => {
-  if (!drag) return;
-  const t = waveAt(e);
-  const MIN = 1;
-  if (drag.mode === 'cnew') { cut = { a: Math.min(drag.anchor, t), b: Math.max(drag.anchor, t) }; syncCut(); return; }
-  if (drag.mode === 'cl') { cut.a = Math.min(t, cut.b - 0.05); syncCut(); return; }
-  if (drag.mode === 'cr') { cut.b = Math.max(t, cut.a + 0.05); syncCut(); return; }
-  if (drag.mode === 'l') L.start = Math.min(t, L.end - MIN);
-  else if (drag.mode === 'r') L.end = Math.max(t, L.start + MIN);
-  else if (drag.mode === 'move') { L.start = Math.min(Math.max(0, t - drag.off), L.dur0 - drag.len); L.end = L.start + drag.len; }
-  else { L.start = Math.min(drag.anchor, t); L.end = Math.max(drag.anchor, t, L.start + MIN); }
-  syncSel();
-});
-wave.addEventListener('pointerup', () => drag = null);
-$('#aStart').onchange = e => { L.start = Math.min(Math.max(0, +e.target.value), L.end - 1); syncSel(); };
-$('#aEnd').onchange = e => { L.end = Math.max(Math.min(L.dur0, +e.target.value), L.start + 1); syncSel(); };
-addEventListener('resize', () => L.dur0 && (syncSel(), syncCut()));
-
-$('#aPlay').onclick = () => src ? stop() : play();
-function play() {
-  src = actx.createBufferSource(); src.buffer = abuf; src.connect(actx.destination);
-  src.start(0, L.start, L.len()); playStart = actx.currentTime;
-  src.onended = stop;
-  $('#aPlayIc').innerHTML = '<path d="M6 4h4v16H6zM14 4h4v16h-4z"/>';
-  ph.style.display = 'block';
-  const tick = () => {
-    const t = L.start + (actx.currentTime - playStart);
-    ph.style.left = (fracAt(t) * wave.clientWidth) + 'px';
-    raf = requestAnimationFrame(tick);
-  };
-  tick();
 }
 // selected part of the decoded audio as 16-bit PCM WAV
 function wavSlice(buf, t0, t1) {
@@ -4952,11 +4836,7 @@ function wavSlice(buf, t0, t1) {
   }
   return new Blob([out.buffer], { type: 'audio/wav' });
 }
-function stop() {
-  if (src) { src.onended = null; try { src.stop(); } catch {} src = null; }
-  cancelAnimationFrame(raf); ph.style.display = 'none';
-  $('#aPlayIc').innerHTML = '<path d="M7 4v16l13-8z"/>';
-}
+
 
 /* ---------- SETUP & MODELS view ---------- */
 const GB = b => b < 1e9 ? Math.round(b / 1e6) + ' МБ' : (b / 1e9).toFixed(1).replace(/\.0$/, '') + ' ГБ';
@@ -9250,12 +9130,6 @@ $('#agLib').onclick = () => {
     } catch { toast(tab === 'img' ? 'Не удалось взять файл' : 'В этом видео нет звука или его не удалось прочитать'); }
   };
 };
-$('#aToAgent').onclick = () => {
-  if (!L.dur0) { toast('Сначала загрузите аудио'); return; }
-  goTo('agent');
-  setChatAudio(wavSlice(abuf, L.start, L.end), (audioName || 'фрагмент').replace(/\.[^.]+$/, ''), L.len());
-  toast(`В Агент отправлено ${L.len().toFixed(1)} с: расшифровываем слова`);
-};
 $('#agFromLip').onclick = () => {
   if (!L.dur0) return;
   setChatAudio(wavSlice(abuf, L.start, L.end), 'фрагмент из «Клипа»', L.len());
@@ -10849,6 +10723,9 @@ const imgSeedForm = (S, fd) => { if (S.seedFixed && S.seed) fd.append('seed', S.
   };
   const fillList = text => { kbMode(true); $('.kr-prompt', root).value = text; $('.kr-prompt', root).oninput({ target: $('.kr-prompt', root) }); K.removed.clear(); kbRender(); };
   imgSeedWire(root, S); upd();
+  // the text written here can be handed to the Agent without retyping it; the target follows the engine
+  agPromptButton($('.card-h', $('.kr-prompt', root).closest('.card')), 'промпт', () => $('.kr-prompt', root).value,
+    () => ({ kreareal: 'krea', flux: 'fluxt', h3img: 'h3t', qwen: 'qwent' }[S.engine] || 'krea'));
   IMG.krea = { fillList, fill: it => { if (it.engine) S.engine = it.engine; else if (/^(Картинка|Изображение) \(FLUX/.test(it.sub || '')) S.engine = 'flux'; else if (/^(Картинка|Изображение) \(Qwen/.test(it.sub || '')) S.engine = 'qwen'; else S.engine = 'krea'; $('.kr-prompt', root).value = it.prompt || ''; $('.kr-prompt', root).oninput({ target: $('.kr-prompt', root) }); if (IMG_SIZES[it.aspect]) S.aspect = it.aspect; upd(); } };
 })();
 
@@ -10859,7 +10736,8 @@ const imgSeedForm = (S, fd) => { if (S.seedFixed && S.seed) fd.append('seed', S.
     <div class="head"><div><h1>Изменение изображения</h1><p>Загрузите изображение и напишите, что изменить: поменять место, одежду, свет, поставить персонажа в новую сцену. Или соберите лист персонажа</p></div>
       <div class="mode-pill"><i></i><span>Qwen Image 2.1</span></div></div>
     <div class="grid"><div class="col">
-      <div class="card"><div class="card-h"><h3><span class="n">1</span>Картинка</h3><button class="btn mini qw-clear" type="button" title="Убрать картинки и текст правки">Очистить</button></div>
+      <div class="row qw-top"><div class="seg qw-kind"><button data-k="edit" type="button" title="Изменить ваше изображение по описанию">Править изображение</button><button data-k="sheet" type="button" title="Собрать лист персонажа: 4 или 6 видов с разных сторон">Лист персонажа</button><button data-k="story" type="button" title="История по кадрам из изображений героя и места">Раскадровка</button></div><button class="btn mini qw-clear" type="button" title="Убрать всё в этом разделе: картинки, текст правки и особые приметы">Очистить всё</button></div>
+      <div class="card"><div class="card-h"><h3><span class="n">1</span>Картинка</h3></div>
         <div class="qw-slots">
           <label class="drop" id="qwDrop"><input type="file" accept="image/*"><i class="cnt">1/3</i><div class="ph"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="9" cy="9" r="1.6"/><path d="m21 15-5-5L5 21"/></svg><b>Ваша картинка</b><span>перетащите или нажмите</span></div><span class="tag" hidden>Исходная</span><button class="x" type="button">✕</button></label>
           <label class="drop qw-s2" id="qwDrop2" title="Ещё одна картинка (референс, по желанию)"><input type="file" accept="image/*"><i class="cnt">2/3</i><div class="ph"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></div><span class="tag" hidden>2</span><button class="x" type="button">✕</button></label>
@@ -10868,24 +10746,24 @@ const imgSeedForm = (S, fd) => { if (S.seedFixed && S.seed) fd.append('seed', S.
           <label class="drop qw-s5 qw-h3only" id="qwDrop5" hidden title="5-я картинка: только MiniMax H3 Image (до 5 референсов)"><input type="file" accept="image/*"><i class="cnt">5/5</i><div class="ph"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></div><span class="tag" hidden>5</span><button class="x" type="button">✕</button></label>
         </div>
         <div class="hint qw-morehint" style="margin-top:8px"></div></div>
-      <div class="card"><div class="card-h"><h3><span class="n">2</span>Что делаем</h3></div>
-        <div class="seg qw-kind" style="grid-template-columns:repeat(3,1fr)"><button data-k="edit">Править изображение<small>изменить по описанию</small></button><button data-k="sheet">Лист персонажа<small>4 или 6 видов с разных сторон</small></button><button data-k="story">Раскадровка<small>история по изображениям героя и места</small></button></div>
-        <div class="qw-edit" style="margin-top:14px">
+      <div class="card"><div class="card-h"><h3><span class="n">2</span>Промпт</h3><span class="hint">можно написать в разделе «Агент»</span></div>
+        <div class="qw-edit">
+          <textarea class="qw-prompt" placeholder="Что изменить и что оставить. Например: Этот человек сидит в кафе у окна и пьёт кофе. Лицо, причёска и одежда как на изображении."></textarea>
+          <div class="ta-foot"><span class="hint">Скажите и что поменять, и что оставить прежним — так результат точнее</span></div></div></div>
+      <div class="card"><div class="card-h"><h3><span class="n">3</span>Параметры</h3></div>
           <div class="row qw-storyopts" hidden style="margin-bottom:12px"><div class="row-l">Как рисовать</div>
             <div class="seg qw-fr" style="grid-template-columns:minmax(0,1fr) minmax(0,1fr)"><button data-fr="1">По кадрам<small>каждый кадр отдельно, лист склеит программа</small></button><button data-fr="0">Одним листом<small>одно изображение сразу</small></button></div>
             <div class="row qw-lnrow" style="margin-top:10px"><div class="row-l">Линия между кадрами</div>
               <div class="seg qw-ln" style="grid-template-columns:repeat(3,1fr)"><button data-ln="white">Тонкая белая</button><button data-ln="black">Тонкая чёрная</button><button data-ln="none">Без линии</button></div></div>
             <div class="hint" style="margin-top:6px">Кадры пишите по одному в строке: «1: ...», «2: ...» (2, 3, 4, 6, 8 или 9 кадров). Каждый кадр сохраняется отдельно в Библиотеку в полном размере. FLUX.2 рисует кадр за секунды, Qwen 2.1 заметно дольше (минуты на кадр).</div></div>
-          <div class="row" style="margin-bottom:12px"><div class="row-l">Модель</div><div class="seg qw-eng" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr))"><button data-e="qwen">Qwen 2.1<small>для творчества, не для коммерции</small></button><button data-e="h3img">MiniMax H3 Image<small>до 5 референсов, крупно</small></button><button data-e="flux">FLUX klein<small>лёгкая модель; лицензию см. в списке моделей</small></button></div>
+          <div class="row qw-parameng" style="margin-bottom:12px"><div class="row-l">Модель</div><div class="seg qw-eng" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr))"><button data-e="qwen">Qwen 2.1<small>для творчества, не для коммерции</small></button><button data-e="h3img">MiniMax H3 Image<small>до 5 референсов, крупно</small></button><button data-e="flux">FLUX klein<small>лёгкая модель; лицензию см. в списке моделей</small></button></div>
             <div class="hint qw-fluxhint" hidden></div></div>
-          <textarea class="qw-prompt" placeholder="Что изменить и что оставить. Например: Этот человек сидит в кафе у окна и пьёт кофе. Лицо, причёска и одежда как на изображении."></textarea>
-          <div class="ta-foot"><span class="hint">Скажите и что поменять, и что оставить прежним — так результат точнее</span></div>
           <div class="row qw-editonly" style="margin-top:12px"><div class="row-l">Формат кадра <span class="hint">по умолчанию как у вашего изображения</span></div><div class="chips qw-asp"></div></div>
           <div class="qw-szwrap" style="margin-top:12px">${SZ_ROW}</div>
           <div class="row qw-editonly qw-szrow" style="margin-top:12px"><div class="row-l">Размер результата</div><div class="seg qw-size" style="grid-template-columns:minmax(0,1fr) minmax(0,1fr)"><button data-s="1">Обычный<small>~1 МП, быстро</small></button><button data-s="2">Крупный<small>~2 МП, дольше</small></button></div></div>
           <div class="row qw-h3sz" hidden style="margin-top:12px"><div class="row-l">Размер результата</div>
             <div class="seg" style="grid-template-columns:repeat(3,1fr)"><button data-h3s="4">4 МП<small>быстро</small></button><button data-h3s="8">8 МП<small>средне</small></button><button data-h3s="16">16 МП<small>дольше всего</small></button></div>
-            <div class="hint" style="margin-top:6px">MiniMax H3 Image: лист персонажа и раскадровка выходят крупными сами (8 МП), а для правки размер выбираете вы.</div></div></div>
+            <div class="hint" style="margin-top:6px">MiniMax H3 Image: лист персонажа и раскадровка выходят крупными сами (8 МП), а для правки размер выбираете вы.</div></div>
         <div class="qw-sheet" style="margin-top:14px" hidden>
           <div class="note"><span>Нужен персонаж на изображении (лучше в полный рост, но портрет тоже подойдёт). Потом лист можно взять как референс в других разделах.</span></div>
           <div class="row"><div class="row-l">Сколько видов</div><div class="seg qw-pn" style="grid-template-columns:minmax(0,1fr) minmax(0,1fr)"><button data-p="4">4 панели<small>полный рост спереди и сзади, два портрета</small></button><button data-p="6">6 панелей<small>полный рост спереди, в 3/4, сбоку, сзади + 2 портрета</small></button></div></div>
@@ -10900,12 +10778,13 @@ const imgSeedForm = (S, fd) => { if (S.seedFixed && S.seed) fd.append('seed', S.
   wireDrop(drop, () => {});
   const drop2 = $('#qwDrop2'), drop3 = $('#qwDrop3'), drop4 = $('#qwDrop4'), drop5 = $('#qwDrop5');
   $('.qw-clear', root).onclick = () => {
-    const pics = [drop, drop2, drop3, drop4, drop5].filter(d => d.classList.contains('filled')), ta = $('.qw-prompt', root);
-    if (!pics.length && !ta.value.trim()) { toast('Здесь и так пусто'); return; }
-    confirmBox('Очистить «Правку картинки»?',
-      `Уберём${pics.length ? ' картинки (' + pics.length + ' шт.) и' : ''} текст правки. Картинки в Библиотеке останутся.`, 'Очистить', () => {
+    const pics = [drop, drop2, drop3, drop4, drop5].filter(d => d.classList.contains('filled')), ta = $('.qw-prompt', root), mk = $('.qw-marks', root);
+    if (!pics.length && !ta.value.trim() && !(mk && mk.value.trim())) { toast('Здесь и так пусто'); return; }
+    confirmBox('Очистить «Изменение изображения»?',
+      `Уберём${pics.length ? ' картинки (' + pics.length + ' шт.),' : ''} текст правки${mk && mk.value.trim() ? ' и особые приметы' : ''}. Картинки в Библиотеке останутся.`, 'Очистить всё', () => {
         pics.forEach(d => $('.x', d)?.click());
         ta.value = ''; ta.dispatchEvent(new Event('input', { bubbles: true }));
+        if (mk) mk.value = '';
         toast('Раздел очищен');
       });
   };
@@ -10933,6 +10812,9 @@ const imgSeedForm = (S, fd) => { if (S.seedFixed && S.seed) fd.append('seed', S.
     $$('.qw-asp .chip', root).forEach(c => c.classList.toggle('on', c.dataset.qa === S.aspect));
     $$('.qw-kind button', root).forEach(b => b.classList.toggle('on', b.dataset.k === S.kind));
     $('.qw-edit', root).hidden = S.kind === 'sheet'; $('.qw-sheet', root).hidden = S.kind !== 'sheet';
+    // the prompt card is meaningless for a character sheet, so it steps out of the way entirely
+    { const pc = $('.qw-edit', root).closest('.card'); if (pc) pc.hidden = S.kind === 'sheet'; }
+    { const er = $('.qw-parameng', root); if (er) er.hidden = S.kind === 'sheet'; }   // the sheet picks its own model
     const h3 = S.engine === 'h3img';
     if (S.kind === 'sheet' && S.engine === 'flux') S.engine = 'qwen';   // лист персонажа умеют Qwen и H3 Image
     $$('.qw-s2, .qw-s3', root).forEach(x => x.hidden = S.kind === 'sheet');
@@ -10991,6 +10873,8 @@ const imgSeedForm = (S, fd) => { if (S.seedFixed && S.seed) fd.append('seed', S.
     } catch {}
   }
   imgSeedWire(root, S); upd();
+  agPromptButton($('.card-h', $('.qw-prompt', root).closest('.card')), 'текст правки', () => $('.qw-prompt', root).value,
+    () => ({ h3img: 'h3e' }[S.engine] || 'qwen'));
   IMG.qwen = { fill: it => { if (it.engine) S.engine = it.engine; if (it.frames !== undefined) S.frames = !!it.frames; if (String(it.sub || '').startsWith('Раскадровка по кадрам')) S.frames = true; else if (String(it.sub || '').startsWith('Раскадровка')) S.frames = false; if (it.kind === 'story' || String(it.sub || '').startsWith('Раскадровка')) { S.kind = 'story'; $('.qw-prompt', root).value = it.prompt || ''; } else if (it.sub === 'Лист персонажа') S.kind = 'sheet'; else { S.kind = 'edit'; $('.qw-prompt', root).value = it.prompt || ''; } upd(); } };
 })();
 
@@ -12600,6 +12484,30 @@ function agMakeBtn(host, icon, what) {
   b.textContent = icon + ' Все в агент';
   b.title = 'Сложить в чат Агента ' + what + ' - он допишет к тому, что уже лежит, и ничего не очистит';
   b.addEventListener('click', e => e.stopPropagation());   // a press here must not fold the card
+  host.append(b);
+  return b;
+}
+/* Carrying a text a person already wrote into the Agent: the field gets it, «Промт для» switches to
+   the engine that is actually chosen in this window, and the cursor lands where the work continues. */
+function agPromptButton(host, what, get, target) {
+  if (!host || typeof get !== 'function') return null;
+  const b = document.createElement('button');
+  b.type = 'button'; b.className = 'btn mini agall-h';
+  b.textContent = '🤖 Промпт в агента';
+  b.title = 'Перенести ' + what + ' в чат Агента и включить нужное «Промт для»';
+  b.addEventListener('click', e => e.stopPropagation());   // a press here must not fold the card
+  b.onclick = () => {
+    const txt = String(get() || '').trim();
+    if (!txt) { toast('Сначала напишите ' + what); return; }
+    const ta = $('#agIn'); if (!ta) { goTo('agent'); return; }
+    ta.value = (ta.value.trim() ? ta.value.trim() + '\n\n' : '') + txt;
+    let t = ''; try { t = typeof target === 'function' ? target() : target; } catch (e) { t = ''; }
+    const btn = t && ($('#agTarget [data-t="' + t + '"]') || $('#agTarget2 [data-t="' + t + '"]'));
+    if (btn && !btn.classList.contains('on')) btn.click();
+    goTo('agent');
+    setTimeout(() => { try { ta.focus(); } catch (e) { } }, 260);
+    toast('Текст передан Агенту' + (btn ? ', цель «' + btn.textContent.trim() + '»' : ''));
+  };
   host.append(b);
   return b;
 }
