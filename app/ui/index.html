@@ -94,6 +94,12 @@
    length at the right edge, and the two were read as one marker that disagreed with the other. */
 /* the words of the scene's song, where the person can read and fix them: a machine hears a
    singing voice badly, and a wrong line sent to the model sings nonsense on purpose */
+/* the scene's own number: a circle for one digit, it grows into a pill for two (there are up to
+   twenty scenes, so two digits is the norm, not an edge case) */
+.sc-no{flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;min-width:28px;height:28px;
+ padding:0 7px;border-radius:999px;background:var(--accent);color:#fff;font-size:15px;font-weight:800;
+ line-height:1;font-family:inherit}
+.sc-sec{flex:0 0 auto;min-width:40px;font-size:13.5px;font-weight:700;color:var(--text);white-space:nowrap}
 .sc-words{display:grid;gap:4px;margin-top:6px;padding:7px 9px;border:1px solid var(--line);
  border-radius:10px;background:rgba(var(--surface-rgb),.55)}
 .sc-words>b{font-size:12px;color:var(--muted);font-weight:700}
@@ -7127,7 +7133,18 @@ function makeRefMode(cfg) {
 
       paintRange($('input[type=range]', c));   // the blue fill follows the handle, also on a freshly added scene
         const from = i ? a[i - 1] / 24 : 0, to = a[i] / 24;
-        $('.sc-win', c).textContent = own ? `кусок аудио ${mmss(st + from)}–${mmss(st + to)}` : '';
+        /* The number of the scene belongs on the card, not only on the ribbon: with twenty scenes
+           the person must see at a glance which one they are looking at. The length of the clip
+           stands right after the plus, the same in both studios - where the action studio used to
+           print the piece of its own song. That time is not lost: it lives in the tooltip. */
+        const no = $('.sc-no', c), se = $('.sc-sec', c);
+        if (no) no.textContent = i + 1;
+        const sec = +$('input[type=range]', c).value;
+        if (se) {
+          se.textContent = sec + ' с';
+          se.title = own ? `Длительность этой сцены: ${sec} с · кусок аудио ${mmss(st + from)}–${mmss(st + to)}` : `Длительность этой сцены: ${sec} с`;
+        }
+        $('.sc-win', c).textContent = '';
       });
       const t = total(); $('.lm-total', root).textContent = `≈ ${Math.round(t)} с в итоге`; S.dur = Math.round(t);
       const dur = root._adur;
@@ -7657,7 +7674,7 @@ function makeRefMode(cfg) {
       const c = document.createElement('div'); c.className = 'sc'; c._dn = { draft: null, final: null };
       Object.defineProperty(c, '_done', { get: () => c._dn[root._q || 'final'], set: v => { c._dn[root._q || 'final'] = v; }, configurable: true });
       c.style.cssText = 'margin:0 0 10px;padding:12px;border:1px solid var(--line);border-radius:12px';
-      c.innerHTML = `<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px"><b></b><input type="range" min="3" max="15" step="1" value="${sec}" style="display:none"><output class="hint" style="min-width:34px"></output><button class="btn sc-m" type="button" title="Короче на секунду" style="padding:2px 9px">−</button><button class="btn sc-p" type="button" title="Длиннее на секунду" style="padding:2px 9px">+</button><span class="hint sc-win" style="flex:1"></span><button class="x btn" type="button" title="Убрать сцену" style="padding:2px 9px">✕</button></div><textarea placeholder="Что происходит в этой сцене…" style="min-height:90px"></textarea>
+      c.innerHTML = `<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px"><b class="sc-no" title="Номер сцены: под ним она лежит на ленте и в Библиотеке"></b><input type="range" min="3" max="15" step="1" value="${sec}" style="display:none"><button class="btn sc-m" type="button" title="Короче на секунду" style="padding:2px 9px">−</button><button class="btn sc-p" type="button" title="Длиннее на секунду" style="padding:2px 9px">+</button><output class="sc-sec" title="Длительность этой сцены"></output><span class="hint sc-win" style="flex:1"></span><button class="x btn" type="button" title="Убрать сцену" style="padding:2px 9px">✕</button></div><textarea placeholder="Что происходит в этой сцене…" style="min-height:90px"></textarea>
 <details class="sc-tdet" style="margin-top:8px"><summary class="hint" style="cursor:pointer;font-size:12px">Проба размера для этой сцены</summary><div class="sc-tst" style="margin-top:6px;display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span class="hint" style="font-size:12px">Попробовать только эту сцену в другом размере (остальные не меняются):</span><select class="sc-tq">${QUALITY.map(q => `<option value="${q.id}">${q.res}</option>`).join('')}</select><button class="btn sc-tbtn" type="button" title="Сцена считается отдельно, в выбранном размере, на 8 шагов. Результат появится ниже и в Библиотеке, остальные сцены не затрагиваются.">Сделать пробу</button></div><div class="sc-tests" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px"></div></details>
         <div class="sc-refs" style="margin-top:8px"><div class="hint sc-rhint" style="font-size:12px"></div><div class="sc-thumbs" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:6px"></div></div>`;
       // nine places of their own, made like the common ones: an empty place offers itself, a filled
