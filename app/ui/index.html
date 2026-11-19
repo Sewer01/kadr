@@ -1401,6 +1401,7 @@ body.dropping::after{content:'Отпустите — программа разл
       О программе
     </button>
     <div class="nav-ver" id="appVer"></div>
+    <div class="nav-ver" id="navSpeech" title="Чем программа слышит слова песен: файл модели распознавания"></div>
 
     <div class="side-foot" id="sysBox">
       <div class="sys-head" id="sysHead" role="button" tabindex="0" title="Свернуть или показать нагрузку компьютера">
@@ -1579,6 +1580,7 @@ body.dropping::after{content:'Отпустите — программа разл
             <div style="font-size:19px;font-weight:800">Kadr</div>
             <div class="hint">Видеостудия на вашем компьютере: картинки, видео, звук и монтаж в одном окне, без подписки и без чужих серверов. Всё считается на вашей видеокарте.</div>
             <div class="hint" style="margin-top:8px" id="abFacts">Версия: уточняем…</div>
+            <div class="hint" style="margin-top:6px" id="abSpeech"></div>
           </div>
         </div>
         <div class="hint" style="margin-top:12px"><b>Что внутри.</b> Пятнадцать режимов: видео по картинке и по описанию, видео по референсам, фильм по сценам, два экшен-режима, клип под аудио, актёрская игра, замена персонажа, рисование и правка картинок, раскадровка, увеличение и улучшение, монтаж готовых клипов и разговор с агентом, который пишет промпты. У каждого режима своя страница, у каждой страницы - справка под знаком «?».</div>
@@ -1685,7 +1687,7 @@ body.dropping::after{content:'Отпустите — программа разл
         <div class="col">
           <div class="card">
             <details class="agfold">
-            <summary>Модель агента <span class="verdict" id="agState" hidden></span></summary>
+            <summary>Модель агента <span class="verdict" id="agState" hidden></span><small id="agWhMini" class="hint" style="font-weight:500"></small></summary>
             <div id="agBig" class="agbig"></div>
             <details id="agVarBox" class="agvar"><summary>Выбор моделей агента</summary><div id="agVariants"></div></details>
             <details class="agvar" id="agMore"><summary>Подробности</summary><div id="agModel" class="hint"></div></details>
@@ -2661,6 +2663,16 @@ function shortCpu(name) {
       put('abFacts', 'Версия ' + (v.version || '?') + (v.built ? ' · сборка от ' + v.built : '') +
         '. Программа работает на этом компьютере и не отправляет ваши файлы никуда.');
     } catch {}
+    try {
+      /* the same fact belongs here: the settings page is where people look for what is installed */
+      const a = await (await fetch('/api/agent/status')).json();
+      const sp = a.speech || {}, bt = sp.better || {};
+      put('abSpeech', sp.ready
+        ? 'Распознавание речи (им читаются слова песен): ' + (sp.model || '?') + (sp.model_size ? ' · ' + Math.round(sp.model_size / 1048576) + ' МБ' : '')
+          + (bt.present ? ' · точная модель, она разбирает пение' : ' · модель маленькая: песни слышит плохо')
+          + '. Выбрать другую или докачать - раздел «Агент», строчка «Модель агента».'
+        : 'Распознавание речи не скачано: раздел «Агент», строчка «Модель агента», кнопка «Докачать».');
+    } catch { }
     try {
       const s = await (await fetch('/api/status')).json();
       const p = s.paths || {};
@@ -4816,7 +4828,7 @@ class AudioTrimmer {
       // the agent refuses audio while it does not know whether recognition is ready: on the first press
       // in a fresh session that status was not fetched yet, and the button looked dead
       try { if (!AG.status || !AG.status.speech_ready) await agStatus(); } catch (e) {}
-      if (!AG.status || !AG.status.speech_ready) { this.say('Агент ещё не может слушать аудио: распознавание речи не готово - карточка «Модель», «Докачать»'); return; }
+      if (!AG.status || !AG.status.speech_ready) { this.say('Агент ещё не может слушать аудио: распознавание речи не готово - строчка «Модель агента», кнопка «Докачать»'); return; }
       if (this.len() < 1) { this.say('Кусок короче секунды: Агент и модель всё равно его не разберут - выделите полторы-две секунды'); return; }
       try { await setChatAudio(wavSlice(this.buf, this.start, this.end), (this.name || 'фрагмент').replace(/\.[^.]+$/, ''), this.len(),
                               this.whereLabel ? this.whereLabel(this) : ''); }
@@ -5274,7 +5286,7 @@ async function agGenerate(btn, gen) {
   if (!draft) { toast('Сначала напишите текст в этом поле'); return; }
   if (AG.busy) { toast('Агент уже пишет: дождитесь ответа или остановите его в чате'); return; }
   if (!AG.status || AG.status.installed === undefined) { try { await agStatus(); } catch (e) { } }   // the status is loaded lazily, do not cry «no model» too early
-  if (!AG.status || !AG.status.installed) { toast('Модель Агента не скачана: раздел «Агент», карточка «Модель»'); return; }
+  if (!AG.status || !AG.status.installed) { toast('Модель Агента не скачана: раздел «Агент», строчка «Модель агента»'); return; }
   const mode = typeof gen.mode === 'function' ? gen.mode() : gen.mode;
   const name = (typeof AG_NAMES !== 'undefined' && AG_NAMES[mode]) || 'этого раздела';
   const was = btn.textContent, chat = $('#agIn'), keep = chat ? chat.value : '';
@@ -7824,7 +7836,7 @@ function makeRefMode(cfg) {
               const put = v => { c._audWords[j] = v; const t2 = $('textarea', host); if (t2) t2.value = v; };
               if (b.dataset.again === 'clear') { put(''); if (root._save) root._save(); toast('Слова стёрты: модель будет петь на свой слух'); return; }
               if (!AG.status || !AG.status.speech_ready) { try { await agStatus(); } catch (e) { } }
-              if (!AG.status || !AG.status.speech_ready) { toast('Распознавание речи не готово: раздел «Агент», карточка «Модель»'); return; }
+              if (!AG.status || !AG.status.speech_ready) { toast('Распознавание речи не готово: раздел «Агент», строчка «Модель агента»'); return; }
               const was = b.textContent; b.disabled = true; b.textContent = 'слушаю…';
               try {
                 const j2 = await transcribeWav(file, b.dataset.again);
@@ -8293,7 +8305,7 @@ function makeRefMode(cfg) {
             ,
             () => '<div class="hint" style="font-size:12.5px;line-height:1.55"><b>Аудио в Референсах, Актёре и Экшн-видео.</b> Здесь у звука своя карточка «Аудио». Файлы не выкладываются тремя пустыми плашками: нажимаете «Загрузить аудио» - и файл становится отдельной меткой с названием, длиной и тегом &lt;Audio 1&gt;, &lt;Audio 2&gt;, &lt;Audio 3&gt;. Нажатие на метку ставит тег в текст, «Обрезать» открывает тот же прибор, что и в Видеостудии: волна, перетаскивание, прослушивание, до 15 секунд. Второе нажатие закрывает окно и применяет выделенное, а открывается снова целый файл - резать можно сколько раз угодно, файл на диске при этом не портится. Больше трёх аудио нельзя: кнопка гаснет сама.</div>',
             () => '<div class="hint" style="font-size:12.5px;line-height:1.55"><b>Референс-видео.</b> В Референсах у видео своя карточка, а в «Замене персонажа» под окном видео стоит тот же верстак. Файлы добавляются по одному, каждый подписан &lt;Video 1&gt;, &lt;Video 2&gt;, &lt;Video 3&gt; - нажатие на метку ставит тег в текст. <b>Дальше 25 секунд модель не смотрит</b>, поэтому лишнее стоит отрезать. «✂ Монтаж» открывает верстак: над лентой окно просмотра, на ленте - сами кадры, жёлтый маркер (в левом верхнем углу ленты всегда показаны его секунды), а прямо у маркера стрелки покадровой прокрутки (один кадр = 1/24 с) и ножницы: левые убирают всё до маркера, правые - всё после. Ползунок и кнопки «−» «+» меняют <b>ширину ленты</b> (сколько пикселей приходится на секунду), «По ширине» возвращает весь клип в окно. Клик по ленте слева от метки играет от начала куска до метки, справа - от метки до конца, а окно просмотра стоит на маркере и показывает его как стоп-кадр. Края выделенного участка тянутся мышью, двойной клик возвращает целый клип, убрать файл совсем можно крестиком на его метке в карточке, «Отменить» шагает назад. «Оставить выбранное» режет по-настоящему, настоящим декодером: в карточке останется кусок, а для новой резки всегда открывается целый файл. «🤖 В агент» отправляет клип Агенту - он посмотрит на него как на кадры.</div>',
-            () => '<div class="hint" style="font-size:12.5px;line-height:1.55"><b>«🤖 В агент».</b> Отправляет выделенный кусок в раздел «Агент»: он распознаёт слова и пишет промпт уже зная, что говорится. Перед отправкой Агент сам переключается на Видеостудию, чтобы не писать в чужой раздел. Если распознавание речи ещё не скачано, кнопка об этом скажет - карточка «Модель», «Докачать».</div>',
+            () => '<div class="hint" style="font-size:12.5px;line-height:1.55"><b>«🤖 В агент».</b> Отправляет выделенный кусок в раздел «Агент»: он распознаёт слова и пишет промпт уже зная, что говорится. Перед отправкой Агент сам переключается на Видеостудию, чтобы не писать в чужой раздел. Если распознавание речи ещё не скачано, кнопка об этом скажет - строчка «Модель агента», кнопка «Докачать».</div>',
             () => {
               const mp = root.querySelector('.mdl-pick'); if (!mp) return '';
               const cur = ($('.mp-cur', mp) || {}).textContent || '—';
@@ -9649,7 +9661,7 @@ function needSpeech() {
   /* A status that never arrived is not a model that was never downloaded. Saying «not downloaded»
      sent the person to download something he already had, while the real fault was a silent
      request - and the transfer of the scene's songs died right there. */
-  toast(AG.status ? 'Распознавание речи ещё не скачано — карточка «Модель» справа, кнопка «Докачать»'
+  toast(AG.status ? 'Распознавание речи ещё не скачано — в разделе «Агент» откройте строчку «Модель агента» и нажмите «Докачать»'
                   : 'Статус Агента не пришёл, проверить распознавание речи не удалось. Попробуйте ещё раз.');
   return true;
 }
@@ -9889,7 +9901,7 @@ async function agSend() {
   const AUD = AG.audios || (AG.audio ? [AG.audio] : []);
   if (AUD.some(a => a.busy)) { toast('Подождите, слова из аудио ещё распознаются'); return; }
   if (!text && !AG.att.length && !AUD.length) return;
-  if (!AG.status?.installed) { toast('Сначала скачайте модель агента — справа, в карточке «Модель»'); return; }
+  if (!AG.status?.installed) { toast('Сначала скачайте модель агента: раздел «Агент», строчка «Модель агента»'); return; }
   if (AUD.length) {
     text += '\n\n[Аудио в проекте: ' + AUD.length + '. Нумерация тегов: <Audio 1> - фон всего ролика, у сцены '
       + 'свои номера десятками: сцена 1 - <Audio 10>, <Audio 11>, <Audio 12>, сцена 2 - <Audio 20> и т.д. '
@@ -10327,7 +10339,7 @@ async function agStatus() {
   if (sp.custom && !$('#agWhDir').value) $('#agWhDir').value = sp.custom;
   $('#agWhInfo').innerHTML = sp.ready
     ? `<span class="ok-t">✓ Программа и модель найдены${sp.model ? ': ' + esc(sp.model) : ''}</span>`
-    : sp.custom ? `<span class="warn-t">Не найдено: ${esc(sp.missing.join(', '))} — нажмите «Докачать» в карточке выше, скачается только это.</span>` : '';
+    : sp.custom ? `<span class="warn-t">Не найдено: ${esc(sp.missing.join(', '))} — откройте строчку «Модель агента» выше и нажмите «Докачать», скачается только это.</span>` : '';
   /* Which recognition file is in use decides whether a song's words come out sense or nonsense:
      the little model mangles singing. The program always takes the best file it can see, so the
      button below only has to bring that file here - switching happens by itself. */
@@ -10344,6 +10356,18 @@ async function agStatus() {
   } else if (!bt.present && bt.custom) {
     $('#agWhInfo').innerHTML += '<br><span class="hint" style="font-size:12px">Вы подключили свою папку whisper: чтобы слышать точнее, положите ggml-large-v3-turbo-q5_0.bin в неё - программа возьмёт лучший файл сама.</span>';
   }
+  /* A person looking for this goes to the settings page, and nobody unfolds a fold to find out
+     what is already working: so the file name sits in the fold's own line, and the full sentence
+     lives on the settings page under the version. */
+  paintSpeech(sp, bt);   // the line under the version must not go stale after a change
+  const mini = $('#agWhMini');
+  if (mini) mini.textContent = sp.ready ? ('· слышит аудио: ' + (sp.model || '?')) : '· распознавание речи не скачано';
+  const absp = $('#abSpeech');
+  if (absp) absp.textContent = sp.ready
+    ? 'Распознавание речи (им читаются слова песен): ' + (sp.model || '?') + (sp.model_size ? ' · ' + Math.round(sp.model_size / 1048576) + ' МБ' : '')
+      + (bt.present ? ' · точная модель, она разбирает пение' : ' · модель маленькая: песни слышит плохо')
+      + '. Выбрать другую или докачать - раздел «Агент», строчка «Модель агента».'
+    : 'Распознавание речи не скачано: раздел «Агент», строчка «Модель агента», кнопка «Докачать».';
   const bb = $('#agWhBetter');
   if (bb) bb.onclick = async () => {
     bb.disabled = true; bb.textContent = 'Скачиваю… полоса сверху карточки';
@@ -11731,6 +11755,18 @@ const imgSeedForm = (S, fd) => { if (S.seedFixed && S.seed) fd.append('seed', S.
 
 
 fetch('/api/version').then(r => r.json()).then(v => { $('#appVer').textContent = 'Версия ' + v.version + (v.built ? ' · сборка ' + v.built : ''); }).catch(() => {});
+/* People ask which model hears their songs, and the answer should not require unfolding the Agent
+   section: the name lives under the version, in the column that is always on screen. */
+function paintSpeech(sp, bt) {
+  const el = document.getElementById('navSpeech'); if (!el) return;
+  const short = m => String(m || '').replace(/^ggml-/, '').replace(/\.bin$/, '');
+  if (!sp || !sp.ready) { el.textContent = 'Распознавание речи не скачано'; el.title = 'Раздел «Агент», строчка «Модель агента», кнопка «Докачать»'; return; }
+  el.textContent = 'Слышит аудио: ' + short(sp.model) + (bt && bt.present ? '' : ' · маленькая модель');
+  el.title = 'Файл ' + (sp.model || '?') + (sp.model_size ? ' · ' + Math.round(sp.model_size / 1048576) + ' МБ' : '')
+    + (bt && bt.present ? ' · точная модель, разбирает пение' : ' · модель маленькая: песни слышит плохо')
+    + '. Выбрать другую или докачать - раздел «Агент», строчка «Модель агента».';
+}
+fetch('/api/agent/status').then(r => r.json()).then(s => paintSpeech(s.speech, (s.speech || {}).better)).catch(() => {});
 /* ---------- updates: a new release on GitHub -> a bar with "Обновить" ---------- */
 (() => {
   if (!API) return;
