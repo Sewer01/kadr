@@ -1401,7 +1401,6 @@ body.dropping::after{content:'Отпустите — программа разл
       О программе
     </button>
     <div class="nav-ver" id="appVer"></div>
-    <div class="nav-ver" id="navSpeech" title="Чем программа слышит слова песен: файл модели распознавания"></div>
 
     <div class="side-foot" id="sysBox">
       <div class="sys-head" id="sysHead" role="button" tabindex="0" title="Свернуть или показать нагрузку компьютера">
@@ -1571,6 +1570,7 @@ body.dropping::after{content:'Отпустите — программа разл
         <div><h1>О программе</h1><p>Что это за студия, из чего она выросла, где лежат её файлы и кому обязана</p></div>
         <div class="mode-pill"><i></i><span id="abVer">Kadr</span></div>
       </div>
+      <div class="hint" style="margin:-6px 0 14px" id="abSpeech"></div>
 
       <div class="card" style="max-width:820px;margin-bottom:16px">
         <div class="card-h"><h3><span class="n">1</span>Эта программа</h3></div>
@@ -1580,7 +1580,6 @@ body.dropping::after{content:'Отпустите — программа разл
             <div style="font-size:19px;font-weight:800">Kadr</div>
             <div class="hint">Видеостудия на вашем компьютере: картинки, видео, звук и монтаж в одном окне, без подписки и без чужих серверов. Всё считается на вашей видеокарте.</div>
             <div class="hint" style="margin-top:8px" id="abFacts">Версия: уточняем…</div>
-            <div class="hint" style="margin-top:6px" id="abSpeech"></div>
           </div>
         </div>
         <div class="hint" style="margin-top:12px"><b>Что внутри.</b> Пятнадцать режимов: видео по картинке и по описанию, видео по референсам, фильм по сценам, два экшен-режима, клип под аудио, актёрская игра, замена персонажа, рисование и правка картинок, раскадровка, увеличение и улучшение, монтаж готовых клипов и разговор с агентом, который пишет промпты. У каждого режима своя страница, у каждой страницы - справка под знаком «?».</div>
@@ -1687,7 +1686,7 @@ body.dropping::after{content:'Отпустите — программа разл
         <div class="col">
           <div class="card">
             <details class="agfold">
-            <summary>Модель агента <span class="verdict" id="agState" hidden></span><small id="agWhMini" class="hint" style="font-weight:500"></small></summary>
+            <summary>Модель агента: <b id="agWhich">&hellip;</b> <span class="verdict" id="agState" hidden></span></summary>
             <div id="agBig" class="agbig"></div>
             <details id="agVarBox" class="agvar"><summary>Выбор моделей агента</summary><div id="agVariants"></div></details>
             <details class="agvar" id="agMore"><summary>Подробности</summary><div id="agModel" class="hint"></div></details>
@@ -10359,9 +10358,7 @@ async function agStatus() {
   /* A person looking for this goes to the settings page, and nobody unfolds a fold to find out
      what is already working: so the file name sits in the fold's own line, and the full sentence
      lives on the settings page under the version. */
-  paintSpeech(sp, bt);   // the line under the version must not go stale after a change
-  const mini = $('#agWhMini');
-  if (mini) mini.textContent = sp.ready ? ('· слышит аудио: ' + (sp.model || '?')) : '· распознавание речи не скачано';
+  $('#agWhich').textContent = curName || 'не скачана';   // the name in the line, not only inside
   const absp = $('#abSpeech');
   if (absp) absp.textContent = sp.ready
     ? 'Распознавание речи (им читаются слова песен): ' + (sp.model || '?') + (sp.model_size ? ' · ' + Math.round(sp.model_size / 1048576) + ' МБ' : '')
@@ -11755,18 +11752,6 @@ const imgSeedForm = (S, fd) => { if (S.seedFixed && S.seed) fd.append('seed', S.
 
 
 fetch('/api/version').then(r => r.json()).then(v => { $('#appVer').textContent = 'Версия ' + v.version + (v.built ? ' · сборка ' + v.built : ''); }).catch(() => {});
-/* People ask which model hears their songs, and the answer should not require unfolding the Agent
-   section: the name lives under the version, in the column that is always on screen. */
-function paintSpeech(sp, bt) {
-  const el = document.getElementById('navSpeech'); if (!el) return;
-  const short = m => String(m || '').replace(/^ggml-/, '').replace(/\.bin$/, '');
-  if (!sp || !sp.ready) { el.textContent = 'Распознавание речи не скачано'; el.title = 'Раздел «Агент», строчка «Модель агента», кнопка «Докачать»'; return; }
-  el.textContent = 'Слышит аудио: ' + short(sp.model) + (bt && bt.present ? '' : ' · маленькая модель');
-  el.title = 'Файл ' + (sp.model || '?') + (sp.model_size ? ' · ' + Math.round(sp.model_size / 1048576) + ' МБ' : '')
-    + (bt && bt.present ? ' · точная модель, разбирает пение' : ' · модель маленькая: песни слышит плохо')
-    + '. Выбрать другую или докачать - раздел «Агент», строчка «Модель агента».';
-}
-fetch('/api/agent/status').then(r => r.json()).then(s => paintSpeech(s.speech, (s.speech || {}).better)).catch(() => {});
 /* ---------- updates: a new release on GitHub -> a bar with "Обновить" ---------- */
 (() => {
   if (!API) return;
