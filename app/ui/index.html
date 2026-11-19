@@ -89,21 +89,22 @@
 .tl-l{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;position:relative;z-index:1}
 .tl-fill{position:absolute;left:42px;top:0;bottom:0;background:rgba(var(--accent-rgb),.22);pointer-events:none}
 .tl-fill::after{content:'';position:absolute;right:0;top:0;bottom:0;width:2px;background:rgb(var(--accent-rgb));opacity:.9}
-/* the line where the ready clip stops: red, thin, and never clickable */
-.tl-mark{position:absolute;top:6px;bottom:6px;width:2px;background:#ff4d5e;border-radius:2px;
- box-shadow:0 0 0 1px rgba(0,0,0,.4);pointer-events:none;z-index:2}
+/* How much of the scene is already in the clip: a red strip along the bottom of the chip, from the
+   number to the ready length. A vertical line here stood right beside the handle that sets the
+   length at the right edge, and the two were read as one marker that disagreed with the other. */
+.tl-mark{position:absolute;left:42px;bottom:3px;height:3px;background:#ff4d5e;border-radius:2px;
+ box-shadow:0 0 0 1px rgba(0,0,0,.35);pointer-events:none;z-index:2}
 /* a row of scene buttons keeps one height: when one label wraps to two lines, the others stretch
    to it instead of the whole card jumping under the finger (the row .sc-act holds «Сделать эту
    сцену», «Очистить сцену» and the long «Перезапустить и продолжить дальше», .sc-fl - the row of
    the plan switch) */
-/* the row of scene buttons keeps one height, and the buttons of the plan switch stretch to it,
-   so a label that wraps to two lines cannot make the card jump */
+/* the buttons of the plan switch share the height of their row */
 .sc-fl .btn{align-self:stretch;display:flex;align-items:center;justify-content:center;text-align:center}
-/* the scene's action buttons live in boxes of their own: the label of the main one changes from
-   «Сделать эту сцену» to «Переделать», and nothing on the card may move because of it; the note
-   beside them takes whatever room is left */
-.sc-act .btn{flex:0 0 176px;align-self:stretch;display:flex;align-items:center;justify-content:center;
- text-align:center;padding:9px 10px;font-size:13.5px;line-height:1.25}
+/* the scene's action buttons live in cells of their own: one width, one height, one line of text.
+   Stretching them to the tallest label was wrong - a long word made the neighbour taller, and the
+   card jumped; the note beside them takes whatever room is left */
+.sc-act .btn{flex:0 0 190px;height:34px;white-space:nowrap;display:flex;align-items:center;
+ justify-content:center;text-align:center;padding:0 10px;font-size:13px;line-height:1}
 .sc-act .sc-state{flex:1 1 auto;min-width:0;align-self:center}
 .tl-grip{flex:none;width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font-size:16px;font-weight:800;
  cursor:grab;z-index:1;background:var(--surface);border:2px solid rgba(var(--accent-rgb),.62);color:var(--text);
@@ -7787,7 +7788,7 @@ function makeRefMode(cfg) {
         ta.value = ta.value.slice(0, at) + add + ta.value.slice(at);
         ta.focus(); ta.selectionStart = ta.selectionEnd = at + add.length; recount(); c._counter?.();
       };
-      c.insertAdjacentHTML('beforeend', `<label class="sc-fl" style="display:flex;gap:6px;align-items:center;margin-top:8px;font-size:12.5px" title="Как смена плана в кино: сцена не продолжает прошлую, а строится заново по вашим изображениям. Качество в ней как в первой сцене. Программа делает так сама после трёх продолжений подряд."><input type="checkbox" class="sc-fresh"> Сменить план здесь (кино-склейка)</label><div class="hint sc-auto" hidden style="font-size:12px;margin-top:6px">Программа сама сделает здесь смену плана: цепочка продолжений стала длинной, а так качество не падает.</div><div class="sc-act" style="display:flex;gap:10px;align-items:stretch;margin-top:8px"><button class="btn mini sc-do" type="button" title="Сделать только эту сцену">Сделать эту сцену</button><button class="btn sc-undo" type="button" hidden title="Вернуть то, что было стёрто или удалено (то же, что Ctrl+Z)">↶ Отменить действие</button><button class="btn mini sc-redogo" type="button" hidden title="Эта сцена считается заново, а потом сами пересчитаются все следующие, уже продолжая новую версию">Переделать и продолжить дальше</button><span class="hint sc-state"></span></div>`);
+      c.insertAdjacentHTML('beforeend', `<label class="sc-fl" style="display:flex;gap:6px;align-items:center;margin-top:8px;font-size:12.5px" title="Как смена плана в кино: сцена не продолжает прошлую, а строится заново по вашим изображениям. Качество в ней как в первой сцене. Программа делает так сама после трёх продолжений подряд."><input type="checkbox" class="sc-fresh"> Сменить план здесь (кино-склейка)</label><div class="hint sc-auto" hidden style="font-size:12px;margin-top:6px">Программа сама сделает здесь смену плана: цепочка продолжений стала длинной, а так качество не падает.</div><div class="sc-act" style="display:flex;gap:10px;align-items:center;margin-top:8px"><button class="btn mini sc-do" type="button" title="Сделать только эту сцену">Сделать эту сцену</button><button class="btn sc-undo" type="button" hidden title="Вернуть то, что было стёрто или удалено (то же, что Ctrl+Z)">↶ Отменить действие</button><button class="btn mini sc-redogo" type="button" hidden title="Эта сцена считается заново, а потом сами пересчитаются все следующие, уже продолжая новую версию">Переделать и продолжить</button><span class="hint sc-state"></span></div>`);
       $('.sc-fresh', c).checked = !!fresh;
       $('.sc-fresh', c).onchange = () => { c._done = null; recount(); };
       $('.sc-redogo', c).onclick = () => { const i = $$('.sc', root).indexOf(c); c._var = (c._var || 0) + 1; root._chainEnd = null; root._chainPart = i; root._target = i; $('.go', $('.rm-preview', root)).click(); };
@@ -7850,7 +7851,7 @@ function makeRefMode(cfg) {
         const rec = dn && dn.id && typeof byId === 'function' ? byId(dn.id) : null;
         const mkSec = Math.max(0, +(dn && dn.sec) || +(rec && rec.len) || 0);
         const mkTxt = mkSec >= 3 && Math.abs(mkSec - sec) > .05 ? ' · в клипе ' + (Math.round(mkSec * 10) / 10).toString().replace('.', ',') + ' с' : '';
-        const mk = mkSec >= 3 ? `<i class="tl-mark" style="left:calc(42px + (100% - 42px - 44px) * ${Math.round((Math.min(15, mkSec) - 3) / 12 * 100)} / 100)" title="В готовом клипе этой сцены ${mkSec.toFixed(1).replace('.', ',')} с - дальше придётся делать заново"></i>` : '';
+        const mk = mkSec >= 3 ? `<i class="tl-mark" style="width:calc((100% - 42px - 44px) * ${Math.round((Math.min(15, mkSec) - 3) / 12 * 100)} / 100)" title="Красная полоска внизу: ${mkSec.toFixed(1).replace('.', ',')} с этой сцены уже лежат в готовом клипе"></i>` : '';
         // the filled part of the chip is the scene's length: 3 s at the left edge, 15 s at the right
       const pct = Math.round((sec - 3) / 12 * 100);
       return `<div class="tl-b${i === root._sel ? ' sel' : ''}${done ? (draft ? ' draft' : ' done') : old ? ' stale' : ''}${fr[i] ? ' cut' : ''}" data-i="${i}" title="${fr[i] ? 'Новый план (смена кадра). ' : ''}Тяните внутри фрагмента - время сцены · за правый край - точно · ручкой слева - порядок"><i class="tl-grip" draggable="true" data-grip="${i}" title="Сцена ${i + 1}. Кружок перетаскивает сцену и открывает её; когда сцена выбрана - кружок залит">${i + 1}</i><i class="tl-fill" style="width:calc((100% - 42px - 44px) * ${pct} / 100)"></i>${mk}<div class="tl-l">${sec} с${done ? (draft ? ' · черновик ✓' : ' · готово ✓') : old ? ' · старая версия' : ''}${mkTxt}${fr[i] ? ' · ✂ новый план' : ''}</div><i class="tl-x" data-scdel="${i}" title="Убрать эту сцену">✕</i><i class="tl-h" title="Тяните: длина сцены"></i></div>`;
