@@ -120,6 +120,8 @@
 .sc-act .btn{flex:0 0 190px;height:34px;white-space:nowrap;display:flex;align-items:center;
  justify-content:center;text-align:center;padding:0 10px;font-size:13px;line-height:1}
 .sc-act .sc-state{flex:1 1 auto;min-width:0;align-self:center}
+.sc-tools{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px}
+.sc-tools .ru-out{flex:1 1 100%;min-width:0}
 .tl-grip{flex:none;width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font-size:16px;font-weight:800;
  cursor:grab;z-index:1;background:var(--surface);border:2px solid rgba(var(--accent-rgb),.62);color:var(--text);
  transition:background .14s,color .14s,border-color .14s}
@@ -470,7 +472,14 @@ h1{font-size:26px;font-weight:800;letter-spacing:-.02em}
 textarea{width:100%;min-height:64px;height:110px;resize:vertical;background:var(--bg-2);border:1px solid var(--line);border-radius:12px;padding:13px 14px;outline:none;line-height:1.55}
 textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
 .ta-foot{display:flex;justify-content:space-between;align-items:center;margin-top:8px;gap:10px;flex-wrap:wrap}
-.ta-foot>.ta-clear{margin-left:auto;flex:none}
+/* Под полем: сначала подпись или плитки тегов - своей строкой, ниже все кнопки одним уровнем,
+   и очистка прижата к правому краю. Порядок задан числами, чтобы не зависеть от того, что
+   примешалось к строке раньше. */
+.ta-foot>span.hint{flex:1 1 100%;order:0}
+.ta-foot>.ta-clear{margin-left:auto;flex:none;order:2}
+.ru-wrap>.ta-clear,.sc-tools>.ta-clear,.field-btns>.ta-clear{margin-left:auto;flex:none}
+.ru-wrap>.ru-out{flex:1 1 100%;min-width:0}
+.field-btns{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px}
 .tokens{display:flex;gap:6px;flex-wrap:wrap}
 .token[disabled],.token:disabled{opacity:.38;cursor:not-allowed;pointer-events:auto}
 .token{font-family:var(--mono);font-size:11.5px;padding:4px 8px;border-radius:7px;background:var(--surface-2);border:1px solid var(--line-2);color:var(--text)}
@@ -870,10 +879,11 @@ img.pr-media{object-position:center 38%}
 #agIn{flex:1 0 100%;order:-1;height:88px;min-height:64px}
 .ag-comp textarea{order:-2;min-height:56px;max-height:180px;flex:1 1 0;min-width:0}
 .ag-comp #agSend{order:-1}
-.ag-comp .ag-clip,.ag-comp #agClear{padding:6px 10px;min-height:0;font-size:12.5px;border-radius:9px}
+.ag-comp .ag-clip,.ag-comp #agClear,.ag-comp #agSend,.ag-comp #agFreeMem{padding:6px 10px;min-height:0;font-size:12.5px;border-radius:9px}
 .ag-comp .ag-ctx{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);padding:0 4px}
+.ag-comp #agFreeMem{margin-left:auto}
 .ag-comp .ag-ctx select{font-size:12.5px;padding:5px 6px;border-radius:8px;background:var(--surface-2);border:1px solid var(--line-2);color:var(--text)}
-.ag-comp .ag-ctx b{color:var(--text);font-size:12.5px}
+
 /* spelling help on the right mouse button: the browser's own menu offers no fixes here, so the
    local model is asked, and its answers are put back exactly where the word stood */
 .sp-menu{position:fixed;z-index:9999;min-width:236px;max-width:340px;background:var(--surface-2);
@@ -973,7 +983,7 @@ body.dropping::after{content:'Отпустите — программа разл
 .slot.vthumb span{color:#3fd18b;font-weight:700;font-size:10.5px;font-family:var(--mono);text-shadow:0 1px 4px #000;background:rgba(var(--ov-rgb),.8);padding:2px 6px;border-radius:6px}
 .slot.vthumb small{color:#fff;font-size:10.5px;font-family:var(--mono);text-shadow:0 1px 4px #000;background:rgba(var(--ov-rgb),.8);padding:2px 6px;border-radius:6px}
 .slot.vthumb.bad span{color:#ff6b6b}
-.ru-wrap{margin:6px 0 2px}
+.ru-wrap{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:9px 0 2px}
 .ru-out{margin-top:6px;padding:10px 12px;border:1px dashed var(--line-2);border-radius:10px;background:var(--bg-2);font-size:12.5px;line-height:1.55}
 .ru-out .ru-h{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:4px}
 .slot svg{width:20px;height:20px;color:var(--accent);flex:none}
@@ -1543,7 +1553,7 @@ body.dropping::after{content:'Отпустите — программа разл
             <textarea id="lPrompt" placeholder="<Picture 1> стоит у окна и тихо поёт, глядя в камеру…"></textarea>
             <div class="ta-foot">
               <div class="tokens" id="tokens"></div>
-              <span class="hint">нажмите, чтобы вставить</span>
+              
             </div>
           </div>
 
@@ -1697,12 +1707,11 @@ body.dropping::after{content:'Отпустите — программа разл
             <button class="btn ag-clip" type="button" id="agMic" title="Голосовой ввод: нажмите, говорите, нажмите ещё раз">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="3" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
             </button>
-            <button class="btn" type="button" id="agClear" title="Убрать текст из поля ввода; история переписки останется">Очистить поле</button>
-            <button class="btn" type="button" id="agFreeMem" title="Выгрузить модель Агента и кэш ComfyUI: освободить видеопамять для генерации">Освободить память</button>
+            <button class="btn" type="button" id="agClear" title="Убрать текст из поля ввода; история переписки останется">Очистить текст</button>
             <label class="ag-ctx" title="Сколько текста модель держит в памяти разом. Больше - влезают длинная переписка и много сцен, но растёт расход памяти; при переполнении.Agent сам просит увеличить">Контекст
               <select id="agCtxSel"></select>
-              <b id="agCtxNow">?</b>
             </label>
+            <button class="btn" type="button" id="agFreeMem" title="Выгрузить модель Агента и кэш ComfyUI: освободить видеопамять для генерации">Освободить память</button>
             <textarea id="agIn" rows="2" placeholder="Опишите сцену, сценарий или вставьте реплики… (Enter — создать промт, Shift+Enter — новая строка)"></textarea>
             <button class="btn pri" id="agSend" title="Агент составит промпты по вашему описанию и приложенным кадрам; в раздел они уйдут кнопкой «В …» под ответом">Создать промт</button>
           </div>
@@ -5406,14 +5415,24 @@ function attachRu(ta, gen) {
   if (!ta || ta._ru) return; ta._ru = true;
   const wrap = document.createElement('div'); wrap.className = 'ru-wrap';
   wrap.innerHTML = '<button class="btn ru-b" type="button" style="padding:4px 12px;font-size:12px" title="Русский перевод только для чтения: в модель уходит текст из поля">Показать по-русски</button><div class="ru-out" hidden></div>';
-  const foot = ta.nextElementSibling?.classList.contains('ta-foot') ? ta.nextElementSibling : ta;
-  foot.insertAdjacentElement('afterend', wrap);
+  /* Кнопка перевода живёт сразу под своим полем: искать строку по всей карточке было ошибкой -
+     в карточке сцены таких строк несколько, и кнопка уезжала наверх, к чужому полю. */
+  const foot = ta.nextElementSibling && ta.nextElementSibling.classList.contains('ta-foot') ? ta.nextElementSibling : null;
+  (foot || ta).insertAdjacentElement('afterend', wrap);
+  /* Кнопки одного поля живут одним рядом: если под полем уже стоит кнопка очистки, созданная раньше,
+     она переезжает сюда, а не остаётся второй строкой. Строка с тегами остаётся только тегами. */
+  const home = wrap.closest('.sc') || wrap.closest('.card') || wrap.parentElement;
+  if (home) {
+    const stray = Array.prototype.slice.call(home.querySelectorAll('.ta-clear')).filter(b => b.parentElement !== wrap && !b.closest('.ru-wrap'));
+    stray.forEach(b => wrap.append(b));
+    home.querySelectorAll('.field-btns').forEach(r => { if (!r.children.length) r.remove(); });
+  }
   const btn = $('.ru-b', wrap), out = $('.ru-out', wrap);
   if (gen) {
     // the draft lives here, so the way to finish it lives here too: the same row under the field
     const g = document.createElement('button');
     g.type = 'button'; g.className = 'btn gen-b';
-    g.style.cssText = 'padding:4px 12px;font-size:12px;margin-right:8px';
+    g.style.cssText = 'padding:4px 12px;font-size:12px';
     g.textContent = '🤖 Генерация промта';
     g.title = 'Агент сделает из этого текста готовый промпт своего режима и заменит им текст в поле. Файлы раздела и черновик уйдут в чат Агента, ответ останется в его истории.';
     g.onclick = () => agGenerate(g, gen);
@@ -6510,7 +6529,7 @@ function makeRefMode(cfg) {
       <div class="card">
         <div class="card-h"><h3><span class="n">2</span>Промпт</h3><span class="hint">можно написать в разделе «Агент»</span></div>
         <textarea class="rm-prompt" placeholder="${cfg.placeholder}"></textarea>
-        <div class="ta-foot"><div class="tokens rm-tokens"></div><span class="hint">нажмите, чтобы вставить</span></div>
+        <div class="ta-foot"><div class="tokens rm-tokens"></div></div>
       </div>
       <div class="card rm-params"></div>
     </div><div class="preview rm-preview"></div></div>`;
@@ -7198,7 +7217,7 @@ function makeRefMode(cfg) {
           <button class="btn lm-srclib" type="button" title="Взять ролик, который вы уже делали здесь">Из Библиотеки…</button>
         </div>
       </div>
-      <div class="ta-foot"><div class="tokens rm-tokens"></div><span class="hint">нажмите, чтобы вставить в сцену</span></div>
+      <div class="ta-foot"><div class="tokens rm-tokens"></div></div>
       <div class="note" style="margin-top:12px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 8h0M11 12h1v5h1"/></svg><span>Изображения героя необязательны: без них ролик строится только по тексту (например, про Древний Рим). Сцены идут одна за другой, каждая продолжает прошлую: герой, место и звук переходят дальше. Но при каждом продолжении изображение немного портится, поэтому при смене плана или места ставьте у сцены галочку «Новый план»: она строится заново по вашим изображениям, и качество остаётся как в первой сцене. В каждой сцене опишите героя, что он делает и как движется камера. Длину сцены задаёт ползунок. Текст сцены можно составить в разделе «Агент».</span></div>`;
     const c1 = $('.rm-imgs', root).closest('.card');
     $('h3', c1).innerHTML = '<span class="n">1</span>Референсы';
@@ -7798,7 +7817,7 @@ function makeRefMode(cfg) {
       const c = document.createElement('div'); c.className = 'sc'; c._dn = { draft: null, final: null };
       Object.defineProperty(c, '_done', { get: () => c._dn[root._q || 'final'], set: v => { c._dn[root._q || 'final'] = v; }, configurable: true });
       c.style.cssText = 'margin:0 0 10px;padding:12px;border:1px solid var(--line);border-radius:12px';
-      c.innerHTML = `<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px"><b class="sc-no" title="Номер сцены: под ним она лежит на ленте и в Библиотеке"></b><input type="range" min="3" max="15" step="1" value="${sec}" style="display:none"><button class="btn sc-m" type="button" title="Короче на секунду" style="padding:2px 9px">−</button><button class="btn sc-p" type="button" title="Длиннее на секунду" style="padding:2px 9px">+</button><output class="sc-sec" title="Длительность этой сцены"></output><span class="hint sc-win" style="flex:1"></span><button class="x btn" type="button" title="Убрать сцену" style="padding:2px 9px">✕</button></div><textarea placeholder="Что происходит в этой сцене…" style="min-height:90px"></textarea>
+      c.innerHTML = `<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px"><b class="sc-no" title="Номер сцены: под ним она лежит на ленте и в Библиотеке"></b><input type="range" min="3" max="15" step="1" value="${sec}" style="display:none"><button class="btn sc-m" type="button" title="Короче на секунду" style="padding:2px 9px">−</button><button class="btn sc-p" type="button" title="Длиннее на секунду" style="padding:2px 9px">+</button><output class="sc-sec" title="Длительность этой сцены"></output><span class="hint sc-win" style="flex:1"></span></div><textarea placeholder="Что происходит в этой сцене…" style="min-height:90px"></textarea>
 <details class="sc-tdet" style="margin-top:8px"><summary class="hint" style="cursor:pointer;font-size:12px">Проба размера для этой сцены</summary><div class="sc-tst" style="margin-top:6px;display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span class="hint" style="font-size:12px">Попробовать только эту сцену в другом размере (остальные не меняются):</span><select class="sc-tq">${QUALITY.map(q => `<option value="${q.id}">${q.res}</option>`).join('')}</select><button class="btn sc-tbtn" type="button" title="Сцена считается отдельно, в выбранном размере, на 8 шагов. Результат появится ниже и в Библиотеке, остальные сцены не затрагиваются.">Сделать пробу</button></div><div class="sc-tests" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px"></div></details>
         <div class="sc-refs" style="margin-top:8px"><div class="hint sc-rhint" style="font-size:12px"></div><div class="sc-thumbs" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:6px"></div></div>`;
       // nine places of their own, made like the common ones: an empty place offers itself, a filled
@@ -8093,18 +8112,10 @@ function makeRefMode(cfg) {
       $('textarea', c).addEventListener('input', () => { refreshStates(); c._counter?.(); });   // first the rebuild, then the count and the lock
       $('textarea', c).addEventListener('focus', e => { root._ta = e.target; c._counter?.(); });   // the row of common chips follows the scene you picked up
       $('input[type=range]', c).oninput = recount;
-      /* The cross beside the scene used to throw the whole scene away, so one careless click cost
-         minutes of writing. It now empties the text of THIS scene - the thing people actually reach
-         for it to do. A scene is still removable: its cross on the ribbon above takes the card out. */
-      $('.x', c).onclick = () => {
-        const ta = $('textarea', c);
-        if (!ta || !ta.value.trim()) { toast('В этой сцене текст и так пустой'); return; }
-        const idx = $$('.sc', root).indexOf(c) + 1;
-        confirmBox('Стереть текст сцены ' + idx + '?',
-          'Фотографии и песни сцены останутся на своих полках. «Шаг назад» вернёт текст целиком.', 'Стереть текст', () => {
-            clearSceneText(c);
-          });
-      };
+      /* The cross in the header emptied the text, and the labelled button under the field did the
+         same: two controls for one thing, one of them silent. The cross is gone, the button stayed -
+         in the row under the field, on one level with the other buttons of the field. A scene is
+         still removable: its cross on the ribbon above takes the card out. */
       const clearSceneText = (cc) => {
         root._pushUndo?.();
         const t2 = $('textarea', cc); if (!t2) return;
@@ -8113,7 +8124,29 @@ function makeRefMode(cfg) {
         if (root._save && !root._restoring) root._save();
         toast('Текст сцены очищен · её фото и песни остались на местах');
       };
-      $('.x', c).title = 'Очистить текст этой сцены (фото и песни останутся)';
+      {
+        const clr = document.createElement('button');
+        clr.type = 'button'; clr.className = 'btn mini ta-clear';
+        clr.textContent = 'Очистить текст';
+        clr.title = 'Стереть текст этой сцены; её фото и песни останутся на полках, «шаг назад» вернёт текст';
+        clr.onclick = () => {
+          const ta = $('textarea', c);
+          if (!ta || !ta.value.trim()) { toast('В этой сцене текст и так пустой'); return; }
+          const idx = $$('.sc', root).indexOf(c) + 1;
+          confirmBox('Стереть текст сцены ' + idx + '?',
+            'Фотографии и песни сцены останутся на своих полках. «Шаг назад» вернёт текст целиком.', 'Стереть текст', () => {
+              clearSceneText(c);
+            });
+        };
+        // the row under the field, where the reading buttons of this field already live
+        const ta0 = $('textarea', c);
+        let row = ta0 ? ta0.nextElementSibling : null;
+        if (!row || (!row.classList.contains('ru-wrap') && !row.classList.contains('sc-tools'))) {
+          row = document.createElement('div'); row.className = 'sc-tools';
+          if (ta0) ta0.insertAdjacentElement('afterend', row);
+        }
+        row.append(clr);   // очистка - последняя в ряду, у правого края
+      }
       recount();
     };
 
@@ -10358,6 +10391,7 @@ document.addEventListener('contextmenu', e => {
   const ta = e.target.closest && e.target.closest('textarea');
   if (!ta || ta.getAttribute('spellcheck') === 'false' || ta.disabled) return;
   e.preventDefault(); spClose();
+  document.querySelectorAll('.ctxm').forEach(x => x.remove());   // старое меню не должно остаться под новым
   const v = ta.value, pos = ta.selectionStart == null ? v.length : ta.selectionStart;
   const cur = spWordAround(v, pos);
   const menu = document.createElement('div'); menu.className = 'sp-menu'; SP_MENU = menu;   // without this the menu cannot be closed
@@ -10408,6 +10442,7 @@ document.addEventListener('contextmenu', e => {
       ta.dispatchEvent(new Event('input', { bubbles: true }));
     } catch (err) { toast('Буфер обмена недоступен: разрешите его в Windows'); }
   });
+  spItem(menu, 'Выделить всё', () => { ta.focus(); ta.select(); });
   document.body.append(menu);
   const r = menu.getBoundingClientRect();
   menu.style.left = Math.max(4, Math.min(e.clientX, (window.innerWidth || 1200) - r.width - 8)) + 'px';
@@ -10474,6 +10509,8 @@ $('#agClear').onclick = () => { const ta = $('#agIn'); ta.value = ''; ta.dispatc
   if (selCtx && !selCtx._filled) {
     selCtx._filled = 1;
     selCtx.innerHTML = CTX.map(v => `<option value="${v}">${(v / 1024).toFixed(0)} тысяч</option>`).join('');
+  const ctxLast = window._ctxLast || (AG.status && AG.status.ctx);
+  if (ctxLast) selCtx.value = String(ctxLast);
     selCtx.onchange = async () => {
       try {
         const r = await postJSON('/api/agent/ctx', { ctx: +selCtx.value });
@@ -10506,6 +10543,10 @@ $('#agClear').onclick = () => { const ta = $('#agIn'); ta.value = ''; ta.dispatc
     const f = isField(e.target) ? e.target : null;
     const selText = String(getSelection());
     const inMsg = e.target.closest?.('.msg, .pblock');
+    /* Поля, где пишут текст, обслуживает меню с проверкой написания: оно умеет то же самое плюс
+       варианты слова. Два меню поверх одного слова - вот этот старый, меньший: для таких полей
+       он молчит. Полям без проверки (поле слов песни) и сообщениям остаётся он. */
+    if (f && f.tagName === 'TEXTAREA' && f.getAttribute('spellcheck') !== 'false' && !f.disabled) return;
     if (!f && !inMsg && !selText) return;
     e.preventDefault(); close();
     const has = f ? f.selectionStart !== f.selectionEnd : !!selText;
@@ -10596,11 +10637,10 @@ async function agStatus() {
       + `<span class="rd ${o.have ? 'ok' : 'no'}">${o.have ? '✓ скачано' : `Нужно скачать · ${(o.size / 1e9).toFixed(1)} ГБ`}${o.current ? ' · ВЫБРАНА' : ''}</span>`
       + (o.min_vram && !o.fits ? `<small>⚠ нужно от ${o.min_vram} ГБ видеопамяти: у вас может быть медленно</small>` : '') + `</button>`).join('')
     + ((s.variants || []).some(o => o.current && o.uncensored) ? `<div class="hint" style="margin-top:8px">Эта модель не отказывается писать любые описания. Вы отвечаете за содержание: не используйте её для запрещённого и для людей без их согласия. Сам MiniMax H3 часть запросов всё равно может отклонить.</div>` : '');
-  const cs = $('#agCtxSel'), cn = $('#agCtxNow');
+  const cs = $('#agCtxSel');
   if (cs && s.ctx) {
     if (!Array.prototype.some.call(cs.options, o => +o.value === +s.ctx)) cs.insertAdjacentHTML('beforeend', '<option value="' + s.ctx + '">' + (s.ctx / 1024).toFixed(0) + ' тысяч</option>');
-    cs.value = String(s.ctx);
-    if (cn) cn.textContent = (s.ctx / 1024).toFixed(0) + ' тыс.' + (s.ctx_custom && s.ctx !== s.ctx_default ? ' (ваша)' : ' (по умолчанию)');
+    cs.value = String(s.ctx); window._ctxLast = s.ctx;   // список перелистовывается позже: без этого он стартует с первого значения
   }
   const needModel = !s.installed;
   $('#agInstall').hidden = s.installing || (s.custom && !s.has_model) || (!needModel && s.speech_ready);
@@ -11664,7 +11704,7 @@ const imgSeedForm = (S, fd) => { if (S.seedFixed && S.seed) fd.append('seed', S.
     <div class="head"><div><h1>Изображение по тексту</h1><p>Опишите изображение словами — модель Krea 2 нарисует его. Загрузить своё изображение здесь нельзя: для этого страница «Правка»</p></div>
       <div class="mode-pill"><i></i><span>Krea 2 · 1 МП</span></div></div>
     <div class="grid"><div class="col">
-      <div class="card"><div class="card-h"><h3><span class="n">1</span>Промпт</h3><span class="counter kr-count">0 символов</span><button class="btn mini kr-clear" type="button" title="Убрать всё в этом разделе: промпт или список промптов">Очистить всё</button></div>
+      <div class="card"><div class="card-h"><h3><span class="n">1</span>Промпт</h3><span class="counter kr-count">0 символов</span></div>
         <div class="seg kr-bm" style="grid-template-columns:minmax(0,1fr) minmax(0,1fr);margin-bottom:8px"><button type="button" data-b="0" class="on">Один промпт</button><button type="button" data-b="1">Список промптов<small>серия картинок</small></button></div>
         <textarea class="kr-prompt" placeholder="Опишите картинку: кто или что в кадре, где, какой свет, какой стиль (фото, иллюстрация, постер)…"></textarea>
         <div class="kr-batch" hidden style="margin-top:10px">
@@ -11762,15 +11802,6 @@ const imgSeedForm = (S, fd) => { if (S.seedFixed && S.seed) fd.append('seed', S.
   $('.kr-asp', root).onclick = e => { const c = e.target.closest('.chip'); if (c) { S.aspect = c.dataset.a; S.cw = S.ch = 0; $('.sz-w', root).value = $('.sz-h', root).value = ''; $('.sz-reset', root).hidden = true; upd(); } };
   szWire(root, S, () => upd(), () => IMG_SIZES[S.aspect]);
   $('.kr-prompt', root).oninput = e => $('.kr-count', root).textContent = e.target.value.length + ' символов';
-  $('.kr-clear', root).onclick = () => {
-    const ta = $('.kr-prompt', root);
-    if (!ta.value.trim()) { toast('Здесь и так пусто'); return; }
-    confirmBox('Очистить «Картинку по тексту»?', 'Уберём промпт и вставленный список промптов. Картинки в Библиотеке останутся.', 'Очистить', () => {
-      ta.value = ''; ta.dispatchEvent(new Event('input', { bubbles: true }));
-      toast('Раздел очищен');
-    });
-  };
-
   /* --- list of prompts: a series of pictures, one queue job per prompt --- */
   const K = { batch: false, items: [], removed: new Set() };
   const splitList = text => {
@@ -11854,7 +11885,7 @@ const imgSeedForm = (S, fd) => { if (S.seedFixed && S.seed) fd.append('seed', S.
         <div class="qw-edit">
           <div class="tokens qw-tokens" style="margin-bottom:8px"></div>
           <textarea class="qw-prompt" placeholder="Что изменить и что оставить. Например: Этот человек сидит в кафе у окна и пьёт кофе. Лицо, причёска и одежда как на изображении."></textarea>
-          <div class="ta-foot"><span class="hint">нажмите на тег над полем, чтобы вставить его в текст</span></div></div></div>
+          <div class="ta-foot"></div></div></div>
       <div class="card"><div class="card-h"><h3><span class="n">3</span>Параметры</h3></div>
           <div class="row qw-storyopts" hidden style="margin-bottom:12px"><div class="row-l">Как рисовать</div>
             <div class="seg qw-fr" style="grid-template-columns:minmax(0,1fr) minmax(0,1fr)"><button data-fr="1">По кадрам<small>каждый кадр отдельно, лист склеит программа</small></button><button data-fr="0">Одним листом<small>одно изображение сразу</small></button></div>
@@ -11932,6 +11963,10 @@ const imgSeedForm = (S, fd) => { if (S.seedFixed && S.seed) fd.append('seed', S.
     $$('.qw-h3only', root).forEach(x => x.hidden = S.kind === 'sheet' || !h3);
     $$('.qw-h3sz', root).forEach(x => x.hidden = S.kind === 'sheet' || !h3);
     $$('.qw-size', root).forEach(x => { const r = x.closest('.row'); if (r) r.hidden = h3 || S.kind === 'sheet'; });
+    /* Индикатор в шапке обязан показывать то, чем раздел реально рисует: раньше тут навсегда
+       осталось «Qwen Image 2.1», и переключение движка или режима на него не влияло. */
+    const QW_KIND = { edit: 'правка', sheet: 'лист персонажа', story: 'раскадровка' };
+    $('.mode-pill span', root).textContent = ({ qwen: 'Qwen Image 2.1', flux: 'FLUX.2 klein', h3img: 'MiniMax H3 Image · ' + (S.h3s || 1) + ' МП' })[S.engine] + ' · ' + (QW_KIND[S.kind] || 'правка');
     $$('.qw-eng [data-e="flux"]', root).forEach(x => x.hidden = S.kind === 'sheet');
     $$('.qw-h3sz [data-h3s]', root).forEach(b => b.classList.toggle('on', b.dataset.h3s === S.h3s)); $('.qw-slots', root).classList.toggle('one', S.kind === 'sheet'); $('.qw-morehint', root).hidden = S.kind === 'sheet';
     $('.qw-morehint', root).innerHTML = S.kind === 'story'
@@ -12031,14 +12066,19 @@ fetch('/api/version').then(r => r.json()).then(v => { $('#appVer').textContent =
    before erasing, and clears exactly the field it stands under. */
 function attachClearButtons(root) {
   const scope = root && root.querySelectorAll ? root : document;
-  const list = scope.matches && scope.matches('.ta-foot') ? [scope] : Array.prototype.slice.call(scope.querySelectorAll('.ta-foot'));
-  list.forEach(foot => {
-    if (foot.querySelector(':scope > .ta-clear')) return;
-    // a scene card and an audio bench have their own controls; a stray "clear" there would lie
-    if (foot.closest('.sc') || foot.closest('.atrim') || foot.closest('.sp-menu')) return;
-    const card = foot.closest('.card') || foot.parentElement;
-    const ta = card ? Array.prototype.slice.call(card.querySelectorAll('textarea')).pop() : null;
-    if (!ta || ta.dataset.noClear === '1') return;
+  /* One rule for every field: the tags and the note keep their own line, all the buttons of the
+     field stand in one row, and the clearing button is always the last one, at the right edge.
+     The row is the one the field's buttons already use; where there are none, a row is made. */
+  const list = Array.prototype.slice.call(scope.querySelectorAll ? scope.querySelectorAll('textarea') : (scope.tagName === 'TEXTAREA' ? [scope] : []));
+  list.forEach(ta => {
+    if (ta.dataset.noClear === '1' || ta.closest('.atrim') || ta.closest('.sp-menu') || ta.closest('.lm-scenes') || ta.closest('.sc') || ta.closest('.ag-comp') || ta.id === 'agIn') return;
+    const card = ta.closest('.card') || ta.parentElement;
+    if (!card || card.querySelector('.ta-clear')) return;
+    // ряд кнопок того же поля: тот, где уже лежат его собственные кнопки, а не попавшийся рядом
+    const wraps = Array.prototype.slice.call(card.querySelectorAll('.ru-wrap'));
+    let row = wraps.filter(r => r.querySelector('.ru-b, .gen-b')).pop() || wraps.pop()
+      || Array.prototype.slice.call(card.querySelectorAll('.ta-foot')).filter(f => !f.querySelector('.rm-tokens, .tokens')).pop();
+    if (!row) { row = document.createElement('div'); row.className = 'field-btns'; ta.insertAdjacentElement('afterend', row); }
     const b = document.createElement('button');
     b.type = 'button'; b.className = 'btn mini ta-clear'; b.textContent = 'Очистить текст';
     b.title = 'Стереть текст в этом поле; файлы на своих местах останутся';
@@ -12052,16 +12092,31 @@ function attachClearButtons(root) {
         toast('Текст стёрт');
       });
     };
-    foot.append(b);
+    row.append(b);
   });
 }
+/* «Вставить пример» сидела на строке с тегами и читалась как ещё один тег. У кнопок поля есть
+   свой ряд - переставляем её туда, третьей, перед очисткой. */
+function placeExampleButtons() {
+  $$('.sw-example').forEach(el => {
+    const card = el.closest('.card'); if (!card) return;
+    const wraps = Array.prototype.slice.call(card.querySelectorAll('.ru-wrap'));
+    const row = wraps.filter(r => r.querySelector('.ru-b, .gen-b')).pop() || wraps.pop();
+    if (!row || el.parentElement === row) return;
+    const clr = row.querySelector('.ta-clear');
+    if (clr) row.insertBefore(el, clr); else row.append(el);
+  });
+}
+/* Обе раскладки полей вызывает один вход: порядок, в котором поля успели построиться, бывает
+   разный, и второй таймер был костылём. */
+function fieldRows(root) { attachClearButtons(root); placeExampleButtons(); }
+
 setTimeout(() => {
-  attachClearButtons(document);
+  fieldRows(document);
   if (typeof MutationObserver !== 'undefined') {
     const mo = new MutationObserver(ms => ms.forEach(m => m.addedNodes.forEach(nd => {
       if (nd.nodeType !== 1) return;
-      if (nd.classList && nd.classList.contains('ta-foot')) attachClearButtons(nd);
-      else if (nd.querySelectorAll) attachClearButtons(nd);
+      if (nd.querySelectorAll || nd.classList) fieldRows(nd);
     })));
     mo.observe(document.body, { childList: true, subtree: true });
   }
