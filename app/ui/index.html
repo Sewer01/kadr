@@ -100,11 +100,12 @@
  padding:0 7px;border-radius:999px;background:var(--accent);color:#fff;font-size:15px;font-weight:800;
  line-height:1;font-family:inherit}
 .sc-sec{flex:0 0 auto;min-width:40px;font-size:13.5px;font-weight:700;color:var(--text);white-space:nowrap}
-.sc-words{display:grid;gap:4px;margin-top:6px;padding:7px 9px;border:1px solid var(--line);
- border-radius:10px;background:rgba(var(--surface-rgb),.55)}
-.sc-words>b{font-size:12px;color:var(--muted);font-weight:700}
-.sc-words textarea{min-height:44px;font-size:13px;line-height:1.4}
-.sc-words .sc-wordbtns{display:flex;gap:6px;flex-wrap:wrap}
+/* The words of the scene's song, at the bottom of the music editor: one line, scrolling, the way
+   the Agent's field works. No heading - the editor is already about this very file. */
+.atrim .at-words{display:grid;gap:6px;margin-top:10px;padding-top:9px;border-top:1px solid var(--line)}
+.atrim .at-words textarea{height:30px;min-height:30px;max-height:30px;resize:none;overflow:auto;
+ font-size:13px;line-height:1.5;padding:5px 10px;border-radius:9px}
+.atrim .at-words .sc-wordbtns{display:flex;gap:6px;flex-wrap:wrap}
 .tl-mark{position:absolute;left:42px;bottom:3px;height:3px;background:#ff4d5e;border-radius:2px;
  box-shadow:0 0 0 1px rgba(0,0,0,.35);pointer-events:none;z-index:2}
 /* a row of scene buttons keeps one height: when one label wraps to two lines, the others stretch
@@ -4395,6 +4396,7 @@ class AudioTrimmer {
       '<label>Конец, с<input type="text" inputmode="decimal" class="at-b" placeholder="15,0" disabled></label>' +
       '<div class="at-box"><span class="at-cap">' + this.lenLabel + '</span><b class="at-dur">—</b></div></div>' +
       '<div class="at-warn" hidden></div>' +
+      '<div class="at-words" hidden></div>' +
       '</div>' +
       '<div class="at-empty">Загрузите аудио - и здесь появится редактор: волна, выделение, паузы, голос.</div>';
     (o.mount || document.body).append(this.el);
@@ -7758,6 +7760,7 @@ function makeRefMode(cfg) {
           const keep = c._audSel[j] || c._trim._loaded || { start: 0, end: c._trim.dur0 };
           if (c._trim.dur0 && (Math.abs(c._trim.start - keep.start) > .05 || Math.abs(c._trim.end - keep.end) > .05)) applyTrim();
           host.hidden = true;
+          c._paintWords && c._paintWords();
           return;
         }
         host.hidden = false;
@@ -7794,48 +7797,50 @@ function makeRefMode(cfg) {
             c._trim._sync();
           }
         }
+        c._paintWords && c._paintWords();   // the editor now shows another song: the words follow
       };
-      /* The words whisper heard are shown under the scene, editable: a singing voice is exactly
-         where small recognition fails, and the person must be able to fix the line before it is
-         sent. Fixed words win over the machine's; the Agent is told about both. */
+      /* The words of this scene's song live at the bottom of the music editor, right under the
+         seconds: that is where the person is when they choose what the scene sings. One scrollable
+         line, the same as in the Agent. Fixed words win over what the machine heard, and the Agent
+         is told about both. */
       c._paintWords = () => {
-        let host = $('.sc-words', c);
-        const songs = (c._auds || []).map((f, j) => f ? j : -1).filter(j => j >= 0);
-        if (!songs.length) { if (host) host.remove(); return; }
-        if (!host) {
-          host = document.createElement('div'); host.className = 'sc-words';
-          ($('.sc-trimhost', c) || $('.sc-auds', c) || c).insertAdjacentElement('beforebegin', host);
+        const trim = c._trim, host = trim ? trim.q('.at-words') : null;
+        if (!host) return;
+        const slot = trim._slot, f = (slot >= 0 && c._auds) ? c._auds[slot] : null;
+        if (!f || ($('.sc-trimhost', c) && $('.sc-trimhost', c).hidden)) { host.hidden = true; host.innerHTML = ''; host.dataset.slot = ''; return; }
+        host.hidden = false;
+        if (host.dataset.slot !== String(slot)) {
+          host.dataset.slot = String(slot);
+          host.innerHTML = '<textarea data-w="' + slot + '" rows="1" placeholder="Что поёт эта сцена - модель возьмёт текст отсюда; можно поправить руками"></textarea>'
+            + '<div class="sc-wordbtns"><button class="btn mini" type="button" data-again="ru">переслушать по-русски</button>'
+            + '<button class="btn mini" type="button" data-again="en">переслушать по-английски</button>'
+            + '<button class="btn mini" type="button" data-again="clear">стереть слова</button></div>';
+          const ta0 = $('textarea', host);
+          ta0.oninput = () => { c._audWords = c._audWords || []; c._audWords[+ta0.dataset.w] = ta0.value; if (root._save) root._save(); };
+          $$('button[data-again]', host).forEach(b => {
+            b.onclick = async () => {
+              const j = +host.dataset.slot, file = c._auds[j]; if (!file) return;
+              c._audWords = c._audWords || [];
+              const put = v => { c._audWords[j] = v; const t2 = $('textarea', host); if (t2) t2.value = v; };
+              if (b.dataset.again === 'clear') { put(''); if (root._save) root._save(); toast('Слова стёрты: модель будет петь на свой слух'); return; }
+              if (!AG.status || !AG.status.speech_ready) { try { await agStatus(); } catch (e) { } }
+              if (!AG.status || !AG.status.speech_ready) { toast('Распознавание речи не готово: раздел «Агент», карточка «Модель»'); return; }
+              const was = b.textContent; b.disabled = true; b.textContent = 'слушаю…';
+              try {
+                const j2 = await transcribeWav(file, b.dataset.again);
+                put((j2.text || '').trim());
+                const hit = (AG.audios || []).find(a => a.name === file.name);
+                if (hit) { hit.text = c._audWords[j]; hit.lang = j2.lang; hit.langName = j2.lang_name; }
+                if (typeof showAudioBox === 'function') showAudioBox();
+                if (root._save) root._save();
+                toast(c._audWords[j] ? ('Услышано заново (' + (j2.lang_name || b.dataset.again) + '): ' + c._audWords[j].slice(0, 60)) : 'Песня не разобралась: слов не слышно');
+              } catch (e) { toast('Не удалось переслушать: ' + (e && e.message ? e.message : e)); }
+              b.disabled = false; b.textContent = was;
+            };
+          });
         }
-        host.innerHTML = songs.map(j => {
-          const f = c._auds[j], bs = c._baseFixed || c._base || 10;
-          const known = (c._audWords || [])[j] || agWordsFor(c, j) || '';
-          return '<b>Слова &lt;Audio ' + (bs + j) + '&gt; · ' + esc2(String(f.name).slice(0, 22)) + '</b>' +
-            '<textarea data-w="' + j + '" rows="2" placeholder="Что поёт эта сцена - модель возьмёт текст отсюда">' + esc2(known) + '</textarea>' +
-            '<div class="sc-wordbtns"><button class="btn mini" type="button" data-again="ru" data-j="' + j + '">переслушать по-русски</button>' +
-            '<button class="btn mini" type="button" data-again="en" data-j="' + j + '">переслушать по-английски</button>' +
-            '<button class="btn mini" type="button" data-again="clear" data-j="' + j + '">стереть слова</button></div>';
-        }).join('');
-        $$('textarea[data-w]', host).forEach(ta => { ta.oninput = () => { c._audWords = c._audWords || []; c._audWords[+ta.dataset.w] = ta.value; if (root._save) root._save(); }; });
-        $$('button[data-again]', host).forEach(b => {
-          b.onclick = async () => {
-            const j = +b.dataset.j, f = c._auds[j]; if (!f) return;
-            c._audWords = c._audWords || [];
-            if (b.dataset.again === 'clear') { c._audWords[j] = ''; const t0 = $('textarea[data-w="' + j + '"]', host); if (t0) t0.value = ''; if (root._save) root._save(); toast('Слова стёрты: модель будет петь на свой слух'); return; }
-            if (!AG.status || !AG.status.speech_ready) { try { await agStatus(); } catch (e) { } }
-            if (!AG.status || !AG.status.speech_ready) { toast('Распознавание речи не готово: раздел «Агент», карточка «Модель»'); return; }
-            const was = b.textContent; b.disabled = true; b.textContent = 'слушаю…';
-            try {
-              const j2 = await transcribeWav(f, b.dataset.again);
-              c._audWords[j] = (j2.text || '').trim();
-              const hit = (AG.audios || []).find(a => a.name === f.name); if (hit) { hit.text = c._audWords[j]; hit.lang = j2.lang; hit.langName = j2.lang_name; }
-              const t1 = $('textarea[data-w="' + j + '"]', host); if (t1) t1.value = c._audWords[j];
-              if (typeof showAudioBox === 'function') showAudioBox();
-              if (root._save) root._save();
-              toast(c._audWords[j] ? ('Услышано заново (' + (j2.lang_name || b.dataset.again) + '): ' + c._audWords[j].slice(0, 60)) : 'Песня не разобралась: слов не слышно');
-            } catch (e) { toast('Не удалось переслушать: ' + (e && e.message ? e.message : e)); }
-            b.disabled = false; b.textContent = was;
-          };
-        });
+        const ta = $('textarea', host), now = (c._audWords || [])[slot] || agWordsFor(c, slot) || '';
+        if (ta && document.activeElement !== ta && ta.value !== now) ta.value = now;
       };
       c._paintAuds = () => {
         const row = $('.sc-auds', c); if (!row) return;
@@ -7873,7 +7878,7 @@ function makeRefMode(cfg) {
           ainp.click();
         } else if (b.dataset.a === 'del') {
           c._auds[j] = null; c._audSrc[j] = null; c._audSel[j] = null; if (c._audDur) c._audDur[j] = null;
-          if (c._trim && c._trim._slot === j) { c._trim.clear(); c._trim._slot = -1; $('.sc-trimhost', c).hidden = true; }
+          if (c._trim && c._trim._slot === j) { c._trim.clear(); c._trim._slot = -1; $('.sc-trimhost', c).hidden = true; c._paintWords && c._paintWords(); }
           c._paintAuds(); paintRefs();
           if (root._save) root._save();
         } else if (b.dataset.a === 'trim') openTrim(j);
