@@ -92,6 +92,13 @@
 /* How much of the scene is already in the clip: a red strip along the bottom of the chip, from the
    number to the ready length. A vertical line here stood right beside the handle that sets the
    length at the right edge, and the two were read as one marker that disagreed with the other. */
+/* the words of the scene's song, where the person can read and fix them: a machine hears a
+   singing voice badly, and a wrong line sent to the model sings nonsense on purpose */
+.sc-words{display:grid;gap:4px;margin-top:6px;padding:7px 9px;border:1px solid var(--line);
+ border-radius:10px;background:rgba(var(--surface-rgb),.55)}
+.sc-words>b{font-size:12px;color:var(--muted);font-weight:700}
+.sc-words textarea{min-height:44px;font-size:13px;line-height:1.4}
+.sc-words .sc-wordbtns{display:flex;gap:6px;flex-wrap:wrap}
 .tl-mark{position:absolute;left:42px;bottom:3px;height:3px;background:#ff4d5e;border-radius:2px;
  box-shadow:0 0 0 1px rgba(0,0,0,.35);pointer-events:none;z-index:2}
 /* a row of scene buttons keeps one height: when one label wraps to two lines, the others stretch
@@ -7527,7 +7534,7 @@ function makeRefMode(cfg) {
         const run = root._run, slotA = $('.rm-auds .slot', root);
         const proj = { run, t: Date.now(), sec: cfg.mode, mode: root._mode, qm: root._q, qBy: { ...(root._qBy || {}), [root._q]: S.q }, snd: root._snd, loop: root._loop !== false, start: $('.lm-start', root).value, vocals: $('.lm-vocals', root).checked,
           aspect: S.aspect, q: S.q, cw: S.cw || 0, ch: S.ch || 0, src: root._src ? { id: root._src.id || '', name: root._src.name } : null,
-          scenes: $$('.sc', root).map(c => ({ prompt: $('textarea', c).value, sec: +$('input[type=range]', c).value, fresh: !!$('.sc-fresh', c)?.checked, nimg: 9, var: c._var || 0, base: c._baseFixed || 0,
+          scenes: $$('.sc', root).map(c => ({ prompt: $('textarea', c).value, sec: +$('input[type=range]', c).value, fresh: !!$('.sc-fresh', c)?.checked, nimg: 9, var: c._var || 0, words: (c._audWords || []).slice(), base: c._baseFixed || 0,
             done: c._dn.final ? { sig: c._dn.final.sig, url: c._dn.final.url, id: c._dn.final.id, text: c._dn.final.text } : null,
             draftDone: c._dn.draft ? { sig: c._dn.draft.sig, url: c._dn.draft.url, id: c._dn.draft.id, text: c._dn.draft.text } : null })) };
         const all = loadAll(); all[run] = proj;
@@ -7719,7 +7726,7 @@ function makeRefMode(cfg) {
       $('textarea', c).insertAdjacentHTML('afterend', '<div class="sc-tokens" style="display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 0"></div><div class="sc-auds" style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:6px"></div><div class="sc-trimhost" hidden style="margin-top:8px"></div>');
       // - - - audio of THIS scene: up to three files, trimmed with the same instrument as the
       // shared track. They reach the model as references; the text decides where one is used.
-      c._auds = c._auds || [null, null, null];
+      c._auds = c._auds || [null, null, null]; c._audWords = c._audWords || [null, null, null];
       c._audSrc = c._audSrc || [null, null, null];   // the file as it was loaded - never overwritten
       c._audSel = c._audSel || [null, null, null];   // what was cut out of it, so the next edit starts from the full wave
       const esc2 = s => String(s).replace(/[<>&]/g, ch => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[ch]));
@@ -7771,6 +7778,48 @@ function makeRefMode(cfg) {
           }
         }
       };
+      /* The words whisper heard are shown under the scene, editable: a singing voice is exactly
+         where small recognition fails, and the person must be able to fix the line before it is
+         sent. Fixed words win over the machine's; the Agent is told about both. */
+      c._paintWords = () => {
+        let host = $('.sc-words', c);
+        const songs = (c._auds || []).map((f, j) => f ? j : -1).filter(j => j >= 0);
+        if (!songs.length) { if (host) host.remove(); return; }
+        if (!host) {
+          host = document.createElement('div'); host.className = 'sc-words';
+          ($('.sc-trimhost', c) || $('.sc-auds', c) || c).insertAdjacentElement('beforebegin', host);
+        }
+        host.innerHTML = songs.map(j => {
+          const f = c._auds[j], bs = c._baseFixed || c._base || 10;
+          const known = (c._audWords || [])[j] || agWordsFor(c, j) || '';
+          return '<b>Слова &lt;Audio ' + (bs + j) + '&gt; · ' + esc2(String(f.name).slice(0, 22)) + '</b>' +
+            '<textarea data-w="' + j + '" rows="2" placeholder="Что поёт эта сцена - модель возьмёт текст отсюда">' + esc2(known) + '</textarea>' +
+            '<div class="sc-wordbtns"><button class="btn mini" type="button" data-again="ru" data-j="' + j + '">переслушать по-русски</button>' +
+            '<button class="btn mini" type="button" data-again="en" data-j="' + j + '">переслушать по-английски</button>' +
+            '<button class="btn mini" type="button" data-again="clear" data-j="' + j + '">стереть слова</button></div>';
+        }).join('');
+        $$('textarea[data-w]', host).forEach(ta => { ta.oninput = () => { c._audWords = c._audWords || []; c._audWords[+ta.dataset.w] = ta.value; if (root._save) root._save(); }; });
+        $$('button[data-again]', host).forEach(b => {
+          b.onclick = async () => {
+            const j = +b.dataset.j, f = c._auds[j]; if (!f) return;
+            c._audWords = c._audWords || [];
+            if (b.dataset.again === 'clear') { c._audWords[j] = ''; const t0 = $('textarea[data-w="' + j + '"]', host); if (t0) t0.value = ''; if (root._save) root._save(); toast('Слова стёрты: модель будет петь на свой слух'); return; }
+            if (!AG.status || !AG.status.speech_ready) { try { await agStatus(); } catch (e) { } }
+            if (!AG.status || !AG.status.speech_ready) { toast('Распознавание речи не готово: раздел «Агент», карточка «Модель»'); return; }
+            const was = b.textContent; b.disabled = true; b.textContent = 'слушаю…';
+            try {
+              const j2 = await transcribeWav(f, b.dataset.again);
+              c._audWords[j] = (j2.text || '').trim();
+              const hit = (AG.audios || []).find(a => a.name === f.name); if (hit) { hit.text = c._audWords[j]; hit.lang = j2.lang; hit.langName = j2.lang_name; }
+              const t1 = $('textarea[data-w="' + j + '"]', host); if (t1) t1.value = c._audWords[j];
+              if (typeof showAudioBox === 'function') showAudioBox();
+              if (root._save) root._save();
+              toast(c._audWords[j] ? ('Услышано заново (' + (j2.lang_name || b.dataset.again) + '): ' + c._audWords[j].slice(0, 60)) : 'Песня не разобралась: слов не слышно');
+            } catch (e) { toast('Не удалось переслушать: ' + (e && e.message ? e.message : e)); }
+            b.disabled = false; b.textContent = was;
+          };
+        });
+      };
       c._paintAuds = () => {
         const row = $('.sc-auds', c); if (!row) return;
         const full = c._auds.filter(Boolean).length >= 3;
@@ -7779,6 +7828,7 @@ function makeRefMode(cfg) {
           '<span class="counter" title="Аудио в этой сцене: не больше трёх">' + c._auds.filter(Boolean).length + ' / 3</span>' +
           c._auds.map((f, j) => f ? `<span class="token" style="display:inline-flex;gap:6px;align-items:center">&lt;Audio ${(c._base || 10) + j}&gt; ${esc2(f.name.slice(0, 18))}${c._audSel[j] ? ' <small style="opacity:.75">с ' + c._audSel[j].start.toFixed(1).replace('.', ',') + ' по ' + c._audSel[j].end.toFixed(1).replace('.', ',') + ' с</small>' : ''} <button class="btn mini" type="button" data-a="trim" data-j="${j}" title="Послушать и обрезать: прибор под строкой">Обрезать</button><button class="btn mini" type="button" data-a="del" data-j="${j}" title="Убрать этот файл из сцены">×</button></span>` : '').join('') +
           (full ? '<span class="hint" style="font-size:12px">три аудио в сцене - максимум</span>' : '');
+        c._paintWords && c._paintWords();
       };
       ainp.onchange = () => {
         const f = ainp.files && ainp.files[0];
@@ -8726,20 +8776,23 @@ function makeRefMode(cfg) {
           try {
             sCards.forEach((c, i) => {
               const pl = sPlans[i]; if (!pl) return;
-              const add = [];
+              const add = [], tags = [];
+              const bs = c._baseFixed || 10 * (i + 1);
               (c._auds || []).forEach((f, j) => {
                 if (!f) return;
-                const x = agWords(f, i + 1);
-                if (!x || !x.words) return;
-                const probe = x.words.slice(0, 24).toLowerCase();
-                if ((pl.text || '').toLowerCase().indexOf(probe) >= 0) return;
-                add.push('<d>[' + (x.lang || 'язык аудио') + '] ' + x.words + '</d>');
+                const words = agWordsFor(c, j); if (!words) return;
+                const probe = words.slice(0, 24).toLowerCase();
+                const x = agWords(f, i + 1) || {};
+                if ((pl.text || '').toLowerCase().indexOf(probe) < 0) add.push('<d>[' + (x.lang || 'язык аудио') + '] ' + words + '</d>');
+                tags.push('<Audio ' + (bs + j) + '>');
               });
-              if (add.length) {
+              if (add.length || tags.length) {
                 pl.text = (pl.text || '').trim() + ' ' + add.join(' ');
-                if (/<Audio\s*\d+>/.test(pl.text)) pl.text = pl.text.replace(/non_diegetic_music:\s*N\/A/i, 'non_diegetic_music: как в теге аудио');
+                /* The music field must name the file, in the language the model reads. An earlier
+                   version put a Russian sentence here, and the model got prose instead of a link. */
+                if (tags.length) pl.text = pl.text.replace(/non_diegetic_music\s*:\s*(?:N\/A|[^\n]*)/i, 'non_diegetic_music: ' + tags.join(' ') + ' (the reference audio of this scene)');
                 pl.text = pl.text.trim();
-                toast('Сцена ' + (i + 1) + ': в текст для модели добавлены слова её песни (' + add.join(' · ').slice(0, 70) + '…)');
+                if (add.length) toast('Сцена ' + (i + 1) + ': в текст для модели добавлены слова её песни (' + add.join(' · ').slice(0, 70) + '…)');
               }
             });
           } catch (e) { }
@@ -9786,6 +9839,15 @@ $('#agMic').onclick = async () => {
 
 /* The words whisper heard live in the chat's list together with the place they came from; a scene's
    song is found there by its name and length, so the same words can be put back into its prompt. */
+/* A card's own words (the person typed or re-listened) come first, the machine's second. */
+function agWordsFor(c, j) {
+  const own = (c && c._audWords || [])[j];
+  if (own && String(own).trim()) return String(own).trim();
+  const f = c && c._auds && c._auds[j]; if (!f) return '';
+  const bs = c._baseFixed || c._base || 10 * ($$('.sc', (c.closest('.view') || document)).indexOf(c) + 1);
+  const no = Math.max(1, Math.round(bs / 10));
+  return (agWords(f, no) || {}).words || '';
+}
 function agWords(f, sceneNo) {
   const list = AG.audios || [];
   const hit = list.find(a => a.name === f.name && Math.abs((a.dur || 0) - (f._dur || 0)) < .2 && a.text)
@@ -9850,7 +9912,7 @@ async function agSend() {
       // told "there is no audio of yours", wrote non_diegetic_music: N/A and left the lyrics out
       scene_audios: $$('.sc', lr).map((c, i) => {
         const bs = c._baseFixed || 10 * (i + 1);
-        const items = (c._auds || []).map((f, j) => f && agWords(f, i + 1)).filter(Boolean).map((x, j2) => Object.assign({ tag: '<Audio ' + (bs + j2) + '>' }, x));
+        const items = (c._auds || []).map((f, j) => { const words = agWordsFor(c, j); if (!f || !words) return null; const base = agWords(f, i + 1) || {}; return Object.assign({ tag: '<Audio ' + (bs + j) + '>', name: f.name, sec: Math.round(base.sec || 0), lang: base.lang || '' }, { words }); }).filter(Boolean);
         return items.length ? { scene: i + 1, audios: items } : null;
       }).filter(Boolean) }; }
   try {
