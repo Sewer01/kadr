@@ -3220,7 +3220,10 @@ function previewPanel(el, st, opts) {
       const r = await fetch(opts.real.url, { method: 'POST', body: opts.real.form() });
       const txt = await r.text();
       try { res = JSON.parse(txt); } catch { res = { error: txt }; }
-      if (!r.ok) throw new Error(res.error || r.statusText);
+      if (!r.ok) {
+        if (r.status === 409 && res.low_memory) { go.disabled = false; return lowMemoryAsk(res.error, () => realStart()); }
+        throw new Error(res.error || r.statusText);
+      }
     } catch (e) { go.disabled = false; if (run) toast('Ошибка: ' + e.message); else status.textContent = 'Ошибка: ' + e.message; return; }
     go.disabled = false;
     if (run) {  // the previous job keeps going in the queue; this panel now follows the new one
@@ -5191,6 +5194,50 @@ async function postJSON(url, body) {
   if (!r.ok) throw new Error(j.error || r.statusText);
   return j;
 }
+/* Программа помнит, при скольком свободном месте видеопамяти этот режим уже прерывался. Если
+   сейчас меньше, пуск останавливается и спрашивает: возможно, память держит браузер или игра.
+   Согласие рискнуть действует три минуты - на эту попытку, а не навсегда. */
+function lowMemoryAsk(text, retry) {
+  confirmBox('Видеопамяти может не хватить', (text || '') + ' Можно рискнуть: если память кончится, работа остановится и скажет об этом прямо.',
+    'Всё равно начать', async () => { try { await postJSON('/api/gate/off', {}); } catch (e) { } retry(); });
+}
+
+/* Клип, который человек приносит продолживать, может нести память о себе: режим, сид и промпт
+   вписаны внутрь файла. Нашли - показываем под кнопкой выбора и даём забрать промпт. */
+let MP4_LINE = null;
+document.addEventListener('change', async e => {
+  const inp = e.target;
+  if (!inp || inp.type !== 'file') return;
+  const f = inp.files && inp.files[0];
+  if (!f || !/\.(mp4|m4v|mov)$/i.test(f.name) || f.size > 120 * 1048576) return;
+  let j = null;
+  try { j = await (await fetch('/api/mp4tag', { method: 'POST', body: f })).json(); } catch (err) { return; }
+  const t = j && j.tag;
+  if (!t) return;
+  if (MP4_LINE) { MP4_LINE.remove(); MP4_LINE = null; }
+  const line = document.createElement('div');
+  line.className = 'note';
+  line.style.cssText = 'margin-top:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap';
+  const ours = j.made_by === 'kadr';
+  const nm = (typeof MODE_NAME !== 'undefined' && MODE_NAME[t.mode]) || t.mode || '';
+  const words = String(t.prompt || '').replace(/\s+/g, ' ').slice(0, 150);
+  const span = document.createElement('span');
+  span.innerHTML = (ours ? 'Этот клип делала программа: <b>' + esc(nm || 'не помнит режим') + '</b>'
+    : 'В файле лежит промпт, которым его сделали')
+    + (t.seed ? ', сид ' + esc(String(t.seed)) : '') + (t.res ? ', ' + esc(String(t.res)) : '')
+    + (words ? ' · «' + esc(words) + (String(t.prompt || '').length > 150 ? '…' : '') + '»' : '');
+  line.append(span);
+  if (t.prompt) {
+    const cp = document.createElement('button');
+    cp.className = 'btn mini'; cp.type = 'button'; cp.textContent = 'Скопировать промпт';
+    cp.onclick = () => { const p = navigator.clipboard && navigator.clipboard.writeText(t.prompt); p && p.then ? p.then(() => toast('Промпт скопирован'), () => toast('Не вышло скопировать')) : toast('Буфер обмена недоступен'); };
+    line.append(cp);
+  }
+  const host = inp.closest('.lm-srcpick') || inp.closest('.row') || (inp.closest('label') || {}).parentElement;
+  if (host) host.insertAdjacentElement('afterend', line);
+  MP4_LINE = line;
+}, true);
+
 // Library: own copies of the results (settings)
 async function resLoad(s) {
   if (!API) return;
@@ -6079,6 +6126,7 @@ function qHandle(m) {
   const j = QUEUE.find(x => x.id === m.prompt_id); if (!j) return;
   j.lastEv = performance.now();
   if (m.type === 'stage') {
+    if (m.eta) j.eta = m.eta;   // сколько эта работа обычно занимает на этой машине
     const samp = String(m.stage).startsWith('sample');
     if (samp && (j.stage !== m.stage || (m.scene && j.scene !== m.scene))) j.step1T = null;
     if (samp && m.step) { j.stepT = performance.now(); if (m.step === 1) j.step1T = j.stepT; }
@@ -6168,6 +6216,13 @@ function qRender() {
       : j.state === 'stopped' ? 'остановлено' : 'ошибка: ' + (j.msg || '');
     if (samp) st += ` · шаг ${j.step || 0} из ${j.max}`;
     if (run && j.t0) st += ` · прошло ${fmtTime((performance.now() - j.t0) / 1000)}`;
+    // срок берём из прошлых прогонов того же режима на этом же компьютере, а не из инструкции
+    if (j.eta >= 20) {
+      const went = j.t0 ? (performance.now() - j.t0) / 1000 : 0;
+      st += run ? (went < j.eta ? ` · по прошлым запускам ~${fmtTime(j.eta)}, осталось ~${fmtTime(j.eta - went)}`
+                                : ` · по прошлым запускам ~${fmtTime(j.eta)}, сейчас дольше обычного`)
+                : ` · по прошлым запускам ~${fmtTime(j.eta)}`;
+    }
     const cls = j.state === 'done' ? ' ok' : j.state === 'error' ? ' err' : run ? ' run' : '';
     if (j.stopping && act.includes(j)) st = 'останавливаем… ComfyUI заканчивает текущий шаг, это может занять несколько секунд';
     const btn = act.includes(j) ? (j.stopping ? `<button class="btn" disabled>Останавливаем…</button>` : `<button class="btn" data-q="stop" data-id="${j.id}">${run ? 'Остановить' : 'Убрать'}</button>`)
@@ -11643,11 +11698,15 @@ function imgPanel(el, o) {
       const resp = await fetch(o.url, { method: 'POST', body: o.form() });
       const txt = await resp.text();
       try { r = JSON.parse(txt); } catch { r = { error: txt }; }
-      if (!resp.ok) throw new Error(r.error || resp.statusText);
+      if (!resp.ok) {
+        if (resp.status === 409 && r.low_memory) { go.disabled = false; return lowMemoryAsk(r.error, () => go.click()); }
+        throw new Error(r.error || resp.statusText);
+      }
     } catch (e) { go.disabled = false; status.textContent = 'Ошибка: ' + e.message; return; }
     go.disabled = false;
     if (run) { clearInterval(run.tick); offPrompt(run.id); const old = QUEUE.find(j => j.id === run.id); if (old) old.detached = true; run = null; }
     qAdd(r.prompt_id, o.mode, o.promptText());
+    { const jj = QUEUE.find(x => x.id === r.prompt_id); if (jj && r.eta) jj.eta = r.eta; }
     live.hidden = true; res.hidden = true; empty.hidden = true; acts.hidden = true; zb.hidden = true; dim.textContent = '';
     run = { id: r.prompt_id, t0: performance.now(), stage: 'queued' };
     stopB.hidden = false;

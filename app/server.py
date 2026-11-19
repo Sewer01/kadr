@@ -38,6 +38,7 @@ import clipboard
 import cloud
 import customwf
 import engine
+import forecast
 import monitor
 import report
 import mp4info
@@ -126,6 +127,7 @@ clipboard.data_dir = DATA_DIR   # the clipboard helper and its temporary PNG liv
 LONG_DIR = DATA_DIR / "long"   # saved scene states of the long video made scene by scene
 REF_DIR = DATA_DIR / "refs"    # copies of the pictures a result was made of, one folder per calculation
 LIBRARY_FILE = DATA_DIR / "library.json"
+TIMINGS = DATA_DIR / "timings.json"   # чем программа платит на вопрос «сколько ждать» и «не упадёт ли»
 QUEUE_FILE = DATA_DIR / "queue.json"
 WORKFLOWS_DIR = DATA_DIR / "workflows"
 MAX_SECONDS = 25.0  # H3 itself is made for up to 15 s; longer clips are allowed, quality is the user's call
@@ -648,6 +650,16 @@ class App:
             await self.finish_job(job)
         elif t == "execution_error":
             job["state"] = "error"
+            em = str(d.get("exception_message") or "")
+            # нехватка памяти, зафиксированная при известном свободном месте, - единственное
+            # основание отказать в следующий раз: своих выдуманных нормативов у нас нет
+            if job.get("free0") is not None and any(k in em.lower() for k in
+                                                    ("out of memory", "oom", "not enough memory", "allocated", "exceeds")):
+                try:
+                    forecast.record(TIMINGS, (job.get("meta") or {}).get("mode", ""), 0, ok=False,
+                                    free=job.get("free0"), reason=em[:120])
+                except Exception:
+                    pass
             self.note_error(f'Ошибка генерации, узел {d.get("node_type", "")}: {d.get("exception_message", "").strip()}')
             hint = self.model_hint((job.get("meta") or {}).get("mode", ""), d.get("exception_message", ""))
             await self.broadcast({"type": "error", "prompt_id": pid,
@@ -659,7 +671,8 @@ class App:
 
     async def send_stage(self, job, stage, step=None, total=None, node=None):
         job["stage"] = stage
-        msg = {"type": "stage", "prompt_id": job["prompt_id"], "stage": stage, "step": step, "max": total}
+        msg = {"type": "stage", "prompt_id": job["prompt_id"], "stage": stage, "step": step, "max": total,
+               "eta": job.get("eta") or 0}   # «примерно столько это обычно идёт»
         sc = job.get("scenes")
         if sc and node is not None and str(node) in sc.get("map", {}):
             job["scene_now"] = sc["map"][str(node)] + 1
@@ -736,8 +749,115 @@ class App:
             item["refs"] = await self.stash_refs(item, _graph_refs(job.get("graph")))
             self.library.add(item)
             await self.archive_item(item)
+            await self.stamp(item)      # клип должен помнить промпт и сид, пока он сам на диске
             items.append(self.public(item))
+        self.remember(job)
         await self.broadcast({"type": "done", "prompt_id": pid, "item": items[0], "items": items})
+
+    def remember(self, job):
+        """Сколько шло задание, без ожидания в очереди: очередь зависит от соседних работ,
+        и в прогнозе ей не место."""
+        try:
+            t0 = job.get("t0")
+            took = time.time() - t0 if t0 else 0
+            if took and 2 < took < 24 * 3600:
+                m = job.get("meta") or {}
+                forecast.record(TIMINGS, m.get("mode", ""), took, quality=str(m.get("q") or ""),
+                                sec=m.get("len") or 0, res=str(m.get("res") or ""))
+        except Exception as e:
+            self.note_error(f"Не удалось запомнить время работы: {e}")
+
+    def tag_text(self, item):
+        """Строка, которая вписывается в сам файл: режим, сид, размер и промпт. Читается и нами,
+        и любой программой, которая показывает метаданные видео."""
+        prompt = re.sub(r"\s+", " ", str(item.get("prompt") or ""))[:900]
+        return "KADR1 " + json.dumps({"v": 1, "mode": item.get("mode"), "seed": item.get("seed"),
+                                      "res": item.get("res"), "sec": item.get("len"),
+                                      "q": item.get("q"), "prompt": prompt}, ensure_ascii=False)
+
+    async def stamp(self, item):
+        """Вписать строку в готовый файл, ничего не пережимая. Не получилось - файл остаётся
+        как есть: копия происхождения стоит куда меньше испорченного клипа.
+
+        Пишем только в свою копию в папке результатов: чужой вывод ComfyUI не трогаем."""
+        try:
+            path = item.get("local")
+            if not path or not str(path).lower().endswith((".mp4", ".mov", ".m4v")):
+                return False
+            ff = self._ffmpeg()
+            if not ff or not Path(path).exists():
+                return False
+            if str(mp4info.tag_of(Path(path)).get("comment") or "").startswith("KADR1"):
+                return True
+            tmp = Path(str(path) + ".tmp.mp4")
+            proc = await asyncio.to_thread(
+                subprocess.run,
+                [str(ff), "-y", "-i", str(path), "-c", "copy", "-movflags", "+faststart",
+                 "-metadata", "comment=" + self.tag_text(item), str(tmp)],
+                capture_output=True, timeout=240)
+            if proc.returncode != 0 or not tmp.exists() or tmp.stat().st_size < 1024:
+                tmp.unlink(missing_ok=True)
+                return False
+            tmp.replace(path)
+            return True
+        except Exception as e:
+            self.note_error(f"Не удалось вписать в файл, как он сделан: {e}")
+            return False
+
+    async def h_gate_off(self, _req):
+        """Человек сам решает, пробовать ли при нехватке памяти. Согласие живёт три минуты и
+        гаснет само: забытое «разрешить всё» оказалось бы хуже отказа."""
+        self._gate_off = time.time() + 180
+        return web.json_response({"ok": True, "for": 180})
+
+    @staticmethod
+    def graph_prompt(raw):
+        """Внутри файла, который писал ComfyUI, лежит весь его график. Промпт оттуда - самое
+        полезное, что можно сказать человеку про чужой клип."""
+        try:
+            g = json.loads(raw)
+        except (TypeError, ValueError):
+            return ""
+        best = [""]
+
+        def walk(x):
+            if isinstance(x, dict):
+                for k, v in x.items():
+                    vals = v if isinstance(v, list) else [v]
+                    if k in ("prompt", "text", "value"):
+                        for it in vals:
+                            if isinstance(it, str) and len(it) > len(best[0]):
+                                best[0] = it
+                    else:
+                        walk(v)
+            elif isinstance(x, list):
+                for it in x:
+                    walk(it)
+
+        walk(g)
+        return re.sub(r"\s+", " ", best[0]).strip()[:1200]
+
+    async def h_mp4tag(self, req):
+        """Что записано внутри присланного видео. Так чужой файл, который человек принёс
+        продолживать, может рассказать, из какого он промпта и с каким сидом."""
+        data = await req.read()
+        if not data:
+            return web.json_response({"tag": None})
+        found = mp4info.tag(data[:8 << 20]) or mp4info.tag(data[-8 << 20:])
+        raw = str(found.get("comment") or "")
+        if raw.startswith("KADR1 "):
+            try:
+                return web.json_response({"tag": json.loads(raw[6:]), "made_by": "kadr"})
+            except ValueError:
+                pass
+        # не наше: может, файл писал ComfyUI и оставил свой график с промптом внутри
+        for key in ("prompt", "comment", "title"):
+            val = str(found.get(key) or "")
+            if val.strip().startswith("{"):
+                got = self.graph_prompt(val)
+                if got:
+                    return web.json_response({"tag": {"prompt": got}, "made_by": "comfyui"})
+        return web.json_response({"tag": None, "comment": raw[:300] or None})
 
     async def broadcast(self, payload):
         text = json.dumps(payload, ensure_ascii=False)
@@ -2022,6 +2142,8 @@ class App:
                     if video.get("consumeCoins"):
                         item["sub"] = f'{item.get("sub", "")} · ☁ {video["consumeCoins"]} RH'.strip(" ·")
                     self.library.add(item)
+                    await self.stamp(dict(item, local=str(dest)))
+                    self.remember(job)
                     await self.broadcast({"type": "done", "prompt_id": pid, "item": self.public(item)})
                     return
                 if status == "FAILED":
@@ -2073,6 +2195,26 @@ class App:
                         "(браузер, Adobe, игры). Закройте их, иначе генерация может идти медленнее.")})
             except Exception:
                 pass
+        # Сколько видеопамяти свободно прямо сейчас и сколько такая работа обычно идёт на этой
+        # машине. Первое нужно, чтобы не начинать то, что уже падало: программа помнит свои падения.
+        # Второе - чтобы сказать «примерно 4 минуты» по делу, а не по инструкции.
+        free0, m = None, meta or {}
+        try:
+            g = await asyncio.to_thread(self.monitor.gpu)
+            if g and g.get("vram_total_gb") is not None:
+                free0 = round(g["vram_total_gb"] - (g.get("vram_used_gb") or 0), 2)
+        except Exception:
+            pass
+        stop = forecast.gate(TIMINGS, mode_key, free0)
+        if stop and time.time() > getattr(self, "_gate_off", 0):   # «рискнуть» снимает запрет на три минуты
+            return web.json_response({
+                "low_memory": True,
+                "error": (f"Свободно {stop['have']:g} ГБ видеопамяти, а этот режим уже прерывался на нехватке памяти, "
+                          f"когда свободно было {stop['need']:g} ГБ. Закройте программы, которые держат память "
+                          "(браузер с видео, Adobe, игры), или освободите память в разделе «Агент» и начните снова."),
+                "have": stop["have"], "need": stop["need"]}, status=409)
+        eta = forecast.estimate(TIMINGS, mode_key, quality=str(m.get("q") or ""),
+                                sec=m.get("len") or 0, res=str(m.get("res") or ""))
         status, res = await self.comfy_json("POST", "/prompt", json={
             "prompt": graph, "client_id": CLIENT_ID,
             "extra_data": {"preview_method": "auto"}})
@@ -2080,8 +2222,10 @@ class App:
             return web.json_response({"error": comfy_error_text(res)}, status=400)
         pid = res["prompt_id"]
         self.jobs[pid] = {"prompt_id": pid, "state": "queued", "stages": stages, "stage": None, "meta": meta, "last_output": last_output, "titles": titles or {},
-                          "graph": graph, "scenes": scenes}
-        return web.json_response({"prompt_id": pid, "seed": meta["seed"], "queue_number": res.get("number")})
+                          "graph": graph, "scenes": scenes,
+                          "t0": time.time(), "free0": free0, "eta": (eta or {}).get("secs", 0)}
+        return web.json_response({"prompt_id": pid, "seed": meta["seed"], "queue_number": res.get("number"),
+                                  "eta": (eta or {}).get("secs", 0), "eta_samples": (eta or {}).get("samples", 0)})
 
     async def need_models(self, mode):
         if self.rh():  # models live on RunningHub
@@ -4611,6 +4755,8 @@ def build_app(comfy_override=None):
         web.post("/api/agent/variant", state.h_agent_variant),
         web.post("/api/agent/ctx", state.h_agent_ctx),
         web.post("/api/agent/spell", state.h_agent_spell),
+        web.post("/api/mp4tag", state.h_mp4tag),
+        web.post("/api/gate/off", state.h_gate_off),
         web.post("/api/speech/transcribe", state.h_transcribe),
         web.post("/api/speech/folder", state.h_speech_folder),
         web.post("/api/speech/model", state.h_speech_model),
