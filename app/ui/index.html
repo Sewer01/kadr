@@ -5322,6 +5322,16 @@ async function agGenerate(btn, gen) {
     if (!blk) { toast('В ответе Агента нет оформленного промпта: посмотрите чат'); return; }
     AG.draft = { to: mode, at: Date.now() };
     await sendPrompt(blk, mode);   // the round trip: text back into this field, files left alone
+    /* The Agent hears the song in the chat but often answers with non_diegetic_music: N/A: the words
+       it was given must not evaporate on the way back. */
+    try {
+      const r0 = (typeof RM !== 'undefined' && RM[mode] && RM[mode].root) || null;
+      if (r0 && gen.scenes) {
+        const filled = [];
+        $$('.sc', r0).forEach((c, i) => { if (c._carryWords && c._carryWords().length) filled.push(i + 1); });
+        if (filled.length) toast('Сцены ' + filled.join(', ') + ': слова песни вписаны обратно в текст - Агент их не перенёс');
+      }
+    } catch (e) { }
     agRefWarn(mode, 'После возврата: ');
     toast((gen.scenes ? 'Тексты сцен переписаны и встали в свои карточки' : 'Промпт готов и заменил текст в разделе')
       + (carried ? ' · в чат перенесено файлов: ' + carried : '') + ' · черновик и ответ остались в истории «Агента»');
@@ -7618,7 +7628,15 @@ function makeRefMode(cfg) {
         const n = x.nimg || (x.img ? 1 : 0);   // an old project kept one picture per scene under another name
         for (let j = 0; j < 9; j++) { const f = await getRef(x.nimg ? `simg${i}_${j}` : 'simg' + i); if (f instanceof File) cards[i]._files[j] = f; }   // back to the same place
         cards[i]._paint();
-        for (let j = 0; j < 3; j++) { const f = await getRef(`saudio${i}_${j}`); if (f instanceof File) cards[i]._auds[j] = f; }
+        /* What lies in the project is the piece that went to the model, not the whole song: it has
+           to be the editor's source too, or opening the scene shows a seven minute wave and the
+           person thinks his cut has burned. The typed words come back with it. */
+        const wsel = ((p.scenes[i] || {}).words || []);
+        cards[i]._audWords = [0, 1, 2].map(j => wsel[j] || null);
+        for (let j = 0; j < 3; j++) {
+          const f = await getRef(`saudio${i}_${j}`);
+          if (f instanceof File) { cards[i]._auds[j] = f; cards[i]._audSrc[j] = f; cards[i]._audSel[j] = null; }
+        }
         cards[i]._paintAuds && cards[i]._paintAuds();
         cards[i]._paintRefs && cards[i]._paintRefs();
       }
@@ -7814,6 +7832,24 @@ function makeRefMode(cfg) {
          seconds: that is where the person is when they choose what the scene sings. One scrollable
          line, the same as in the Agent. Fixed words win over what the machine heard, and the Agent
          is told about both. */
+      /* After the Agent has rewritten the scene texts, the heard lyric must stand in the card
+         itself: a person must see with his eyes that the words are there, and the model gets them
+         from the text, not from a favour. Nothing is invented - only what was heard is added. */
+      c._carryWords = () => {
+        const ta = $('textarea', c); if (!ta) return [];
+        const bs = c._baseFixed || c._base || 10;
+        const done = [];
+        (c._auds || []).forEach((f, j) => {
+          if (!f) return;
+          const words = agWordsFor(c, j); if (!words) return;
+          if (ta.value.toLowerCase().indexOf(words.slice(0, 24).toLowerCase()) >= 0) return;
+          const x = agWords(f, Math.max(1, Math.round(bs / 10))) || {};
+          ta.value = ta.value.trim() + '\n<d>[' + (x.lang || 'язык аудио') + '] ' + words + '</d>';
+          done.push('<Audio ' + (bs + j) + '>');
+        });
+        if (done.length) { c._counter?.(); refreshStates(); if (root._save) root._save(); }
+        return done;
+      };
       c._paintWords = () => {
         const trim = c._trim, host = trim ? trim.q('.at-words') : null;
         if (!host) return;
@@ -8820,10 +8856,11 @@ function makeRefMode(cfg) {
                 tags.push('<Audio ' + (bs + j) + '>');
               });
               if (add.length || tags.length) {
-                pl.text = (pl.text || '').trim() + ' ' + add.join(' ');
-                /* The music field must name the file, in the language the model reads. An earlier
-                   version put a Russian sentence here, and the model got prose instead of a link. */
-                if (tags.length) pl.text = pl.text.replace(/non_diegetic_music\s*:\s*(?:N\/A|[^\n]*)/i, 'non_diegetic_music: ' + tags.join(' ') + ' (the reference audio of this scene)');
+                /* Order matters, and getting it wrong destroyed the lyric: the music field reaches to
+                   the end of its line, so writing the sung line onto that same line made the rewrite
+                   swallow the words. Fix the field first, then put the sung line on lines of its own. */
+                if (tags.length) pl.text = (pl.text || '').replace(/non_diegetic_music\s*:\s*(?:N\/A|[^\n]*)/i, 'non_diegetic_music: ' + tags.join(' ') + ' (the reference audio of this scene)');
+                if (add.length) pl.text = (String(pl.text || '').trim() ? String(pl.text).trim() + '\n' : '') + add.join('\n');
                 pl.text = pl.text.trim();
                 if (add.length) toast('Сцена ' + (i + 1) + ': в текст для модели добавлены слова её песни (' + add.join(' · ').slice(0, 70) + '…)');
               }
