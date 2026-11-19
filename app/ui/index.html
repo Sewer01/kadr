@@ -89,6 +89,15 @@
 .tl-l{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;position:relative;z-index:1}
 .tl-fill{position:absolute;left:42px;top:0;bottom:0;background:rgba(var(--accent-rgb),.22);pointer-events:none}
 .tl-fill::after{content:'';position:absolute;right:0;top:0;bottom:0;width:2px;background:rgb(var(--accent-rgb));opacity:.9}
+/* the line where the ready clip stops: red, thin, and never clickable */
+.tl-mark{position:absolute;top:6px;bottom:6px;width:2px;background:#ff4d5e;border-radius:2px;
+ box-shadow:0 0 0 1px rgba(0,0,0,.4);pointer-events:none;z-index:2}
+/* a row of scene buttons keeps one height: when one label wraps to two lines, the others stretch
+   to it instead of the whole card jumping under the finger (the row .sc-act holds «Сделать эту
+   сцену», «Очистить сцену» and the long «Перезапустить и продолжить дальше», .sc-fl - the row of
+   the plan switch) */
+.sc-fl .btn{align-self:stretch}
+.sc-act .btn,.sc-fl .btn{display:flex;align-items:center;justify-content:center;text-align:center}
 .tl-grip{flex:none;width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font-size:16px;font-weight:800;
  cursor:grab;z-index:1;background:var(--surface);border:2px solid rgba(var(--accent-rgb),.62);color:var(--text);
  transition:background .14s,color .14s,border-color .14s}
@@ -7265,7 +7274,7 @@ function makeRefMode(cfg) {
           const c = $$('.sc', root)[lg.part]; if (!c) return;
           const mk = lg.draft ? 'draft' : 'final';
           if (c._dn && !c._dn[mk]) {
-            c._dn[mk] = { sig: root._sig(c), url: it.url, id: it.id, text: ($('textarea', c) || {}).value || '' };
+            c._dn[mk] = { sig: root._sig(c), url: it.url, id: it.id, sec: +it.len || 0, text: ($('textarea', c) || {}).value || '' };
             (root._doneIds = root._doneIds || new Set()).add(it.id);
             took++;
           }
@@ -7368,12 +7377,12 @@ function makeRefMode(cfg) {
       if (root._doneIds && root._doneIds.has(item.id)) return;   // the same result can arrive twice (panel and queue)
       (root._doneIds = root._doneIds || new Set()).add(item.id);
       if (lg.all) {   // the whole video at once: every scene is done, the last one can be continued
-        $$('.sc', root).forEach(c => { c._dn.final = { sig: root._sig(c), url: item.url, id: item.id, text: $('textarea', c).value }; });
+        $$('.sc', root).forEach(c => { c._dn.final = { sig: root._sig(c), url: item.url, id: item.id, sec: +item.len || 0, text: $('textarea', c).value }; });
         refreshStates(); toast('Ролик готов. Чтобы продлить его, добавьте сцену и нажмите «Сделать эту сцену» (режим «По частям»).'); return;
       }
       const c = $$('.sc', root)[lg.part]; if (!c) return;
       if (lg.test) { c._tests.push({ res: item.res, url: item.url, id: item.id }); c._paintTests(); toast(`Проба сцены ${lg.part + 1} в размере ${item.res} готова: кнопка под сценой`); return; }
-      c._dn[lg.draft ? 'draft' : 'final'] = { sig: (root._sent && root._sent[lg.part]) || root._sig(c), url: item.url, id: item.id, text: root._sentText && root._sentText[lg.part] != null ? root._sentText[lg.part] : $('textarea', c).value };
+      c._dn[lg.draft ? 'draft' : 'final'] = { sig: (root._sent && root._sent[lg.part]) || root._sig(c), url: item.url, id: item.id, sec: +item.len || 0, text: root._sentText && root._sentText[lg.part] != null ? root._sentText[lg.part] : $('textarea', c).value };
       { const fr = freshAt(), all = $$('.sc', root), mk = lg.draft ? 'draft' : 'final'; for (let j = lg.part + 1; j < all.length && !fr[j]; j++) { const x = all[j]; if (x._dn[mk]) x._old = { ...(x._old || {}), [mk]: x._dn[mk] }; x._dn[mk] = null; } c._old = { ...(c._old || {}), [mk]: null }; }   // the scenes that continued the old one, up to the next new shot
       refreshStates();
       // почему цепочка встала, видно только из этих чисел: что было запланировано, сколько готово, какой проект
@@ -7771,7 +7780,7 @@ function makeRefMode(cfg) {
         ta.value = ta.value.slice(0, at) + add + ta.value.slice(at);
         ta.focus(); ta.selectionStart = ta.selectionEnd = at + add.length; recount(); c._counter?.();
       };
-      c.insertAdjacentHTML('beforeend', `<label class="sc-fl" style="display:flex;gap:6px;align-items:center;margin-top:8px;font-size:12.5px" title="Как смена плана в кино: сцена не продолжает прошлую, а строится заново по вашим изображениям. Качество в ней как в первой сцене. Программа делает так сама после трёх продолжений подряд."><input type="checkbox" class="sc-fresh"> Сменить план здесь (кино-склейка)</label><div class="hint sc-auto" hidden style="font-size:12px;margin-top:6px">Программа сама сделает здесь смену плана: цепочка продолжений стала длинной, а так качество не падает.</div><div class="sc-act" style="display:flex;gap:10px;align-items:center;margin-top:8px"><button class="btn pri sc-do" type="button" style="padding:11px 20px;font-size:15px">Сделать эту сцену</button><button class="btn sc-clear" type="button" title="Стереть текст, изображения и результат только этой сцены">Очистить сцену</button><button class="btn sc-undo" type="button" hidden title="Вернуть то, что было стёрто или удалено (то же, что Ctrl+Z)">↶ Отменить действие</button><button class="btn pri sc-redogo" type="button" hidden title="Эта сцена считается заново, а потом сами пересчитаются все следующие, уже продолжая новую версию">Переделать и продолжить дальше</button><span class="hint sc-state"></span></div>`);
+      c.insertAdjacentHTML('beforeend', `<label class="sc-fl" style="display:flex;gap:6px;align-items:center;margin-top:8px;font-size:12.5px" title="Как смена плана в кино: сцена не продолжает прошлую, а строится заново по вашим изображениям. Качество в ней как в первой сцене. Программа делает так сама после трёх продолжений подряд."><input type="checkbox" class="sc-fresh"> Сменить план здесь (кино-склейка)</label><div class="hint sc-auto" hidden style="font-size:12px;margin-top:6px">Программа сама сделает здесь смену плана: цепочка продолжений стала длинной, а так качество не падает.</div><div class="sc-act" style="display:flex;gap:10px;align-items:stretch;margin-top:8px"><button class="btn pri sc-do" type="button" style="padding:11px 20px;font-size:15px">Сделать эту сцену</button><button class="btn sc-clear" type="button" title="Стереть текст, изображения и результат только этой сцены">Очистить сцену</button><button class="btn sc-undo" type="button" hidden title="Вернуть то, что было стёрто или удалено (то же, что Ctrl+Z)">↶ Отменить действие</button><button class="btn pri sc-redogo" type="button" hidden title="Эта сцена считается заново, а потом сами пересчитаются все следующие, уже продолжая новую версию">Переделать и продолжить дальше</button><span class="hint sc-state"></span></div>`);
       $('.sc-fresh', c).checked = !!fresh;
       $('.sc-fresh', c).onchange = () => { c._done = null; recount(); };
       $('.sc-redogo', c).onclick = () => { const i = $$('.sc', root).indexOf(c); c._var = (c._var || 0) + 1; root._chainEnd = null; root._chainPart = i; root._target = i; $('.go', $('.rm-preview', root)).click(); };
@@ -7823,9 +7832,18 @@ function makeRefMode(cfg) {
       all.forEach((c, j) => c.classList.toggle('sel', j === root._sel));
       tl.innerHTML = all.map((c, i) => {
         const sec = +$('input[type=range]', c).value, done = sigOk(c), draft = root._q === 'draft', old = !done && !!(c._old || {})[root._q];
+        /* How much of the scene really lies in the finished clip: the slider may already show another
+           number than what was rendered, and then a person re-renders seconds he already has, or
+           believes he has more than he does. A thin red line stands where the ready clip stops; a
+           scene that was never made has no line at all. The length also comes from the library card
+           of the clip, so scenes rendered before this rule get their line too. */
+        const dn = (c._dn || {})[draft ? 'draft' : 'final'] || (c._dn || {}).final || (c._dn || {}).draft;
+        const rec = dn && dn.id && typeof byId === 'function' ? byId(dn.id) : null;
+        const mkSec = Math.max(0, +(dn && dn.sec) || +(rec && rec.len) || 0);
+        const mk = mkSec >= 3 ? `<i class="tl-mark" style="left:calc(42px + (100% - 42px - 44px) * ${Math.round((Math.min(15, mkSec) - 3) / 12 * 100)} / 100)" title="В готовом клипе этой сцены ${mkSec.toFixed(1).replace('.', ',')} с - дальше придётся делать заново"></i>` : '';
         // the filled part of the chip is the scene's length: 3 s at the left edge, 15 s at the right
       const pct = Math.round((sec - 3) / 12 * 100);
-      return `<div class="tl-b${i === root._sel ? ' sel' : ''}${done ? (draft ? ' draft' : ' done') : old ? ' stale' : ''}${fr[i] ? ' cut' : ''}" data-i="${i}" title="${fr[i] ? 'Новый план (смена кадра). ' : ''}Тяните внутри фрагмента - время сцены · за правый край - точно · ручкой слева - порядок"><i class="tl-grip" draggable="true" data-grip="${i}" title="Сцена ${i + 1}. Кружок перетаскивает сцену и открывает её; когда сцена выбрана - кружок залит">${i + 1}</i><i class="tl-fill" style="width:calc((100% - 42px - 44px) * ${pct} / 100)"></i><div class="tl-l">${sec} с${done ? (draft ? ' · черновик ✓' : ' · готово ✓') : old ? ' · старая версия' : ''}${fr[i] ? ' · ✂ новый план' : ''}</div><i class="tl-x" data-scdel="${i}" title="Убрать эту сцену">✕</i><i class="tl-h" title="Тяните: длина сцены"></i></div>`;
+      return `<div class="tl-b${i === root._sel ? ' sel' : ''}${done ? (draft ? ' draft' : ' done') : old ? ' stale' : ''}${fr[i] ? ' cut' : ''}" data-i="${i}" title="${fr[i] ? 'Новый план (смена кадра). ' : ''}Тяните внутри фрагмента - время сцены · за правый край - точно · ручкой слева - порядок"><i class="tl-grip" draggable="true" data-grip="${i}" title="Сцена ${i + 1}. Кружок перетаскивает сцену и открывает её; когда сцена выбрана - кружок залит">${i + 1}</i><i class="tl-fill" style="width:calc((100% - 42px - 44px) * ${pct} / 100)"></i>${mk}<div class="tl-l">${sec} с${done ? (draft ? ' · черновик ✓' : ' · готово ✓') : old ? ' · старая версия' : ''}${fr[i] ? ' · ✂ новый план' : ''}</div><i class="tl-x" data-scdel="${i}" title="Убрать эту сцену">✕</i><i class="tl-h" title="Тяните: длина сцены"></i></div>`;
       }).join('') + '<div class="tl-b tl-add" data-add="1" style="align-items:center;justify-content:center" title="Добавить фрагмент">+</div>';
       const dmb = $('.lm-q button[data-mq="draft"]', root);
       dmb.disabled = false;   // pressing it is how you find out you need a file - and how you get it
