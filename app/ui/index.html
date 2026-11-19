@@ -5287,6 +5287,9 @@ function agRefCheck(mode) {
   if (!root) return [];
   const fill = new Map();
   $$('label.ref', root).forEach((r, j) => { if (r._file) fill.set('Picture ' + (j + 1), 'общее место ' + (j + 1)); });
+  // the single-text modes keep their media in numbered slots, not in label.ref shelves
+  $$('.rm-imgs .slot', root).filter(x => x._file).forEach((r, j) => { if (!fill.has('Picture ' + (j + 1))) fill.set('Picture ' + (j + 1), 'фото ' + (j + 1)); });
+  $$('.rm-auds .slot', root).filter(x => x._file).forEach((r, j) => { if (!fill.has('Audio ' + (j + 1))) fill.set('Audio ' + (j + 1), 'звук ' + (j + 1)); });
   const cards = (typeof $$ === 'function' ? $$('.sc', root) : []);
   const named = t => new Set(((t || '').match(/<\s*(?:Picture|Audio)\s*\d+\s*>/g) || []).map(s => s.replace(/[<>]/g, '').replace(/\s+/g, ' ')));
   const bad = [];
@@ -5302,13 +5305,13 @@ function agRefCheck(mode) {
     one(($('textarea', c) || {}).value, 'сцена ' + (i + 1), own);
   });
   if (!cards.length) {
-    const ta = root.querySelector('textarea');
+    const ta = root.querySelector('textarea.rm-prompt') || root.querySelector('textarea');
     if (ta) one(ta.value, 'текст', []);
   }
   const out = [];
   fill.forEach((where, tag) => {
     const anywhere = cards.length ? cards.some(c => (($('textarea', c) || {}).value || '').indexOf('<' + tag + '>') >= 0)
-      : ((root.querySelector('textarea') || {}).value || '').indexOf('<' + tag + '>') >= 0;
+      : ((root.querySelector('textarea.rm-prompt') || root.querySelector('textarea') || {}).value || '').indexOf('<' + tag + '>') >= 0;
     if (!anywhere) out.push(where + ' - <' + tag + '> ни в одном тексте не назван');
   });
   return out.concat(bad.filter((x, i) => bad.indexOf(x) === i));
@@ -6023,7 +6026,11 @@ window.addEventListener('error', e => noteMsg('Ошибка скрипта: ' + 
 window.addEventListener('unhandledrejection', e => noteMsg('Ошибка: ' + (e.reason && e.reason.message || e.reason)));
 function toast(msg) {
   noteMsg(msg);
-  const t = $('#toast'); t.textContent = msg; t.classList.add('on');
+  /* A message must never be the thing that breaks the action it reports: some views build their own
+     DOM and leave no place for the line, so the line is created on the spot when it is gone. */
+  let t = (typeof $ === 'function' ? $('#toast') : null) || document.getElementById('toast') || document.querySelector('.toast');
+  if (!t) { t = document.createElement('div'); t.className = 'toast'; t.id = 'toast'; document.body.append(t); }
+  t.textContent = msg; t.classList.add('on');
   clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('on'), 2600);
 }
 function fmtDate(d) {
@@ -8921,15 +8928,13 @@ function makeRefMode(cfg) {
           }
         }
         if (cfg.scenes && root._mode !== 'parts') { fd.append('run', root._run); if (root._q === 'draft') fd.append('draft', '1'); }
+        try { if (!root._restoring) agRefWarn(cfg.mode, 'Перед генерацией: '); } catch (e) { }
         if (cfg.scenes) {
           /* The server numbers a scene's media by the decade of its PLACE, so what leaves the app is
              not what stands on the card: the cards keep the scene's own numbers, the text gets the
              numbers of the places. The person sees his numbers, the model gets the right files. */
           const sCards = $$('.sc', root);
           const sPlans = sCards.map((c, i) => sceneAudioPlan(c, root._fauds || [], 10 * (i + 1)));
-          /* Files and numbers must agree BEFORE the long job starts: an unnamed photo means the model
-             invents that person, a number without a file means it guesses the picture. */
-          try { if (!root._restoring) agRefWarn(cfg.mode, 'Перед генерацией: '); } catch (e) { }
           /* The song's words only reach the model if they stand in the scene's text: the reference
              audio carries a voice, not a lyric. If the Agent dropped them, the program puts the heard
              words into the line it sends and says so out loud - a person must never guess that his
@@ -10595,7 +10600,7 @@ async function agStatus() {
   if (cs && s.ctx) {
     if (!Array.prototype.some.call(cs.options, o => +o.value === +s.ctx)) cs.insertAdjacentHTML('beforeend', '<option value="' + s.ctx + '">' + (s.ctx / 1024).toFixed(0) + ' тысяч</option>');
     cs.value = String(s.ctx);
-    if (cn) cn.textContent = (s.ctx / 1024).toFixed(0) + ' тыс.' + (s.ctx_custom ? ' (ваша)' : ' (по умолчанию)');
+    if (cn) cn.textContent = (s.ctx / 1024).toFixed(0) + ' тыс.' + (s.ctx_custom && s.ctx !== s.ctx_default ? ' (ваша)' : ' (по умолчанию)');
   }
   const needModel = !s.installed;
   $('#agInstall').hidden = s.installing || (s.custom && !s.has_model) || (!needModel && s.speech_ready);
