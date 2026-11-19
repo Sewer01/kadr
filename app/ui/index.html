@@ -90,14 +90,21 @@
 .tl-fill{position:absolute;left:42px;top:0;bottom:0;background:rgba(var(--accent-rgb),.22);pointer-events:none}
 .tl-fill::after{content:'';position:absolute;right:0;top:0;bottom:0;width:2px;background:rgb(var(--accent-rgb));opacity:.9}
 .tl-grip{flex:none;width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font-size:16px;font-weight:800;
- cursor:grab;z-index:1;background:var(--surface-3);border:2px solid rgba(232,38,79,.62);color:var(--fg);
+ cursor:grab;z-index:1;background:var(--surface);border:2px solid rgba(var(--accent-rgb),.62);color:var(--text);
  transition:background .14s,color .14s,border-color .14s}
 /* the number is the handle: it fills up when its scene is the active one, so the eye finds the
    chosen scene by the lit circle and not by a thin outline around the whole chip */
 .tl-b.sel .tl-grip{background:var(--accent);border-color:var(--accent);color:#fff}
 .tl-b:hover .tl-grip{border-color:var(--accent)} .tl-grip:hover{color:var(--accent)}
-.tl-x{flex:none;width:18px;height:18px;border-radius:5px;display:grid;place-items:center;font-size:10px;font-style:normal;color:var(--muted)}
-.tl-x:hover{background:#c0303f;color:#fff}
+/* The cross that removes a scene gets a rim of its own: without it the small grey mark looked like
+   part of the chip, and a slip of the finger cost a scene. Idle it is a quiet circle, only on a press
+   does it turn red - and pressing it now asks first. */
+.tl-x{flex:none;width:20px;height:20px;border-radius:50%;display:grid;place-items:center;font-size:11px;font-style:normal;
+ color:var(--muted);background:var(--surface);border:2px solid rgba(var(--accent-rgb),.34);transition:background .14s,border-color .14s,color .14s}
+.tl-x:hover{background:#c0303f;border-color:#c0303f;color:#fff}
+/* the cross is not part of the label: it sits in its own quiet ring and only turns red on a press,
+   so an accidental touch reads as a different object before the finger lands */
+.tl-x::before{content:'';position:absolute;inset:-4px;border-radius:50%}
 .tl-b.sel{border-color:var(--accent);box-shadow:0 0 0 2px rgba(var(--accent-rgb),.3)}
 .tl-b.stale{background:rgba(150,150,150,.14);border-style:dashed}.tl-b.done{background:rgba(47,191,113,.18)}.tl-b.draft{background:rgba(232,163,23,.18)}
 .tl-b.cut{border-left:4px solid var(--accent)}
@@ -7818,7 +7825,7 @@ function makeRefMode(cfg) {
         const sec = +$('input[type=range]', c).value, done = sigOk(c), draft = root._q === 'draft', old = !done && !!(c._old || {})[root._q];
         // the filled part of the chip is the scene's length: 3 s at the left edge, 15 s at the right
       const pct = Math.round((sec - 3) / 12 * 100);
-      return `<div class="tl-b${i === root._sel ? ' sel' : ''}${done ? (draft ? ' draft' : ' done') : old ? ' stale' : ''}${fr[i] ? ' cut' : ''}" data-i="${i}" title="${fr[i] ? 'Новый план (смена кадра). ' : ''}Тяните внутри фрагмента - время сцены · за правый край - точно · ручкой слева - порядок"><i class="tl-grip" draggable="true" data-grip="${i}" title="Сцена ${i + 1}. Кружок перетаскивает сцену и открывает её; когда сцена выбрана - кружок залит">${i + 1}</i><i class="tl-fill" style="width:calc((100% - 42px) * ${pct} / 100)"></i><div class="tl-l">${sec} с${done ? (draft ? ' · черновик ✓' : ' · готово ✓') : old ? ' · старая версия' : ''}${fr[i] ? ' · ✂ новый план' : ''}</div><i class="tl-x" data-scdel="${i}" title="Убрать эту сцену">✕</i><i class="tl-h" title="Тяните: длина сцены"></i></div>`;
+      return `<div class="tl-b${i === root._sel ? ' sel' : ''}${done ? (draft ? ' draft' : ' done') : old ? ' stale' : ''}${fr[i] ? ' cut' : ''}" data-i="${i}" title="${fr[i] ? 'Новый план (смена кадра). ' : ''}Тяните внутри фрагмента - время сцены · за правый край - точно · ручкой слева - порядок"><i class="tl-grip" draggable="true" data-grip="${i}" title="Сцена ${i + 1}. Кружок перетаскивает сцену и открывает её; когда сцена выбрана - кружок залит">${i + 1}</i><i class="tl-fill" style="width:calc((100% - 42px - 44px) * ${pct} / 100)"></i><div class="tl-l">${sec} с${done ? (draft ? ' · черновик ✓' : ' · готово ✓') : old ? ' · старая версия' : ''}${fr[i] ? ' · ✂ новый план' : ''}</div><i class="tl-x" data-scdel="${i}" title="Убрать эту сцену">✕</i><i class="tl-h" title="Тяните: длина сцены"></i></div>`;
       }).join('') + '<div class="tl-b tl-add" data-add="1" style="align-items:center;justify-content:center" title="Добавить фрагмент">+</div>';
       const dmb = $('.lm-q button[data-mq="draft"]', root);
       dmb.disabled = false;   // pressing it is how you find out you need a file - and how you get it
@@ -7855,7 +7862,8 @@ function makeRefMode(cfg) {
       // 3 секунды начинаются там, где кончается кружок с номером: полоса времени и рука
       // человека должны считать один и тот же отрезок, иначе минимальная сцена тянется
       // из-под номера и первая треть жеста ничего не меняет
-      const r = b.getBoundingClientRect(), off = 42, avail = Math.max(1, r.width - off);
+      const r = b.getBoundingClientRect(), off = 42, back = 44;   // the same inset on the right: the cap must not sit on the cross
+      const avail = Math.max(1, r.width - off - back);
       const p = Math.min(1, Math.max(0, (clientX - r.left - off) / avail));
       return Math.max(3, Math.min(15, Math.round(3 + p * 12)));
     };
@@ -7926,10 +7934,16 @@ function makeRefMode(cfg) {
       if (x) {                          // a scene can be dropped right on the ribbon
         e.stopPropagation();
         if ($$('.sc', root).length < 2) { toast('Оставлена одна сцена - из одной ролик не соберёшь'); return; }
-        const c = $$('.sc', root)[+x.dataset.scdel]; if (!c) return;
-        // the card's own cross now only empties its text, so the ribbon removes the card itself
-        root._pushUndo?.(); c.remove(); recount(); renderTL(); showClip(); refreshStates();
-        if (root._save && !root._restoring) root._save();
+        const idx = +x.dataset.scdel, c = $$('.sc', root)[idx]; if (!c) return;
+        /* Removing a scene takes its text with it, and the ribbon does not show what was thrown away.
+           The cross now asks first; «Шаг назад» stays the way back if the person changes his mind. */
+        confirmBox('Убрать сцену ' + (idx + 1) + ' с ленты?',
+          'Текст сцены уйдёт вместе с ней. Её фотографии и песни на полках останутся и дождутся новой сцены, а «Шаг назад» вернёт сцену целиком.',
+          'Убрать сцену', async () => {
+            root._pushUndo?.(); c.remove(); recount(); renderTL(); showClip(); refreshStates();
+            if (root._save && !root._restoring) root._save();
+            toast('Сцена ' + (idx + 1) + ' убрана с ленты · «Шаг назад» вернёт её');
+          });
         return;
       }
       const b = e.target.closest('.tl-b'); if (!b) return;
