@@ -89,8 +89,13 @@
 .tl-l{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;position:relative;z-index:1}
 .tl-fill{position:absolute;left:0;top:0;bottom:0;background:rgba(var(--accent-rgb),.22);pointer-events:none}
 .tl-fill::after{content:'';position:absolute;right:0;top:0;bottom:0;width:2px;background:rgb(var(--accent-rgb));opacity:.9}
-.tl-grip{flex:none;width:24px;height:24px;border-radius:50%;display:grid;place-items:center;font-size:12px;font-weight:800;
- cursor:grab;z-index:1;background:var(--surface-3);border:1px solid var(--line-2);color:var(--fg)} .tl-grip:hover{color:var(--accent)}
+.tl-grip{flex:none;width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font-size:16px;font-weight:800;
+ cursor:grab;z-index:1;background:var(--surface-3);border:1px solid var(--line-2);color:var(--fg-mute,#9aa);
+ transition:background .14s,color .14s,border-color .14s}
+/* the number is the handle: it fills up when its scene is the active one, so the eye finds the
+   chosen scene by the lit circle and not by a thin outline around the whole chip */
+.tl-b.sel .tl-grip{background:var(--accent);border-color:var(--accent);color:#fff}
+.tl-b:hover .tl-grip{border-color:var(--accent)} .tl-grip:hover{color:var(--accent)}
 .tl-x{flex:none;width:18px;height:18px;border-radius:5px;display:grid;place-items:center;font-size:10px;font-style:normal;color:var(--muted)}
 .tl-x:hover{background:#c0303f;color:#fff}
 .tl-b.sel{border-color:var(--accent);box-shadow:0 0 0 2px rgba(var(--accent-rgb),.3)}
@@ -7813,7 +7818,7 @@ function makeRefMode(cfg) {
         const sec = +$('input[type=range]', c).value, done = sigOk(c), draft = root._q === 'draft', old = !done && !!(c._old || {})[root._q];
         // the filled part of the chip is the scene's length: 3 s at the left edge, 15 s at the right
       const pct = Math.round((sec - 3) / 12 * 100);
-      return `<div class="tl-b${i === root._sel ? ' sel' : ''}${done ? (draft ? ' draft' : ' done') : old ? ' stale' : ''}${fr[i] ? ' cut' : ''}" data-i="${i}" title="${fr[i] ? 'Новый план (смена кадра). ' : ''}Тяните внутри фрагмента - время сцены · за правый край - точно · ручкой слева - порядок"><i class="tl-grip" draggable="true" data-grip="${i}" title="Сцена ${i + 1}. Тащите кружок, чтобы переставить сцену, нажмите на фрагмент, чтобы открыть">${i + 1}</i><i class="tl-fill" style="width:${pct}%"></i><div class="tl-l">${sec} с${done ? (draft ? ' · черновик ✓' : ' · готово ✓') : old ? ' · старая версия' : ''}${fr[i] ? ' · ✂ новый план' : ''}</div><i class="tl-x" data-scdel="${i}" title="Убрать эту сцену">✕</i><i class="tl-h" title="Тяните: длина сцены"></i></div>`;
+      return `<div class="tl-b${i === root._sel ? ' sel' : ''}${done ? (draft ? ' draft' : ' done') : old ? ' stale' : ''}${fr[i] ? ' cut' : ''}" data-i="${i}" title="${fr[i] ? 'Новый план (смена кадра). ' : ''}Тяните внутри фрагмента - время сцены · за правый край - точно · ручкой слева - порядок"><i class="tl-grip" draggable="true" data-grip="${i}" title="Сцена ${i + 1}. Кружок перетаскивает сцену и открывает её; когда сцена выбрана - кружок залит">${i + 1}</i><i class="tl-fill" style="width:${pct}%"></i><div class="tl-l">${sec} с${done ? (draft ? ' · черновик ✓' : ' · готово ✓') : old ? ' · старая версия' : ''}${fr[i] ? ' · ✂ новый план' : ''}</div><i class="tl-x" data-scdel="${i}" title="Убрать эту сцену">✕</i><i class="tl-h" title="Тяните: длина сцены"></i></div>`;
       }).join('') + '<div class="tl-b tl-add" data-add="1" style="align-items:center;justify-content:center" title="Добавить фрагмент">+</div>';
       const dmb = $('.lm-q button[data-mq="draft"]', root);
       dmb.disabled = false;   // pressing it is how you find out you need a file - and how you get it
@@ -8570,6 +8575,30 @@ function makeRefMode(cfg) {
           /* Files and numbers must agree BEFORE the long job starts: an unnamed photo means the model
              invents that person, a number without a file means it guesses the picture. */
           try { if (!root._restoring) agRefWarn(cfg.mode, 'Перед генерацией: '); } catch (e) { }
+          /* The song's words only reach the model if they stand in the scene's text: the reference
+             audio carries a voice, not a lyric. If the Agent dropped them, the program puts the heard
+             words into the line it sends and says so out loud - a person must never guess that his
+             song went in silent and the model sang something of its own. */
+          try {
+            sCards.forEach((c, i) => {
+              const pl = sPlans[i]; if (!pl) return;
+              const add = [];
+              (c._auds || []).forEach((f, j) => {
+                if (!f) return;
+                const x = agWords(f, i + 1);
+                if (!x || !x.words) return;
+                const probe = x.words.slice(0, 24).toLowerCase();
+                if ((pl.text || '').toLowerCase().indexOf(probe) >= 0) return;
+                add.push('<d>[' + (x.lang || 'язык аудио') + '] ' + x.words + '</d>');
+              });
+              if (add.length) {
+                pl.text = (pl.text || '').trim() + ' ' + add.join(' ');
+                if (/<Audio\s*\d+>/.test(pl.text)) pl.text = pl.text.replace(/non_diegetic_music:\s*N\/A/i, 'non_diegetic_music: как в теге аудио');
+                pl.text = pl.text.trim();
+                toast('Сцена ' + (i + 1) + ': в текст для модели добавлены слова её песни (' + add.join(' · ').slice(0, 70) + '…)');
+              }
+            });
+          } catch (e) { }
           fd.append('scenes', JSON.stringify(sceneList().map((x, i) => Object.assign({}, x, { prompt: (sPlans[i] || {}).text || x.prompt }))));
           sCards.forEach((c, i) => c._files.forEach((f, j) => { if (f) fd.append(`simg${i}_${j}`, f); }));
           sCards.forEach((c, i) => {
@@ -9611,6 +9640,15 @@ $('#agMic').onclick = async () => {
   mr.start();
 };
 
+/* The words whisper heard live in the chat's list together with the place they came from; a scene's
+   song is found there by its name and length, so the same words can be put back into its prompt. */
+function agWords(f, sceneNo) {
+  const list = AG.audios || [];
+  const hit = list.find(a => a.name === f.name && Math.abs((a.dur || 0) - (f._dur || 0)) < .2 && a.text)
+    || list.find(a => a.name === f.name && a.text)
+    || list.find(a => a.text && new RegExp('сцен' + '\\w*\\s*' + sceneNo).test(a.where || ''));
+  return hit ? { name: hit.name, sec: Math.round(hit.dur || 0), words: String(hit.text || '').trim(), lang: hit.langName || hit.lang || '' } : null;
+}
 async function agSend() {
   let text = $('#agIn').value.trim();
   if (AG.busy) {
@@ -9663,7 +9701,14 @@ async function agSend() {
   const ctx = { cont: AG.target === 'long' && (AG.att.some(a => a.frame) || !!RM.long.root._src) ? 1 : 0, model: AG.target === 'qwen' ? ((qwBtn && qwBtn.dataset.e) || 'qwen') : (AG.storyFrames && AG.storyModel === 'krea' ? 'flux' : AG.storyModel), frames: AG.target === 'story' && AG.storyFrames, duration: AG_IMG.includes(AG.target) ? null : AG.target === 'video' ? V.dur : AG.target === 'lipsync' ? (L.dur0 ? L.len() : null) : RM[AG.target].S.dur };
   if (AG.target === 'actor') ctx.voice = RM.actor.voice() ? 1 : 0;
   if (AG.target === 'long') { const lr = RM.long.root; ctx.long = { sound: lr._snd, secs: $$('.sc input[type=range]', RM.long.root).map(r => +r.value),
-      music: lr._snd === 'own' ? { loop: lr._loop !== false, sec: Math.round((lr._adur || 0) * 10) / 10 } : null }; }
+      music: lr._snd === 'own' ? { loop: lr._loop !== false, sec: Math.round((lr._adur || 0) * 10) / 10 } : null,
+      // the songs of the scenes are told apart from the model's own sound: without this the agent was
+      // told "there is no audio of yours", wrote non_diegetic_music: N/A and left the lyrics out
+      scene_audios: $$('.sc', lr).map((c, i) => {
+        const bs = c._baseFixed || 10 * (i + 1);
+        const items = (c._auds || []).map((f, j) => f && agWords(f, i + 1)).filter(Boolean).map((x, j2) => Object.assign({ tag: '<Audio ' + (bs + j2) + '>' }, x));
+        return items.length ? { scene: i + 1, audios: items } : null;
+      }).filter(Boolean) }; }
   try {
     const r = await fetch('/api/agent/chat', {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: AG.ctrl.signal,
