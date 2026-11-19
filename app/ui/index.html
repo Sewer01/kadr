@@ -84,10 +84,10 @@
 .cmp-fs:hover{background:var(--accent)}
 #cmpFull{position:fixed;inset:0;z-index:80;background:rgba(0,0,0,.96);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:2vh 2vw}
 #cmpFull .cmp-in{height:88vh;width:auto;max-width:96vw;max-height:none;margin:0}
-.tl{display:grid;grid-template-columns:repeat(2,minmax(0,200px));gap:6px;align-items:stretch;margin:6px 0 8px;padding-bottom:2px}
+.tl{display:grid;grid-template-columns:repeat(2,minmax(0,300px));gap:6px;align-items:stretch;margin:6px 0 8px;padding-bottom:2px}
 .tl-b{position:relative;box-sizing:border-box;height:40px;overflow:hidden;border-radius:9px;border:1.5px solid var(--line-2);background:var(--surface-2);padding:0 8px;cursor:pointer;display:flex;align-items:center;gap:8px;font-size:12px}
 .tl-l{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;position:relative;z-index:1}
-.tl-fill{position:absolute;left:0;top:0;bottom:0;background:rgba(var(--accent-rgb),.22);pointer-events:none}
+.tl-fill{position:absolute;left:42px;top:0;bottom:0;background:rgba(var(--accent-rgb),.22);pointer-events:none}
 .tl-fill::after{content:'';position:absolute;right:0;top:0;bottom:0;width:2px;background:rgb(var(--accent-rgb));opacity:.9}
 .tl-grip{flex:none;width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font-size:16px;font-weight:800;
  cursor:grab;z-index:1;background:var(--surface-3);border:2px solid rgba(232,38,79,.62);color:var(--fg);
@@ -7818,7 +7818,7 @@ function makeRefMode(cfg) {
         const sec = +$('input[type=range]', c).value, done = sigOk(c), draft = root._q === 'draft', old = !done && !!(c._old || {})[root._q];
         // the filled part of the chip is the scene's length: 3 s at the left edge, 15 s at the right
       const pct = Math.round((sec - 3) / 12 * 100);
-      return `<div class="tl-b${i === root._sel ? ' sel' : ''}${done ? (draft ? ' draft' : ' done') : old ? ' stale' : ''}${fr[i] ? ' cut' : ''}" data-i="${i}" title="${fr[i] ? 'Новый план (смена кадра). ' : ''}Тяните внутри фрагмента - время сцены · за правый край - точно · ручкой слева - порядок"><i class="tl-grip" draggable="true" data-grip="${i}" title="Сцена ${i + 1}. Кружок перетаскивает сцену и открывает её; когда сцена выбрана - кружок залит">${i + 1}</i><i class="tl-fill" style="width:${pct}%"></i><div class="tl-l">${sec} с${done ? (draft ? ' · черновик ✓' : ' · готово ✓') : old ? ' · старая версия' : ''}${fr[i] ? ' · ✂ новый план' : ''}</div><i class="tl-x" data-scdel="${i}" title="Убрать эту сцену">✕</i><i class="tl-h" title="Тяните: длина сцены"></i></div>`;
+      return `<div class="tl-b${i === root._sel ? ' sel' : ''}${done ? (draft ? ' draft' : ' done') : old ? ' stale' : ''}${fr[i] ? ' cut' : ''}" data-i="${i}" title="${fr[i] ? 'Новый план (смена кадра). ' : ''}Тяните внутри фрагмента - время сцены · за правый край - точно · ручкой слева - порядок"><i class="tl-grip" draggable="true" data-grip="${i}" title="Сцена ${i + 1}. Кружок перетаскивает сцену и открывает её; когда сцена выбрана - кружок залит">${i + 1}</i><i class="tl-fill" style="width:calc((100% - 42px) * ${pct} / 100)"></i><div class="tl-l">${sec} с${done ? (draft ? ' · черновик ✓' : ' · готово ✓') : old ? ' · старая версия' : ''}${fr[i] ? ' · ✂ новый план' : ''}</div><i class="tl-x" data-scdel="${i}" title="Убрать эту сцену">✕</i><i class="tl-h" title="Тяните: длина сцены"></i></div>`;
       }).join('') + '<div class="tl-b tl-add" data-add="1" style="align-items:center;justify-content:center" title="Добавить фрагмент">+</div>';
       const dmb = $('.lm-q button[data-mq="draft"]', root);
       dmb.disabled = false;   // pressing it is how you find out you need a file - and how you get it
@@ -7852,8 +7852,11 @@ function makeRefMode(cfg) {
       try { tl.setPointerCapture(e.pointerId); } catch (err) { }
     });
     const secAt = (b, clientX) => {
-      const r = b.getBoundingClientRect();
-      const p = r.width ? Math.min(1, Math.max(0, (clientX - r.left) / r.width)) : 0;
+      // 3 секунды начинаются там, где кончается кружок с номером: полоса времени и рука
+      // человека должны считать один и тот же отрезок, иначе минимальная сцена тянется
+      // из-под номера и первая треть жеста ничего не меняет
+      const r = b.getBoundingClientRect(), off = 42, avail = Math.max(1, r.width - off);
+      const p = Math.min(1, Math.max(0, (clientX - r.left - off) / avail));
       return Math.max(3, Math.min(15, Math.round(3 + p * 12)));
     };
     tl.addEventListener('pointermove', e => {
