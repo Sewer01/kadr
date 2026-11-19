@@ -89,7 +89,8 @@
 .tl-l{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;position:relative;z-index:1}
 .tl-fill{position:absolute;left:0;top:0;bottom:0;background:rgba(var(--accent-rgb),.22);pointer-events:none}
 .tl-fill::after{content:'';position:absolute;right:0;top:0;bottom:0;width:2px;background:rgb(var(--accent-rgb));opacity:.9}
-.tl-grip{flex:none;width:16px;align-self:stretch;display:grid;place-items:center;font-size:12px;color:var(--muted);cursor:grab;z-index:1}
+.tl-grip{flex:none;width:24px;height:24px;border-radius:50%;display:grid;place-items:center;font-size:12px;font-weight:800;
+ cursor:grab;z-index:1;background:var(--surface-3);border:1px solid var(--line-2);color:var(--fg)
 .tl-grip:hover{color:var(--accent)}
 .tl-x{flex:none;width:18px;height:18px;border-radius:5px;display:grid;place-items:center;font-size:10px;font-style:normal;color:var(--muted)}
 .tl-x:hover{background:#c0303f;color:#fff}
@@ -2767,6 +2768,8 @@ const normItem = it => ({ ...it, date: new Date(it.date) });
 
 /* ---------- navigation ---------- */
 $$('.nav[data-view]').forEach(b => b.onclick = () => {
+  // leaving a section must not leave a clip or a song playing behind another page
+  $$('video, audio').forEach(m => { try { if (!m.paused) m.pause(); } catch (e) { } });
   if (b.dataset.view !== 'custom') { try { localStorage.setItem('h3-last-view', b.dataset.view); } catch {} }   // the program opens on the page where the user was last
   $$('.nav').forEach(n => n.classList.toggle('active', n === b || (b.classList.contains('sub') && n.dataset.view === 'presets')));   // a section opened from the start page keeps it lit
   $$('.view').forEach(v => v.classList.toggle('active', v.id === 'view-' + b.dataset.view));
@@ -5088,6 +5091,51 @@ async function agSettle(max) {
 }
 const agViewOf = m => (/^(krea|kreareal|fluxt|h3t|qwent)$/.test(m) ? '#view-krea'
   : (/^(qwen|h3e|sheet|sheet6|story)$/.test(m) ? '#view-qwen' : '#view-' + m));
+/* Before the Agent rewrites a text the section says what it really holds: every file must be named
+   by a number in the text, and no number in the text may stand without a file. Left unchecked, the
+   Agent renumbers <Picture 2> to the location, the woman from the third photo is never named, and
+   the person gets a stranger on the screen instead of his reference. */
+function agRefCheck(mode) {
+  const root = (typeof RM !== 'undefined' && RM[mode] && RM[mode].root) || document.querySelector(agViewOf(mode));
+  if (!root) return [];
+  const fill = new Map();
+  $$('label.ref', root).forEach((r, j) => { if (r._file) fill.set('Picture ' + (j + 1), 'общее место ' + (j + 1)); });
+  const cards = (typeof $$ === 'function' ? $$('.sc', root) : []);
+  const named = t => new Set(((t || '').match(/<\s*(?:Picture|Audio)\s*\d+\s*>/g) || []).map(s => s.replace(/[<>]/g, '').replace(/\s+/g, ' ')));
+  const bad = [];
+  const one = (text, label, own) => {
+    (own || []).forEach(x => { if (!named(text).has(x.tag)) bad.push(label + ': ' + x.where + ' - тег <' + x.tag + '> в тексте не назван'); });
+    named(text).forEach(tag => { if (!fill.has(tag) && !(own || []).some(x => x.tag === tag)) bad.push(label + ': в тексте есть <' + tag + '>, а такого файла в разделе нет'); });
+  };
+  cards.forEach((c, i) => {
+    const bs = c._baseFixed || c._base || 10 * (i + 1);
+    const own = [];
+    (c._files || []).forEach((f, j) => { if (f) own.push({ tag: 'Picture ' + (bs + j), where: 'фото сцены ' + (i + 1) }); });
+    (c._auds || []).forEach((f, j) => { if (f) own.push({ tag: 'Audio ' + (bs + j), where: 'песня сцены ' + (i + 1) }); });
+    one(($('textarea', c) || {}).value, 'сцена ' + (i + 1), own);
+  });
+  if (!cards.length) {
+    const ta = root.querySelector('textarea');
+    if (ta) one(ta.value, 'текст', []);
+  }
+  const out = [];
+  fill.forEach((where, tag) => {
+    const anywhere = cards.length ? cards.some(c => (($('textarea', c) || {}).value || '').indexOf('<' + tag + '>') >= 0)
+      : ((root.querySelector('textarea') || {}).value || '').indexOf('<' + tag + '>') >= 0;
+    if (!anywhere) out.push(where + ' - <' + tag + '> ни в одном тексте не назван');
+  });
+  return out.concat(bad.filter((x, i) => bad.indexOf(x) === i));
+}
+function agRefWarn(mode, head) {
+  try {
+    const r = (typeof RM !== 'undefined' && RM[mode] && RM[mode].root);
+    if (r && r._restoring) return 0;   // the shelves are still filling from memory: nothing is missing yet
+    const bad = agRefCheck(mode);
+    if (!bad.length) return 0;
+    toast(head + bad.length + ': ' + bad.slice(0, 3).join(' · ') + (bad.length > 3 ? ' · и ещё ' + (bad.length - 3) : ''));
+    return bad.length;
+  } catch (e) { return 0; }
+}
 async function agCarry(mode) {
   const root = (typeof RM !== 'undefined' && RM[mode] && RM[mode].root) || document.querySelector(agViewOf(mode));
   if (!root) return 0;
@@ -5114,6 +5162,7 @@ async function agGenerate(btn, gen) {
   const was = btn.textContent, chat = $('#agIn'), keep = chat ? chat.value : '';
   btn.disabled = true; btn.textContent = 'Переносим в чат…';
   try {
+    agRefWarn(mode, 'До Агента: не всё разложено по полочкам - ');   // files and tags must agree BEFORE the rewrite
     const carried = await agCarry(mode);
     btn.textContent = 'Агент пишет промпт…';
     const t = $('#agTarget [data-t="' + mode + '"]') || $('#agTarget2 [data-t="' + mode + '"]');
@@ -5124,10 +5173,17 @@ async function agGenerate(btn, gen) {
       // texts would not know which card they belong to
       ? 'Сцены из раздела ' + name + '. Перепиши каждую сцену как готовый промпт этого режима. Верни ровно те же заголовки SCENE N с той же длительностью, не объединяй и не теряй сцены, сохрани все теги (<Picture N>, <Video N>, <Audio N>) и их номера, от себя ничего не добавляй.\n\n'
       : 'Черновик промпта из раздела ' + name + '. Сделай из него готовый промпт этого режима: сохрани все теги (<Picture N>, <Video N>, <Audio N>) и их номера, не добавляй того, чего в черновике нет, и верни ВЕСЬ промпт одним блоком.\n\n') + draft;
+    const before = AG.msgs.length;   // our own reply lands right after our own message, not at the tail
     await agSend();
-    const last = AG.msgs[AG.msgs.length - 1];
+    if (AG.msgs.length < before + 2) {
+      // the send was refused (the agent is busy, the model is missing): the reason was already said
+      AG.draft = null;
+      if (chat && !chat.value.trim() && keep) chat.value = keep;
+      return;
+    }
+    const last = AG.msgs[before + 1];
     if (!last || last.role !== 'assistant' || last.error) {
-      toast('Агент не ответил: ' + ((last && last.error) || 'пустой ответ') + '. Текст в разделе остался как был.');
+      if (!last._reported) { last._reported = true; toast('Агент не ответил: ' + ((last && last.error) || 'пустой ответ') + '. Текст в разделе остался как был.'); }
       if (chat && !chat.value.trim() && keep) chat.value = keep;
       return;
     }
@@ -5137,6 +5193,7 @@ async function agGenerate(btn, gen) {
     if (!blk) { toast('В ответе Агента нет оформленного промпта: посмотрите чат'); return; }
     AG.draft = { to: mode, at: Date.now() };
     await sendPrompt(blk, mode);   // the round trip: text back into this field, files left alone
+    agRefWarn(mode, 'После возврата: ');
     toast((gen.scenes ? 'Тексты сцен переписаны и встали в свои карточки' : 'Промпт готов и заменил текст в разделе')
       + (carried ? ' · в чат перенесено файлов: ' + carried : '') + ' · черновик и ответ остались в истории «Агента»');
   } catch (e) {
@@ -7211,10 +7268,14 @@ function makeRefMode(cfg) {
      non_diegetic_music:, integrated_multimodal_description:, служебные фразы «For the target video,
      at 0.00 seconds ...» и метки [Shot 1]; модель читает их как содержимое кадра и начинает
      дорисовывать лишние фигуры. Кнопка «почистить» убирает служебное и оставляем описание. */
-  const cleanScene = (txt, pics) => {
+  const cleanScene = (txt, pics, c) => {
     let s = String(txt || '');
     // sound and music fields belong to another section: drop the field and its value to the line end
-    s = s.replace(/[ \t]*(?:overall_soundscape|non_diegetic_music|diegetic_sounds|background_music|sound_design)\s*:[^\n]*/gi, ' ');
+    /* A sound field belongs to another section, but its VALUE may be a tag the person put there by
+       hand - <Audio 20> is the scene's own song. The field name goes, the tag stays: eating it used to
+       leave the song on the shelf and the model singing its own music. */
+    s = s.replace(/[ \t]*(?:overall_soundscape|non_diegetic_music|diegetic_sounds|background_music|sound_design)\s*:\s*([^\n]*)/gi,
+      (whole, val) => { const tg = (val.match(/<\s*(?:Picture|Audio)\s*\d+\s*>/gi) || []); return tg.length ? ' ' + tg.join(' ') + ' ' : ' '; });
     // a heading label of its own: keep the description standing after it
     s = s.replace(/[ \t]*(?:integrated_multimodal_description|shot_description|subject_action|camera_movement)\s*:\s*/gi, ' ');
     // the legacy sentence «<Picture 3> (from [Shot 1]) is fully referenced.» - the model has no such pictures
@@ -7223,7 +7284,20 @@ function makeRefMode(cfg) {
     s = s.replace(/at\s+\d+(?:\.\d+)?\s+seconds\s+into\s+the\s+target\s+video\s*,?\s*/gi, ' ');
     s = s.replace(/\(?\s*(?:from\s*)?\[\s*Shot\s*\d+\s*\]\s*\)?\s*(?:is\s+fully\s+referenced\s*)?\.?/gi, ' ');
     s = s.replace(/\(\s*\)/g, ' ').replace(/\bis\s+fully\s+referenced\s*\.?/gi, ' ');
-    if (pics > 0) s = s.replace(/<\s*Picture\s*(\d+)\s*>/gi, (m, d) => (+d <= pics ? `<Picture ${d}>` : ''));
+    if (pics > 0) {
+      /* The count of common references says nothing about the scene's OWN photos, which carry numbers
+         of the scene's decade: <Picture 30> was deleted as "more pictures than we have", although the
+         file was sitting on the scene's shelf and travelling to the model. A tag with a file behind it
+         is never junk. */
+      const own = (c && c._baseFixed) || 0, slots = (c && c._files) || [], auds = (c && c._auds) || [];
+      s = s.replace(/<\s*(Picture|Audio)\s*(\d+)\s*>/gi, (m, kind, d) => {
+        d = +d;
+        if (kind.toLowerCase() === 'audio') return (own && d >= own && d < own + 3 && auds[d - own]) ? '<Audio ' + d + '>' : (d < 10 ? '<Audio ' + d + '>' : '');
+        if (d <= pics) return '<Picture ' + d + '>';
+        const j = own ? d - own : -1;
+        return (j >= 0 && j < 9 && slots[j]) ? '<Picture ' + d + '>' : '';
+      });
+    }
     return s.replace(/[ \t]{2,}/g, ' ').replace(/\s*\n\s*/g, '\n').replace(/^\s+|\s+$/g, '').replace(/\.\s*\./g, '.');
   };
   const sceneJunk = txt => {
@@ -7256,7 +7330,7 @@ function makeRefMode(cfg) {
       if (b) b.onclick = () => {
         $$('.sc', root).forEach(c => {
           const ta = c.querySelector('textarea'); if (!ta) return;
-          const v = cleanScene(ta.value, pics);
+          const v = cleanScene(ta.value, pics, c);
           if (v !== ta.value) { ta.value = v; ta.dispatchEvent(new Event('input', { bubbles: true })); }
         });
         toast('Тексты починены: осталось только то, что происходит в кадре');
@@ -7399,6 +7473,7 @@ function makeRefMode(cfg) {
       $$('.sc', root).forEach((c, i) => { c._var = (p.scenes[i] || {}).var || 0; });
       root._sel = 0;
       const cards = $$('.sc', root);
+      root._restoring = true;   // shelves fill in asynchronously: while they are empty, no check may call a true tag a lie
       for (const [i, x] of p.scenes.entries()) {
         const n = x.nimg || (x.img ? 1 : 0);   // an old project kept one picture per scene under another name
         for (let j = 0; j < 9; j++) { const f = await getRef(x.nimg ? `simg${i}_${j}` : 'simg' + i); if (f instanceof File) cards[i]._files[j] = f; }   // back to the same place
@@ -7407,6 +7482,7 @@ function makeRefMode(cfg) {
         cards[i]._paintAuds && cards[i]._paintAuds();
         cards[i]._paintRefs && cards[i]._paintRefs();
       }
+      root._restoring = false;
       let srcLost = false;
       if (p.src) {
         const sf = p.src.id ? null : await memFile('get', `long/${run}/src`);
@@ -7738,7 +7814,7 @@ function makeRefMode(cfg) {
         const sec = +$('input[type=range]', c).value, done = sigOk(c), draft = root._q === 'draft', old = !done && !!(c._old || {})[root._q];
         // the filled part of the chip is the scene's length: 3 s at the left edge, 15 s at the right
       const pct = Math.round((sec - 3) / 12 * 100);
-      return `<div class="tl-b${i === root._sel ? ' sel' : ''}${done ? (draft ? ' draft' : ' done') : old ? ' stale' : ''}${fr[i] ? ' cut' : ''}" data-i="${i}" title="${fr[i] ? 'Новый план (смена кадра). ' : ''}Тяните внутри фрагмента - время сцены · за правый край - точно · ручкой слева - порядок"><i class="tl-grip" draggable="true" data-grip="${i}" title="Тащите, чтобы переставить сцену">⠿</i><i class="tl-fill" style="width:${pct}%"></i><div class="tl-l"><b>${i + 1}</b> · ${sec} с${done ? (draft ? ' · черновик ✓' : ' · готово ✓') : old ? ' · старая версия' : ''}${fr[i] ? ' · ✂ новый план' : ''}</div><i class="tl-x" data-scdel="${i}" title="Убрать эту сцену">✕</i><i class="tl-h" title="Тяните: длина сцены"></i></div>`;
+      return `<div class="tl-b${i === root._sel ? ' sel' : ''}${done ? (draft ? ' draft' : ' done') : old ? ' stale' : ''}${fr[i] ? ' cut' : ''}" data-i="${i}" title="${fr[i] ? 'Новый план (смена кадра). ' : ''}Тяните внутри фрагмента - время сцены · за правый край - точно · ручкой слева - порядок"><i class="tl-grip" draggable="true" data-grip="${i}" title="Сцена ${i + 1}. Тащите кружок, чтобы переставить сцену, нажмите на фрагмент, чтобы открыть">${i + 1}</i><i class="tl-fill" style="width:${pct}%"></i><div class="tl-l">${sec} с${done ? (draft ? ' · черновик ✓' : ' · готово ✓') : old ? ' · старая версия' : ''}${fr[i] ? ' · ✂ новый план' : ''}</div><i class="tl-x" data-scdel="${i}" title="Убрать эту сцену">✕</i><i class="tl-h" title="Тяните: длина сцены"></i></div>`;
       }).join('') + '<div class="tl-b tl-add" data-add="1" style="align-items:center;justify-content:center" title="Добавить фрагмент">+</div>';
       const dmb = $('.lm-q button[data-mq="draft"]', root);
       dmb.disabled = false;   // pressing it is how you find out you need a file - and how you get it
@@ -8492,6 +8568,9 @@ function makeRefMode(cfg) {
              numbers of the places. The person sees his numbers, the model gets the right files. */
           const sCards = $$('.sc', root);
           const sPlans = sCards.map((c, i) => sceneAudioPlan(c, root._fauds || [], 10 * (i + 1)));
+          /* Files and numbers must agree BEFORE the long job starts: an unnamed photo means the model
+             invents that person, a number without a file means it guesses the picture. */
+          try { if (!root._restoring) agRefWarn(cfg.mode, 'Перед генерацией: '); } catch (e) { }
           fd.append('scenes', JSON.stringify(sceneList().map((x, i) => Object.assign({}, x, { prompt: (sPlans[i] || {}).text || x.prompt }))));
           sCards.forEach((c, i) => c._files.forEach((f, j) => { if (f) fd.append(`simg${i}_${j}`, f); }));
           sCards.forEach((c, i) => {
@@ -8759,14 +8838,14 @@ function makeRefMode(cfg) {
     const fz = document.createElement('button');
     fz.type = 'button'; fz.className = 'btn mini';
     fz.textContent = 'Освободить память';
-    fz.title = 'Отдать видеопамять, которую после генерации держит ComfyUI: модель Агента не влезает, пока она занята';
+    fz.title = 'Остановить модель Агента и сбросить кэш ComfyUI: пока память занята, вторая сторона не загружается и отвечает «Остановлено»';
     fz.onclick = async () => {
       fz.disabled = true; const keep2 = fz.textContent; fz.textContent = 'Освобождаю…';
       try {
         const r = await fetch('/api/comfy/free', { method: 'POST' });
         const j = await r.json().catch(() => ({}));
         toast(!r.ok ? (j.error || 'Память не освободилась')
-          : (j.used != null ? 'Видеопамять освобождена: занято ' + j.used + ' ГБ' : 'Видеопамять освобождена'));
+        : ('Освободил ComfyUI' + (j.llm ? ' и модель Агента' : '') + (j.used != null ? ' · занято осталось ' + j.used + ' ГБ' : '')));
       } catch (e) { toast('ComfyUI не ответил'); }
       fz.textContent = keep2; fz.disabled = false;
     };
@@ -9535,7 +9614,13 @@ $('#agMic').onclick = async () => {
 
 async function agSend() {
   let text = $('#agIn').value.trim();
-  if (AG.busy) { AG.ctrl?.abort(); return; }
+  if (AG.busy) {
+    /* Pressing send while the agent is still writing used to kill that answer in silence: the person
+       got «Остановлено» for a reply that was a second away, and the same abort was then reported by
+       both waiters. Sending something new is not a way to stop: stopping has its own empty field. */
+    if (text || AG.att.length || (AG.audios || []).length) { toast('Агент ещё пишет: дождитесь ответа, а остановить - пустым полем или кнопкой «Стоп»'); return; }
+    AG.ctrl?.abort(); return;
+  }
   const AUD = AG.audios || (AG.audio ? [AG.audio] : []);
   if (AUD.some(a => a.busy)) { toast('Подождите, слова из аудио ещё распознаются'); return; }
   if (!text && !AG.att.length && !AUD.length) return;

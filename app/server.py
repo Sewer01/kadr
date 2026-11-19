@@ -2937,7 +2937,8 @@ class App:
             return await self.queue(graph, stages, {
                 "mode": "actionsc" if act else "long", "sub": sub + (" · черновик" if draft else f" · проба {width}×{height}" if test else ""), "prompt": scenes[k][0], "aspect": aspect, "q": quality,
                 "len": round((plan[k]["total"] - plan[k]["ov"]) / wf.FPS, 1), "res": f"{width}×{height}", "seed": seed,
-                "long": {"run": run, "part": k, "n": len(scenes), "draft": draft, "test": test}})
+                "long": {"run": run, "part": k, "n": len(scenes), "draft": draft, "test": test},
+                "ref_size": ref_size})
         graph, stages = wf.long_graph(self.model_names, scenes, width, height, seed, images, audio, start,
                                       dmad if draft else self.model_names["pika_lora"], self.custom_loras("long"), ref_size, vocals, await self.preview_opts(), fresh, False, draft,
                                       frame=files.get("srcframe"), loop=form.get("music_loop") == "1", audio_dur=float(form.get("audio_dur") or 0),
@@ -3714,17 +3715,24 @@ class App:
                {"refs": [r.name for r in s["refs"]]}
 
     async def h_comfy_free(self, req):
-        """Hand the video memory back. After a generation ComfyUI keeps its models resident, and the
-        agent's model needs the same gigabytes: while they are held, the agent answers «Остановлено»."""
+        """Hand the video memory back. BOTH holders are asked: ComfyUI keeps its models resident as a
+        cache, and llama-server keeps the agent's model - either one alone can starve the other, and
+        freeing only ComfyUI left the card full, which is what the person saw as «не освободилось»."""
         if getattr(self, "jobs", None):
             return web.json_response({"error": "Задание ещё идёт: память освободится, когда оно кончится"}, status=409)
+        llm = False
+        try:
+            llm = bool(getattr(self, "llm", None) or getattr(self, "llm_proc", None) or getattr(self, "llama", None))
+            await self.stop_llm()
+        except Exception:
+            pass
         try:
             await self.comfy_json("POST", "/free", json={"unload_models": True, "free_memory": True})
         except Exception as e:
             return web.json_response({"error": "ComfyUI не ответил: " + str(e)[:90]}, status=502)
         await asyncio.sleep(1.2)
         gpu = await asyncio.to_thread(self.monitor.gpu)
-        return web.json_response({"used": (gpu or {}).get("vram_used_gb")})
+        return web.json_response({"used": (gpu or {}).get("vram_used_gb"), "llm": llm})
 
     async def h_agent_status(self, _req):
         variant = await self.llm_variant()
