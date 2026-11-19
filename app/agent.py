@@ -217,7 +217,8 @@ def system_prompt(skills_text, target, ctx, editing=True):
 - Правь текст черновика ровно так, как просят, и верни ВЕСЬ промпт целиком - кнопка раздела заменит текст весь, а не построчно.
 - Если в черновике есть строки "SCENE N | секунды" - это сцены студии: верни тот же набор с теми же номерами SCENE 1, SCENE 2..., не склейвай сцены в одну и не теряй ни одной; раздел разбирает список по номерам.
 - Если в сообщении есть блоки `[Аудио ... Слова из аудио ...]`, а в контексте раздела перечислены аудио сцен (scene_audios): это СВОИ песни сцен, а не «звук от модели». Слова из такого блока вставь в свою сцену ДОСЛОВНО, без перевода и правок, репликой `<d>[Язык] ...</d>` (язык бери из блока), и в `non_diegetic_music` укажи тег этого аудио вместо N/A. Сочинять свои слова вместо распознанных запрещено: человек услышит чужую песню и решит, что его файл не дошёл.
-- Файлы раздела программа не трогает: не проси приложить то, что уже стоит в разделе, и не считай отсутствующим то, чего нет в чате."""
+- Файлы раздела программа не трогает: не проси приложить то, что уже стоит в разделе, и не считай отсутствующим то, чего нет в чате.
+- ЯЗЫК СЛОВ И РЕПЛИК. Всё, что произносится или поётся (реплики в <d>[Язык] ...</d>, слова песни, текст диктора), пиши ТОЛЬКО на том языке, на котором эти слова произнёс пользователь или которые распознаны в аудио. Английский язык описания сцены НЕ переносится на реплики: песня по-русски остаётся по-русски внутри английской строки. Если человек не просил слов, реплик и пения в промпте быть не должно: оставь звук на усмотрение модели. Не переводи распознанные слова, не переписывай их кириллицей в латиницу и не вставляй фразы на третьем языке, которого нет ни в просьбе, ни в аудио."""
 
     # "make the cat black" is a fix, not a second scene: without this the model keeps both cats
     editing_rule = f"""
@@ -717,8 +718,10 @@ class LlamaServer:
     def url(self):
         return f"http://127.0.0.1:{self.port}"
 
-    def start(self, variant):
-        key = (variant, json.dumps(self.custom, sort_keys=True))
+    def start(self, variant, ctx=None):
+        # a long dialogue and a studio of fifteen scenes do not fit the shipped size: the person can
+        # widen the context with a slider, at the price of memory; 0 and a bad value keep the default
+        key = (variant, json.dumps(self.custom, sort_keys=True), int(ctx or 0))
         if self.alive() and self.variant == key:
             return
         self.stop()
@@ -729,7 +732,7 @@ class LlamaServer:
         # (heavier models run partly on the CPU, slower but they start); the context stays fixed
         # because the skills need about 20k tokens
         args = [str(self.exe()), "-m", str(m), "--host", "127.0.0.1", "--port", str(self.port),
-                "-c", str(LLM_VARIANTS[variant]["ctx"]), "-fit", "on", "-fitt", "1536", "--jinja", "-np", "1"]
+                "-c", str(int(ctx) if ctx and 8192 <= int(ctx) <= 262144 else LLM_VARIANTS[variant]["ctx"]), "-fit", "on", "-fitt", "1536", "--jinja", "-np", "1"]
         if p:
             args += ["--mmproj", str(p)]
         self.log_path.parent.mkdir(parents=True, exist_ok=True)

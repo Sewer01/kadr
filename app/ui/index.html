@@ -870,6 +870,21 @@ img.pr-media{object-position:center 38%}
 .ag-comp textarea{order:-2;min-height:56px;max-height:180px;flex:1 1 0;min-width:0}
 .ag-comp #agSend{order:-1}
 .ag-comp .ag-clip,.ag-comp #agClear{padding:6px 10px;min-height:0;font-size:12.5px;border-radius:9px}
+.ag-comp .ag-ctx{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);padding:0 4px}
+.ag-comp .ag-ctx select{font-size:12.5px;padding:5px 6px;border-radius:8px;background:var(--surface-2);border:1px solid var(--line-2);color:var(--text)}
+.ag-comp .ag-ctx b{color:var(--text);font-size:12.5px}
+/* spelling help on the right mouse button: the browser's own menu offers no fixes here, so the
+   local model is asked, and its answers are put back exactly where the word stood */
+.sp-menu{position:fixed;z-index:9999;min-width:236px;max-width:340px;background:var(--surface-2);
+ border:1px solid var(--line-2);border-radius:10px;box-shadow:0 12px 30px rgba(0,0,0,.5);padding:5px;display:grid;gap:2px}
+.sp-menu .sp-head{font-size:11.5px;color:var(--muted);padding:5px 9px 4px;border-bottom:1px solid var(--line);margin-bottom:3px;
+ overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sp-menu>button{all:unset;cursor:pointer;display:flex;justify-content:space-between;gap:10px;align-items:baseline;
+ font-size:13px;padding:7px 9px;border-radius:7px;color:var(--text)}
+.sp-menu>button:hover{background:rgba(var(--accent-rgb),.16)}
+.sp-menu>button[disabled]{opacity:.62;cursor:default}
+.sp-menu>button small{color:var(--muted);font-size:11px}
+.sp-menu .sp-sep{display:block;height:1px;background:var(--line);margin:4px 2px}
 .ag-comp .ag-clip svg{width:15px;height:15px}
 .ag-clip{padding:12px;display:grid;place-items:center}
 /* the button that sits in a card heading: same small size, pushed to the right edge, quiet until
@@ -1679,6 +1694,11 @@ body.dropping::after{content:'Отпустите — программа разл
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="3" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
             </button>
             <button class="btn" type="button" id="agClear" title="Убрать текст из поля ввода; история переписки останется">Очистить поле</button>
+            <button class="btn" type="button" id="agFreeMem" title="Выгрузить модель Агента и кэш ComfyUI: освободить видеопамять для генерации">Освободить память</button>
+            <label class="ag-ctx" title="Сколько текста модель держит в памяти разом. Больше - влезают длинная переписка и много сцен, но растёт расход памяти; при переполнении.Agent сам просит увеличить">Контекст
+              <select id="agCtxSel"></select>
+              <b id="agCtxNow">?</b>
+            </label>
             <textarea id="agIn" rows="2" placeholder="Опишите сцену, сценарий или вставьте реплики… (Enter — создать промт, Shift+Enter — новая строка)"></textarea>
             <button class="btn pri" id="agSend" title="Агент составит промпты по вашему описанию и приложенным кадрам; в раздел они уйдут кнопкой «В …» под ответом">Создать промт</button>
           </div>
@@ -10251,6 +10271,87 @@ async function sendPrompt(blk, to) {
   toast(`${back ? 'Черновик вернулся в' : 'Промпт перенесён в режим'} ${name}` + (back ? ', ваши файлы остались на местах' : '') + (files.length && to !== 'video' && to !== 'krea' ? ' вместе с изображениями' : '')
     + (vUsed ? ` и видео: ${vUsed}` : '') + (vidFiles.length > vUsed ? ` (видео в чате ${vidFiles.length}, раздел принимает ${vAll || 1}: лишние не перенесены)` : '') + (to === 'lipsync' && !back ? (au ? ' и аудио — выделите нужный фрагмент' : ' — добавьте аудио') : ''));
 }
+/* Right mouse button over a field where a person writes: the browser's own menu does not offer
+   spelling fixes here, so the local model is asked. It gives up to three ways to write the word, and
+   the chosen one replaces exactly that word - the caret and the undo history stay in the field. */
+let SP_MENU = null;
+const spClose = () => { if (SP_MENU) { SP_MENU.remove(); SP_MENU = null; } };
+const spItem = (menu, html, fn, note, disabled) => {
+  const b = document.createElement('button'); b.type = 'button';
+  b.innerHTML = html + (note ? '<small>' + note + '</small>' : '');
+  if (disabled) b.disabled = true; else b.onclick = () => { spClose(); fn(); };
+  menu.append(b); return b;
+};
+const spWordAround = (v, pos) => {
+  const isCh = ch => /[A-Za-zА-Яа-яЁё'\u2019\u0451\u0401-]/.test(ch);
+  let a = pos, b = pos;
+  while (a > 0 && isCh(v[a - 1])) a--;
+  while (b < v.length && isCh(v[b])) b++;
+  return { a, b, word: v.slice(a, b) };
+};
+document.addEventListener('contextmenu', e => {
+  const ta = e.target.closest && e.target.closest('textarea');
+  if (!ta || ta.getAttribute('spellcheck') === 'false' || ta.disabled) return;
+  e.preventDefault(); spClose();
+  const v = ta.value, pos = ta.selectionStart == null ? v.length : ta.selectionStart;
+  const cur = spWordAround(v, pos);
+  const menu = document.createElement('div'); menu.className = 'sp-menu'; SP_MENU = menu;   // without this the menu cannot be closed
+  const head = document.createElement('div'); head.className = 'sp-head';
+  head.textContent = cur.word ? 'Слово: ' + cur.word : 'Орфография';
+  menu.append(head);
+  if (cur.word.length > 2) {
+    const waiting = spItem(menu, 'Подбираю варианты…', null, 'локальная модель', true);
+    postJSON('/api/agent/spell', {
+      word: cur.word,
+      text: v.slice(Math.max(0, cur.a - 140), Math.min(v.length, cur.b + 140)),
+    }).then(j => {
+      waiting.remove();
+      const list = (j.variants || []).filter(Boolean);
+      if (!list.length) { spItem(menu, j.clean ? 'Написание верное' : 'Вариантов нет', null, '', true); return; }
+      list.forEach(c => spItem(menu, 'Заменить на <b>' + c.replace(/[<>&]/g, ch => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[ch])) + '</b>', () => {
+        ta.focus(); ta.setSelectionRange(cur.a, cur.b);
+        if (!document.execCommand('insertText', false, c)) { ta.value = v.slice(0, cur.a) + c + v.slice(cur.b); }
+        ta.dispatchEvent(new Event('input', { bubbles: true }));
+        if (ta._undo == null) ta._undo = [];
+      }, 'модель'));
+    }).catch(err => { waiting.remove(); spItem(menu, 'Модель не ответила', null, (err && err.message || '').slice(0, 28), true); });
+  }
+  spItem(menu, 'Поправить весь текст', () => {
+    const whole = ta.value;
+    if (!whole.trim()) { toast('Поле пустое'); return; }
+    toast('Читаю текст и правлю написания…');
+    postJSON('/api/agent/spell', { text: whole }).then(j => {
+      const fixed = (j.text || '').trim();
+      if (!fixed) { toast(j.error || 'Модель не ответила'); return; }
+      if (fixed === whole.trim()) { toast('Ошибок написания модель не нашла'); return; }
+      ta.focus(); ta.select();
+      if (!document.execCommand('insertText', false, fixed)) ta.value = fixed;
+      ta.dispatchEvent(new Event('input', { bubbles: true }));
+      toast('Написание поправлено: текст заменён целиком');
+    }).catch(err => toast('Не вышло: ' + (err && err.message || err)));
+  }, 'всем текстом');
+  const sep = document.createElement('i'); sep.className = 'sp-sep'; menu.append(sep);
+  const sel = () => ta.value.slice(ta.selectionStart, ta.selectionEnd);
+  spItem(menu, 'Вырезать', () => { const t = sel(); if (t) { navigator.clipboard?.writeText(t); ta.setRangeText('', ta.selectionStart, ta.selectionEnd, 'end'); ta.dispatchEvent(new Event('input', { bubbles: true })); } });
+  spItem(menu, 'Скопировать', () => { const t = sel() || ta.value; if (t) navigator.clipboard?.writeText(t); });
+  spItem(menu, 'Вставить', async () => {
+    try {
+      const t = await (navigator.clipboard?.readText() || Promise.resolve(''));
+      if (!t) { toast('Буфер обмена пуст или недоступен'); return; }
+      ta.focus();
+      if (!document.execCommand('insertText', false, t)) ta.setRangeText(t, ta.selectionStart, ta.selectionEnd, 'end');
+      ta.dispatchEvent(new Event('input', { bubbles: true }));
+    } catch (err) { toast('Буфер обмена недоступен: разрешите его в Windows'); }
+  });
+  document.body.append(menu);
+  const r = menu.getBoundingClientRect();
+  menu.style.left = Math.max(4, Math.min(e.clientX, (window.innerWidth || 1200) - r.width - 8)) + 'px';
+  menu.style.top = Math.max(4, Math.min(e.clientY, (window.innerHeight || 800) - r.height - 8)) + 'px';
+});
+document.addEventListener('pointerdown', e => { if (SP_MENU && !SP_MENU.contains(e.target)) spClose(); }, true);
+document.addEventListener('keydown', e => { if (e.key === 'Escape') spClose(); });
+window.addEventListener('blur', spClose);
+
 // the finished prompt can be edited in place; the edit is kept when the chat is redrawn
 $('#agMsgs').addEventListener('input', e => {
   const pre = e.target.closest?.('pre[data-b]'); if (!pre) return;
@@ -10300,6 +10401,36 @@ async function clipText() {
   try { return (await (await fetch('/api/clipboard', { method: 'POST' })).json()).text || ''; } catch { return ''; }
 }
 $('#agClear').onclick = () => { const ta = $('#agIn'); ta.value = ''; ta.dispatchEvent(new Event('input', { bubbles: true })); ta.focus(); };
+  /* The context size is a choice between "everything fits" and "the card has room to breathe", so
+     it is the person's dial, not a hidden constant. Changing it unloads the model: the next request
+     pays the loading time once, and a long dialogue stops dying with a 400 error. */
+  const CTX = [16384, 32768, 49152, 65536, 98304, 131072, 196608];
+  const selCtx = $('#agCtxSel');
+  if (selCtx && !selCtx._filled) {
+    selCtx._filled = 1;
+    selCtx.innerHTML = CTX.map(v => `<option value="${v}">${(v / 1024).toFixed(0)} тысяч</option>`).join('');
+    selCtx.onchange = async () => {
+      try {
+        const r = await postJSON('/api/agent/ctx', { ctx: +selCtx.value });
+        toast(`Контекст ${r.ctx} токенов (это ${(r.ctx / 1024).toFixed(0)} тысяч). Модель выгружена: следующий запрос поднимет её с новым размером.` + (r.ctx >= 98304 ? ' Большой контекст ест память: генерация может идти медленнее.' : ''));
+        agStatus();
+      } catch (e) { toast('Не вышло: ' + (e && e.message ? e.message : e)); agStatus(); }
+    };
+  }
+  const fm = $('#agFreeMem');
+  if (fm && !fm._wired) {
+    fm._wired = 1;
+    fm.onclick = async () => {
+      const was = fm.textContent; fm.disabled = true; fm.textContent = 'Выгружаю…';
+      try {
+        const r = await (await fetch('/api/comfy/free', { method: 'POST' })).json();
+        toast(r && r.error ? ('Не вышло: ' + r.error) : ('Выгрузил модель Агента и кэш ComfyUI · занято осталось ' + ((r && r.used != null) ? r.used : '?') + ' ГБ'));
+        agStatus();
+      } catch (e) { toast('Не вышло: ' + (e && e.message ? e.message : e)); }
+      fm.disabled = false; fm.textContent = was;
+    };
+  }
+
 
 // right-click menu: copy / cut / paste / select all in every text field, copy on any selectable text
 (() => {
@@ -10400,6 +10531,12 @@ async function agStatus() {
       + `<span class="rd ${o.have ? 'ok' : 'no'}">${o.have ? '✓ скачано' : `Нужно скачать · ${(o.size / 1e9).toFixed(1)} ГБ`}${o.current ? ' · ВЫБРАНА' : ''}</span>`
       + (o.min_vram && !o.fits ? `<small>⚠ нужно от ${o.min_vram} ГБ видеопамяти: у вас может быть медленно</small>` : '') + `</button>`).join('')
     + ((s.variants || []).some(o => o.current && o.uncensored) ? `<div class="hint" style="margin-top:8px">Эта модель не отказывается писать любые описания. Вы отвечаете за содержание: не используйте её для запрещённого и для людей без их согласия. Сам MiniMax H3 часть запросов всё равно может отклонить.</div>` : '');
+  const cs = $('#agCtxSel'), cn = $('#agCtxNow');
+  if (cs && s.ctx) {
+    if (!Array.prototype.some.call(cs.options, o => +o.value === +s.ctx)) cs.insertAdjacentHTML('beforeend', '<option value="' + s.ctx + '">' + (s.ctx / 1024).toFixed(0) + ' тысяч</option>');
+    cs.value = String(s.ctx);
+    if (cn) cn.textContent = (s.ctx / 1024).toFixed(0) + ' тыс.' + (s.ctx_custom ? ' (ваша)' : ' (по умолчанию)');
+  }
   const needModel = !s.installed;
   $('#agInstall').hidden = s.installing || (s.custom && !s.has_model) || (!needModel && s.speech_ready);
   $('#agInstall').textContent = !needModel ? `Докачать распознавание речи (~${Math.round(s.speech_size / 1e6)} МБ)`

@@ -3760,6 +3760,7 @@ class App:
             "custom": custom, "vision": self.llm.vision(variant), "has_model": self.llm.has_model(variant),
             "speech_ready": self.speech_status()["ready"], "speech_size": speech.MODEL_SIZE + speech.WHISPER_ZIP_SIZE,
             "speech": self.speech_status(),
+            "ctx": self.agent_ctx() or v.get("ctx"), "ctx_default": v.get("ctx"), "ctx_custom": bool(self.agent_ctx()),
             "installed": self.llm.installed(variant), "running": self.llm.alive(),
             "installing": bool(self.agent_installer), "dir": str(self.llm.root), "managed": self.config.get("engine") == "managed",
             "dir_chosen": bool(self.config.get("llm_dir")) or self.config.get("engine") == "managed",
@@ -3843,6 +3844,86 @@ class App:
 
         asyncio.create_task(run())
         return web.json_response({"ok": True, "name": st["name"], "size": st["size"]})
+
+    def agent_ctx(self):
+        """Context the agent runs with: the person's dial first, the model's shipped size else."""
+        try:
+            v = int(self.config.get("llm_ctx") or 0)
+        except (TypeError, ValueError):
+            return None
+        return v if 8192 <= v <= 262144 else None
+
+    async def h_agent_ctx(self, req):
+        """How much text the agent holds at once. More fits a long dialogue and many scenes, and it
+        costs memory: the model is unloaded here, so the next request pays the loading time once."""
+        body = await req.json()
+        try:
+            v = int(body.get("ctx") or 0)
+        except (TypeError, ValueError):
+            v = 0
+        if v and not 8192 <= v <= 262144:
+            return web.json_response({"error": "Размер контекста должен быть от 8192 до 262144 токенов"}, status=400)
+        self.config.update(llm_ctx=v or None)
+        variant = await self.llm_variant()
+        await self.stop_llm()
+        default = ag.LLM_VARIANTS.get(variant, {}).get("ctx")
+        return web.json_response({"ok": True, "ctx": v or default, "custom": bool(v), "default": default,
+                                  "note": "Модель выгружена: следующий запрос поднимет её с новым размером"})
+
+    async def h_agent_spell(self, req):
+        """Spelling help for the right mouse button in a prompt field: variants of one word, or a
+        clean copy of the whole text. The local model does it, so nothing leaves the computer."""
+        body = await req.json()
+        word = (body.get("word") or "").strip()[:64]
+        text = (body.get("text") or "").strip()[:4000]
+        if not word and not text:
+            return web.json_response({"error": "Пустое слово и пустой текст"}, status=400)
+        if self.jobs:
+            return web.json_response({"error": "Сейчас идёт генерация видео - поправите после"}, status=409)
+        variant = await self.llm_variant()
+        if not self.llm.installed(variant):
+            return web.json_response({"error": "Модель агента ещё не скачана."}, status=400)
+        try:
+            if not self.llm.alive():
+                self.llm.start(variant, ctx=self.agent_ctx())
+                await ag.wait_ready(self.session, self.llm)
+            if word:
+                system = ("Ты проверяешь написание слов. Ответь не больше трёх правильных написаний "
+                          "запрошенного слова, каждое с новой строки, без кавычек, без пояснений, без нумерации. "
+                          "Если слово написано правильно, ответь ровно одной строкой: ОК.")
+                user = "Слово: " + word + " | Его окружение в тексте: " + text + " | Ответ:"
+            else:
+                system = ("Поправь орфографию и пунктуацию. Смысл, порядок слов и язык не меняй; "
+                          "теги <Picture N>, <Video N>, <Audio N>, реплики <d>[Язык] ...</d>, строки SCENE N | секунды "
+                          "и названия полей промпта оставь дословно. Ответь только исправленным текстом.")
+                user = "Исправь написания в тексте между чертами. Текст: <<< " + text + " >>>"
+            payload = {"messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
+                       "stream": False, "temperature": 0.1, "max_tokens": 900 if word else 3000,
+                       "chat_template_kwargs": {"enable_thinking": False}, "thinking_budget_tokens": 0}
+            async with self.session.post(self.llm.url + "/v1/chat/completions", json=payload,
+                                         timeout=aiohttp.ClientTimeout(total=240)) as r:
+                if r.status != 200:
+                    return web.json_response({"error": f"Модель ответила ошибкой {r.status}"}, status=502)
+                data = await r.json()
+            out = ((data.get("choices") or [{}])[0].get("message") or {}).get("content", "").strip()
+            if not word:
+                # the model often hands back the frame it was given: the field must get plain text
+                while out[:3] in ("<<<", "```"):
+                    out = out[3:].lstrip()
+                while out[-3:] in (">>>", "```"):
+                    out = out[:-3].rstrip()
+                return web.json_response({"text": out})
+            if out.upper().startswith("ОК") or out.upper().startswith("OK"):
+                return web.json_response({"variants": [], "clean": True})
+            seen, vars_ = set(), []
+            for line in out.splitlines():
+                cand = line.strip().strip("'\u0022`\u00ab\u00bb.,:;-— ").split(" ")[0][:40]
+                if cand and cand.lower() != word.lower() and cand.lower() not in seen:
+                    seen.add(cand.lower())
+                    vars_.append(cand)
+            return web.json_response({"variants": vars_[:3]})
+        except Exception as e:
+            return web.json_response({"error": str(e) or "Не удалось проверить написание"}, status=500)
 
     async def h_speech_folder(self, req):
         """Use whisper files the user already has (or go back to the app's own copy)."""
@@ -3956,7 +4037,7 @@ class App:
                 except Exception:
                     pass
                 await send({"type": "status", "text": f'Загружаем {ag.LLM_VARIANTS[variant]["title"]}… (до минуты)'})
-                self.llm.start(variant)
+                self.llm.start(variant, ctx=self.agent_ctx())
                 await ag.wait_ready(self.session, self.llm)
 
             if not self.llm.vision(variant) and any(m.get("images") for m in messages):
@@ -3999,6 +4080,9 @@ class App:
                         why = (await r.text())[:300]
                         if "exceed_context" in why and attempt == 0:
                             continue   # lighter payload on the next pass
+                        if "exceed_context" in why:
+                            why += (". Увеличьте длину контекста ползунком «Контекст» в разделе «Агент» "
+                                    "или начните новый чат - старый диалог занимает место")
                         raise RuntimeError(f"Модель ответила ошибкой {r.status}: {why}")
                     async for raw in r.content:
                         line = raw.decode("utf-8", errors="replace").strip()
@@ -4035,7 +4119,7 @@ class App:
                     await self.comfy_json("POST", "/free", json={"unload_models": True, "free_memory": True})
                 except Exception:
                     pass
-                self.llm.start(variant)
+                self.llm.start(variant, ctx=self.agent_ctx())
                 await ag.wait_ready(self.session, self.llm)
             system = ("Ты переводчик. Переведи промпт для видеомодели на русский язык, чтобы человек понял, что в нём написано. "
                       "Правила: теги <Picture 1>, <Video 1>, <Audio 1>, @image1, [Shot 1], тайм-коды и названия полей "
@@ -4525,6 +4609,8 @@ def build_app(comfy_override=None):
         web.post("/api/agent/install/cancel", state.h_agent_install_cancel),
         web.post("/api/agent/model", state.h_agent_model),
         web.post("/api/agent/variant", state.h_agent_variant),
+        web.post("/api/agent/ctx", state.h_agent_ctx),
+        web.post("/api/agent/spell", state.h_agent_spell),
         web.post("/api/speech/transcribe", state.h_transcribe),
         web.post("/api/speech/folder", state.h_speech_folder),
         web.post("/api/speech/model", state.h_speech_model),
