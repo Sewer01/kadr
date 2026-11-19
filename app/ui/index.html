@@ -181,6 +181,11 @@
 .atrim .at-cv{display:block}
 .atrim .at-sel{position:absolute;top:0;bottom:0;background:rgba(var(--accent-rgb),.16);border-left:2px solid var(--accent);border-right:2px solid var(--accent);pointer-events:none}
 .atrim .at-ph{position:absolute;top:0;bottom:0;width:2px;background:#fff;pointer-events:none}
+/* the ribbon is sliding this way while a marker is held near the edge */
+.atrim .at-dir{position:absolute;top:50%;transform:translateY(-50%);z-index:5;pointer-events:none;
+ font-size:11.5px;font-weight:700;font-style:normal;color:#fff;background:rgba(var(--accent-rgb),.92);
+ border-radius:9px;padding:3px 8px;box-shadow:0 1px 6px rgba(0,0,0,.35)}
+.atrim .at-dir-l{left:6px}.atrim .at-dir-r{right:6px}
 .atrim .at-wave{touch-action:none}
 .atrim .at-h{position:absolute;top:-4px;bottom:-4px;width:20px;cursor:ew-resize;display:grid;place-items:center;background:none;border:0;padding:0;pointer-events:auto;z-index:3}
 .atrim .at-h::before{content:'';position:absolute;top:0;bottom:0;left:50%;width:14px;transform:translateX(-50%)}
@@ -4573,6 +4578,69 @@ class AudioTrimmer {
     if (this.src) { this.src.onended = null; try { this.src.stop(); } catch {} this.src = null; }
     cancelAnimationFrame(this.raf); this.q('.at-ph').hidden = true; this.q('.at-play').textContent = '▶';
   }
+  /* A zoomed ribbon used to recompute its window from the marker being dragged: the marker stayed
+     painted in the same spot while the hand walked away, and the ribbon only moved while the mouse
+     moved. Now the window is pinned the moment a marker is taken: the marker follows the cursor, and
+     when the cursor leans on the edge of the window the ribbon slides on its own - at a calm speed -
+     until the hand leaves the band. The arrow at that edge says which way it is going. */
+  _pinView() {
+    if (this.zoom <= 1.02) { this._pan = null; return; }
+    const span = this.dur0 / this.zoom, free = Math.max(.001, this.dur0 - span);
+    this._pan = Math.min(1, Math.max(0, this.view()[0] / free));
+  }
+  _applyGrab() {
+    const g = this._grab; if (!g || !this.dur0) return;
+    const r = this.q('.at-wave').getBoundingClientRect();
+    const v = this.tAt(Math.min(1, Math.max(0, (this._grabX - r.left) / Math.max(1, r.width))));
+    if (g === 'l') this.start = Math.min(v, this.end - .1);
+    else this.end = Math.max(v, this.start + .1);
+    this._sync();
+  }
+  _dirPaint() {
+    const on = !!this._grab;
+    const l = this.q('.at-dir-l'), rr = this.q('.at-dir-r');
+    if (l) l.hidden = !(on && this._dir === 'l');
+    if (rr) rr.hidden = !(on && this._dir === 'r');
+  }
+  _grabMove(clientX) {
+    if (!this._grab || !this.dur0) return;
+    this._grabX = clientX;
+    if (this.zoom > 1.02) {
+      const [a0, b0] = this.view(), span = b0 - a0, free = Math.max(.001, this.dur0 - span);
+      const r = this.q('.at-wave').getBoundingClientRect();
+      const t = a0 + Math.min(1, Math.max(0, (clientX - r.left) / Math.max(1, r.width))) * span;
+      const edge = span * .05, band = span * .16;   // the band where the ribbon starts to slide
+      let na = a0;
+      if (t < a0 + edge) na = Math.max(0, a0 - (a0 + edge - t));
+      else if (t > b0 - edge) na = Math.min(free, a0 + (t - (b0 - edge)));
+      if (Math.abs(na - a0) > 1e-4) this._pan = na / free;
+      const dir = (t < a0 + band) ? 'l' : (t > b0 - band) ? 'r' : null;
+      this._dir = dir;
+      this._dirPaint();
+      if (dir && !this._slideRaf) {
+        const step = ts => {
+          this._slideRaf = 0;
+          if (!this._grab || !this._dir) { this._dirPaint(); return; }
+          const [a, b] = this.view(), sp = b - a, fr = Math.max(.001, this.dur0 - sp);
+          const dt = this._slideTs ? (ts - this._slideTs) / 1000 : 0;
+          this._slideTs = ts;
+          const na2 = Math.min(fr, Math.max(0, a + sp * .4 * dt * (this._dir === 'l' ? -1 : 1)));
+          this._pan = na2 / fr;
+          this._applyGrab();
+          if (this._grab && this._dir) this._slideRaf = requestAnimationFrame(step);
+          else this._dirPaint();
+        };
+        this._slideTs = 0; this._slideRaf = requestAnimationFrame(step);
+      }
+      if (!dir && this._slideRaf) { cancelAnimationFrame(this._slideRaf); this._slideRaf = 0; }
+    }
+    this._applyGrab();
+  }
+  _releaseGrab() {
+    this._grab = null; this._dir = null; this._grabX = null;
+    if (this._slideRaf) { cancelAnimationFrame(this._slideRaf); this._slideRaf = 0; }
+    this._dirPaint();
+  }
   _drag(e) {
     if (!this.dur0 || this._grab) return;   // while a handle is held, the wave must not restart the selection
     const r = this.q('.at-wave').getBoundingClientRect(), px = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width));
@@ -4586,6 +4654,12 @@ class AudioTrimmer {
   }
   _wire() {
     const el = this.q('.at-wave');
+    if (!this.q('.at-dir-l')) {
+      // words, not glyphs: the arrow only has to say which way the ribbon is sliding
+      const dl = document.createElement('i'); dl.className = 'at-dir at-dir-l'; dl.textContent = 'влево'; dl.hidden = true;
+      const dr = document.createElement('i'); dr.className = 'at-dir at-dir-r'; dr.textContent = 'вправо'; dr.hidden = true;
+      el.append(dl, dr);
+    }
     this._sync();
     this._anchor = null;
     const at = e => Math.min(this.dur0, Math.max(0, this.tAt(Math.min(1, Math.max(0, (e.clientX - el.getBoundingClientRect().left) / el.getBoundingClientRect().width)))));
@@ -4596,22 +4670,18 @@ class AudioTrimmer {
         if (!this.dur0) return;
         e.stopPropagation(); e.preventDefault();
         this._grab = h.dataset.h;
+        this._grabX = e.clientX; this._dir = null;
+        this._pinView();                        // the window stops chasing the marker: it now follows the hand
         try { h.setPointerCapture(e.pointerId); } catch (err) { }   // a released pointer is not an error: the drag still works
       });
-      h.addEventListener('pointermove', e => {
-        const g = this._grab; if (!g) return;
-        const v = at(e);
-        this._pan = null;                       // the window follows the marker the person moved
-        if (g === 'l') this.start = Math.min(v, this.end - .1);
-        else if (g === 'r') this.end = Math.max(v, this.start + .1);
-        this._sync();
-      });
+      h.addEventListener('pointermove', e => { if (this._grab) this._grabMove(e.clientX); });
       h.addEventListener('pointerup', e => {
         if (!this._grab) return;
-        this._grab = null;
+        this._grabMove(e.clientX);
+        this._releaseGrab();
         this.out();
       });
-      h.addEventListener('pointercancel', () => { this._grab = null; });
+      h.addEventListener('pointercancel', () => this._releaseGrab());
     });
     el.addEventListener('pointerdown', e => {
       if (!this.dur0 || this._grab) return;
@@ -4622,6 +4692,7 @@ class AudioTrimmer {
       const inside = t > this.start + .2 && t < this.end - .2 && !e.target.closest('.at-fd');
       if (inside && this.mode !== 'fade') this._move = { off: t - this.start, len: this.len() };
       else this._anchor = t;
+      this._pinView();   // the piece follows the hand, not the sliding window
       try { el.setPointerCapture(e.pointerId); } catch (err) { }      // a released pointer is not an error
       this._drag(e);
     });
@@ -4750,6 +4821,7 @@ class AudioTrimmer {
     };
     const setZoom = v => {
       this.zoom = Math.min(40, Math.max(1, v));
+      this._pan = null;   // a new scale shows the whole selection again; pinning starts when a marker is taken
       const sl = this.q('.at-zr');
       sl.value = this.zoom;
       paintRange(sl);   // the blue part is a CSS variable: a programmatic value does not wake the listener
