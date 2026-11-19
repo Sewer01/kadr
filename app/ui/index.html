@@ -10306,6 +10306,30 @@ async function agStatus() {
   $('#agWhInfo').innerHTML = sp.ready
     ? `<span class="ok-t">✓ Программа и модель найдены${sp.model ? ': ' + esc(sp.model) : ''}</span>`
     : sp.custom ? `<span class="warn-t">Не найдено: ${esc(sp.missing.join(', '))} — нажмите «Докачать» в карточке выше, скачается только это.</span>` : '';
+  /* Which recognition file is in use decides whether a song's words come out sense or nonsense:
+     the little model mangles singing. The program always takes the best file it can see, so the
+     button below only has to bring that file here - switching happens by itself. */
+  const bt = sp.better || {};
+  if (sp.model) {
+    $('#agWhInfo').innerHTML += '<br><span class="hint" style="font-size:12px">Файл '
+      + (sp.model_size ? Math.round(sp.model_size / 1048576) + ' МБ' : 'неизвестного размера')
+      + (bt.present ? ' · это точная модель: она разбирает пение' : ' · модель маленькая: песни она слышит плохо') + '</span>';
+  }
+  if (!bt.present && !bt.custom) {
+    $('#agWhInfo').innerHTML += '<br><button class="btn mini" type="button" id="agWhBetter" style="margin-top:6px" title="'
+      + 'Скачать ggml-large-v3-turbo-q5_0.bin: он разбирает пение там, где маленькая модель придумывает слова' + '">Скачать точную модель распознавания (~'
+      + Math.round((bt.size || 0) / 1048576) + ' МБ)</button>';
+  } else if (!bt.present && bt.custom) {
+    $('#agWhInfo').innerHTML += '<br><span class="hint" style="font-size:12px">Вы подключили свою папку whisper: чтобы слышать точнее, положите ggml-large-v3-turbo-q5_0.bin в неё - программа возьмёт лучший файл сама.</span>';
+  }
+  const bb = $('#agWhBetter');
+  if (bb) bb.onclick = async () => {
+    bb.disabled = true; bb.textContent = 'Скачиваю… полоса сверху карточки';
+    try {
+      const r = await postJSON('/api/speech/model', {});
+      toast('Начали: ' + r.name + ' · ' + Math.round((r.size || 0) / 1048576) + ' МБ. Как только файл ляжет в папку, программа сама перейдёт на него.');
+    } catch (e) { toast('Не вышло: ' + (e && e.message ? e.message : e)); bb.disabled = false; bb.textContent = 'Скачать точную модель распознавания'; }
+  };
   $('#agModel').insertAdjacentHTML('beforeend', s.speech_ready
     ? '<br><span class="ok-t">✓ Распознавание речи готово: можно приложить аудио и говорить в микрофон.</span>'
     : '<br><span class="warn-t">Распознавание речи не скачано: без него нельзя приложить аудио и говорить голосом.</span>');

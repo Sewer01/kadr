@@ -3811,7 +3811,38 @@ class App:
     def speech_status(self):
         s = speech.locate(self.llm.root, self.config.get("whisper_dir"))
         return {"ready": s["ready"], "missing": s["missing"], "custom": s["custom"],
-                "exe": str(s["exe"]) if s["exe"] else None, "model": s["model"].name if s["model"] else None}
+                "exe": str(s["exe"]) if s["exe"] else None, "model": s["model"].name if s["model"] else None,
+                "model_size": s["model"].stat().st_size if s["model"] else 0,
+                "better": speech.better_state(self.llm.root, self.config.get("whisper_dir"))}
+
+    async def h_speech_model(self, req):
+        """Fetch the accurate whisper model. `small` mangles lyrics, and the app starts using the
+        better file the moment it lies in the models folder - nothing else has to be switched."""
+        if self.agent_installer:
+            return web.json_response({"error": "Уже скачивается"}, status=409)
+        st = speech.better_state(self.llm.root, self.config.get("whisper_dir"))
+        if st.get("custom"):
+            return web.json_response({"error": "Вы указали свою папку whisper: файл нужен в неё. "
+                                               "Скачайте ggml-large-v3-turbo-q5_0.bin и положите рядом со своей моделью"}, status=400)
+
+        async def emit(ev):
+            await self.broadcast(dict(ev, type="agent_setup"))
+
+        self.agent_installer = engine.Installer(ROOT, self.session, emit)
+
+        async def run():
+            try:
+                await speech.install_better(self.agent_installer, self.llm.root)
+                await emit({"step": "agent", "state": "done", "label": "Модель распознавания речи: точная версия на месте"})
+            except engine.Cancelled:
+                await emit({"step": "agent", "state": "cancelled", "label": "Скачивание остановлено"})
+            except Exception as e:
+                await emit({"step": "agent", "state": "error", "label": str(e)})
+            finally:
+                self.agent_installer = None
+
+        asyncio.create_task(run())
+        return web.json_response({"ok": True, "name": st["name"], "size": st["size"]})
 
     async def h_speech_folder(self, req):
         """Use whisper files the user already has (or go back to the app's own copy)."""
@@ -4496,6 +4527,7 @@ def build_app(comfy_override=None):
         web.post("/api/agent/variant", state.h_agent_variant),
         web.post("/api/speech/transcribe", state.h_transcribe),
         web.post("/api/speech/folder", state.h_speech_folder),
+        web.post("/api/speech/model", state.h_speech_model),
         web.post("/api/agent/chat", state.h_agent_chat),
         web.post("/api/comfy/free", state.h_comfy_free),
         web.get("/api/agent/chats", state.h_chats),

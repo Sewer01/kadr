@@ -29,6 +29,32 @@ NOISE = re.compile(r"[\[\(][^\]\)]{0,40}[\]\)]")  # [BLANK_AUDIO], (music), [Mus
 MODEL_PREFERENCE = ["large-v3-turbo", "large-v3", "large-v2", "large", "medium", "small", "base", "tiny"]
 
 
+# `small` mangles singing - it is exactly where a little model gives up. This file hears lyrics far
+# better, runs on the same CPU build, and the app starts using it by itself: the finder below always
+# takes the best ggml file it can see.
+BETTER_MODEL = "ggml-large-v3-turbo-q5_0.bin"
+BETTER_URL = f"https://huggingface.co/ggerganov/whisper.cpp/resolve/main/{BETTER_MODEL}"
+BETTER_SIZE = 574e6
+
+
+def better_state(root, custom_dir=None):
+    """Is the accurate model here, and where would it have to go."""
+    dst = Path(root) / "whisper" / "models" / BETTER_MODEL
+    if dst.exists():
+        return {"present": True, "name": BETTER_MODEL, "size": dst.stat().st_size, "path": str(dst),
+                "custom": bool(custom_dir)}
+    return {"present": False, "name": BETTER_MODEL, "size": int(BETTER_SIZE), "custom": bool(custom_dir)}
+
+
+async def install_better(installer, root):
+    dst = Path(root) / "whisper" / "models" / BETTER_MODEL
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    if dst.exists():
+        return {"ok": True, "name": dst.name, "already": True}
+    await installer.download(BETTER_URL, dst, "agent", f"распознавание речи: {BETTER_MODEL}", BETTER_SIZE)
+    return {"ok": True, "name": dst.name}
+
+
 def _find_exe(folder):
     folder = Path(folder)
     if not folder.is_dir():
