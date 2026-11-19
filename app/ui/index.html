@@ -116,12 +116,15 @@
 /* The cross that removes a scene gets a rim of its own: without it the small grey mark looked like
    part of the chip, and a slip of the finger cost a scene. Idle it is a quiet circle, only on a press
    does it turn red - and pressing it now asks first. */
-.tl-x{flex:none;width:20px;height:20px;border-radius:50%;display:grid;place-items:center;font-size:11px;font-style:normal;
+/* position:relative matters: the enlarged hit area below is absolutely positioned, and without an
+   anchor of its own it resolved against the whole chip - the cross then answered to a hover and a
+   click anywhere on the fragment, including its top edge and the red strip */
+.tl-x{position:relative;flex:none;width:20px;height:20px;border-radius:50%;display:grid;place-items:center;font-size:11px;font-style:normal;
  color:var(--muted);background:var(--surface);border:2px solid rgba(var(--accent-rgb),.34);transition:background .14s,border-color .14s,color .14s}
 .tl-x:hover{background:#c0303f;border-color:#c0303f;color:#fff}
-/* the cross is not part of the label: it sits in its own quiet ring and only turns red on a press,
-   so an accidental touch reads as a different object before the finger lands */
-.tl-x::before{content:'';position:absolute;inset:-4px;border-radius:50%}
+/* the cross is not part of the label: it sits in its own quiet ring and only turns red on a press.
+   The hit area is 4 pixels wider on every side - of the cross, not of the chip */
+.tl-x::before{content:'';position:absolute;left:-4px;right:-4px;top:-4px;bottom:-4px;border-radius:50%}
 .tl-b.sel{border-color:var(--accent);box-shadow:0 0 0 2px rgba(var(--accent-rgb),.3)}
 .tl-b.stale{background:rgba(150,150,150,.14);border-style:dashed}.tl-b.done{background:rgba(47,191,113,.18)}.tl-b.draft{background:rgba(232,163,23,.18)}
 .tl-b.cut{border-left:4px solid var(--accent)}
