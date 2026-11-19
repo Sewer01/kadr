@@ -5163,7 +5163,11 @@ function upFinished(j) {
     }
     toast('Увеличение не получилось: ' + errSay(j.raw || j.msg));
   } else if (line) {
-    line.innerHTML = '<b style="color:#3fd18b">Готово.</b> <span>Новый файл в Библиотеке, ваш исходный не тронут.</span>';
+    line.innerHTML = '<b style="color:#3fd18b">Готово.</b> <span>Новый файл в Библиотеке, ваш исходный не тронут.</span>'
+      + (j.itemId ? '<button class="btn mini" type="button" data-a="cmp">Показать до и после</button>' : '');
+    const cb = line && $('[data-a="cmp"]', line);
+    if (cb) cb.onclick = () => openViewer(j.itemId);
+    if (j.itemId && $('#viewer').hidden) setTimeout(() => openViewer(j.itemId), 400);   // do not make him hunt for it
     toast('Готово: файл в Библиотеке');
   }
   UP_JOB = null;
@@ -6006,6 +6010,9 @@ function qHandle(m) {
      раньше здесь была прописана только Видеостудия, и клип Экшн-студии не доходил до ленты сцен */
     if (it.long && typeof RM !== 'undefined') { const rm = RM[it.mode] || RM.long; if (rm && rm.root && rm.root._partDone) rm.root._partDone(normItem(it) || it); } });
     if (j.mode === 'upscale' && j.itemId && $('#view-queue').classList.contains('active') && $('#viewer').hidden) setTimeout(() => openViewer(j.itemId), 400);  // show before/after at once
+    /* The card's line used to be closed only when the job had failed: a good retouch left
+       «Идёт увеличение 98%» standing there forever, and the finished file was never shown. */
+    if (j.mode === 'upscale') upFinished(j);
     if (j.detached) toast(`Готово: ${MODE_NAME[j.mode] || 'видео'} — оно в Библиотеке`);
   } else if (m.type === 'error') {
     j.state = 'error'; j.raw = m.message; j.msg = errSay(m.message);
@@ -7352,6 +7359,30 @@ function makeRefMode(cfg) {
     };
     root._setScenes = list => {   // from the agent: replace all scenes
       if (!list.length) return 0;
+      /* The usual round trip is the same scenes with better texts. Rebuilding the cards for it threw
+         away what the person had put in them - a photo gone from a scene was the price of a cleaner
+         sentence. When the number of scenes is the same, only the words change: the text and the
+         length are written into the cards that already stand there, and shelves, songs, cuts, typed
+         lyrics and the decade are not touched at all. */
+      const same = $$('.sc', root);
+      if (same.length === list.length && list.every(x => x && typeof x.prompt === 'string')) {
+        const tags = s => new Set(((s || '').match(/<(?:Audio|Picture)\s*\d+>/g) || []));
+        const back = [];
+        same.forEach((c, i) => {
+          const x = list[i], ta = $('textarea', c); if (!ta) return;
+          const had = tags(ta.value), got = tags(x.prompt);
+          const lost = Array.from(had).filter(t => !got.has(t));
+          ta.value = (String(x.prompt).trim() + (lost.length ? ' ' + lost.join(' ') : '')).trim();
+          const sec = Math.min(15, Math.max(3, Math.round(x.sec) || 0));
+          if (sec) { const r = $('input[type=range]', c); if (r) { r.value = sec; } }
+          if (x.fresh !== undefined) { const fb = $('.sc-fresh', c); if (fb) fb.checked = !!x.fresh; }
+          if (lost.length) back.push('сцена ' + (i + 1) + ': ' + lost.join(', '));
+          c._paint?.();
+        });
+        recount(); refreshStates(); renderTL(); showClip(); if (root._save) root._save();
+        if (back.length) toast('Возврат из чата дописал потерянные теги: ' + back.join(' · '));
+        return same.length;
+      }
       /* The person's own photos and songs hang on the scene cards. Rebuilding the list without
          saving them threw everything away: a draft sent to the Agent came back without a single
          picture, and the numbers in the text pointed at nothing. Cards are matched by their place,
@@ -7359,7 +7390,7 @@ function makeRefMode(cfg) {
       const keep = $$('.sc', root).map(c => ({
         files: (c._files || []).slice(), auds: (c._auds || []).slice(), src: (c._audSrc || []).slice(),
         sel: (c._audSel || []).slice(), dur: (c._audDur || []).slice(), fresh: !!$('.sc-fresh', c)?.checked,
-        base: c._baseFixed || 0, prompt: ($('textarea', c) || {}).value || "",
+        base: c._baseFixed || 0, words: (c._audWords || []).slice(), prompt: ($('textarea', c) || {}).value || "",
       }));
       $$('.sc', root).forEach(c => c.remove());
       list.slice(0, 20).forEach((x, i) => addScene(x.prompt, Math.min(15, Math.max(3, Math.round(x.sec) || 10)),
@@ -7382,6 +7413,7 @@ function makeRefMode(cfg) {
         if ((k.auds || []).some(Boolean)) {
           c._auds = k.auds.slice(); c._audSrc = (k.src || []).slice(); c._audSel = (k.sel || []).slice();
           if (c._audDur) c._audDur = (k.dur || []).slice();
+          c._audWords = (k.words || []).slice();   // the line the person fixed must outlive the rewrite
           c._paintAuds?.(); back++;
         }
       });
@@ -8061,7 +8093,10 @@ function makeRefMode(cfg) {
       const pl = $('.tl-player', root), em = $('.tl-empty', root);
       const n = root._sel + 1;
       if (d && d.url) { if (!vid.src.endsWith(d.url)) vid.src = d.url; vid.hidden = false; em.hidden = true; pl.classList.remove('empty'); }
-      else { vid.pause(); vid.removeAttribute('src'); vid.hidden = true; em.hidden = false; pl.classList.add('empty'); }
+      /* Removing the address is not enough: Chromium keeps showing the frame it had already
+         buffered, so a cleared project left a clip standing in the player as if nothing happened.
+         The element has to be reloaded empty. */
+      else { vid.pause(); vid.removeAttribute('src'); vid.load(); vid.hidden = true; em.hidden = false; pl.classList.add('empty'); }
       em.textContent = `Сцена ${n}: здесь появится её готовое видео. Собрать или пересобрать её можно кнопкой «Сделать сцену ${n}».`;
       $('.rm-preview', root)._syncLabel?.();
     }
@@ -11789,6 +11824,20 @@ const imgSeedForm = (S, fd) => { if (S.seedFixed && S.seed) fd.append('seed', S.
 
 
 fetch('/api/version').then(r => r.json()).then(v => { $('#appVer').textContent = 'Версия ' + v.version + (v.built ? ' · сборка ' + v.built : ''); }).catch(() => {});
+/* A prompt is prose, and one typo can cost a whole generation: turn the browser's own spelling
+   check on explicitly for the fields where a person writes, and keep it on for the ones that are
+   built later. Fields carrying a path or code stay quiet. */
+(function () {
+  const quiet = el => /dir|path|json|api|код/i.test((el.id || '') + ' ' + (el.className || '') + ' ' + (el.placeholder || ''));
+  const on = el => { if (el.tagName === 'TEXTAREA' && !quiet(el)) el.setAttribute('spellcheck', 'true'); };
+  setTimeout(() => {
+    document.querySelectorAll('textarea').forEach(on);
+    if (typeof MutationObserver !== 'undefined') new MutationObserver(ms => ms.forEach(m => m.addedNodes.forEach(nd => {
+      if (nd.nodeType !== 1) return; on(nd); nd.querySelectorAll && nd.querySelectorAll('textarea').forEach(on);
+    }))).observe(document.body, { childList: true, subtree: true });
+  }, 1500);
+})();
+
 /* ---------- updates: a new release on GitHub -> a bar with "Обновить" ---------- */
 (() => {
   if (!API) return;
