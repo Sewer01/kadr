@@ -8901,6 +8901,7 @@ function makeRefMode(cfg) {
           $$('.sc', root).forEach(x => x.remove());
           root._run = Math.random().toString(36).slice(2, 12); root._sel = 0;
           addScene('', 10); recount(); refreshStates(); renderTL(); showClip();
+          const pv = $('.rm-preview', root); if (pv && pv._reset) pv._reset();   // и предпросмотр сцены пустеет
           toast('Сцены очищены: осталась одна пустая, общие фото на месте');
         });
       const chips = $('.rm-tokens', root)?.closest('.ta-foot'), ta0 = $('.col textarea', root);
@@ -8926,7 +8927,9 @@ function makeRefMode(cfg) {
       $$('.sc', root).forEach(c => c.remove());
       addScene('', 10);
       root._run = Math.random().toString(36).slice(2, 12);   // the new scenes continue nothing from the old ones
-      recount(); refreshStates();
+      // клип последней сцены жил в проигрывателе ленты: без этой пары он оставался на экране
+      // и после того, как сцен уже нет, - человек читал это как «очистка не сработала»
+      recount(); renderTL(); showClip(); refreshStates();
     };
     const mus = document.createElement('div'); mus.className = 'card';
     root._snd = 'none';
@@ -10551,6 +10554,49 @@ async function sendPrompt(blk, to) {
       if (twins.length) toast('Агент повторил сцены ' + twins.join(' · ') + ' одинаковым текстом: поправьте текст или попросите его продолжить дальше');
     }
     L2.root._setScenes(scenesMade);
+    /* Своё фото и своя песня сцены живут под её номером места: у второй сцены это 20.
+       В чате эти номера сохраняются в подписях вложений, поэтому на обратном пути
+       картинка и песня кладутся ровно в ту сцену, которая их назвала. Без этого в
+       раздел возвращались только тексты и общие фото, а теги вида <Picture 20>
+       оставались без файлов - и модель рисовала их по своему вкусу. */
+    const tagNum = (txt, kind) => {
+      const m = new RegExp('<\\s*' + kind + '\\s*(\\d+)\\s*>', 'i').exec(txt || '');
+      return m ? +m[1] : 0;
+    };
+    const home = { pics: 0, auds: 0, gone: [] };
+    {
+      const cards = $$('.sc', L2.root);
+      const same = (a, b) => !!a && !!b && a.name === b.name && a.size === b.size;
+      for (const a of (AG.att || [])) {
+        if (!a || a.frame || !a.file) continue;
+        const n = tagNum(a.note, 'Picture');
+        if (n < 10) continue;                          // общие места переносит обычный перенос
+        const c = cards[Math.floor(n / 10) - 1], j = n % 10;
+        if (!c || j > 8) { home.gone.push('<Picture ' + n + '>'); continue; }
+        if ((c._files || [])[j]) continue;             // своё место занято - не затираем положенное руками
+        if (c._setOwn) c._setOwn(j, a.file); else { c._files[j] = a.file; c._paint?.(); }
+        home.pics++;
+        files = files.filter(f => !same(f, a.file));   // тот же файл не встанет ещё и на общую полку
+      }
+      for (const a of (AG.audios || [])) {
+        if (!a || !a.file) continue;
+        const n = tagNum(a.where, 'Audio');
+        if (n < 10) continue;
+        const c = cards[Math.floor(n / 10) - 1], j = n % 10;
+        if (!c || j > 2) { home.gone.push('<Audio ' + n + '>'); continue; }
+        c._auds = c._auds || []; c._audSrc = c._audSrc || []; c._audSel = c._audSel || [];
+        if (c._auds[j]) continue;
+        c._auds[j] = a.file; c._audSrc[j] = a.file; c._audSel[j] = null;
+        c._paintAuds?.(); c._paint?.(); home.auds++;
+      }
+      if (home.pics || home.auds) {
+        L2.root._save?.();
+        toast('В сцены вернулось из чата: ' + [home.pics ? 'фото ' + home.pics : '', home.auds ? 'песен ' + home.auds : ''].filter(Boolean).join(' · ')
+          + (home.gone.length ? ' · а ' + home.gone.join(', ') + ' позвало сцену, которой в ответе нет' : ''));
+      } else if (home.gone.length) {
+        toast('В чате есть ' + home.gone.join(', ') + ', но такой сцены в ответе нет - файл некуда положить');
+      }
+    }
     // the studio never receives the frames from the chat: a <Video N> in the text would point at nothing,
     // and the numbers would land on the person's photos. What the studio really has is the base frame.
     prompt = prompt.replace(/<\s*Video\s*\d+\s*>/g, '<Frame>');
@@ -12304,8 +12350,8 @@ function attachClearButtons(root) {
      The row is the one the field's buttons already use; where there are none, a row is made. */
   const list = Array.prototype.slice.call(scope.querySelectorAll ? scope.querySelectorAll('textarea') : (scope.tagName === 'TEXTAREA' ? [scope] : []));
   list.forEach(ta => {
-    // ряд аудио в лотке Агента: у него есть свой крестик, кнопка очистки только мешает
-    if (ta.dataset.noClear === '1' || ta.id === 'agAudioText' || ta.closest('.atrim') || ta.closest('.sp-menu') || ta.closest('.lm-scenes') || ta.closest('.sc') || ta.closest('.ag-comp') || ta.id === 'agIn') return;
+    // ряд аудио в лотке Агента: у каждой строки есть свой крестик, кнопка очистки только мешает
+    if (ta.dataset.noClear === '1' || ta.id === 'agAudioText' || ta.closest('#agAudioBox') || ta.closest('.atrim') || ta.closest('.sp-menu') || ta.closest('.lm-scenes') || ta.closest('.sc') || ta.closest('.ag-comp') || ta.id === 'agIn') return;
     const card = ta.closest('.card') || ta.parentElement;
     if (!card || card.querySelector('.ta-clear')) return;
     // ряд кнопок того же поля: тот, где уже лежат его собственные кнопки, а не попавшийся рядом
