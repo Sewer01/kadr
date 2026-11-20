@@ -2210,6 +2210,26 @@ window.fetch = (input, init) => {
 
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+/* Номер места обязан совпадать с числами в тексте сцены: если плитка подписана «Pic 30», а в тексте
+   стоит <Picture 20>, модель получает номер, под которым в этой сцене ничего не лежит, и картина
+   человека в расчёт не входит. Номер правится по тексту сцены, когда он никем не занят. */
+function sceneReconcile(root) {
+  const cs = $$('.sc', root);
+  const decadeOf = c => {
+    const n = [...String((($('textarea', c) || {}).value) || '').matchAll(/<(?:Picture|Audio)\s*(\d{2,})>/g)]
+      .map(m => Math.floor(+m[1] / 10) * 10);
+    return n.length ? Math.min(...n) : 0;
+  };
+  const held = new Set(cs.map(c => +c._baseFixed || 0));
+  cs.forEach(c => {
+    if (!((c._files || []).some(Boolean) || (c._auds || []).some(Boolean))) return;
+    const want = decadeOf(c);
+    if (!want || want === (+c._baseFixed || 0) || held.has(want)) return;
+    held.delete(+c._baseFixed || 0); held.add(want);
+    c._baseFixed = want; c._base = want;
+    c._paint?.(); c._paintAuds?.();
+  });
+}
 
 /* the blue part of a slider has to follow its handle, wherever that slider was built (the scene
    cards in the long mode are created later and never painted, so the fill stood still there) */
@@ -7572,7 +7592,7 @@ function makeRefMode(cfg) {
           if (lost.length) back.push('сцена ' + (i + 1) + ': ' + lost.join(', '));
           c._paint?.();
         });
-        renumber(); recount(); refreshStates(); renderTL(); showClip(); if (root._save) root._save();
+        renumber(); sceneReconcile(root); recount(); refreshStates(); renderTL(); showClip(); if (root._save) root._save();
         if (back.length) toast('Возврат из чата дописал потерянные теги: ' + back.join(' · '));
         return same.length;
       }
@@ -7585,18 +7605,67 @@ function makeRefMode(cfg) {
         sel: (c._audSel || []).slice(), dur: (c._audDur || []).slice(), fresh: !!$('.sc-fresh', c)?.checked,
         base: c._baseFixed || 0, words: (c._audWords || []).slice(), prompt: ($('textarea', c) || {}).value || "",
       }));
+      /* Файл сцены живёт под её номером места: у второй сцены десятки от 20. Когда ответов
+       приходит больше или меньше, чем карточек, место съезжает и полка остаётся пустой, хотя
+       человек ничего не выбрасывал. Поэтому файл ищем сначала по номеру, который новый текст
+       сам называет, и только потом - по совпадению мест. */
+      const wantBase = txt => {
+        const n = [...String(txt || '').matchAll(/<(?:Picture|Audio)\s*(\d{2,})>/g)].map(m => Math.floor(+m[1] / 10) * 10);
+        return n.length ? n.sort((x, y) => x - y)[0] : 0;
+      };
       $$('.sc', root).forEach(c => c.remove());
+      /* Номер места решается до того, как карточка появилась. Новый текст сам называет номер
+         своих файлов: если его позвала сцена, этот номер за ней и закрепляется, а прежняя
+         владелица получает свободный. Так подпись плитки и тег в тексте всегда одинаковы. */
+      const fresh = list.slice(0, 20);
       const used0 = new Set();
-      list.slice(0, 20).forEach((x, i) => {
-        const old = (keep[i] && keep[i].base) || 0;   // номер уносим с собой, только если его никто не занял
-        const b = old && !used0.has(old) ? old : 0;
-        used0.add(b);
-        addScene(x.prompt, Math.min(15, Math.max(3, Math.round(x.sec) || 10)),
-          x.fresh === undefined ? !!(keep[i] && keep[i].fresh) : !!x.fresh, b);
+      const baseFor = fresh.map(() => 0);
+      // очереди: сначала те, кого текст назвал сам, потом прежний номер сцены, и лишь потом свободный
+      fresh.forEach((x, i) => {
+        const called = wantBase(x.prompt);
+        if (called && !used0.has(called)) { used0.add(called); baseFor[i] = called; }
       });
+      fresh.forEach((x, i) => {
+        if (baseFor[i]) return;
+        const mine = (keep[i] && keep[i].base) || 0;
+        if (mine && !used0.has(mine)) { used0.add(mine); baseFor[i] = mine; }
+      });
+      let free0 = 10;
+      const alloc = () => { while (used0.has(free0)) free0 += 10; const v = free0; free0 += 10; return v; };
+      fresh.forEach((x, i) => { if (!baseFor[i]) baseFor[i] = alloc(); });
+      fresh.forEach((x, i) => addScene(x.prompt, Math.min(15, Math.max(3, Math.round(x.sec) || 10)),
+        x.fresh === undefined ? !!(keep[i] && keep[i].fresh) : !!x.fresh, baseFor[i]));
       let back = 0; const lostBack = [];
-      $$('.sc', root).forEach((c, i) => {
-        const k = keep[i]; if (!k) return;
+      /* Перенос в два прохода. Сначала каждая сцена забирает файлы того номера места, который
+         назван в её новом тексте: так фото и песня едут вместе со своим тегом, даже если сцены
+         в ответе встали в другом порядке. Только то, что никто не позвал, достаётся по месту.
+         одним проходом те же файлы оказывались в двух сценах сразу. */
+      const cards = $$('.sc', root);
+      const called0 = new Array(keep.length).fill(false);
+      const take = new Array(cards.length).fill(null);
+      cards.forEach((c, i) => {
+        const want = wantBase((list[i] && list[i].prompt) || '');
+        if (!want) return;
+        const j = keep.findIndex((k0, n) => !called0[n] && k0.base === want);
+        if (j < 0) return;
+        called0[j] = true; take[i] = keep[j];   // файлы едут к той сцене, которая их позвала
+      });
+      cards.forEach((c, i) => { if (!take[i] && keep[i] && !called0[i]) take[i] = keep[i]; });
+      /* Сцен убрали больше, чем карточек осталось: снимок с файлами некому достался. Молча
+         выбросить то, что человек принёс, - худший из исходов, поэтому бесхозные файлы
+         уходят первой пустой сцене, а её текст пополняется их номерами. */
+      keep.forEach((k0, j) => {
+        if (called0[j] || !(k0.files.some(Boolean) || k0.auds.some(Boolean))) return;
+        const empty = n => cards[n] && !(cards[n]._files || []).some(Boolean) && !(cards[n]._auds || []).some(Boolean)
+          && !(take[n] && (take[n].files || []).some(Boolean) || take[n] && (take[n].auds || []).some(Boolean));
+        const i = take.findIndex(empty);
+        if (i < 0) return;
+        called0[j] = true; take[i] = k0;   // снимок без файлов уступает место снимку с файлами
+        if (k0.base && !cards[i]._baseFixed) { cards[i]._baseFixed = k0.base; cards[i]._base = k0.base; }
+      });
+      cards.forEach((c, i) => {
+        const k = take[i];
+        if (!k) return;
         /* The rewritten text often forgets the media tags of the scene it came from: the agent
            answers beautifully and the song or the object disappears with the tag. Tags the draft
            carried and the answer dropped are put back - the files are still on the shelves, so a
@@ -7617,7 +7686,7 @@ function makeRefMode(cfg) {
         }
       });
       root._sel = 0;
-      renumber();   // номера мест в новом списке не должны спорить друг с другом
+      renumber(); sceneReconcile(root);   // номера мест не спорят друг с другом и согласуются с текстом
       root._run = Math.random().toString(36).slice(2, 12); recount(); refreshStates();
       if (lostBack.length) toast('Возврат из чата дописал потерянные теги: ' + lostBack.join(' · '));
       return back;
@@ -7852,7 +7921,7 @@ function makeRefMode(cfg) {
       root._loop = p.loop !== false; setSnd(p.snd || 'none'); $('.lm-start', root).value = p.start || '0'; $('.lm-vocals', root).checked = !!p.vocals;
       $$('.sc', root).forEach(c => c.remove());
       for (const x of p.scenes) addScene(x.prompt, x.sec, !!x.fresh, x.base || 0);
-      renumber();   // в проекте номер места не хранится: его надо поделить заново
+      renumber(); sceneReconcile(root);   // в проекте номер места не хранится: его надо поделить заново
       $$('.sc', root).forEach((c, i) => { c._var = (p.scenes[i] || {}).var || 0; });
       root._sel = 0;
       const cards = $$('.sc', root);
@@ -8796,7 +8865,7 @@ function makeRefMode(cfg) {
         u.scenes.forEach(x => { addScene(x.prompt, x.sec, x.fresh, x.base || 0); const c = $$('.sc', root).pop(); c._files = x.files; c._paint(); c._dn = x.dn; c._old = x.old; c._tests = x.tests; c._paintTests(); c._var = x.var; });
         const names = a => JSON.stringify(a.map(f => f && f.name));
         if (names(refsFiles()) !== names(u.refs)) { $$('.ref .x', imgsEl).forEach(x => x.click()); for (let i = 0; i < u.refs.length; i++) if (u.refs[i]) await putInto($$('.ref input', imgsEl)[i], u.refs[i]); }
-        root._sel = u.sel; renumber(); recount(); refreshStates(); toast('Действие отменено');
+        root._sel = u.sel; renumber(); sceneReconcile(root); recount(); refreshStates(); toast('Действие отменено');
       };
       document.addEventListener('keydown', e => { if ((e.ctrlKey || e.metaKey) && !e.shiftKey && String(e.key).toLowerCase() === 'z' && $('#view-long.active') && !e.target.closest('textarea, input') && root._undo.length) { e.preventDefault(); root._doUndo(); } });
       /* One scene, then all of them: the button that empties a single scene stands first, right
@@ -9705,7 +9774,20 @@ function renderAtt() {
      the text really uses; the note of the section says which one that is. */
   const ownTag = a => { const m = /<\s*(Picture|Video|Audio)\s*(\d+)\s*>/i.exec((a && a.note) || ''); return m ? m[1] + ' ' + m[2] : ''; };
   // the number a picture answers to: the section wrote it into the text, the tray must not invent its own
-  const lab = AG.att.map(a => { if (a.frame) return ''; const own = ownTag(a); if (own) return own; k++; return 'Picture ' + (base + k); });
+  /* Придуманный номер не должен совпадать с тем, что уже написан на другой плитке: картинка,
+     пришедшая из сцены, приносит свой номер (у сцены он десятичный), и рядом вставала плитка
+     с таким же числом - человек видел две «Picture 3» и не понимал, какая настоящая. */
+  const taken = new Set();
+  AG.att.forEach(a => { const m = (ownTag(a).match(/\d+/) || [])[0]; if (m) taken.add(+m); });
+  const lab = AG.att.map(a => {
+    if (a.frame) return '';
+    const own = ownTag(a);
+    if (own) return own;
+    let n = base + (++k);
+    while (taken.has(n)) n++;   // свободное число: плиток больше, чем мест, не бывает, но бережёмся
+    taken.add(n);
+    return 'Picture ' + n;
+  });
   $('#agAtt').innerHTML = AG.att.map((a, i) => a.frame
     ? `<div data-tag="&lt;${ownTag(a) || 'Video ' + (vnames.indexOf(a.vname) + 1)}&gt;" title="Кадр из видео «${esc(a.vname)}» · нажмите, чтобы вставить тег"><img src="${a.url}"><b style="background:#3a5a8c">🎞 ${esc(a.label)}</b><button data-i="${i}">✕</button></div>`
       : `<div data-tag="&lt;${lab[i]}&gt;" title="${a.note ? esc(a.note) + ' · ' : ''}нажмите, чтобы вставить тег"><img src="${a.url}"><b>${lab[i]}</b><button data-i="${i}">✕</button></div>`).join('');
@@ -12222,7 +12304,8 @@ function attachClearButtons(root) {
      The row is the one the field's buttons already use; where there are none, a row is made. */
   const list = Array.prototype.slice.call(scope.querySelectorAll ? scope.querySelectorAll('textarea') : (scope.tagName === 'TEXTAREA' ? [scope] : []));
   list.forEach(ta => {
-    if (ta.dataset.noClear === '1' || ta.closest('.atrim') || ta.closest('.sp-menu') || ta.closest('.lm-scenes') || ta.closest('.sc') || ta.closest('.ag-comp') || ta.id === 'agIn') return;
+    // ряд аудио в лотке Агента: у него есть свой крестик, кнопка очистки только мешает
+    if (ta.dataset.noClear === '1' || ta.id === 'agAudioText' || ta.closest('.atrim') || ta.closest('.sp-menu') || ta.closest('.lm-scenes') || ta.closest('.sc') || ta.closest('.ag-comp') || ta.id === 'agIn') return;
     const card = ta.closest('.card') || ta.parentElement;
     if (!card || card.querySelector('.ta-clear')) return;
     // ряд кнопок того же поля: тот, где уже лежат его собственные кнопки, а не попавшийся рядом
