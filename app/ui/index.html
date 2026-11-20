@@ -10223,9 +10223,16 @@ async function setChatAudio(wavBlob, name, dur, where) {
     at = AG.audios.indexOf(keep);
   }
   if (at < 0) at = AG.audios.findIndex(x => x.name === name && Math.abs((x.dur || 0) - dur) < .1 && (x.where || '') === (where || ''));
-  const a = { name, dur, where: where || '', text: '', busy: true, lang: '', langName: '', file, key };
+  /* Кусок с той же подписью уже был услышан: слова переносим, а не слушаем заново -
+     каждое новое распознавание может вернуть другую строку, и человек видел, как
+     та же песня поёт по-разному. Заново слушаем только действительно другой звук. */
+  const prev = at >= 0 ? AG.audios[at] : null;
+  const sameAudio = !!(prev && prev.key === key && (prev.text || '').trim());
+  const a = { name, dur, where: where || '', text: sameAudio ? String(prev.text).trim() : '', busy: !sameAudio,
+    lang: sameAudio ? (prev.lang || '') : '', langName: sameAudio ? (prev.langName || '') : '', file, key };
   if (at >= 0) AG.audios.splice(at, 1, a); else AG.audios.push(a);
   showAudioBox();
+  if (sameAudio) return true;
   try { const j = await transcribeWav(wavBlob); a.text = j.text; a.lang = j.lang; a.langName = j.lang_name; }
   catch (e) { toast(e.message); }
   a.busy = false; showAudioBox();
@@ -10386,7 +10393,13 @@ function agWords(f, sceneNo) {
   /* Опознать кусок по имени нельзя: два разных куска одной песни носят одно имя, и
      сцена получала слова соседней сцены - в промпте две сцены пели одну строку.
      Сначала точная подпись байтов, потом длительность; по одному имени больше никогда. */
-  const mine = a => { const wh = a.where || ''; return !wh.trim() || new RegExp('сцен\\w*\\s*' + sceneNo + '(?![0-9])').test(wh); };
+  const mine = a => {
+    const wh = a.where || '';
+    // подпись без номера сцены - это общее аудио ролика: его слова подходят любой сцене,
+    // которая этим звуком пользуется; чужую сцену подменять нельзя
+    if (!wh.trim() || !/сцен\w*\s*\d/.test(wh)) return true;
+    return new RegExp('сцен\\w*\\s*' + sceneNo + '(?![0-9])').test(wh);
+  };
   const hit = (f.__key ? list.find(a => a.key === f.__key && a.text) : null)
     || list.find(a => a.name === f.name && Math.abs((a.dur || 0) - (f._dur || 0)) < .2 && a.text && mine(a))
     || null;
@@ -10747,7 +10760,10 @@ async function sendPrompt(blk, to) {
         let j = (n % 10 <= 2 && !c._auds[n % 10]) ? n % 10 : [0, 1, 2].findIndex(k => !c._auds[k]);
         if (j < 0) { home.gone.push('<Audio ' + n + '> - в сцене нет свободного места для песни'); continue; }
         c._auds[j] = a.file; c._audSrc[j] = a.file; c._audSel[j] = null; if (!a.file.__key) window.audioKey(a.file);
-        c._paintAuds?.(); c._paint?.(); home.auds++;
+        c._audWords = c._audWords || [];
+        // слова уже услышаны в агенте: переносим их в карточку сцены, а не слушаем заново
+        if ((a.text || '').trim() && !(c._audWords[j] || '').trim()) c._audWords[j] = String(a.text).trim();
+        c._paintAuds?.(); c._paintWords?.(); c._paint?.(); home.auds++;
         home.where.push('<Audio ' + n + '> → сцена ' + Math.floor(n / 10) + ' · ' + a.file.name);
       }
       const now = home.pics + home.auds;
