@@ -179,6 +179,9 @@ class App:
         self._relay_at = 0.0
         self.token = uuid.uuid4().hex   # the key of this session: only our own window may ask the server to act
         self._index = None              # index.html with that key in it
+        self._gpu_last = None           # последние показания видеокарты: опрашивать её каждый кадр дорого
+        self._gpu_at = 0.0
+        self._index_at = 0.0            # when that file was read: a fresh page must not need a restart
         self.process = None  # engine.ComfyProcess in managed mode
         self._bg = set()  # background tasks (kept so they are not garbage collected)
         self.installer = None
@@ -803,6 +806,32 @@ class App:
         except Exception as e:
             self.note_error(f"Не удалось вписать в файл, как он сделан: {e}")
             return False
+
+    async def h_gpu(self, _req):
+        """Живые показания видеокарты: загрузка, температура, питание. Нужны, чтобы сказать
+        человеку не просто «работает», а почему работа идёт медленнее обычного."""
+        now = time.time()
+        if self._gpu_at and now - self._gpu_at < 2.0 and self._gpu_last is not None:
+            return web.json_response(self._gpu_last)
+        try:
+            g = await asyncio.to_thread(self.monitor.gpu) or {}
+        except Exception as e:
+            return web.json_response({"error": str(e)[:120]})
+        self._gpu_last, self._gpu_at = g, now
+        return web.json_response(g)
+
+    async def h_forecast(self, req):
+        """Сколько такая работа обычно идёт на этой машине. Отвечаем только когда прогонов было
+        достаточно: выдуманное число хуже молчания."""
+        mode = (req.query.get("mode") or "").strip()
+        try:
+            sec = float(req.query.get("sec") or 0)
+        except ValueError:
+            sec = 0
+        e = forecast.estimate(TIMINGS, mode, quality=(req.query.get("q") or "").strip(), sec=sec) or {}
+        if e.get("secs", 0) < 20 or e.get("samples", 0) < 2:
+            return web.json_response({"secs": 0, "samples": e.get("samples", 0)})
+        return web.json_response(e)
 
     async def h_gate_off(self, _req):
         """Человек сам решает, пробовать ли при нехватке памяти. Согласие живёт три минуты и
@@ -4418,10 +4447,24 @@ class App:
         return web.json_response({"ok": await asyncio.to_thread(self.focus_own_window)})
 
     async def h_index(self, _req):
-        """The interface, with the key of this session inside it."""
-        if self._index is None:
-            html = (UI_DIR / "index.html").read_text(encoding="utf-8")
-            self._index = html.replace("</head>", f'<script>window.__H3_TOKEN="{self.token}";</script></head>', 1)
+        """The interface, with the key of this session inside it.
+
+        The page is kept in memory only as long as the file on disk does not change: while the
+        person's window stays open, a fixed interface arrives on the next reload, not after a
+        restart. A page that cannot be read (mid-copy, locked) leaves the good one in place."""
+        f = UI_DIR / "index.html"
+        try:
+            stamp = f.stat().st_mtime
+        except OSError:
+            stamp = 0.0
+        if self._index is None or stamp != self._index_at:
+            try:
+                html = f.read_text(encoding="utf-8")
+            except OSError:
+                html = ""
+            if html:
+                self._index = html.replace("</head>", f'<script>window.__H3_TOKEN="{self.token}";</script></head>', 1)
+                self._index_at = stamp
         return web.Response(text=self._index, content_type="text/html",
                             headers={"Cache-Control": "no-store",
                                      "Set-Cookie": f"h3token={self.token}; Path=/; SameSite=Lax"})
@@ -4756,6 +4799,8 @@ def build_app(comfy_override=None):
         web.post("/api/agent/ctx", state.h_agent_ctx),
         web.post("/api/agent/spell", state.h_agent_spell),
         web.post("/api/mp4tag", state.h_mp4tag),
+        web.get("/api/gpu", state.h_gpu),
+        web.get("/api/forecast", state.h_forecast),
         web.post("/api/gate/off", state.h_gate_off),
         web.post("/api/speech/transcribe", state.h_transcribe),
         web.post("/api/speech/folder", state.h_speech_folder),

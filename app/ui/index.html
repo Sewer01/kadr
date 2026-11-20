@@ -2995,7 +2995,7 @@ function paramsCard(el, st, opts) {
     const r = e.target.closest('.seg button[data-r]'); if (r) { st.refSize = r.dataset.r; upd(); }
     const sf = e.target.closest('.seed-seg button'); if (sf) { st.seedFixed = sf.dataset.sf === '1'; if (st.seedFixed && !st.seed) st.seed = newSeed(); upd(); }
     if (e.target.closest('.seed-new')) { st.seed = newSeed(); upd(); }
-    if (e.target.closest('.seed-copy')) { navigator.clipboard?.writeText(String(st.seed || '')); toast('Seed скопирован: ' + st.seed); }
+    if (e.target.closest('.seed-copy')) { copyText(String(st.seed || ''), 'Seed скопирован: ' + st.seed); }
   });
   const cwApply = () => {
     const iw = $('.cw-w', el), ih = $('.cw-h', el), hint = $('.cw-hint', el);
@@ -5194,9 +5194,60 @@ async function postJSON(url, body) {
   if (!r.ok) throw new Error(j.error || r.statusText);
   return j;
 }
+/* У FreeVideo в результатах работы отдельной строчкой пишут «карту держит другая программа» и
+   «перегрев ограничил скорость». Мы говорим то же самое прямо в очереди, пока идёт расчёт:
+   так человек видит, что тормозит не модель, а что-то рядом с ней. */
+let GPU_LIVE = null, GPU_AT = 0;
+async function gpuPoll() {
+  if (typeof QUEUE === 'undefined' || !QUEUE.some(j => j.state === 'running')) { GPU_LIVE = null; return; }
+  const now = performance.now();
+  if (now - GPU_AT < 6000) return;
+  GPU_AT = now;
+  try { GPU_LIVE = await (await fetch('/api/gpu')).json(); } catch (e) { GPU_LIVE = null; }
+}
+setInterval(() => { try { gpuPoll(); } catch (e) { } }, 6000);
+function gpuNote(j) {
+  const g = GPU_LIVE;
+  if (!g || g.util == null || !j || !/^sample/.test(String(j.stage || ''))) return '';
+  if (g.util <= 25) return ' · карта загружена на ' + Math.round(g.util) + '%: её, похоже, держит другая программа';
+  if (g.power_limit && g.power >= g.power_limit * 0.93) return ' · карта упёрлась в лимит питания (' + Math.round(g.power) + ' Вт)';
+  if (g.temp >= 83) return ' · карта нагрета до ' + Math.round(g.temp) + '°: скорость ограничена';
+  return '';
+}
+
 /* Программа помнит, при скольком свободном месте видеопамяти этот режим уже прерывался. Если
    сейчас меньше, пуск останавливается и спрашивает: возможно, память держит браузер или игра.
    Согласие рискнуть действует три минуты - на эту попытку, а не навсегда. */
+/* Буфер обмена браузер доверяет только активному окну: стоит человеку кликнуть мимо, и
+   navigator.clipboard отказывает. Тогда текст кладём в скрытое поле и копируем по-старому -
+   этот способ работает, пока клик настоящий. */
+function copyText(text, okMsg) {
+  const s = String(text == null ? '' : text);
+  const viaArea = () => {
+    const ta = document.createElement('textarea');
+    ta.value = s;
+    ta.setAttribute('readonly', '');
+    ta.style.cssText = 'position:fixed;left:-1200px;top:0;opacity:0';
+    document.body.append(ta);
+    ta.select();
+    ta.setSelectionRange(0, s.length);
+    let done = false;
+    try { done = document.execCommand('copy'); } catch (e) { done = false; }
+    ta.remove();
+    return done;
+  };
+  const fail = () => { if (s.length <= 90) toast(s); else toast('Не удалось скопировать: окно не активно'); };
+  if (!s) { toast('Копировать нечего'); return Promise.resolve(false); }
+  const nav = navigator.clipboard && navigator.clipboard.writeText ? navigator.clipboard.writeText(s) : null;
+  if (nav && nav.then) {
+    return nav.then(() => { if (okMsg) toast(okMsg); return true; },
+                    () => { const ok = viaArea(); if (ok) { if (okMsg) toast(okMsg); } else { fail(); } return ok; });
+  }
+  const ok = viaArea();
+  if (ok) { if (okMsg) toast(okMsg); } else { fail(); }
+  return Promise.resolve(ok);
+}
+
 function lowMemoryAsk(text, retry) {
   confirmBox('Видеопамяти может не хватить', (text || '') + ' Можно рискнуть: если память кончится, работа остановится и скажет об этом прямо.',
     'Всё равно начать', async () => { try { await postJSON('/api/gate/off', {}); } catch (e) { } retry(); });
@@ -5230,7 +5281,7 @@ document.addEventListener('change', async e => {
   if (t.prompt) {
     const cp = document.createElement('button');
     cp.className = 'btn mini'; cp.type = 'button'; cp.textContent = 'Скопировать промпт';
-    cp.onclick = () => { const p = navigator.clipboard && navigator.clipboard.writeText(t.prompt); p && p.then ? p.then(() => toast('Промпт скопирован'), () => toast('Не вышло скопировать')) : toast('Буфер обмена недоступен'); };
+    cp.onclick = () => { copyText(t.prompt, 'Промпт скопирован'); };
     line.append(cp);
   }
   const host = inp.closest('.lm-srcpick') || inp.closest('.row') || (inp.closest('label') || {}).parentElement;
@@ -5495,7 +5546,7 @@ function attachRu(ta, gen) {
       const r = await postJSON('/api/agent/translate', { text });
       out._t = r.text || '';
       out.innerHTML = '<div class="ru-h"><b>По-русски (только для чтения):</b><button class="btn" type="button" data-cp style="padding:3px 10px;font-size:12px">Копировать русский</button></div>' + esc(out._t).replace(/\n/g, '<br>');
-      $('[data-cp]', out).onclick = () => { navigator.clipboard?.writeText(out._t); toast('Русский текст скопирован'); };
+      $('[data-cp]', out).onclick = () => { copyText(out._t, 'Русский текст скопирован'); };
       out.hidden = false; btn.textContent = 'Скрыть перевод';
     } catch (e) { toast(e.message); btn.textContent = 'Показать по-русски'; }
     btn.disabled = false;
@@ -6031,7 +6082,7 @@ async function loadNodes() {
 $('#mdNodesRe').onclick = loadNodes;
 $('#mdNodes').addEventListener('click', e => {
   const b = e.target.closest('[data-copyurl]'); if (!b) return;
-  navigator.clipboard?.writeText(b.dataset.copyurl).then(() => toast('Ссылка скопирована'), () => toast(b.dataset.copyurl));
+  copyText(b.dataset.copyurl, 'Ссылка скопирована');
 });
 function firstRun(on) { document.body.classList.toggle('first-run', !!on); }
 let SET_LOCK = false;
@@ -6223,6 +6274,7 @@ function qRender() {
                                 : ` · по прошлым запускам ~${fmtTime(j.eta)}, сейчас дольше обычного`)
                 : ` · по прошлым запускам ~${fmtTime(j.eta)}`;
     }
+    if (run) st += gpuNote(j);   // почему идёт медленнее, если видеокарта занята не нашей работой
     const cls = j.state === 'done' ? ' ok' : j.state === 'error' ? ' err' : run ? ' run' : '';
     if (j.stopping && act.includes(j)) st = 'останавливаем… ComfyUI заканчивает текущий шаг, это может занять несколько секунд';
     const btn = act.includes(j) ? (j.stopping ? `<button class="btn" disabled>Останавливаем…</button>` : `<button class="btn" data-q="stop" data-id="${j.id}">${run ? 'Остановить' : 'Убрать'}</button>`)
@@ -6331,8 +6383,13 @@ async function saveItemsNow(items) {
   toast(items.length === 1 ? `Сохранение ${fileName(items[0])} — здесь откроется окно выбора папки` : `Сохранение ${items.length} видео — здесь откроется окно выбора папки`);
 }
 function askDelete(ids) {
-  $('#cfTitle').textContent = ids.length === 1 ? 'Удалить видео?' : `Удалить ${ids.length} видео?`;
-  $('#cfText').textContent = 'Файлы переместятся в корзину Windows — их можно будет восстановить.';
+  // в списке лежат не только видео: слово должно соответствовать тому, что человек открыл
+  const one = ids.length === 1 ? (LIB.find(x => x.id === ids[0]) || {}) : {};
+  const what = one.kind === 'image' ? 'картинку' : one.kind === 'audio' ? 'звук' : 'видео';
+  $('#cfTitle').textContent = ids.length === 1 ? `Удалить ${what}?` : `Удалить файлов: ${ids.length}?`;
+  $('#cfText').textContent = ids.length === 1
+    ? 'Файл переместится в корзину Windows — его можно будет восстановить.'
+    : 'Файлы переместятся в корзину Windows — их можно будет восстановить.';
   $('#confirm').hidden = false;
   $('#cfOk').onclick = async () => {
     if ($('#cfOk')._busy) return;   // one click is enough: while it works, the second does nothing
@@ -6388,10 +6445,11 @@ function openViewer(id, fallback) {
       : `<span>${k}</span><b>${v}</b>`).join('');
   $('#vwKv').onclick = e => {
     const b = e.target.closest('.vw-file'); if (!b) return;
-    navigator.clipboard?.writeText(b.dataset.file).then(() => toast('Имя файла скопировано'), () => toast(b.dataset.file));
+    copyText(b.dataset.file, 'Имя файла скопировано');
   };
   $('#vwPrompt').textContent = it.prompt || 'без промпта';
   $('#vwFav').textContent = it.fav ? '★ В избранном' : 'В избранное';
+  $('#vwZoom').hidden = !(it.kind === 'image' && it.url);   // при открытом сравнении она не нужна
   $('#vwSeed').hidden = it.seed == null;
   $('#vwContinue').hidden = pic || !it.url || !!it.missing;
   $('#vwUp').hidden = it.mode === 'upscale' || it.mode === 'custom' || !it.url || !!it.missing;
@@ -6501,7 +6559,7 @@ $('#vwDel').onclick = () => { if (openId) askDelete([openId]); };   // the windo
 $('#vwCopy').onclick = () => {
   const t = ((byId(openId) || openItem) || {}).prompt || '';
   if (!t) { toast('У этого файла нет промпта'); return; }
-  navigator.clipboard?.writeText(t).then(() => toast('Промпт скопирован'), () => toast('Не удалось скопировать'));
+  copyText(t, 'Промпт скопирован');
 };
 $('#vwZoom').onclick = () => { const it = (byId(openId) || openItem); if (it && it.url) zoomOpen(it.url); };
 $('#vwImg').onclick = () => { const it = (byId(openId) || openItem); if (it && it.kind === 'image' && it.url) zoomOpen(it.url); };
@@ -7514,7 +7572,7 @@ function makeRefMode(cfg) {
           if (lost.length) back.push('сцена ' + (i + 1) + ': ' + lost.join(', '));
           c._paint?.();
         });
-        recount(); refreshStates(); renderTL(); showClip(); if (root._save) root._save();
+        renumber(); recount(); refreshStates(); renderTL(); showClip(); if (root._save) root._save();
         if (back.length) toast('Возврат из чата дописал потерянные теги: ' + back.join(' · '));
         return same.length;
       }
@@ -7528,8 +7586,14 @@ function makeRefMode(cfg) {
         base: c._baseFixed || 0, words: (c._audWords || []).slice(), prompt: ($('textarea', c) || {}).value || "",
       }));
       $$('.sc', root).forEach(c => c.remove());
-      list.slice(0, 20).forEach((x, i) => addScene(x.prompt, Math.min(15, Math.max(3, Math.round(x.sec) || 10)),
-        x.fresh === undefined ? !!(keep[i] && keep[i].fresh) : !!x.fresh, (keep[i] && keep[i].base) || 0));
+      const used0 = new Set();
+      list.slice(0, 20).forEach((x, i) => {
+        const old = (keep[i] && keep[i].base) || 0;   // номер уносим с собой, только если его никто не занял
+        const b = old && !used0.has(old) ? old : 0;
+        used0.add(b);
+        addScene(x.prompt, Math.min(15, Math.max(3, Math.round(x.sec) || 10)),
+          x.fresh === undefined ? !!(keep[i] && keep[i].fresh) : !!x.fresh, b);
+      });
       let back = 0; const lostBack = [];
       $$('.sc', root).forEach((c, i) => {
         const k = keep[i]; if (!k) return;
@@ -7553,6 +7617,7 @@ function makeRefMode(cfg) {
         }
       });
       root._sel = 0;
+      renumber();   // номера мест в новом списке не должны спорить друг с другом
       root._run = Math.random().toString(36).slice(2, 12); recount(); refreshStates();
       if (lostBack.length) toast('Возврат из чата дописал потерянные теги: ' + lostBack.join(' · '));
       return back;
@@ -7787,6 +7852,7 @@ function makeRefMode(cfg) {
       root._loop = p.loop !== false; setSnd(p.snd || 'none'); $('.lm-start', root).value = p.start || '0'; $('.lm-vocals', root).checked = !!p.vocals;
       $$('.sc', root).forEach(c => c.remove());
       for (const x of p.scenes) addScene(x.prompt, x.sec, !!x.fresh, x.base || 0);
+      renumber();   // в проекте номер места не хранится: его надо поделить заново
       $$('.sc', root).forEach((c, i) => { c._var = (p.scenes[i] || {}).var || 0; });
       root._sel = 0;
       const cards = $$('.sc', root);
@@ -7868,6 +7934,19 @@ function makeRefMode(cfg) {
       return k;
     };
     const nextBase = () => { let b = 10; $$('.sc', root).forEach(x => { const v = +x._baseFixed || 0; if (v >= b) b = v + 10; }); return b; };
+    /* Две сцены с одним номером места тянут одни и те же фото: чипы гаснут, теги в тексте указывают
+       не туда, и человеку кажется, что картина и песня «не загрузились». Номера сверяются по порядку
+       после всякой пересборки списка и после открытия проекта. */
+    const renumber = () => {
+      const taken = new Set();
+      $$('.sc', root).forEach(c => {
+        let b = +c._baseFixed || 0;
+        if (!b || taken.has(b)) { b = nextBase(); c._baseFixed = b; }
+        taken.add(b); c._base = b;
+        c._paint?.(); c._paintAuds?.();
+      });
+      return taken.size;
+    };
     const addScene = (txt = '', sec = 10, fresh = false, base = 0) => {
       const c = document.createElement('div'); c.className = 'sc'; c._dn = { draft: null, final: null };
       Object.defineProperty(c, '_done', { get: () => c._dn[root._q || 'final'], set: v => { c._dn[root._q || 'final'] = v; }, configurable: true });
@@ -7906,6 +7985,7 @@ function makeRefMode(cfg) {
       $('.sc-tbtn', c).onclick = () => { root._test = { q: $('.sc-tq', c).value }; root._chainPart = null; root._target = $$('.sc', root).indexOf(c); $('.go', $('.rm-preview', root)).click(); };
       c._files = new Array(9).fill(null);   // nine places of their own, an empty one keeps its number
       c._baseFixed = +base > 0 ? +base : (guessBase(txt) || nextBase());
+      c._base = c._baseFixed;   // ряд аудио и счётчик мест читают номер до первой отрисовки
       const ownBase = () => c._baseFixed || (c._baseFixed = nextBase());   // the scene's own decade, not its place
       const paintRefs = c._paint = () => {
         const bsHere = ownBase();   // номер места: в первой сцене 10-е, во второй 20-е; подпись плитки обязана
@@ -7965,7 +8045,7 @@ function makeRefMode(cfg) {
             mount: host, limit: 15, agentTarget: cfg.mode,
             whereLabel: q => {                    // in this scope the scenes hang off root, not off R
               const all = $$('.sc', root), at = all.indexOf(c);
-              const bs = c._base || 10 * ((at < 0 ? all.length : at) + 1);
+              const bs = c._baseFixed || c._base || 10 * ((at < 0 ? all.length : at) + 1);
               return 'сцена ' + (at < 0 ? '?' : at + 1) + ', аудио ' + (q._slot + 1) + ', тег <Audio ' + (bs + q._slot) + '>';
             },
             onFile: f => {
@@ -8062,7 +8142,7 @@ function makeRefMode(cfg) {
         row.innerHTML = '<button class="btn mini" type="button" data-a="add"' + (full ? ' disabled' : '') +
           ' title="Аудио отдельной сцены: до трёх файлов. Модель получает их как ссылки и применяет там, где вы упомянули файл тегом в тексте сцены; не упомянули - звук делает сама. Обрезать можно до 15 секунд.">Загрузить аудио сцены</button>' +
           '<span class="counter" title="Аудио в этой сцене: не больше трёх">' + c._auds.filter(Boolean).length + ' / 3</span>' +
-          c._auds.map((f, j) => f ? `<span class="token" style="display:inline-flex;gap:6px;align-items:center">&lt;Audio ${(c._base || 10) + j}&gt; ${esc2(f.name.slice(0, 18))}${c._audSel[j] ? ' <small style="opacity:.75">с ' + c._audSel[j].start.toFixed(1).replace('.', ',') + ' по ' + c._audSel[j].end.toFixed(1).replace('.', ',') + ' с</small>' : ''} <button class="btn mini" type="button" data-a="trim" data-j="${j}" title="Послушать и обрезать: прибор под строкой">Обрезать</button><button class="btn mini" type="button" data-a="del" data-j="${j}" title="Убрать этот файл из сцены">×</button></span>` : '').join('') +
+          c._auds.map((f, j) => f ? `<span class="token" style="display:inline-flex;gap:6px;align-items:center">&lt;Audio ${(c._baseFixed || c._base || 10) + j}&gt; ${esc2(f.name.slice(0, 18))}${c._audSel[j] ? ' <small style="opacity:.75">с ' + c._audSel[j].start.toFixed(1).replace('.', ',') + ' по ' + c._audSel[j].end.toFixed(1).replace('.', ',') + ' с</small>' : ''} <button class="btn mini" type="button" data-a="trim" data-j="${j}" title="Послушать и обрезать: прибор под строкой">Обрезать</button><button class="btn mini" type="button" data-a="del" data-j="${j}" title="Убрать этот файл из сцены">×</button></span>` : '').join('') +
           (full ? '<span class="hint" style="font-size:12px">три аудио в сцене - максимум</span>' : '');
         c._paintWords && c._paintWords();
       };
@@ -8075,7 +8155,7 @@ function makeRefMode(cfg) {
         if (j < 0) { toast('Больше трёх аудио в одной сцене нельзя'); return; }
         c._auds[j] = f; c._audSrc[j] = f; c._audSel[j] = null; if (c._audDur) c._audDur[j] = null; c._paintAuds(); paintRefs();
         if (root._save) root._save();
-        toast('Аудио <Audio ' + ((c._base || 10) + j) + '> в сцене: ' + f.name + ' - при желании обрежьте (до 15 с)');
+        toast('Аудио <Audio ' + ((c._baseFixed || c._base || 10) + j) + '> в сцене: ' + f.name + ' - при желании обрежьте (до 15 с)');
       };
       if (!$('.sc-auds', c)) {
         $('textarea', c).insertAdjacentHTML('afterend', '<div class="sc-auds" style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:6px"></div><div class="sc-trimhost" hidden style="margin-top:8px"></div>');
@@ -8110,7 +8190,7 @@ function makeRefMode(cfg) {
         const used = new Set();
         ($('textarea', c).value.match(/<\s*Picture\s*(\d+)\s*>/g) || []).forEach(x => {
           const k = +x.replace(/\D+/g, '');
-          const bs0 = c._base || 10;
+          const bs0 = c._baseFixed || c._base || 10;
           if (k < 10 ? !!places[k - 1] : (k >= bs0 && k < bs0 + 10 && !!ownPlaces[k - bs0])) used.add(k);   // свои номера - своя декада
         });
         c._used = used; c._cap = cap; c._frame = frame;
@@ -8130,7 +8210,7 @@ function makeRefMode(cfg) {
           if (b.dataset.audio) { b.disabled = false; b.style.opacity = ''; b.style.cursor = ''; return; }   // the audio tag is not one of the nine places
           const k = +(b.textContent.match(/\d+/) || [0])[0];
           if (!b.dataset.otitle) b.dataset.otitle = b.title;
-          const bs1 = c._base || 10;
+          const bs1 = c._baseFixed || c._base || 10;
           const filled = k < 10 ? !!places[k - 1] : (k >= bs1 && k < bs1 + 10 ? !!ownPlaces[k - bs1] : false);
           const free = filled && (used.has(k) || left > 0);   // a place without a picture never wakes up
           b.disabled = !free;
@@ -8716,7 +8796,7 @@ function makeRefMode(cfg) {
         u.scenes.forEach(x => { addScene(x.prompt, x.sec, x.fresh, x.base || 0); const c = $$('.sc', root).pop(); c._files = x.files; c._paint(); c._dn = x.dn; c._old = x.old; c._tests = x.tests; c._paintTests(); c._var = x.var; });
         const names = a => JSON.stringify(a.map(f => f && f.name));
         if (names(refsFiles()) !== names(u.refs)) { $$('.ref .x', imgsEl).forEach(x => x.click()); for (let i = 0; i < u.refs.length; i++) if (u.refs[i]) await putInto($$('.ref input', imgsEl)[i], u.refs[i]); }
-        root._sel = u.sel; recount(); refreshStates(); toast('Действие отменено');
+        root._sel = u.sel; renumber(); recount(); refreshStates(); toast('Действие отменено');
       };
       document.addEventListener('keydown', e => { if ((e.ctrlKey || e.metaKey) && !e.shiftKey && String(e.key).toLowerCase() === 'z' && $('#view-long.active') && !e.target.closest('textarea, input') && root._undo.length) { e.preventDefault(); root._doUndo(); } });
       /* One scene, then all of them: the button that empties a single scene stands first, right
@@ -10486,8 +10566,8 @@ document.addEventListener('contextmenu', e => {
   }, 'всем текстом');
   const sep = document.createElement('i'); sep.className = 'sp-sep'; menu.append(sep);
   const sel = () => ta.value.slice(ta.selectionStart, ta.selectionEnd);
-  spItem(menu, 'Вырезать', () => { const t = sel(); if (t) { navigator.clipboard?.writeText(t); ta.setRangeText('', ta.selectionStart, ta.selectionEnd, 'end'); ta.dispatchEvent(new Event('input', { bubbles: true })); } });
-  spItem(menu, 'Скопировать', () => { const t = sel() || ta.value; if (t) navigator.clipboard?.writeText(t); });
+  spItem(menu, 'Вырезать', () => { const t = sel(); if (t) { copyText(t); ta.setRangeText('', ta.selectionStart, ta.selectionEnd, 'end'); ta.dispatchEvent(new Event('input', { bubbles: true })); } });
+  spItem(menu, 'Скопировать', () => { const t = sel() || ta.value; if (t) copyText(t, 'Скопировано'); });
   spItem(menu, 'Вставить', async () => {
     try {
       const t = await (navigator.clipboard?.readText() || Promise.resolve(''));
@@ -10529,7 +10609,7 @@ $('#agMsgs').addEventListener('click', async e => {
   }
   if (e.target.closest('[data-copy-ru]')) {
     const m = AG.msgs[+blk.closest('.msg')?.dataset.i], t = m?.ru?.[$('pre', blk).dataset.b];
-    if (t) { navigator.clipboard?.writeText(t); toast('Русский текст скопирован'); }
+    if (t) { copyText(t, 'Русский текст скопирован'); }
     return;
   }
   const ruBtn = e.target.closest('[data-ru]');
@@ -10544,7 +10624,7 @@ $('#agMsgs').addEventListener('click', async e => {
     } catch (err) { toast(err.message); }
     renderAssistant(blk.closest('.msg'), m); return;
   }
-  if (e.target.closest('[data-copy]')) { navigator.clipboard?.writeText($('pre', blk).textContent); toast('Промпт скопирован'); return; }
+  if (e.target.closest('[data-copy]')) { copyText($('pre', blk).textContent, 'Промпт скопирован'); return; }
   const to = e.target.closest('[data-send]')?.dataset.send; if (to) sendPrompt(blk, to);
 });
 $('#agMsgs').addEventListener('change', e => {
@@ -10607,19 +10687,19 @@ $('#agClear').onclick = () => { const ta = $('#agIn'); ta.value = ''; ta.dispatc
     const has = f ? f.selectionStart !== f.selectionEnd : !!selText;
     const items = [['Копировать', !has, async () => {
       const t = f ? f.value.slice(f.selectionStart, f.selectionEnd) : selText;
-      try { await navigator.clipboard.writeText(t); toast('Скопировано'); } catch { document.execCommand('copy'); }
+      try { await navigator.clipboard.writeText(t); toast('Скопировано'); } catch { copyText(t, 'Скопировано'); }
     }]];
     if (!f && inMsg) {
       const blk = e.target.closest('.pblock');
       const whole = (blk ? $('pre', blk) : e.target.closest('.msg'))?.innerText || '';
       items.push([blk ? 'Копировать весь промпт' : 'Копировать всё сообщение', !whole, async () => {
-        try { await navigator.clipboard.writeText(whole); toast('Скопировано'); } catch { toast('Не удалось скопировать'); }
+        try { await navigator.clipboard.writeText(whole); toast('Скопировано'); } catch { copyText(whole, 'Скопировано'); }
       }]);
     }
     const ed = !f && e.target.closest?.('pre[data-b]');
     if (ed) {
       items.push(['Вырезать', !has, async () => {
-        try { await navigator.clipboard.writeText(selText); } catch {}
+        try { await navigator.clipboard.writeText(selText); } catch { copyText(selText); }
         ed.focus(); document.execCommand('delete');
       }]);
       items.push(['Вставить', false, async () => {
@@ -10631,7 +10711,7 @@ $('#agClear').onclick = () => { const ta = $('#agIn'); ta.value = ''; ta.dispatc
     if (f) {
       const ro = f.readOnly || f.disabled;
       items.push(['Вырезать', !has || ro, async () => {
-        try { await navigator.clipboard.writeText(f.value.slice(f.selectionStart, f.selectionEnd)); } catch {}
+        try { await navigator.clipboard.writeText(f.value.slice(f.selectionStart, f.selectionEnd)); } catch { copyText(f.value.slice(f.selectionStart, f.selectionEnd)); }
         f.focus(); document.execCommand('delete');
       }]);
       items.push(['Вставить', ro, async () => {
@@ -10938,11 +11018,11 @@ function hGripAfter(host, key, o) {
 $('#mlist').addEventListener('click', async e => {
   const dn = e.target.closest('[data-dlnow]'); if (dn) { mdStart([dn.dataset.dlnow]); return; }
   const cu = e.target.closest('[data-copyurl]');
-  if (cu) { const u = cu.dataset.copyurl; navigator.clipboard?.writeText(u).then(() => toast('Ссылка скопирована: вставьте её в менеджер загрузок'), () => toast(u)); return; }
+  if (cu) { const u = cu.dataset.copyurl; copyText(u, 'Ссылка скопирована: вставьте её в менеджер загрузок'); return; }
   const d = e.target.closest('[data-dlmodel]'), c = e.target.closest('[data-copyname]'), f = e.target.closest('.mf');
   if (d) { try { await postJSON('/api/models/open', { role: d.dataset.dlmodel }); toast('Страница скачивания открыта в браузере'); } catch (err) { toast(err.message); } return; }
   const name = c ? c.dataset.copyname : f ? f.textContent : ''; if (!name) return;
-  navigator.clipboard?.writeText(name).then(() => toast('Имя файла скопировано'), () => toast(name));
+  copyText(name, 'Имя файла скопировано');
 });
 // a model file with another name than the app expects: pick it from what ComfyUI sees
 $('#mlist').addEventListener('click', async e => {
@@ -11033,6 +11113,18 @@ async function openUpscale(it, file, into) {   // `file`: the person's own file;
       : (`<div class="hint" style="margin:14px 0">Для этого нужна модель SeedVR2 (около 4 ГБ). ${st.engine === 'managed' ? 'Нажмите, чтобы скачать, и вернитесь сюда.' : 'Если файлов seedvr2_3b_int8_convrot и seedvr2_ema_vae_fp16 нет в вашем ComfyUI, положите их в его папки моделей.'}</div>`
         + (st.engine === 'managed' ? '<button class="btn pri" data-dl type="button">Скачать модель</button>' : '')));
   host.innerHTML = inline ? body : BOX_HEAD + body + '</div>';
+  // чужая оценка дана для другой видеокарты; если у нас есть свои замеры такой же работы, зовём на помощь их
+  if (API) {
+    fetch('/api/forecast?mode=upscale&sec=' + Math.round(secs || 0)).then(r => r.json()).then(jc => {
+      if (!jc || jc.samples < 2 || jc.secs < 20) return;
+      if (!host.isConnected) return;
+      const line = document.createElement('div');
+      line.className = 'hint';
+      line.style.cssText = 'margin-top:10px';
+      line.textContent = 'По вашим прошлым запускам такой работы: примерно ' + fmtTime(jc.secs) + ' (замеров: ' + jc.samples + ').';
+      host.append(line);
+    }).catch(() => { });
+  }
   // the blue part of a slider is painted by hand; a control created later was left unpainted,
   // which is why the handle stood at 70% while the colour stopped at a third
   [...host.querySelectorAll('input[type=range]')].forEach(paintRange);
