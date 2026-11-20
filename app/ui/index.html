@@ -10217,6 +10217,11 @@ async function setChatAudio(wavBlob, name, dur, where) {
   const tg = tagOf(where);
   let at = AG.audios.findIndex(x => x.key === key);
   if (at < 0 && tg) at = AG.audios.findIndex(x => tagOf(x.where) === tg);
+  if (at >= 0 && tg) {   // устаревшие дубли тега, накопленные до этого правила, убираем сразу
+    const keep = AG.audios[at];
+    AG.audios = AG.audios.filter((x, i) => i === at || tagOf(x.where) !== tg);
+    at = AG.audios.indexOf(keep);
+  }
   if (at < 0) at = AG.audios.findIndex(x => x.name === name && Math.abs((x.dur || 0) - dur) < .1 && (x.where || '') === (where || ''));
   const a = { name, dur, where: where || '', text: '', busy: true, lang: '', langName: '', file, key };
   if (at >= 0) AG.audios.splice(at, 1, a); else AG.audios.push(a);
@@ -10543,6 +10548,13 @@ async function openChat(id) {
     let f = null;
     try { f = window.dataUrlToFile(a.url, a.name || 'аудио', 'audio/wav'); } catch (e) { continue; }
     AG.audios.push({ name: a.name || 'аудио', dur: +a.dur || 0, where: a.where || '', text: a.text || '', lang: a.lang || '', langName: a.langName || '', file: f, busy: false, __u: a.url });
+  }
+  const tgOf = s => { const m = /<\s*Audio\s*(\d+)\s*>/i.exec(s || ''); return m ? +m[1] : 0; };
+  const lastPerTag = new Set();
+  for (let x = AG.audios.length - 1; x >= 0; x--) {
+    const t = tgOf(AG.audios[x].where);
+    if (!t || !lastPerTag.has(t)) { if (t) lastPerTag.add(t); continue; }
+    AG.audios.splice(x, 1);   // в старых чатах под одним тегом лежало по два-четыре исполнения
   }
   AG.audio = AG.audios[0] || null;
   renderAtt(); showAudioBox();
