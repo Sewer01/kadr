@@ -584,7 +584,10 @@ def long_plan(scene_seconds, overlap=LONG_OVERLAP, cont_first=False, fresh=()):
     reference pictures like scene 1, so the quality of a long video does not wear off from scene to scene."""
     plan, acc = [], 0
     for i, sec in enumerate(scene_seconds):
-        seg = frames(min(LONG_MAX_SCENE, max(1, sec)))
+            # the ceiling of a single scene is decided where the scene is accepted (its long
+        # mode allows 25 s); here only the absolute cap applies - otherwise a 20 s scene
+        # silently came out as 15 s, and the film was shorter than the person ordered
+        seg = frames(min(LONG_MAX_SCENE_LONG, max(1, sec)))
         if i > 0 and i < len(fresh) and fresh[i]:
             plan.append({"total": seg, "ov": 0, "acc_before": acc, "acc": acc + seg})
             acc += seg
