@@ -9766,6 +9766,27 @@ const fileToDataURL = (file, max = 1024) => new Promise(res => {
   img.src = URL.createObjectURL(file);
 });
 function agImgCount() { return AG.msgs.reduce((n, m) => n + (m.images?.length || 0) - (m.nframes || 0), 0); }   // frames of a video are not pictures of heroes
+/* Номер, который человек видит на плитке лотка, и есть номер, которым его картинка
+   называется в тексте. Явный тег из подписи важнее; остальные получают свободные числа
+   после картинок, уже отправленных в чат. По этим же номерам картинка возвращается в
+   свою сцену: у 10 первая цифра - номер сцены, последняя - её место. Раньше обратно
+   читалась только подпись вложения, и плитка с придуманным номером «Picture 10» в
+   первую сцену не попадала: тег в тексте оставался без файла. */
+window.agAttTags = () => {
+  const num = a => { const m = /<\s*(?:Picture|Video|Audio)\s*(\d+)\s*>/i.exec((a && a.note) || ''); return m ? +m[1] : 0; };
+  const taken = new Set();
+  (AG.att || []).forEach(a => { const n = num(a); if (n) taken.add(n); });
+  const base = (typeof agImgCount === 'function' ? agImgCount() : 0);
+  let k = 0;
+  return (AG.att || []).map(a => {
+    if (!a || a.frame) return 0;                       // кадры видео в сцены не едут
+    const own = num(a); if (own) return own;
+    let n = base + (++k);
+    while (taken.has(n)) n++;
+    taken.add(n);
+    return n;
+  });
+};
 function renderAtt() {
   const base = agImgCount(); let k = 0;
   // every tile carries the tag it stands for; a video is named to the model as <Video 1>, <Video 2>…
@@ -9782,14 +9803,12 @@ function renderAtt() {
      с таким же числом - человек видел две «Picture 3» и не понимал, какая настоящая. */
   const taken = new Set();
   AG.att.forEach(a => { const m = (ownTag(a).match(/\d+/) || [])[0]; if (m) taken.add(+m); });
-  const lab = AG.att.map(a => {
+  const nums = window.agAttTags();
+  const lab = AG.att.map((a, i) => {
     if (a.frame) return '';
     const own = ownTag(a);
     if (own) return own;
-    let n = base + (++k);
-    while (taken.has(n)) n++;   // свободное число: плиток больше, чем мест, не бывает, но бережёмся
-    taken.add(n);
-    return 'Picture ' + n;
+    return 'Picture ' + (nums[i] || (base + (++k)));   // то же число, по которому картинка едет в свою сцену
   });
   $('#agAtt').innerHTML = AG.att.map((a, i) => a.frame
     ? `<div data-tag="&lt;${ownTag(a) || 'Video ' + (vnames.indexOf(a.vname) + 1)}&gt;" title="Кадр из видео «${esc(a.vname)}» · нажмите, чтобы вставить тег"><img src="${a.url}"><b style="background:#3a5a8c">🎞 ${esc(a.label)}</b><button data-i="${i}">✕</button></div>`
@@ -10563,40 +10582,64 @@ async function sendPrompt(blk, to) {
       const m = new RegExp('<\\s*' + kind + '\\s*(\\d+)\\s*>', 'i').exec(txt || '');
       return m ? +m[1] : 0;
     };
-    const home = { pics: 0, auds: 0, gone: [] };
-    {
+    const home = { pics: 0, auds: 0, gone: [], where: [], said: -1 };
+    const sameFile = (a, b) => !!a && !!b && a.name === b.name && a.size === b.size;
+    const deliver = () => {
       const cards = $$('.sc', L2.root);
-      const same = (a, b) => !!a && !!b && a.name === b.name && a.size === b.size;
-      for (const a of (AG.att || [])) {
+      if (!cards.length) return;
+      const nums = (typeof window.agAttTags === 'function' ? window.agAttTags() : []) || [];
+      for (let ai = 0; ai < (AG.att || []).length; ai++) {
+        const a = AG.att[ai];
         if (!a || a.frame || !a.file) continue;
-        const n = tagNum(a.note, 'Picture');
-        if (n < 10) continue;                          // общие места переносит обычный перенос
-        const c = cards[Math.floor(n / 10) - 1], j = n % 10;
-        if (!c || j > 8) { home.gone.push('<Picture ' + n + '>'); continue; }
-        if ((c._files || [])[j]) continue;             // своё место занято - не затираем положенное руками
+        const n = tagNum(a.note, 'Picture') || nums[ai] || 0;   // подпись вложения, а если её нет - число на плитке
+        if (n < 10) continue;                                   // общие места переносит обычный перенос
+        const dec = Math.floor(n / 10) * 10;                    // последняя цифра - место, остальное - сцена
+        const c = cards.filter(x => (x._baseFixed || x._base) === dec)[0] || cards[Math.floor(n / 10) - 1];
+        if (!c) { if (!home.gone.some(s => s === '<Picture ' + n + '>')) home.gone.push('<Picture ' + n + '>'); continue; }
+        c._files = c._files || new Array(9).fill(null);
+        if (c._files.some(f => sameFile(f, a.file))) continue;  // файл уже лежит в этой сцене - не дублируем
+        let j = (n % 10 <= 8 && !c._files[n % 10]) ? n % 10 : c._files.findIndex(f => !f);
+        if (j < 0) { home.gone.push('<Picture ' + n + '> - в сцене нет свободного места'); continue; }
         if (c._setOwn) c._setOwn(j, a.file); else { c._files[j] = a.file; c._paint?.(); }
         home.pics++;
-        files = files.filter(f => !same(f, a.file));   // тот же файл не встанет ещё и на общую полку
+        home.where.push('<Picture ' + n + '> → сцена ' + Math.floor(n / 10) + ', место ' + (dec + j) + ' · ' + a.file.name);
+        files = files.filter(f => !sameFile(f, a.file));        // тот же файл не встанет ещё и на общую полку
       }
       for (const a of (AG.audios || [])) {
         if (!a || !a.file) continue;
         const n = tagNum(a.where, 'Audio');
         if (n < 10) continue;
-        const c = cards[Math.floor(n / 10) - 1], j = n % 10;
-        if (!c || j > 2) { home.gone.push('<Audio ' + n + '>'); continue; }
+        const dec = Math.floor(n / 10) * 10;
+        const c = cards.filter(x => (x._baseFixed || x._base) === dec)[0] || cards[Math.floor(n / 10) - 1];
+        if (!c) { if (!home.gone.some(s => s === '<Audio ' + n + '>')) home.gone.push('<Audio ' + n + '>'); continue; }
         c._auds = c._auds || []; c._audSrc = c._audSrc || []; c._audSel = c._audSel || [];
-        if (c._auds[j]) continue;
+        if ((c._auds || []).some(f => sameFile(f, a.file))) continue;
+        let j = (n % 10 <= 2 && !c._auds[n % 10]) ? n % 10 : [0, 1, 2].findIndex(k => !c._auds[k]);
+        if (j < 0) { home.gone.push('<Audio ' + n + '> - в сцене нет свободного места для песни'); continue; }
         c._auds[j] = a.file; c._audSrc[j] = a.file; c._audSel[j] = null;
         c._paintAuds?.(); c._paint?.(); home.auds++;
+        home.where.push('<Audio ' + n + '> → сцена ' + Math.floor(n / 10) + ' · ' + a.file.name);
       }
-      if (home.pics || home.auds) {
-        L2.root._save?.();
-        toast('В сцены вернулось из чата: ' + [home.pics ? 'фото ' + home.pics : '', home.auds ? 'песен ' + home.auds : ''].filter(Boolean).join(' · ')
-          + (home.gone.length ? ' · а ' + home.gone.join(', ') + ' позвало сцену, которой в ответе нет' : ''));
-      } else if (home.gone.length) {
-        toast('В чате есть ' + home.gone.join(', ') + ', но такой сцены в ответе нет - файл некуда положить');
+      const now = home.pics + home.auds;
+      if (now > home.said) {
+        home.said = now;
+        if (now) {
+          L2.root._save?.();
+          toast('В сцены вернулось из чата: ' + [home.pics ? 'фото ' + home.pics : '', home.auds ? 'песен ' + home.auds : ''].filter(Boolean).join(' · ')
+            + (home.where.length ? ' (' + home.where.join('; ') + ')' : '')
+            + (home.gone.length ? ' · а ' + home.gone.join(', ') + ' некуда положить' : ''));
+        } else if (home.gone.length) {
+          toast('В чате есть ' + home.gone.join(', ') + ', но такой сцены в ответе нет - файл некуда положить');
+        }
       }
-    }
+    };
+    deliver();
+    /* Карточки раздела перестраиваются не в тот же миг: доставка, сделанная один раз,
+       попадала в карточки, которые потом заменялись новыми, и фото сцены исчезало.
+       Поэтому она повторяется, когда Киностудия уже на экране. Повтор ничего не
+       дублирует: лежащий в сцене файл узнаётся по имени и размеру. */
+    setTimeout(deliver, 400);
+    setTimeout(deliver, 1400);
     // the studio never receives the frames from the chat: a <Video N> in the text would point at nothing,
     // and the numbers would land on the person's photos. What the studio really has is the base frame.
     prompt = prompt.replace(/<\s*Video\s*\d+\s*>/g, '<Frame>');
@@ -10609,8 +10652,11 @@ async function sendPrompt(blk, to) {
     }
     if (fix && files.length) $$('label.ref.filled .x', L2.root).forEach(x => x.click());   // a fix replaces the pictures; a continuation keeps the old ones
     for (const f of files) {   // existing references (e.g. the last frame of the video being continued) stay; new pictures take the free slots
-      const have = $$('label.ref.filled', L2.root).some(r => r._file && r._file.name === f.name && r._file.size === f.size);
-      const free = $$('label.ref:not(.filled) input', L2.root)[0];
+      /* Плитки собственных фото сцен носят тот же класс ref: без оговорки ниже лишние
+         картинки из чата заполняли места сцен и затирали то, что легло туда по номеру
+         тега - возвращённое из чата фото сцены пропадало под чужим файлом. */
+      const have = $$('label.ref:not(.own).filled', L2.root).some(r => r._file && r._file.name === f.name && r._file.size === f.size);
+      const free = $$('label.ref:not(.own):not(.filled) input', L2.root)[0];
       if (have || !free) continue;
       await setDropFile(free, f);
     }
