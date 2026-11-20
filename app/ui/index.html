@@ -9755,6 +9755,14 @@ presetsPaint();
 
 /* ---------- AGENT ---------- */
 const AG = { msgs: [], att: [], target: 'video', busy: false, ctrl: null, status: null, edit: true };
+window.dataUrlToFile = (du, name, kind) => {   // сохранённый чат возвращает файл, а не его уменьшенный показ
+  const [h, b] = String(du || '').split(',');
+  const bin = atob(b || '');
+  const a = new Uint8Array(bin.length);
+  for (let k = 0; k < bin.length; k++) a[k] = bin.charCodeAt(k);
+  const mime = kind || (h.match(/:(.*?);/) || [])[1] || 'application/octet-stream';
+  return new File([a], name || 'файл', { type: mime });
+};
 const fileToDataURL = (file, max = 1024) => new Promise(res => {
   const img = new Image();
   img.onload = () => {
@@ -10409,8 +10417,36 @@ $('#agSend').onclick = agSend;
 async function saveChat() {
   if (!API || !AG.msgs.length) return;
   AG.id = AG.id || Math.random().toString(36).slice(2, 14).replace(/[^a-z0-9]/g, 'x');
+  /* Лоток и песни сцен лежат рядом с чатом. Раньше в чат писался только текст с
+     уменьшенными показами картинок: возвращённая переписка выглядела целой, но файлов
+     у неё не было, и кнопка переноса в раздел не могла положить фото в свою сцену.
+     Файлы пишутся целиком, поэтому вернувшаяся картинка остаётся того же качества. */
+  const raw = f => new Promise(res => {
+    try {
+      if (!f) return res('');
+      const fr = new FileReader();
+      fr.onload = () => res(String(fr.result || ''));
+      fr.onerror = () => res('');
+      fr.readAsDataURL(f);
+    } catch (e) { res(''); }
+  });
+  const att = [];
+  for (const a of (AG.att || [])) {
+    if (!a) continue;
+    if (a.__u === undefined) a.__u = a.file ? await raw(a.file) : '';
+    const du = a.__u || a.url || '';
+    if (!du) continue;
+    att.push({ url: du, note: a.note || '', frame: !!a.frame, label: a.label || '', vname: a.vname || '', name: (a.file && a.file.name) || '', kind: (a.file && a.file.type) || '' });
+  }
+  const auds = [];
+  for (const a of (AG.audios || [])) {
+    if (!a) continue;
+    if (a.__u === undefined) a.__u = a.file ? await raw(a.file) : '';
+    if (!a.__u) continue;
+    auds.push({ url: a.__u, name: a.name || '', dur: a.dur || 0, where: a.where || '', text: a.text || '', lang: a.lang || '', langName: a.langName || '' });
+  }
   await fetch(`/api/agent/chats/${AG.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ target: AG.target, messages: AG.msgs.map(({ files, status, audioFile, ...m }) => m) }) });
+    body: JSON.stringify({ target: AG.target, messages: AG.msgs.map(({ files, status, audioFile, ...m }) => m), att, auds }) });
   loadChats();
 }
 function fmtShort(iso) { return iso ? fmtDate(new Date(iso)) : ''; }
@@ -10424,14 +10460,34 @@ async function loadChats() {
 }
 function newChat() {
   if (AG.busy) AG.ctrl?.abort();
-  AG.id = null; AG.msgs = []; AG.att = []; AG.audios = []; AG.audio = null; renderAtt(); showAudioBox(); renderMsgs(); agCtx(); loadChats(); $('#agIn').focus();
+  AG.id = null; AG.msgs = []; AG.att = []; AG.audios = []; AG.audio = null; AG.draft = null;
+  $('#agIn').value = '';   // в новом чате пусто всё, и начатый текст старого там оставаться не должен
+  renderAtt(); showAudioBox(); renderMsgs(); agCtx(); loadChats(); $('#agIn').focus();
 }
 async function openChat(id) {
   if (AG.busy) AG.ctrl?.abort();
   const c = await (await fetch(`/api/agent/chats/${id}`)).json();
-  AG.id = id; AG.msgs = c.messages || []; AG.att = []; renderAtt();
+  AG.id = id; AG.msgs = c.messages || [];
+  AG.att = [];
+  for (const a of (c.att || [])) {
+    if (!a || !a.url) continue;
+    let f = null;
+    try { f = window.dataUrlToFile(a.url, a.name || 'картинка', a.kind || 'image/png'); } catch (e) { continue; }
+    AG.att.push({ file: f, url: a.url, note: a.note || '', frame: !!a.frame, label: a.label || '', vname: a.vname || '', __u: a.url });
+  }
+  AG.audios = [];
+  for (const a of (c.auds || [])) {
+    if (!a || !a.url) continue;
+    let f = null;
+    try { f = window.dataUrlToFile(a.url, a.name || 'аудио', 'audio/wav'); } catch (e) { continue; }
+    AG.audios.push({ name: a.name || 'аудио', dur: +a.dur || 0, where: a.where || '', text: a.text || '', lang: a.lang || '', langName: a.langName || '', file: f, busy: false, __u: a.url });
+  }
+  AG.audio = AG.audios[0] || null;
+  renderAtt(); showAudioBox();
   const b = $(`#agTarget button[data-t="${c.target}"], #agTarget2 button[data-t="${c.target}"]`); if (b) b.click();
   renderMsgs(); agCtx(); loadChats();
+  if (AG.att.length || AG.audios.length) toast('В чат вернулись его файлы: картинок ' + AG.att.length + ', аудио ' + AG.audios.length);
+  else if ((AG.msgs || []).length && !(c.att || []).length && !(c.auds || []).length) toast('В этом чате файлы не сохранялись: они лежат только в тексте');
 }
 /* "Правка" or "Продолжить сюжет": a fix replaces what was written, a continuation remembers the whole chat */
 /* в режимах со списком «продолжить» реально что-то добавляет, и переключатель называется по-месту */

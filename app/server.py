@@ -4340,11 +4340,25 @@ class App:
     async def h_chat_put(self, req):
         p = self.chat_path(req.match_info["id"])
         body = await req.json()
-        msgs = [{k: m.get(k) for k in ("role", "content", "images", "skills", "error", "nframes") if m.get(k)}
-                for m in body.get("messages") or [] if m.get("role") in ("user", "assistant")]
+        keep = ("role", "content", "images", "skills", "error", "nframes")
+        msgs = []
+        for m in body.get("messages") or []:
+            if m.get("role") not in ("user", "assistant"):
+                continue
+            one = {k: m.get(k) for k in keep if m.get(k)}
+            if "edit" in m:
+                one["edit"] = bool(m["edit"])  # правка это была или продолжение: иначе ответ возвращается слепым
+            msgs.append(one)
         first = next((m.get("content", "") for m in msgs if m["role"] == "user"), "") or "Без названия"
         data = {"title": (body.get("title") or first).strip().replace("\n", " ")[:80], "target": body.get("target", "video"),
                 "updated": datetime.now().isoformat(timespec="seconds"), "messages": msgs}
+        # лоток вложений и песни сцен: без них чат возвращается текстом без файлов,
+        # и перенести фото сцены в раздел после этого уже невозможно
+        att = body.get("att") or []
+        auds = body.get("auds") or []
+        if len(att) + len(auds) < 400:
+            data["att"] = att
+            data["auds"] = auds
         p.parent.mkdir(parents=True, exist_ok=True)
         p.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
         return web.json_response({"ok": True, "title": data["title"]})
