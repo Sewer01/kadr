@@ -2979,7 +2979,7 @@ class App:
                 self._long_run = None
 
     async def generate_long(self, req):
-        form, files, prompt, aspect, quality, seed = await self.read_form(req, ("img0", "img1", "img2", "img3", "img4", "aud0", "srcvid", "srcframe") + tuple(f"simg{i}_{j}" for i in range(12) for j in range(9)) + tuple(f"saudio{i}_{j}" for i in range(12) for j in range(3)), need_prompt=False)   # the texts are in the scenes, there is no single prompt
+        form, files, prompt, aspect, quality, seed = await self.read_form(req, ("img0", "img1", "img2", "img3", "img4", "aud0", "srcvid", "srcframe") + tuple(f"simg{i}_{j}" for i in range(catalog.LONG_MAX_SCENES) for j in range(9)) + tuple(f"saudio{i}_{j}" for i in range(catalog.LONG_MAX_SCENES) for j in range(3)), need_prompt=False)   # the texts are in the scenes, there is no single prompt
         act = getattr(self, "_studio_mode", "long") == "actionsc"
         self._long_run = re.sub(r"[^A-Za-z0-9]", "", form.get("run", ""))[:32]   # the references are kept even if the request is refused later
         try:
