@@ -106,6 +106,11 @@
 .sc-no{flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;min-width:28px;height:28px;
  padding:0 7px;border-radius:999px;background:var(--accent);color:#fff;font-size:15px;font-weight:800;
  line-height:1;font-family:inherit}
+.sc-long{display:inline-flex;gap:5px;align-items:center;font-size:12px;font-weight:600;color:var(--muted);
+  cursor:pointer;white-space:nowrap;flex:0 0 auto}
+.sc-long:hover{color:var(--txt)}
+.sc-long input{accent-color:var(--accent);cursor:pointer;margin:0}
+.sc-long.on{color:var(--pink)}
 .sc-sec{flex:0 0 auto;min-width:40px;font-size:13.5px;font-weight:700;color:var(--text);white-space:nowrap}
 /* The words of the scene's song, at the bottom of the music editor: one line, scrolling, the way
    the Agent's field works. No heading - the editor is already about this very file. */
@@ -7331,7 +7336,7 @@ function makeRefMode(cfg) {
   // (a long chain of continuations wears the picture out; a new shot is built from the references again, so the quality stays the same)
   const MAX_CHAIN = 3;
   const freshAt = () => { let run = 0; return $$('.sc', root).map((c, i) => { if (!i) { run = 0; return false; } const hand = !!$('.sc-fresh', c)?.checked; if (hand || run >= MAX_CHAIN) { run = 0; return true; } run++; return false; }); };
-  const sceneList = () => { const fr = freshAt(); return $$('.sc', root).map((c, i) => ({ prompt: $('textarea', c).value.trim(), sec: +$('input[type=range]', c).value, fresh: fr[i] })); };
+  const sceneList = () => { const fr = freshAt(); return $$('.sc', root).map((c, i) => ({ prompt: $('textarea', c).value.trim(), sec: +$('input[type=range]', c).value, lng: !!c._longSec, fresh: fr[i] })); };
   if (cfg.scenes) {
     const card = $('.rm-prompt', root).closest('.card');
     card.innerHTML = `<div class="card-h"><h3><span class="n">4</span>Сцены</h3><span class="counter lm-total"></span></div>
@@ -7392,7 +7397,9 @@ function makeRefMode(cfg) {
         const sec = +$('input[type=range]', c).value;
         if (se) {
           se.textContent = sec + ' с';
-          se.title = own ? `Длительность этой сцены: ${sec} с · кусок аудио ${mmss(st + from)}–${mmss(st + to)}` : `Длительность этой сцены: ${sec} с`;
+          // за 15 секунд качество держится хуже: пусть это будет видно без наведения
+          se.style.color = sec > 15 ? 'var(--pink)' : '';
+          se.title = `Длительность этой сцены: ${sec} с` + (sec > 15 ? ' · длинный режим: модель обучена до 15 с' : '') + (own ? ` · кусок аудио ${mmss(st + from)}–${mmss(st + to)}` : '');
         }
         $('.sc-win', c).textContent = '';
       });
@@ -7593,7 +7600,8 @@ function makeRefMode(cfg) {
           const had = tags(ta.value), got = tags(x.prompt);
           const lost = Array.from(had).filter(t => !got.has(t));
           ta.value = (String(x.prompt).trim() + (lost.length ? ' ' + lost.join(' ') : '')).trim();
-          const sec = Math.min(15, Math.max(3, Math.round(x.sec) || 0));
+          if (Math.round(x.sec) > 15) window.sceneLongOn(c, true);
+          const sec = Math.min(window.sceneCap(c), Math.max(3, Math.round(x.sec) || 0));
           if (sec) { const r = $('input[type=range]', c); if (r) { r.value = sec; } }
           if (x.fresh !== undefined) { const fb = $('.sc-fresh', c); if (fb) fb.checked = !!x.fresh; }
           if (lost.length) back.push('сцена ' + (i + 1) + ': ' + lost.join(', '));
@@ -7640,7 +7648,7 @@ function makeRefMode(cfg) {
       let free0 = 10;
       const alloc = () => { while (used0.has(free0)) free0 += 10; const v = free0; free0 += 10; return v; };
       fresh.forEach((x, i) => { if (!baseFor[i]) baseFor[i] = alloc(); });
-      fresh.forEach((x, i) => addScene(x.prompt, Math.min(15, Math.max(3, Math.round(x.sec) || 10)),
+      fresh.forEach((x, i) => addScene(x.prompt, Math.min(25, Math.max(3, Math.round(x.sec) || 10)),
         x.fresh === undefined ? !!(keep[i] && keep[i].fresh) : !!x.fresh, baseFor[i]));
       let back = 0; const lostBack = [];
       /* Перенос в два прохода. Сначала каждая сцена забирает файлы того номера места, который
@@ -7882,7 +7890,7 @@ function makeRefMode(cfg) {
         const run = root._run, slotA = $('.rm-auds .slot', root);
         const proj = { run, t: Date.now(), sec: cfg.mode, mode: root._mode, qm: root._q, qBy: { ...(root._qBy || {}), [root._q]: S.q }, snd: root._snd, loop: root._loop !== false, start: $('.lm-start', root).value, vocals: $('.lm-vocals', root).checked,
           aspect: S.aspect, q: S.q, cw: S.cw || 0, ch: S.ch || 0, src: root._src ? { id: root._src.id || '', name: root._src.name } : null,
-          scenes: $$('.sc', root).map(c => ({ prompt: $('textarea', c).value, sec: +$('input[type=range]', c).value, fresh: !!$('.sc-fresh', c)?.checked, nimg: 9, var: c._var || 0, words: (c._audWords || []).slice(), base: c._baseFixed || 0,
+          scenes: $$('.sc', root).map(c => ({ prompt: $('textarea', c).value, sec: +$('input[type=range]', c).value, lng: !!c._longSec, fresh: !!$('.sc-fresh', c)?.checked, nimg: 9, var: c._var || 0, words: (c._audWords || []).slice(), base: c._baseFixed || 0,
             done: c._dn.final ? { sig: c._dn.final.sig, url: c._dn.final.url, id: c._dn.final.id, text: c._dn.final.text } : null,
             draftDone: c._dn.draft ? { sig: c._dn.draft.sig, url: c._dn.draft.url, id: c._dn.draft.id, text: c._dn.draft.text } : null })) };
         const all = loadAll(); all[run] = proj;
@@ -7927,7 +7935,7 @@ function makeRefMode(cfg) {
       const aud = await getRef('aud0'); if (aud instanceof File) await putInto($('input', slotA), aud);
       root._loop = p.loop !== false; setSnd(p.snd || 'none'); $('.lm-start', root).value = p.start || '0'; $('.lm-vocals', root).checked = !!p.vocals;
       $$('.sc', root).forEach(c => c.remove());
-      for (const x of p.scenes) addScene(x.prompt, x.sec, !!x.fresh, x.base || 0);
+      for (const x of p.scenes) addScene(x.prompt, Math.min(x.lng ? 25 : 15, x.sec), !!x.fresh, x.base || 0);
       renumber(); sceneReconcile(root);   // в проекте номер места не хранится: его надо поделить заново
       $$('.sc', root).forEach((c, i) => { c._var = (p.scenes[i] || {}).var || 0; });
       root._sel = 0;
@@ -8023,13 +8031,32 @@ function makeRefMode(cfg) {
       });
       return taken.size;
     };
+    /* Модель обучена примерно до 15 секунд, поэтому длинная сцена - не общее
+       настроечное окно, а решение про одну конкретную сцену: включили галочку в её
+       ряду - и ползунок, и плюс, и лента считают время только этой сцены до 25 секунд.
+       Соседние сцены своего предела не замечают. */
+    const SCENE_MAX = 15, SCENE_MAX_LONG = 25;
+    window.sceneCap = c => {
+      if (!c) return SCENE_MAX;
+      const r = $('input[type=range]', c);
+      return (c._longSec || (+((r || {}).value) || 0) > SCENE_MAX) ? SCENE_MAX_LONG : SCENE_MAX;
+    };
+    window.sceneLongOn = (c, on) => {
+      if (!c) return;
+      c._longSec = !!on;
+      const box = $('.sc-long-c', c); if (box) { box.checked = !!on; (box.closest('.sc-long') || box).classList.toggle('on', !!on); }
+      const r = $('input[type=range]', c);
+      if (r) { r.max = String(on ? SCENE_MAX_LONG : SCENE_MAX); if (!on && +r.value > SCENE_MAX) r.value = String(SCENE_MAX); }
+    };
     const addScene = (txt = '', sec = 10, fresh = false, base = 0) => {
       const c = document.createElement('div'); c.className = 'sc'; c._dn = { draft: null, final: null };
       Object.defineProperty(c, '_done', { get: () => c._dn[root._q || 'final'], set: v => { c._dn[root._q || 'final'] = v; }, configurable: true });
       c.style.cssText = 'margin:0 0 10px;padding:12px;border:1px solid var(--line);border-radius:12px';
-      c.innerHTML = `<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px"><i class="sc-nav" data-dir="-1" title="К предыдущей сцене">‹</i><b class="sc-no" title="Номер сцены: под ним она лежит на ленте и в Библиотеке"></b><i class="sc-nav" data-dir="1" title="К следующей сцене">›</i><input type="range" min="3" max="15" step="1" value="${sec}" style="display:none"><button class="btn sc-m" type="button" title="Короче на секунду" style="padding:2px 9px">−</button><button class="btn sc-p" type="button" title="Длиннее на секунду" style="padding:2px 9px">+</button><output class="sc-sec" title="Длительность этой сцены"></output><span class="hint sc-win" style="flex:1"></span></div><textarea placeholder="Что происходит в этой сцене…" style="min-height:90px"></textarea>
+      c.innerHTML = `<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px"><i class="sc-nav" data-dir="-1" title="К предыдущей сцене">‹</i><b class="sc-no" title="Номер сцены: под ним она лежит на ленте и в Библиотеке"></b><i class="sc-nav" data-dir="1" title="К следующей сцене">›</i><input type="range" min="3" max="15" step="1" value="${sec}" style="display:none"><button class="btn sc-m" type="button" title="Короче на секунду" style="padding:2px 9px">−</button><button class="btn sc-p" type="button" title="Длиннее на секунду" style="padding:2px 9px">+</button><output class="sc-sec" title="Длительность этой сцены"></output><label class="sc-long" title="Только для этой сцены: разрешить до 25 секунд. Модель обучена примерно до 15 с, дальше качество держит хуже, а расчёт идёт дольше; соседние сцены не меняются."><input type="checkbox" class="sc-long-c"> 25 с</label><span class="hint sc-win" style="flex:1"></span></div><textarea placeholder="Что происходит в этой сцене…" style="min-height:90px"></textarea>
 <details class="sc-tdet" style="margin-top:8px"><summary class="hint" style="cursor:pointer;font-size:12px">Проба размера для этой сцены</summary><div class="sc-tst" style="margin-top:6px;display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span class="hint" style="font-size:12px">Попробовать только эту сцену в другом размере (остальные не меняются):</span><select class="sc-tq">${QUALITY.map(q => `<option value="${q.id}">${q.res}</option>`).join('')}</select><button class="btn sc-tbtn" type="button" title="Сцена считается отдельно, в выбранном размере, на 8 шагов. Результат появится ниже и в Библиотеке, остальные сцены не затрагиваются.">Сделать пробу</button></div><div class="sc-tests" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px"></div></details>
         <div class="sc-refs" style="margin-top:8px"><div class="hint sc-rhint" style="font-size:12px"></div><div class="sc-thumbs" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:6px"></div></div>`;
+      { const r0 = $('input[type=range]', c);
+        if (r0 && sec > 15) { r0.max = '25'; r0.value = String(Math.min(25, sec)); window.sceneLongOn(c, true); } }
       // nine places of their own, made like the common ones: an empty place offers itself, a filled
       // one shows the picture with its number and a cross, and a photo can be dropped right into it
       const box0 = $('.sc-thumbs', c);
@@ -8102,7 +8129,16 @@ function makeRefMode(cfg) {
       };
     });
   $('.sc-m', c).onclick = () => { const r = $('input[type=range]', c); r.value = Math.max(3, +r.value - 1); r.dispatchEvent(new Event('input')); };
-      $('.sc-p', c).onclick = () => { const r = $('input[type=range]', c); r.value = Math.min(15, +r.value + 1); r.dispatchEvent(new Event('input')); };
+      $('.sc-p', c).onclick = () => { const r = $('input[type=range]', c); r.value = Math.min(window.sceneCap(c), +r.value + 1); r.dispatchEvent(new Event('input')); };
+      const lbox = $('.sc-long-c', c);
+      if (lbox) lbox.onchange = () => {
+        const r = $('input[type=range]', c);
+        const back = !lbox.checked && +r.value > SCENE_MAX;
+        window.sceneLongOn(c, lbox.checked);
+        if (back) { r.dispatchEvent(new Event('input')); renderTL(); recount(); refreshStates(); if (root._save && !root._restoring) root._save(); toast('Сцена вернулась к 15 с: выключили длинный режим'); return; }
+        renderTL(); recount(); refreshStates();
+        if (root._save && !root._restoring) root._save();
+      };
       $('textarea', c).value = txt;
       $('textarea', c).insertAdjacentHTML('afterend', '<div class="sc-tokens" style="display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 0"></div><div class="sc-auds" style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:6px"></div><div class="sc-trimhost" hidden style="margin-top:8px"></div>');
       // - - - audio of THIS scene: up to three files, trimmed with the same instrument as the
@@ -8406,10 +8442,11 @@ function makeRefMode(cfg) {
         const dn = (c._dn || {})[draft ? 'draft' : 'final'] || (c._dn || {}).final || (c._dn || {}).draft;
         const rec = dn && dn.id && typeof byId === 'function' ? byId(dn.id) : null;
         const mkSec = Math.max(0, +(dn && dn.sec) || +(rec && rec.len) || 0);
+        const capC = window.sceneCap(c);   // предел длины - у сцены свой: у длинной шкала 3-25
         const mkTxt = mkSec >= 3 && Math.abs(mkSec - sec) > .05 ? ' · в клипе ' + (Math.round(mkSec * 10) / 10).toString().replace('.', ',') + ' с' : '';
-        const mk = mkSec >= 3 ? `<i class="tl-mark" style="width:calc((100% - 42px - 44px) * ${Math.round((Math.min(15, mkSec) - 3) / 12 * 100)} / 100)" title="Красная полоска внизу: ${mkSec.toFixed(1).replace('.', ',')} с этой сцены уже лежат в готовом клипе"></i>` : '';
+        const mk = mkSec >= 3 ? `<i class="tl-mark" style="width:calc((100% - 42px - 44px) * ${Math.round((Math.min(capC, mkSec) - 3) / (capC - 3) * 100)} / 100)" title="Красная полоска внизу: ${mkSec.toFixed(1).replace('.', ',')} с этой сцены уже лежат в готовом клипе"></i>` : '';
         // the filled part of the chip is the scene's length: 3 s at the left edge, 15 s at the right
-      const pct = Math.round((sec - 3) / 12 * 100);
+      const pct = Math.round((sec - 3) / (capC - 3) * 100);
       return `<div class="tl-b${i === root._sel ? ' sel' : ''}${done ? (draft ? ' draft' : ' done') : old ? ' stale' : ''}${fr[i] ? ' cut' : ''}" data-i="${i}" title="${fr[i] ? 'Новый план (смена кадра). ' : ''}Тяните внутри фрагмента - время сцены · за правый край - точно · ручкой слева - порядок"><i class="tl-grip" draggable="true" data-grip="${i}" title="Сцена ${i + 1}. Кружок перетаскивает сцену и открывает её; когда сцена выбрана - кружок залит">${i + 1}</i><i class="tl-fill" style="width:calc((100% - 42px - 44px) * ${pct} / 100)"></i>${mk}<div class="tl-l">${sec} с${done ? (draft ? ' · черновик ✓' : ' · готово ✓') : old ? ' · старая версия' : ''}${mkTxt}${fr[i] ? ' · ✂ новый план' : ''}</div><i class="tl-x" data-scdel="${i}" title="Убрать эту сцену">✕</i><i class="tl-h" title="Тяните: длина сцены"></i></div>`;
       }).join('') + '<div class="tl-b tl-add" data-add="1" style="align-items:center;justify-content:center" title="Добавить фрагмент">+</div>';
       const dmb = $('.lm-q button[data-mq="draft"]', root);
@@ -8454,7 +8491,8 @@ function makeRefMode(cfg) {
 
       const avail = Math.max(1, r.width - off - back);
       const p = Math.min(1, Math.max(0, (clientX - r.left - off) / avail));
-      return Math.max(3, Math.min(15, Math.round(3 + p * 12)));
+      const capC = window.sceneCap($$('.sc', root)[+b.dataset.i] || null);
+      return Math.max(3, Math.min(capC, Math.round(3 + p * (capC - 3))));
     };
     tl.addEventListener('pointermove', e => {
       const s = root._dragSec;
@@ -8466,7 +8504,7 @@ function makeRefMode(cfg) {
         return;
       }
       const d = root._drag; if (!d) return;
-      const sec = Math.max(3, Math.min(15, Math.round(d.sec0 + (e.clientX - d.x0) / TL_PPS)));
+      const sec = Math.max(3, Math.min(window.sceneCap($$('.sc', root)[d.i] || null), Math.round(d.sec0 + (e.clientX - d.x0) / TL_PPS)));
       if (+d.sl.value !== sec) { d.sl.value = sec; d.sl.dispatchEvent(new Event('input')); }
     });
     tl.addEventListener('pointerup', () => { root._drag = null; root._dragSec = null; });

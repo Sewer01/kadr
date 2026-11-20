@@ -564,6 +564,7 @@ def montage_graph(names, sizes, cuts=None, timing=None, starts=None):
 
 
 LONG_MAX_SCENE = 15      # seconds per scene (the model is trained for about 5-15 s)
+LONG_MAX_SCENE_LONG = 25  # seconds: the same scene when its long mode is switched on
 LONG_OVERLAP = 1.0       # seconds of the previous scene that the next one continues from
 
 

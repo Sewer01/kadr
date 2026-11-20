@@ -2983,13 +2983,15 @@ class App:
         act = getattr(self, "_studio_mode", "long") == "actionsc"
         self._long_run = re.sub(r"[^A-Za-z0-9]", "", form.get("run", ""))[:32]   # the references are kept even if the request is refused later
         try:
-            scenes = [(str(x.get("prompt", "")).strip(), float(x.get("sec", 10)), bool(x.get("fresh"))) for x in json.loads(form.get("scenes") or "[]")]
+            scenes = [(str(x.get("prompt", "")).strip(), float(x.get("sec", 10)), bool(x.get("fresh")), bool(x.get("lng")))
+                    for x in json.loads(form.get("scenes") or "[]")]
         except (ValueError, TypeError, AttributeError):
             scenes = []
         sc_audios = [[files.get(f"saudio{i}_{j}") for j in range(3)] for i in range(len(scenes))]   # по сценам, места не сдвигаются
-        scenes = [(p, min(wf.LONG_MAX_SCENE, max(3.0, sec)), [files.get(f"simg{i}_{j}") for j in range(9)], fr)
+        scenes = [(p, min(wf.LONG_MAX_SCENE_LONG if lg else wf.LONG_MAX_SCENE, max(3.0, sec)),
+                   [files.get(f"simg{i}_{j}") for j in range(9)], fr)
                   # the places are kept: an empty place stays empty and does not shift the numbers
-                  for i, (p, sec, fr) in enumerate(scenes) if p][:catalog.LONG_MAX_SCENES]
+                  for i, (p, sec, fr, lg) in enumerate(scenes) if p][:catalog.LONG_MAX_SCENES]
                   # every scene may bring its own references (instead of the common ones)
         fresh = [fr for *_, fr in scenes]   # a scene marked as a NEW SHOT does not continue the previous one (no quality loss)
         scenes = [(p, sec, extra) for p, sec, extra, _ in scenes]
