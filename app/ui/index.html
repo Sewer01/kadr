@@ -10650,6 +10650,47 @@ const spWordAround = (v, pos) => {
   while (b < v.length && isCh(v[b])) b++;
   return { a, b, word: v.slice(a, b) };
 };
+/* Меню по правой кнопке обязано помещаться в окне программы целиком. Раньше его граница
+   считалась по координатам мыши напрямую, но интерфейс живёт с масштабом UI_Z.ui:
+   координаты мыши и координаты разметки различаются в этот раз, и при увеличенном
+   интерфейсе меню уезжало за нижний край. Ставилось оно строго вниз от курсора, хотя
+   под курсором места могло не быть вовсе. Теперь позиция считается в координатах
+   разметки, при нехватке места внизу меню встаёт вверх от курсора, а когда меню
+   вырастает (подоспели варианты слов) - пересчитывается само. */
+window.menuZoom = () => {
+  // масштаб интерфейса задаётся свойством zoom у корня; переменная UI_Z живёт в области
+  // видимости скрипта и в window её нет, поэтому надежнее один раз измерить фактический
+  // размер: стопиксельная планка показывает, во сколько раз пикселы разметки крупнее
+  try {
+    const t = document.createElement('div');
+    t.style.cssText = 'position:fixed;left:0;top:0;width:100px;height:8px;visibility:hidden;pointer-events:none';
+    document.body.append(t);
+    const got = (t.getBoundingClientRect().width || 100) / 100;
+    t.remove();
+    if (got > 0.2) return got;
+  } catch (e) { }
+  try { return (typeof UI_Z !== 'undefined' && +UI_Z.ui) || 1; } catch (e) { return 1; }
+};
+window.placeAtCursor = (el, x, y) => {
+  if (x != null) { el.__x = x; el.__y = y; }
+  const z = window.menuZoom();
+  const W = (window.innerWidth || 1200) / z, H = (window.innerHeight || 800) / z;
+  const cx = (+el.__x || 0) / z, cy = (+el.__y || 0) / z;
+  const wid = el.offsetWidth || 240;
+  el.style.maxHeight = Math.max(120, H - 12) + 'px';   // длинное меню прокручивается внутри, а не растёт за край
+  const hei = Math.min(el.offsetHeight || 170, H - 12);
+  let ly = cy + 2;                                     // вниз от курсора, как привычно
+  if (ly + hei + 8 > H) ly = Math.max(4, Math.min(cy - hei - 6, H - hei - 8));
+  el.style.left = Math.max(4, Math.min(cx, W - wid - 6)) + 'px';
+  el.style.top = Math.max(4, ly) + 'px';
+};
+window.watchMenu = el => {
+  const again = () => { try { window.placeAtCursor(el); } catch (e) { } };
+  try { new ResizeObserver(again).observe(el); } catch (e) { }
+  // варианты слов приходят ответом модели: меню меняется и до того, как наблюдатель успевает
+  [60, 260, 700, 1400].forEach(ms => setTimeout(again, ms));
+};
+
 document.addEventListener('contextmenu', e => {
   const ta = e.target.closest && e.target.closest('textarea');
   if (!ta || ta.getAttribute('spellcheck') === 'false' || ta.disabled) return;
@@ -10707,9 +10748,8 @@ document.addEventListener('contextmenu', e => {
   });
   spItem(menu, 'Выделить всё', () => { ta.focus(); ta.select(); });
   document.body.append(menu);
-  const r = menu.getBoundingClientRect();
-  menu.style.left = Math.max(4, Math.min(e.clientX, (window.innerWidth || 1200) - r.width - 8)) + 'px';
-  menu.style.top = Math.max(4, Math.min(e.clientY, (window.innerHeight || 800) - r.height - 8)) + 'px';
+  window.placeAtCursor(menu, e.clientX, e.clientY);
+  window.watchMenu(menu);   // варианты слов доходят позже и меню растёт в длину
 });
 document.addEventListener('pointerdown', e => { if (SP_MENU && !SP_MENU.contains(e.target)) spClose(); }, true);
 document.addEventListener('keydown', e => { if (e.key === 'Escape') spClose(); });
@@ -10862,8 +10902,8 @@ $('#agClear').onclick = () => { const ta = $('#agIn'); ta.value = ''; ta.dispatc
       menu.append(b);
     });
     document.body.append(menu);
-    menu.style.left = Math.min(e.clientX, innerWidth - menu.offsetWidth - 6) + 'px';
-    menu.style.top = Math.min(e.clientY, innerHeight - menu.offsetHeight - 6) + 'px';
+    window.placeAtCursor(menu, e.clientX, e.clientY);
+    window.watchMenu(menu);
   });
   addEventListener('mousedown', e => { if (menu && !menu.contains(e.target)) close(); }, true);
   addEventListener('blur', close); addEventListener('scroll', close, true); addEventListener('resize', close);
