@@ -85,9 +85,9 @@
 #cmpFull{position:fixed;inset:0;z-index:80;background:rgba(0,0,0,.96);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:2vh 2vw}
 #cmpFull .cmp-in{height:88vh;width:auto;max-width:96vw;max-height:none;margin:0}
 .tl{display:grid;grid-template-columns:repeat(2,minmax(0,300px));gap:6px;align-items:stretch;margin:6px 0 8px;padding-bottom:2px}
-.tl-b{--tlnav:92px;position:relative;box-sizing:border-box;height:40px;overflow:hidden;border-radius:9px;border:1.5px solid var(--line-2);background:var(--surface-2);padding:0 8px;cursor:pointer;display:flex;align-items:center;gap:8px;font-size:12px}
+.tl-b{position:relative;box-sizing:border-box;height:40px;overflow:hidden;border-radius:9px;border:1.5px solid var(--line-2);background:var(--surface-2);padding:0 8px;cursor:pointer;display:flex;align-items:center;gap:8px;font-size:12px}
 .tl-l{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;position:relative;z-index:1}
-.tl-fill{position:absolute;left:var(--tlnav,42px);top:0;bottom:0;background:rgba(var(--accent-rgb),.22);pointer-events:none}
+.tl-fill{position:absolute;left:42px;top:0;bottom:0;background:rgba(var(--accent-rgb),.22);pointer-events:none}
 .tl-fill::after{content:'';position:absolute;right:0;top:0;bottom:0;width:2px;background:rgb(var(--accent-rgb));opacity:.9}
 /* How much of the scene is already in the clip: a red strip along the bottom of the chip, from the
    number to the ready length. A vertical line here stood right beside the handle that sets the
@@ -96,6 +96,13 @@
    singing voice badly, and a wrong line sent to the model sings nonsense on purpose */
 /* the scene's own number: a circle for one digit, it grows into a pill for two (there are up to
    twenty scenes, so two digits is the norm, not an edge case) */
+.sc-nav{flex:0 0 auto;width:34px;height:34px;display:inline-flex;align-items:center;justify-content:center;
+  font-size:26px;font-weight:900;line-height:1;font-style:normal;cursor:pointer;border-radius:10px;
+  border:1.5px solid rgba(var(--accent-rgb),.55);background:var(--surface-2);color:var(--txt);
+  padding-bottom:3px;transition:background .12s,border-color .12s,opacity .12s}
+.sc-nav:hover{background:var(--accent);border-color:var(--accent);color:#fff}
+.sc-nav.off{opacity:.28;cursor:default;border-color:var(--line-2)}
+.sc-nav.off:hover{background:var(--surface-2);color:var(--txt);border-color:var(--line-2)}
 .sc-no{flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;min-width:28px;height:28px;
  padding:0 7px;border-radius:999px;background:var(--accent);color:#fff;font-size:15px;font-weight:800;
  line-height:1;font-family:inherit}
@@ -106,7 +113,7 @@
 .atrim .at-words textarea{height:30px;min-height:30px;max-height:30px;resize:none;overflow:auto;
  font-size:13px;line-height:1.5;padding:5px 10px;border-radius:9px}
 .atrim .at-words .sc-wordbtns{display:flex;gap:6px;flex-wrap:wrap}
-.tl-mark{position:absolute;left:var(--tlnav,42px);bottom:3px;height:3px;background:#ff4d5e;border-radius:2px;
+.tl-mark{position:absolute;left:42px;bottom:3px;height:3px;background:#ff4d5e;border-radius:2px;
  box-shadow:0 0 0 1px rgba(0,0,0,.35);pointer-events:none;z-index:2}
 /* a row of scene buttons keeps one height: when one label wraps to two lines, the others stretch
    to it instead of the whole card jumping under the finger (the row .sc-act holds «Сделать эту
@@ -148,11 +155,6 @@
 .tl-b.dragging{opacity:.45}.tl-b.over{outline:2px dashed var(--accent);outline-offset:2px}
 .tl-h{position:absolute;right:-4px;top:4px;bottom:4px;width:10px;cursor:ew-resize;z-index:2}.tl-h::after{content:'';position:absolute;left:3px;top:10px;bottom:10px;width:4px;border-radius:3px;background:var(--accent);opacity:.55}.tl-b:hover .tl-h::after,.tl-b.sel .tl-h::after{opacity:1}
 .tl{touch-action:pan-x;user-select:none}
-.tl-nav{flex:none;width:16px;height:28px;display:grid;place-items:center;font-size:17px;line-height:1;
-  color:var(--muted);border-radius:6px;cursor:pointer;z-index:1;font-style:normal}
-.tl-nav:hover{background:var(--surface);color:var(--txt)}
-.tl-nav.off{opacity:.3;cursor:default}
-.tl-nav.off:hover{background:none;color:var(--muted)}
 .tl-add{border-style:dashed;min-width:56px;font-size:20px;font-weight:800;color:var(--muted)}
 .tl-player{background:#000;border-radius:12px;overflow:hidden;min-height:90px;display:grid;place-items:center;margin-bottom:8px}
 .tl-player.empty{background:transparent;min-height:0}
@@ -8025,7 +8027,7 @@ function makeRefMode(cfg) {
       const c = document.createElement('div'); c.className = 'sc'; c._dn = { draft: null, final: null };
       Object.defineProperty(c, '_done', { get: () => c._dn[root._q || 'final'], set: v => { c._dn[root._q || 'final'] = v; }, configurable: true });
       c.style.cssText = 'margin:0 0 10px;padding:12px;border:1px solid var(--line);border-radius:12px';
-      c.innerHTML = `<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px"><b class="sc-no" title="Номер сцены: под ним она лежит на ленте и в Библиотеке"></b><input type="range" min="3" max="15" step="1" value="${sec}" style="display:none"><button class="btn sc-m" type="button" title="Короче на секунду" style="padding:2px 9px">−</button><button class="btn sc-p" type="button" title="Длиннее на секунду" style="padding:2px 9px">+</button><output class="sc-sec" title="Длительность этой сцены"></output><span class="hint sc-win" style="flex:1"></span></div><textarea placeholder="Что происходит в этой сцене…" style="min-height:90px"></textarea>
+      c.innerHTML = `<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px"><i class="sc-nav" data-dir="-1" title="К предыдущей сцене">‹</i><b class="sc-no" title="Номер сцены: под ним она лежит на ленте и в Библиотеке"></b><i class="sc-nav" data-dir="1" title="К следующей сцене">›</i><input type="range" min="3" max="15" step="1" value="${sec}" style="display:none"><button class="btn sc-m" type="button" title="Короче на секунду" style="padding:2px 9px">−</button><button class="btn sc-p" type="button" title="Длиннее на секунду" style="padding:2px 9px">+</button><output class="sc-sec" title="Длительность этой сцены"></output><span class="hint sc-win" style="flex:1"></span></div><textarea placeholder="Что происходит в этой сцене…" style="min-height:90px"></textarea>
 <details class="sc-tdet" style="margin-top:8px"><summary class="hint" style="cursor:pointer;font-size:12px">Проба размера для этой сцены</summary><div class="sc-tst" style="margin-top:6px;display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span class="hint" style="font-size:12px">Попробовать только эту сцену в другом размере (остальные не меняются):</span><select class="sc-tq">${QUALITY.map(q => `<option value="${q.id}">${q.res}</option>`).join('')}</select><button class="btn sc-tbtn" type="button" title="Сцена считается отдельно, в выбранном размере, на 8 шагов. Результат появится ниже и в Библиотеке, остальные сцены не затрагиваются.">Сделать пробу</button></div><div class="sc-tests" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px"></div></details>
         <div class="sc-refs" style="margin-top:8px"><div class="hint sc-rhint" style="font-size:12px"></div><div class="sc-thumbs" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:6px"></div></div>`;
       // nine places of their own, made like the common ones: an empty place offers itself, a filled
@@ -8089,7 +8091,17 @@ function makeRefMode(cfg) {
       // (the places take pictures themselves: click a tile or drop a photo into it)
       paintRefs();
 
-      $('.sc-m', c).onclick = () => { const r = $('input[type=range]', c); r.value = Math.max(3, +r.value - 1); r.dispatchEvent(new Event('input')); };
+      c.querySelectorAll('.sc-nav').forEach(n => {
+      n.onclick = () => {
+        const all = $$('.sc', root), at = all.indexOf(c), to = at + (+n.dataset.dir);
+        if (!all[to]) { toast(n.title); return; }
+        root._sel = to; root._target = to; root._q = root._q || 'final';
+        renderTL(); showClip(); refreshStates(); recount();
+        if (root._save && !root._restoring) root._save();
+        all[to].scrollIntoView({ block: 'nearest' });
+      };
+    });
+  $('.sc-m', c).onclick = () => { const r = $('input[type=range]', c); r.value = Math.max(3, +r.value - 1); r.dispatchEvent(new Event('input')); };
       $('.sc-p', c).onclick = () => { const r = $('input[type=range]', c); r.value = Math.min(15, +r.value + 1); r.dispatchEvent(new Event('input')); };
       $('textarea', c).value = txt;
       $('textarea', c).insertAdjacentHTML('afterend', '<div class="sc-tokens" style="display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 0"></div><div class="sc-auds" style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:6px"></div><div class="sc-trimhost" hidden style="margin-top:8px"></div>');
@@ -8375,6 +8387,15 @@ function makeRefMode(cfg) {
       const all = $$('.sc', root), fr = freshAt(), ready = readyUpTo();
       root._sel = Math.max(0, Math.min(all.length - 1, root._sel || 0));
       all.forEach((c, j) => c.classList.toggle('sel', j === root._sel));
+      // стрелки у кружка номера живут соседними сценами: где соседа нет, там стрелка гаснет
+      all.forEach((c, i) => {
+        $$('.sc-nav', c).forEach(n => {
+          const to = i + (+n.dataset.dir);
+          const ok = !!all[to];
+          n.classList.toggle('off', !ok);
+          n.title = ok ? ('К сцене ' + (to + 1)) : (Number(n.dataset.dir) < 0 ? 'Это первая сцена' : 'Это последняя сцена');
+        });
+      });
       tl.innerHTML = all.map((c, i) => {
         const sec = +$('input[type=range]', c).value, done = sigOk(c), draft = root._q === 'draft', old = !done && !!(c._old || {})[root._q];
         /* How much of the scene really lies in the finished clip: the slider may already show another
@@ -8386,14 +8407,10 @@ function makeRefMode(cfg) {
         const rec = dn && dn.id && typeof byId === 'function' ? byId(dn.id) : null;
         const mkSec = Math.max(0, +(dn && dn.sec) || +(rec && rec.len) || 0);
         const mkTxt = mkSec >= 3 && Math.abs(mkSec - sec) > .05 ? ' · в клипе ' + (Math.round(mkSec * 10) / 10).toString().replace('.', ',') + ' с' : '';
-        const mk = mkSec >= 3 ? `<i class="tl-mark" style="width:calc((100% - var(--tlnav,42px) - 44px) * ${Math.round((Math.min(15, mkSec) - 3) / 12 * 100)} / 100)" title="Красная полоска внизу: ${mkSec.toFixed(1).replace('.', ',')} с этой сцены уже лежат в готовом клипе"></i>` : '';
+        const mk = mkSec >= 3 ? `<i class="tl-mark" style="width:calc((100% - 42px - 44px) * ${Math.round((Math.min(15, mkSec) - 3) / 12 * 100)} / 100)" title="Красная полоска внизу: ${mkSec.toFixed(1).replace('.', ',')} с этой сцены уже лежат в готовом клипе"></i>` : '';
         // the filled part of the chip is the scene's length: 3 s at the left edge, 15 s at the right
       const pct = Math.round((sec - 3) / 12 * 100);
-    // стрелки вокруг кружка: налево - к предыдущей сцене, направо - к следующей;
-    // на краю ленты нужной сцены нет, и стрелка гаснет, а не делает вид
-    const navL = `<i class="tl-nav${i === 0 ? ' off' : ''}" data-nav="${i - 1}" title="${i === 0 ? 'Предыдущей сцены нет' : 'К предыдущей сцене'}">‹</i>`;
-    const navR = `<i class="tl-nav${i === all.length - 1 ? ' off' : ''}" data-nav="${i + 1}" title="${i === all.length - 1 ? 'Следующей сцены нет' : 'К следующей сцене'}">›</i>`;
-      return `<div class="tl-b${i === root._sel ? ' sel' : ''}${done ? (draft ? ' draft' : ' done') : old ? ' stale' : ''}${fr[i] ? ' cut' : ''}" data-i="${i}" title="${fr[i] ? 'Новый план (смена кадра). ' : ''}Тяните внутри фрагмента - время сцены · за правый край - точно · ручкой слева - порядок">${navL}<i class="tl-grip" draggable="true" data-grip="${i}" title="Сцена ${i + 1}. Кружок перетаскивает сцену и открывает её; когда сцена выбрана - кружок залит">${i + 1}</i>${navR}<i class="tl-fill" style="width:calc((100% - var(--tlnav,42px) - 44px) * ${pct} / 100)"></i>${mk}<div class="tl-l">${sec} с${done ? (draft ? ' · черновик ✓' : ' · готово ✓') : old ? ' · старая версия' : ''}${mkTxt}${fr[i] ? ' · ✂ новый план' : ''}</div><i class="tl-x" data-scdel="${i}" title="Убрать эту сцену">✕</i><i class="tl-h" title="Тяните: длина сцены"></i></div>`;
+      return `<div class="tl-b${i === root._sel ? ' sel' : ''}${done ? (draft ? ' draft' : ' done') : old ? ' stale' : ''}${fr[i] ? ' cut' : ''}" data-i="${i}" title="${fr[i] ? 'Новый план (смена кадра). ' : ''}Тяните внутри фрагмента - время сцены · за правый край - точно · ручкой слева - порядок"><i class="tl-grip" draggable="true" data-grip="${i}" title="Сцена ${i + 1}. Кружок перетаскивает сцену и открывает её; когда сцена выбрана - кружок залит">${i + 1}</i><i class="tl-fill" style="width:calc((100% - 42px - 44px) * ${pct} / 100)"></i>${mk}<div class="tl-l">${sec} с${done ? (draft ? ' · черновик ✓' : ' · готово ✓') : old ? ' · старая версия' : ''}${mkTxt}${fr[i] ? ' · ✂ новый план' : ''}</div><i class="tl-x" data-scdel="${i}" title="Убрать эту сцену">✕</i><i class="tl-h" title="Тяните: длина сцены"></i></div>`;
       }).join('') + '<div class="tl-b tl-add" data-add="1" style="align-items:center;justify-content:center" title="Добавить фрагмент">+</div>';
       const dmb = $('.lm-q button[data-mq="draft"]', root);
       dmb.disabled = false;   // pressing it is how you find out you need a file - and how you get it
@@ -8422,7 +8439,7 @@ function makeRefMode(cfg) {
     tl.addEventListener('pointerdown', e => {
       // a press on the body of a chip is a hand on the scene's time: the filled part follows the finger
       const b = e.target.closest('.tl-b');
-      if (!b || b.dataset.add || e.target.closest('.tl-h') || e.target.closest('.tl-x') || e.target.closest('[data-grip]') || e.target.closest('.tl-nav')) return;
+      if (!b || b.dataset.add || e.target.closest('.tl-h') || e.target.closest('.tl-x') || e.target.closest('[data-grip]')) return;
       const c = $$('.sc', root)[+b.dataset.i]; if (!c) return;
       const sl = $('input[type=range]', c); if (!sl) return;
       e.preventDefault();
@@ -8433,11 +8450,7 @@ function makeRefMode(cfg) {
       // 3 секунды начинаются там, где кончается кружок с номером: полоса времени и рука
       // человека должны считать один и тот же отрезок, иначе минимальная сцена тянется
       // из-под номера и первая треть жеста ничего не меняет
-      const r = b.getBoundingClientRect(), back = 44;   // тот же отступ справа: заглушка не должна сесть на крестик
-    // левый край времени - правый край второй стрелки: номер сцены и стрелки живут в
-    // разметке, а жест человека обязан считать ровно тот же отрезок, что и полоса
-    const g = b.querySelector('.tl-nav[data-dir="1"]') || b.querySelector('.tl-grip');
-    const off = g ? Math.round(g.getBoundingClientRect().right - r.left) + 6 : 42;
+      const r = b.getBoundingClientRect(), off = 42, back = 44;   // the same inset on the right: the cap must not sit on the cross
 
       const avail = Math.max(1, r.width - off - back);
       const p = Math.min(1, Math.max(0, (clientX - r.left - off) / avail));
@@ -8458,18 +8471,6 @@ function makeRefMode(cfg) {
     });
     tl.addEventListener('pointerup', () => { root._drag = null; root._dragSec = null; });
     tl.addEventListener('pointercancel', () => { root._drag = null; root._dragSec = null; });
-  // стрелки около кружка переставляют выбор сцены: тот же переход, что клик по фишке,
-  // но руками попадает точнее, и на краях ленты стрелка не активна
-  tl.addEventListener('click', e => {
-    const n = e.target.closest('.tl-nav'); if (!n) return;
-    e.preventDefault(); e.stopPropagation();
-    if (n.classList.contains('off')) { toast(n.title); return; }
-    const all = $$('.sc', root), to = +n.dataset.nav;
-    if (!all[to] || to === root._sel) return;
-    root._sel = to; root._target = to;
-    renderTL(); showClip(); refreshStates();
-    const chip = $$('.tl-b', tl)[to]; if (chip && chip.scrollIntoView) chip.scrollIntoView({ block: 'nearest', inline: 'nearest' });
-  });
     /* The order of the scenes is the order of the film, and the hand wants to change it without
        dragging whole cards around: chips of the ribbon carry their scene number, and dropping one
        onto another moves the scene there. Everything keyed by the card itself - its text, photos,
@@ -8536,7 +8537,6 @@ function makeRefMode(cfg) {
       }
       const b = e.target.closest('.tl-b'); if (!b) return;
       if (b.dataset.add) { $('#lmAdd', root).click(); return; }
-      if (e.target.closest('.tl-nav')) return;   // стрелка у номера сама решает, на какую сцену перейти
       root._sel = +b.dataset.i; root._target = root._sel;   // the run button works on the scene you picked
       renderTL(); showClip(); refreshStates();
     };
