@@ -10207,11 +10207,17 @@ async function setChatAudio(wavBlob, name, dur, where) {
   if (needSpeech()) return false;
   where = where || audioTagFor(name, dur);
   AG.audios = AG.audios || [];
-  // the same file cut again replaces its own entry, a different one is added next to it
   const file = new File([wavBlob], name.replace(/\.[^.]+$/, '') + '.wav', { type: 'audio/wav' });
   file._dur = dur;
   const key = await window.audioKey(file);   // тот же кусок - та же запись, другой кусок - рядом
-  const at = AG.audios.findIndex(x => x.key === key);
+  /* Одно место сцены - одно аудио. Картинки так уже делают, а аудио вставалось рядом:
+     второе нажатие «в агента» удваивало строки под одним тегом, и в промпт уходило
+     неизвестно какое из двух исполнений одной и той же сцены. */
+  const tagOf = s => { const m = /<\s*Audio\s*(\d+)\s*>/i.exec(s || ''); return m ? +m[1] : 0; };
+  const tg = tagOf(where);
+  let at = AG.audios.findIndex(x => x.key === key);
+  if (at < 0 && tg) at = AG.audios.findIndex(x => tagOf(x.where) === tg);
+  if (at < 0) at = AG.audios.findIndex(x => x.name === name && Math.abs((x.dur || 0) - dur) < .1 && (x.where || '') === (where || ''));
   const a = { name, dur, where: where || '', text: '', busy: true, lang: '', langName: '', file, key };
   if (at >= 0) AG.audios.splice(at, 1, a); else AG.audios.push(a);
   showAudioBox();
