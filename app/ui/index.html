@@ -1188,6 +1188,11 @@ body.dropping::after{content:'Отпустите — программа разл
 .li-act button:hover{background:var(--accent)}
 .li-act svg,.li-fav svg{width:15px;height:15px}
 .li-fav{position:absolute;top:8px;left:8px;color:var(--warn)}
+/* знак режима в углу миниатюры: С - субтитры, 48 или 60 - плавность. Правый верх свободен:
+   звезда и галочка выбора живут слева. На наведении правый угол отдают кнопкам, поэтому знак
+   уезжает под них (в режиме выбора кнопок нет, и знак остаётся на месте) */
+.li-tag{position:absolute;top:8px;right:8px;font-size:10px;font-weight:800;line-height:1;padding:4px 6px;border-radius:7px;color:var(--pink);background:rgba(var(--ov-rgb),.72);backdrop-filter:blur(6px);pointer-events:none;transition:.15s}
+.lib:not(.selecting) .li:hover .li-tag{transform:translateY(36px)}
 .li-check{position:absolute;top:8px;left:8px;width:24px;height:24px;border-radius:7px;border:2px solid #fff;background:rgba(var(--ov-rgb),.5);display:none;place-items:center;font-size:13px;color:#fff}
 .lib.selecting .li-check{display:grid}
 .lib.selecting .li-act,.lib.selecting .li-play,.lib.selecting .li-fav{display:none}
@@ -6344,6 +6349,17 @@ function addToLib(item, date = new Date()) {
   renderLib();
   window.trayFill?.();
 }
+// знак режима на миниатюре: «С» - запись сделана кнопкой «Субтитры…», «48» или «60» - кнопкой
+// «Плавность…», «С 60» - если поля есть оба. У обычной записи знака нет, и карточка не меняется
+function libTag(it) {
+  const s = it.subtitled && typeof it.subtitled === 'object' ? it.subtitled : null;
+  const f = it.smoothed && typeof it.smoothed === 'object' ? +it.smoothed.fps : 0;
+  const fps = (f === 48 || f === 60) ? String(f) : '';
+  if (!s && !fps) return '';
+  const mark = [s ? 'С' : '', fps].filter(Boolean).join(' ');
+  const title = s && fps ? `Субтитры и плавность ${fps} кадров в секунду` : s ? 'Субтитры' : `Плавность ${fps} кадров в секунду`;
+  return `<span class="li-tag" title="${title}">${mark}</span>`;
+}
 window.renderLib = renderLib;   // a keepsake saved from any bench must be able to ask for a redraw
 function renderLib() {
   $('#libBadge').textContent = LIB.length;
@@ -6357,6 +6373,7 @@ function renderLib() {
           : it.kind === 'image' ? `<img src="${it.url}" alt="" loading="lazy">` : it.url ? `<video src="${it.url}#t=0.5" preload="metadata" muted loop playsinline></video>` : `<img src="${it.thumb}" alt="">`}
         ${it.kind === 'image' ? '' : `<div class="li-play"><i>${ICON.play}</i></div>`}
         ${it.fav ? `<span class="li-fav">${ICON.star}</span>` : ''}
+        ${libTag(it)}
         <span class="li-check">${selected.has(it.id) ? '✓' : ''}</span>
         <div class="li-act">
           <button data-act="use" title="Использовать в workflow">${ICON.use}</button>
@@ -11500,9 +11517,10 @@ $('#mlist').addEventListener('click', async e => {
 /* ---------- improve quality of a finished video (SeedVR2) ---------- */
 $('#vwUp').onclick = () => openUpscale((byId(openId) || openItem));
 /* ---------- субтитры поверх готового клипа ---------- */
-$('#vwSub').onclick = e => {
-  const it = byId(openId) || openItem; if (!it) return;
-  document.querySelectorAll('.ctxm').forEach(x => x.remove());   // старое меню не должно остаться под новым
+// маленькое меню у курсора: тем же способом, что и остальные контекстные меню (div.ctxm,
+// закрытие по клику вне и по Escape); записи - тройки [текст, подсказка, что сделать]
+function subMenu(x, y, items) {
+  document.querySelectorAll('.ctxm').forEach(z => z.remove());   // старое меню не должно остаться под новым
   const menu = document.createElement('div'); menu.className = 'ctxm';
   const close = () => {
     menu.remove();
@@ -11511,34 +11529,52 @@ $('#vwSub').onclick = e => {
   };
   const off = ev => { if (!menu.contains(ev.target)) close(); };
   const onKey = ev => { if (ev.key === 'Escape') close(); };
-  [['Понизу, обычные', 'bottom'], ['Понизу, крупные', 'big'], ['По центру', 'center']].forEach(([label, place]) => {
-    const b = document.createElement('button'); b.type = 'button'; b.textContent = label;
-    b.title = 'Слова лягут поверх видео: ' + label.toLowerCase();
-    b.onclick = () => { close(); subMake(it, place); };
+  items.forEach(([label, hint, go]) => {
+    const b = document.createElement('button'); b.type = 'button'; b.textContent = label; b.title = hint;
+    b.onclick = () => { close(); go(); };
     menu.append(b);
   });
   document.body.append(menu);
-  window.placeAtCursor(menu, e.clientX, e.clientY);
+  window.placeAtCursor(menu, x, y);
   window.watchMenu(menu);
   addEventListener('mousedown', off, true); addEventListener('keydown', onKey);
   addEventListener('resize', close); addEventListener('scroll', close, true);
+}
+$('#vwSub').onclick = e => {
+  const it = byId(openId) || openItem; if (!it) return;
+  subMenu(e.clientX, e.clientY, [['Понизу, обычные', 'bottom'], ['Понизу, крупные', 'big'], ['По центру', 'center']]
+    .map(([label, place]) => [label, 'Слова лягут поверх видео: ' + label.toLowerCase(),
+                              () => subAskLang(it, place, e.clientX, e.clientY)]));
 };
-// речь из клипа распознаётся на процессоре: десятки секунд на короткий ролик, поэтому запас большой
-async function subMake(it, place) {
+// второе меню: оставлять распознанное как сказано или просить перевод. Перевод делает локальная
+// модель Агента, поэтому нужны её модель на диске и чтобы генерация видео в это время не шла
+function subAskLang(it, place, x, y) {
+  subMenu(x, y, [
+    ['Оставить как сказано', 'Слова лягут поверх видео такие, какие распознались: ничего не переводится',
+      () => subMake(it, place, false)],
+    ['Перевести на русский', 'Перевод делает локальная модель Агента: нужна её модель на диске и чтобы генерация видео не шла. Метки времени останутся те же',
+      () => subMake(it, place, true)],
+  ]);
+}
+// речь из клипа распознаётся на процессоре: десятки секунд на короткий ролик, поэтому запас большой;
+// перевод моделью Агента добавляет к ожиданию ещё минуты
+async function subMake(it, place, translate) {
   const b = $('#vwSub'); if (!b || b.disabled) return;
   const was = b.textContent;
-  b.disabled = true; b.textContent = 'Распознаю…';
-  toast('Распознаю речь из клипа - нужно подождать');
+  b.disabled = true; b.textContent = translate ? 'Распознаю и перевожу…' : 'Распознаю…';
+  toast(translate ? 'Распознаю речь из клипа и перевожу на русский - нужно подождать'
+                  : 'Распознаю речь из клипа - нужно подождать');
   const ctl = new AbortController();
-  const timer = setTimeout(() => ctl.abort(), 600000);   // 10 минут: ждёт даже длинный ролик
+  const timer = setTimeout(() => ctl.abort(), translate ? 1500000 : 600000);   // 25 минут или 10: ждёт даже длинный ролик
   try {
     const r = await fetch('/api/subtitles', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: it.id, place, lang: 'auto' }), signal: ctl.signal });
+      body: JSON.stringify({ id: it.id, place, lang: 'auto', translate: !!translate }), signal: ctl.signal });
     const txt = await r.text(); let j; try { j = JSON.parse(txt); } catch { j = { error: txt }; }
     if (!r.ok) throw new Error(j.error || r.statusText);
     if (!j.ok) { toast(j.error || 'Субтитры не вышли'); return; }
     await window.h3ReloadLibrary();   // список Библиотеки обновляется общим способом
-    toast(`Субтитры готовы: реплик ${j.lines}. Ролик лёг в Библиотеку отдельно, исходник как был`);
+    toast(`Субтитры готовы: реплик ${j.lines}. Ролик лёг в Библиотеку отдельно, исходник как был`
+      + (j.translated ? ', текст переведён на русский' : ', текст оставлен как сказано' + (j.why ? ' (' + j.why + ')' : '')));
     if (byId(j.id)) openViewer(j.id);
   } catch (err) {
     toast('Субтитры не вышли: ' + String((err && err.message) || err).slice(0, 180));
