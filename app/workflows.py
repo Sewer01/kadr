@@ -192,12 +192,43 @@ def _lora_chain(g, start, loras, base=60):
     return prev
 
 
+def _guide_frames(g, cond_node, vae, first=None, last=None, base=130):
+    """Привязка картинок к кадрам будущего ролика нодой MiniMaxH3AddGuide (есть в ComfyUI).
+
+    Ноду ставят после режима, который даёт conditioning и AV-латент одной нодой (у референсов
+    это MiniMaxH3ReferenceToVideo: выход 0 - conditioning, выход 1 - латент). Первая привязка
+    берёт conditioning у той ноды, вторая - у первой, поэтому кадры не спорят друг с другом.
+    frame_idx 0 - первый кадр ролика, -1 - последний: отрицательные считают от конца.
+    Картинки грузятся на нодах base и base+1, ноды привязки стоят на base+2 и base+3; номера
+    взяты ВЫШЕ загрузок референсов (100+), чтобы «повторить настройки» возвращало референсы
+    в прежнем порядке. Без картинок граф не меняется ни на одну ноду.
+    Возвращает (conditioning для сэмплера, список новых нод).
+    """
+    cond, added = [cond_node, 0], []
+    # картинка передаётся тем же способом, что в video_graph: (номер ноды-загрузки, её выход, имя файла)
+    for k, (frame_idx, (load_id, out, image)) in enumerate(
+            ((0, (str(base), "0", first)), (-1, (str(base + 1), "0", last)))):
+        if not image:
+            continue
+        g[load_id] = {"class_type": "LoadImage", "inputs": {"image": image}}
+        nid = str(base + 2 + k)
+        g[nid] = {"class_type": "MiniMaxH3AddGuide", "inputs": {
+            "positive": cond, "vae": vae, "latent": [cond_node, 1],
+            "image": [load_id, int(out)], "frame_idx": frame_idx}}
+        cond = [nid, 0]
+        added += [load_id, nid]
+    return cond, added
+
+
 def ref_graph(m, prompt, width, height, seconds, seed, images, videos, audios, steps=6,
-              ref_size="max", extra_loras=(), pika=None):
+              ref_size="max", extra_loras=(), pika=None, first=None, last=None):
     """MinimaxH3_Ref to Video (ULTRA SPEED Singularity 4-step), single pass.
 
     The original samples with T8's Dual Clock node (shift video 12 / audio 4, beta);
     here the same shifts go through ComfyUI's built-in MiniMaxH3SigmaShift + beta scheduler.
+
+    `first` и `last` - картинки первого и последнего кадра будущего ролика: они ставятся
+    рядом с референсами (см. _guide_frames) и не обязательны.
     """
     g = {
         "1": {"class_type": "UNETLoader", "inputs": {"unet_name": m["lipsync_unet"], "weight_dtype": "default"}},
@@ -231,8 +262,13 @@ def ref_graph(m, prompt, width, height, seconds, seed, images, videos, audios, s
             "video": ["17", 0], "filename_prefix": "H3Workspace/refs", "format": "auto", "format.codec": "auto"}},
     })
     loaders = _refs(g, "8", images, videos, audios)
+    # кадры начала и конца ставятся ПОВЕРХ референсов: картинка привязывается к первому (0)
+    # и к последнему (-1) кадру, а в сэмплер идёт conditioning последней привязки
+    cond, guides = _guide_frames(g, "8", ["5", 0], first=first, last=last)
+    if guides:
+        g["13"]["inputs"]["conditioning"] = cond
     stages = {n: "load" for n in ["1", "2", "4", "5", "6"] + [k for k in g if k.isdigit() and 60 <= int(k) < 70]}
-    stages.update({n: "encode" for n in ["8"] + loaders})
+    stages.update({n: "encode" for n in ["8"] + loaders + guides})
     stages.update({"14": "sample", "15": "decode", "16": "decode", "17": "save", "18": "save"})
     return g, stages
 

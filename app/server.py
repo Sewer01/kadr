@@ -2881,12 +2881,18 @@ class App:
             "aspect": aspect, "q": quality, "len": seconds, "res": f"{out_w}×{out_h}", "seed": seed,
             "ref_size": ref_size})
 
-    async def read_ref_form(self, req, max_images):
+    async def read_ref_form(self, req, max_images, frames=False):
         fields = tuple(f"img{i}" for i in range(max_images)) + tuple(f"vid{i}" for i in range(3)) + \
             tuple(f"aud{i}" for i in range(3))
+        if frames:
+            fields += ("first", "last")   # картинки первого и последнего кадра: те же имена полей, что в режиме «Видео»
         form, files, prompt, aspect, quality, seed = await self.read_form(req, fields)
         pick = lambda p, n: [files[f"{p}{i}"] for i in range(n) if f"{p}{i}" in files]
         images, videos, audios = pick("img", max_images), pick("vid", 3), pick("aud", 3)
+        if frames:
+            # кадры - не референсы: они не входят в счётчик 12 и не заменяют требование
+            # прикрепить хоть что-то; поле не прислали - будет None
+            form["_frames"] = (files.get("first"), files.get("last"))
         if not images and not videos:
             raise web.HTTPBadRequest(text="Добавьте хотя бы одно референс-изображение")
         if len(images) + len(videos) + len(audios) > 12:
@@ -2971,7 +2977,8 @@ class App:
 
     async def h_generate_refs(self, req):
         await self.need_models("refs")
-        form, prompt, aspect, quality, seed, images, videos, audios, seconds = await self.read_ref_form(req, 9)
+        form, prompt, aspect, quality, seed, images, videos, audios, seconds = await self.read_ref_form(req, 9, frames=True)
+        first, last = form.get("_frames") or (None, None)
         steps = int(form.get("steps", 6)) if form.get("steps", "6").isdigit() else 6
         steps = min(8, max(4, steps))
         ref_size = form.get("ref_size") if form.get("ref_size") in ("match", "max") else "max"
@@ -2984,9 +2991,10 @@ class App:
                                               "Скачайте его в разделе «Настройки» или выберите прежнее ускорение.")
             pika, steps = self.model_names["pika_lora"], max(6, steps)
         graph, stages = wf.ref_graph(self.model_names, wf.lipsync_prompt(prompt, len(images), len(videos)), width, height, seconds, seed, images, videos, audios,
-                                     steps, ref_size, extra, pika)
+                                     steps, ref_size, extra, pika, first=first, last=last)
         sub = f"{len(images)} карт." + (f", {len(videos)} видео" if videos else "") + (f", {len(audios)} аудио" if audios else "") \
-            + f" · {steps} шагов" + (" · Pika" if pika else "")
+            + f" · {steps} шагов" + (" · Pika" if pika else "") \
+            + (" · первый кадр" if first else "") + (" · последний кадр" if last else "")
         return await self.queue(graph, stages, {
             "mode": "refs", "sub": sub, "prompt": prompt, "note": (form.get("note") or "").strip(), "aspect": aspect, "q": quality, "len": seconds,
             "res": f"{width}×{height}", "seed": seed, "steps": steps, "ref_size": ref_size})

@@ -5430,7 +5430,8 @@ function agRefCheck(mode) {
   const root = (typeof RM !== 'undefined' && RM[mode] && RM[mode].root) || document.querySelector(agViewOf(mode));
   if (!root) return [];
   const fill = new Map();
-  $$('label.ref', root).forEach((r, j) => { if (r._file) fill.set('Picture ' + (j + 1), 'общее место ' + (j + 1)); });
+  // кадры ролика - не места референсов, их в тексте нет под номерами (<Picture N>)
+  $$('label.ref:not(.frame)', root).forEach((r, j) => { if (r._file) fill.set('Picture ' + (j + 1), 'общее место ' + (j + 1)); });
   // the single-text modes keep their media in numbered slots, not in label.ref shelves
   $$('.rm-imgs .slot', root).filter(x => x._file).forEach((r, j) => { if (!fill.has('Picture ' + (j + 1))) fill.set('Picture ' + (j + 1), 'фото ' + (j + 1)); });
   $$('.rm-auds .slot', root).filter(x => x._file).forEach((r, j) => { if (!fill.has('Audio ' + (j + 1))) fill.set('Audio ' + (j + 1), 'звук ' + (j + 1)); });
@@ -6672,6 +6673,9 @@ function makeRefMode(cfg) {
         <div class="card-h"><h3><span class="n">1</span>Референсы</h3><span class="counter rm-count"></span>
           <button class="btn mini rm-clear" type="button" title="Убрать всё в этом разделе: картинки, видео, аудио и текст">Очистить всё</button></div>
         <div class="refs rm-imgs"></div>
+        ${cfg.frames ? `<div class="sub-l"><span>Первый и последний кадр</span></div>
+        <div class="refs rm-frames"></div>
+        <small class="media-hint">необязательно: первый кадр - с чего ролик начнётся, последний - чем кончится</small>` : ''}
         <div class="rm-media">
           ${cfg.videos ? `<div><div class="sub-l"><span>Референс-видео</span></div><div class="slots rm-vids"></div><small class="media-hint">движение, камера, хореография · 2–15 с</small></div>` : ''}
           <div><div class="sub-l"><span>Референс-аудио</span></div><div class="slots rm-auds"></div><small class="media-hint">голос, ритм, атмосфера · до 15 с</small></div>
@@ -6686,7 +6690,7 @@ function makeRefMode(cfg) {
       </div>
       <div class="card rm-params"></div>
     </div><div class="preview rm-preview"></div></div>`;
-  const imgsEl = $('.rm-imgs', root), vidsEl = $('.rm-vids', root), audsEl = $('.rm-auds', root);
+  const imgsEl = $('.rm-imgs', root), vidsEl = $('.rm-vids', root), audsEl = $('.rm-auds', root), framesEl = $('.rm-frames', root);
 
   // one button instead of clicking every ✕ by hand: pictures, video, audio, text and scenes at once
   $('.rm-clear', root).onclick = () => {
@@ -6712,10 +6716,24 @@ function makeRefMode(cfg) {
   // the numbers belong to the places: an empty place keeps its number, nothing shifts
 
   // picture slots (same behaviour as Lipsync)
-  for (let i = 0; i < cfg.maxImages; i++) {
+  /* Кадры начала и конца ролика - те же плиты, что и референсы: тот же вид, тот же крест,
+     то же перетаскивание файла. Отличаются надписью и тем, что уходят на сервер в поля
+     first и last, как в режиме «Видео». Первый кадр - с чего ролик начнётся, последний -
+     чем кончится; оба не обязательны. */
+  const FRAME_PLACES = cfg.frames ? [['Первый кадр', 'первый', 'first'], ['Последний кадр', 'последний', 'last']] : [];
+  const framePlates = [];
+  for (let i = 0; i < cfg.maxImages + FRAME_PLACES.length; i++) {
     const r = document.createElement('label'); r.className = 'ref';
     r.innerHTML = `<input type="file" accept="image/*"><div class="plus">${ICON_IMG}${i === 0 ? 'Главный' : 'Референс'}</div><i class="cnt">${i + 1}/${cfg.maxImages}</i><span class="tag" hidden></span><button class="x" type="button">✕</button>`;
-    imgsEl.append(r);
+    const fr = i >= cfg.maxImages ? FRAME_PLACES[i - cfg.maxImages] : null;   // плита кадра стоит в своём ряду
+    (fr ? framesEl : imgsEl).append(r);
+    if (fr) {
+      r.classList.add('frame'); r._frameKey = fr[2];
+      $('.plus', r).lastChild.textContent = fr[0];
+      $('.cnt', r).textContent = (i - cfg.maxImages + 1) + '/' + FRAME_PLACES.length;
+      $('.tag', r).textContent = fr[1];   // подпись видна и когда плита уже занята
+      framePlates.push(r);
+    }
     const input = $('input', r);
     const set = f => {
       if (!isImage(f)) return;
@@ -9306,6 +9324,9 @@ function makeRefMode(cfg) {
            The other sections still count their references densely, so they keep the old way. */
         if (cfg.scenes) $$('.ref', imgsEl).forEach((r, i) => { if (r._file) fd.append('img' + i, r._file); });
         else $$('.ref', imgsEl).filter(r => r._file).forEach((r, i) => fd.append('img' + i, r._file));
+        // кадры начала и конца уходят отдельными полями first и last, как в режиме «Видео»;
+        // если картинка не выбрана, поля в запросе нет
+        framePlates.forEach(r => { if (r._file) fd.append(r._frameKey, r._file); });
         if (cfg.scenes && root._srcFrameFile) fd.append('srcframe', root._srcFrameFile);   // the frame of the continued video: a picture of its own
         if (vidsEl) files('.rm-vids .slot').forEach((s, i) => fd.append('vid' + i, s._file));
         (cfg.scenes && root._snd !== 'own' ? [] : files('.rm-auds .slot')).forEach((s, i) => fd.append('aud' + i, s._file));
@@ -9571,7 +9592,7 @@ function makeRefMode(cfg) {
 }
 const RM = {
   refs: makeRefMode({
-    mode: 'refs', title: 'Видеостудия', pill: 'Singularity Ref2V · 1 проход', dur: 6, maxImages: 9, videos: true,
+    mode: 'refs', title: 'Видеостудия', pill: 'Singularity Ref2V · 1 проход', dur: 6, maxImages: 9, videos: true, frames: true,
     sub: 'Видео по изображениям, видео и аудио: персонаж, локация, движение, голос',
     refHint: 'Изображения — персонажи, локация, предметы (до 9). Видео задаёт движение или камеру, аудио — голос, ритм или атмосферу (всего до 12 файлов). В промпте ссылайтесь на изображения как &lt;Picture 1&gt;, &lt;Picture 2&gt;…',
     placeholder: '<Picture 1> идёт по ночной улице к камере, дождь, неон…',
@@ -10852,8 +10873,9 @@ async function sendPrompt(blk, to) {
     const box = to === 'lipsync' ? refsEl : RM[to].root;
     (to === 'lipsync' ? $('#lPrompt') : RM[to].prompt()).value = prompt;
     if (files.length) {
-      $$('.ref.filled .x', box).forEach(x => x.click());
-      const slots = $$('.ref input', box);
+      // картинки из чата - это референсы: свои кадры начала и конца человек выбрал сам, их не трогаем
+      $$('.ref:not(.frame).filled .x', box).forEach(x => x.click());
+      const slots = $$('.ref:not(.frame) input', box);
       for (let i = 0; i < Math.min(files.length, slots.length); i++) await setDropFile(slots[i], files[i]);
     }
   }
@@ -12104,7 +12126,8 @@ async function libToFile(it, forVideo, keepName) {
 const USE_TARGETS = [['video', 'Видео'], ['lipsync', 'Клип'], ['refs', 'Видеостудия'], ['actor', 'Актёр'], ['action', 'Экшн-видео'], ['actionsc', 'Экшн-студия'], ['long', 'Киностудия'], ['qwen', 'Изменение изображения'], ['agent', 'Агент (в чат)']];
 function freeSlot(view) {
   const root = $('#view-' + view); if (!root) return null;
-  const s = $$('label.drop:not(.disabled):not(.filled), label.ref:not(.filled)', root)[0];
+  // кадры начала и конца человек выбирает сам: само туда ничего не подставляем
+  const s = $$('label.drop:not(.disabled):not(.filled), label.ref:not(.filled):not(.frame)', root)[0];
   const f = s || (view === 'qwen' ? $('label.drop', root) : null);  // the editor has one slot: it is replaced
   return f && $('input[type=file]', f);
 }
