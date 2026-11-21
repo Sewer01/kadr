@@ -1,0 +1,282 @@
+
+.agfold{border-top:1px solid var(--line);padding:2px 0 8px}
+
+.agfold>summary{cursor:pointer;font-weight:700;font-size:13.5px;color:var(--fg);padding:9px 2px;list-style:none;display:flex;align-items:center;gap:8px}
+
+.agfold>summary::-webkit-details-marker{display:none}
+
+.agfold>summary::before{content:'›';color:var(--dim);font-size:15px;width:9px}
+
+.agfold[open]>summary::before{content:'⌄'}
+
+.agfold>summary:hover{color:var(--accent)}
+
+.agnow{font-weight:600;font-size:12px;color:var(--accent);background:rgba(var(--acc-rgb,232,38,79),.12);border-radius:8px;padding:1px 7px}
+
+.agfold .seg{grid-auto-rows:auto}
+
+.agfold .seg button{padding:7px 9px;line-height:1.2;font-size:12.5px;white-space:normal;overflow-wrap:anywhere}
+
+.agbig{border-radius:14px;padding:16px 18px;margin:4px 0 12px;border:2px solid var(--line-2)}
+
+.agbig .h{font-size:13px;font-weight:700;color:var(--muted);margin-bottom:8px}
+
+.agbig .r{display:flex;justify-content:space-between;align-items:baseline;gap:12px;font-size:12.5px;margin-top:5px}
+
+.agbig .r span{color:var(--dim);flex:none}
+
+.agbig .r b{text-align:right;min-width:0;overflow-wrap:anywhere;font-weight:600}
+
+.agbig .t{font-size:14px;font-weight:700;line-height:1.25;margin-top:10px}
+
+.agbig .n{font-size:15px;margin-top:6px;word-break:break-all}
+
+.agbig.ok{border-color:#3fd18b;background:rgba(63,209,139,.12)}
+ .agbig.ok .t{color:#3fd18b}
+
+.agbig.bad{border-color:#ff6b6b;background:rgba(255,107,107,.10)}
+ .agbig.bad .t{color:#ff6b6b}
+
+.agbig.wait{border-color:#e6a45c;background:rgba(230,164,92,.12)}
+ .agbig.wait .t{color:#e6a45c}
+
+.agvar{margin:0 0 10px;border:1.5px solid var(--line-2);border-radius:12px;padding:0 12px}
+
+.agvar>summary{cursor:pointer;font-size:16px;font-weight:700;padding:12px 0;list-style:none}
+
+.agvar>summary::before{content:'▸ ';color:var(--accent,#c0405a)}
+ .agvar[open]>summary::before{content:'▾ '}
+
+.agvar[open]{padding-bottom:12px}
+
+.agv .rd{grid-column:1/-1;font-size:14px;font-weight:700}
+
+.agv .rd.ok{color:#3fd18b}
+ .agv .rd.no{color:#e6a45c}
+
+.agv{display:grid;grid-template-columns:1fr auto;gap:2px 10px;width:100%;text-align:left;padding:10px 12px;margin-top:6px;border-radius:11px;background:var(--bg-2);border:1.5px solid var(--line);transition:.15s}
+
+.agv:hover{border-color:var(--line-2)}
+
+.agv.on{border-color:var(--accent,#c0405a)}
+
+.agv b{font-size:13px}
+
+.agv small{grid-column:1/-1;font-size:11.5px;color:var(--mut,#9a8d93)}
+
+.agv .tg{font-size:10.5px;padding:1px 8px;border-radius:99px;border:1px solid var(--line-2);align-self:center}
+
+.agv .tg.unc{border-color:#b8742a;color:#e6a45c}
+
+.ag-grid{position:relative;display:grid;grid-template-columns:230px minmax(0,1fr) var(--aw);gap:16px;align-items:start}
+
+.ag-grid .gresize{right:calc(var(--aw) - 3px)}
+
+.ag-hist{display:flex;flex-direction:column;gap:10px;height:calc(calc(var(--vh,1vh)*100) - 182px);min-height:480px;padding:12px}
+
+.ag-hlist{flex:1;overflow:auto;display:flex;flex-direction:column;gap:4px}
+
+.ag-h{display:flex;align-items:center;gap:6px;padding:8px 10px;border-radius:10px;cursor:pointer;color:var(--muted)}
+
+.ag-h:hover{background:var(--surface-2);color:var(--text)}
+
+.ag-h.on{background:var(--accent-soft);color:var(--text);box-shadow:inset 0 0 0 1px rgba(var(--accent-rgb),.35)}
+
+.ag-h div{flex:1;min-width:0}
+
+.ag-h b{display:block;font-size:12.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+.ag-h small{font-size:10.5px;color:var(--dim)}
+
+.ag-h button{width:22px;height:22px;border-radius:7px;font-size:11px;opacity:0;flex:none}
+
+.ag-h:hover button{opacity:1;background:var(--surface)}
+
+.ag-h button:hover{background:var(--accent)!important}
+
+.ag-hempty{font-size:12px;color:var(--dim);text-align:center;padding:20px 6px}
+
+/* Ten pictures and four audios are taller than the window: the column used to clip them and scroll
+   only the messages, so the buttons at the bottom fell out of reach and nothing could bring them back.
+   The whole column scrolls now, and the row of buttons stays pinned to its bottom edge. */
+.ag-chat{display:flex;flex-direction:column;height:calc(calc(var(--vh,1vh)*100) - 182px);min-height:480px;padding:0;overflow-y:auto;overscroll-behavior:contain}
+
+.ag-msgs{flex:1 0 auto;overflow:visible;padding:18px;display:flex;flex-direction:column;gap:14px}
+
+.ag-empty{margin:auto;display:grid;gap:8px;text-align:center;color:var(--muted);max-width:460px}
+
+.ag-empty b{color:var(--text);font-size:15px}
+
+.ag-empty span{font-size:13px;padding:8px 12px;border-radius:10px;background:var(--bg-2);border:1px solid var(--line);cursor:pointer}
+
+.ag-empty span:hover{border-color:var(--accent)}
+
+.ag-att{display:flex;gap:10px;padding:0 18px;flex-wrap:wrap}
+
+.ag-att>div{position:relative;cursor:pointer;width:104px;height:104px;flex:0 0 104px;border-radius:10px;overflow:hidden;background:var(--surface-2)}
+
+.ag-att div{position:relative}
+
+.ag-att img{width:100%;height:100%;object-fit:cover;display:block}
+
+.ag-att b{position:absolute;left:6px;bottom:6px;font-size:10.5px;font-weight:700;font-family:var(--mono);background:rgba(var(--ov-rgb),.8);padding:2px 6px;border-radius:6px;color:#fff}
+
+.ag-att button{position:absolute;right:-6px;top:-6px;width:20px;height:20px;border-radius:50%;background:var(--surface-2);font-size:11px}
+
+.ag-att .vid{width:100%;height:100%;overflow:hidden;background:var(--bg-2)}
+
+.ag-att .vid img{width:100%;height:100%;object-fit:cover;display:block}
+
+/* while a video is dragged into the chat, the screen splits in two: where it lands decides what it becomes */
+/* the row of buttons stays where the hand expects it while the column above is scrolled */
+.ag-comp{display:flex;flex-wrap:wrap;gap:8px 10px;align-items:flex-end;padding:12px 18px 14px;position:sticky;bottom:0;z-index:4;background:var(--bg);border-top:1px solid var(--line)}
+
+/* below the conversation there is a fixed height: the previews, the mode line and the field
+   must take their own room, or the column squashes them into each other and they overlap */
+.ag-chat>.ag-att,.ag-chat>.ag-edit,.ag-chat>.ag-audio,.ag-chat>.ag-comp{flex:none}
+
+.ag-msgs{min-height:120px}
+
+/* the prompt field gets a line of its own over the buttons: squeezed between them it was a
+   three-line window, and shrinking the buttons to give it room would make them harder to hit */
+#agIn{flex:1 0 100%;order:-1;height:88px;min-height:64px}
+
+.ag-comp textarea{order:-2;min-height:56px;max-height:180px;flex:1 1 0;min-width:0}
+
+.ag-comp #agSend{order:-1}
+
+.ag-comp .ag-clip,.ag-comp #agClear,.ag-comp #agSend,.ag-comp #agFreeMem{padding:6px 10px;min-height:0;font-size:12.5px;border-radius:9px}
+
+.ag-comp .ag-ctx{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);padding:0 4px}
+
+.ag-comp #agFreeMem{margin-left:auto}
+
+.ag-comp .ag-ctx select{font-size:12.5px;padding:5px 6px;border-radius:8px;background:var(--surface-2);border:1px solid var(--line-2);color:var(--text)}
+
+
+/* spelling help on the right mouse button: the browser's own menu offers no fixes here, so the
+   local model is asked, and its answers are put back exactly where the word stood */
+.sp-menu{position:fixed;z-index:9999;min-width:236px;max-width:340px;background:var(--surface-2);
+ border:1px solid var(--line-2);border-radius:10px;box-shadow:0 12px 30px rgba(0,0,0,.5);padding:5px;display:grid;gap:2px}
+
+.sp-menu .sp-head{font-size:11.5px;color:var(--muted);padding:5px 9px 4px;border-bottom:1px solid var(--line);margin-bottom:3px;
+ overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+.sp-menu>button{all:unset;cursor:pointer;display:flex;justify-content:space-between;gap:10px;align-items:baseline;
+ font-size:13px;padding:7px 9px;border-radius:7px;color:var(--text)}
+
+.sp-menu>button:hover{background:rgba(var(--accent-rgb),.16)}
+
+.sp-menu>button[disabled]{opacity:.62;cursor:default}
+
+.sp-menu>button small{color:var(--muted);font-size:11px}
+
+.sp-menu .sp-sep{display:block;height:1px;background:var(--line);margin:4px 2px}
+
+.ag-comp .ag-clip svg{width:15px;height:15px}
+
+.ag-clip{padding:12px;display:grid;place-items:center}
+
+.agall-h:disabled{opacity:.42;cursor:not-allowed;filter:none;background:var(--surface-2);border-color:var(--line-2);color:var(--muted)}
+
+.agall-h{margin-left:0;flex:none;font-size:12px;padding:5px 11px;min-height:0;border-radius:9px;background:var(--surface-2);border:1px solid var(--line-2);color:var(--muted)}
+
+.agall-h:hover{border-color:var(--accent);color:var(--text)}
+
+.ag-clip.rec{background:rgba(var(--accent-rgb),.25);border-color:var(--accent);color:#fff;animation:pulse 1s infinite}
+
+.ag-audio{margin:0 18px;padding:10px 12px;border-radius:12px;background:var(--bg-2);border:1px solid var(--line);display:grid;gap:6px}
+
+.ag-audio-h{display:flex;align-items:center;gap:10px}
+
+.ag-audio-h b{flex:1;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+.ag-audio-h small{font-family:var(--mono);color:var(--muted)}
+
+.ag-audio-h button{width:24px;height:24px;border-radius:7px;background:var(--surface-2);font-size:11px}
+
+/* a name or a tile that carries a tag says so: it brightens under the pointer */
+.ag-tagb{cursor:pointer;border-bottom:1px dotted var(--line-2)}
+
+.ag-tagb:hover{color:var(--accent)}
+
+.ag-att>div:hover b{filter:brightness(1.25)}
+
+.ag-audio textarea{height:30px;min-height:30px;max-height:30px;resize:none;overflow:auto;font-size:13px}
+
+/* What a message carries - the audios, the pictures and the video frames - is put away by default:
+   four audios with a window each used to eat the whole column, the prompt field fell out of the
+   window and could not be reached at all. A folded block is one line; its own scroll is capped,
+   so opening it never pushes the composer away either. */
+.ag-fold{margin:0 18px 8px;border:1px solid var(--line);border-radius:12px;background:var(--bg-2)}
+
+.ag-fold>summary{cursor:pointer;list-style:none;display:flex;align-items:center;gap:8px;padding:7px 12px;
+  font-size:12.5px;font-weight:700;color:var(--muted);user-select:none}
+
+.ag-fold>summary::-webkit-details-marker{display:none}
+
+.ag-fold>summary::before{content:'\25B8';color:var(--dim);transition:transform .15s}
+
+.ag-fold[open]>summary::before{transform:rotate(90deg)}
+
+.ag-fold>summary b{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:700}
+
+.ag-fold>summary small{font-family:var(--mono);color:var(--muted);font-weight:500}
+
+.ag-fold>summary button{width:24px;height:24px;border-radius:7px;background:var(--surface-2);font-size:11px;flex:none}
+
+.ag-fold[hidden]{display:none}
+
+.ag-fold-body{padding:0 12px 10px;max-height:46vh;overflow:auto;display:grid;gap:6px}
+
+.ag-fold .ag-att{padding:0;margin:0}
+
+.ag-fold.ag-audio{display:block;padding:0}
+
+/* is the next message a fix of what was written, or the next scene of the same story? */
+.ag-edit{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 18px 8px}
+
+.ag-edit button{border:1px solid var(--line-2);background:var(--bg-2);border-radius:999px;padding:4px 12px;font-size:12px;color:var(--muted)}
+
+.ag-edit button.on{border-color:var(--accent);background:rgba(var(--accent-rgb),.14);color:var(--text);font-weight:700}
+
+.ag-edit small{font-size:11.5px;color:var(--dim)}
+
+.sk-list{display:grid;gap:8px;margin-bottom:10px}
+
+.sk-top{display:flex;align-items:center;gap:8px;min-width:0}
+
+.sk-top>b{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+.sk-top .sk-mode{flex:none;width:112px;display:flex;justify-content:flex-end;align-items:center;gap:6px}
+
+.sk-top .sk-mode select{width:100%;min-width:0;font-size:11.5px;padding:3px 6px}
+
+.sk-top .sk-mode .hint{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:right}
+
+.sk-foot{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;min-height:31px}
+
+.sk-foot input{flex:1 1 auto;min-width:0}
+
+.sk-foot small{flex:0 1 auto;min-width:0;margin-left:auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+.sk{padding:10px 12px;border-radius:11px;background:var(--bg-2);border:1px solid var(--line);display:grid;gap:6px}
+
+/* .sk-top is styled above (there with min-width:0): this copy only re-declared the same lines */
+.sk-top b{font-size:13px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+.sk-top select{background:var(--surface);border:1px solid var(--line-2);border-radius:8px;padding:4px 6px;font-size:12px;outline:none}
+
+.sk-top .x{width:24px;height:24px;border-radius:7px;background:var(--surface-2);font-size:11px}
+
+.sk p{font-size:11.5px;color:var(--dim);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:2.7em;margin:0}
+
+.sk input{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:6px 8px;font-size:11.5px;outline:none;font-family:var(--mono)}
+
+.ru-out{margin-top:6px;padding:10px 12px;border:1px dashed var(--line-2);border-radius:10px;background:var(--bg-2);font-size:12.5px;line-height:1.55}
+
+.ru-out .ru-h{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:4px}
+
+.sk-list[hidden]{display:none}
+
+#skToggle{cursor:pointer}

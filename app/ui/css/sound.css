@@ -1,0 +1,229 @@
+
+/* The words of the scene's song, at the bottom of the music editor: one line, scrolling, the way
+   the Agent's field works. No heading - the editor is already about this very file. */
+.atrim .at-words{display:grid;gap:6px;margin-top:10px;padding-top:9px;border-top:1px solid var(--line)}
+
+.atrim .at-words textarea{height:30px;min-height:30px;max-height:30px;resize:none;overflow:auto;
+ font-size:13px;line-height:1.5;padding:5px 10px;border-radius:9px}
+
+.atrim .at-words .sc-wordbtns{display:flex;gap:6px;flex-wrap:wrap}
+
+/* вид работы со звуком: один блок, который можно поставить в любую карточку аудио */
+.atrim{display:grid;gap:10px;margin-top:12px}
+
+.atrim .at-top{display:flex;align-items:center;gap:10px}
+
+.atrim .at-name{font-weight:700;font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+.atrim .at-len{margin-left:auto;color:var(--dim);font-size:12.5px;flex:none}
+
+.atrim .at-wave{position:relative;height:86px;border:1px solid var(--line);border-radius:12px;background:var(--bg-2);cursor:crosshair;overflow:hidden}
+
+.atrim .at-cv{display:block}
+
+.atrim .at-sel{position:absolute;top:0;bottom:0;background:rgba(var(--accent-rgb),.16);border-left:2px solid var(--accent);border-right:2px solid var(--accent);pointer-events:none}
+
+.atrim .at-ph{position:absolute;top:0;bottom:0;width:2px;background:#fff;pointer-events:none}
+
+/* the ribbon is sliding this way while a marker is held near the edge */
+.atrim .at-dir{position:absolute;top:50%;transform:translateY(-50%);z-index:5;pointer-events:none;
+ font-size:11.5px;font-weight:700;font-style:normal;color:#fff;background:rgba(var(--accent-rgb),.92);
+ border-radius:9px;padding:3px 8px;box-shadow:0 1px 6px rgba(0,0,0,.35)}
+
+.atrim .at-dir-l{left:6px}
+.atrim .at-dir-r{right:6px}
+
+.atrim .at-wave{touch-action:none}
+
+.atrim .at-h{position:absolute;top:-4px;bottom:-4px;width:20px;cursor:ew-resize;display:grid;place-items:center;background:none;border:0;padding:0;pointer-events:auto;z-index:3}
+
+.atrim .at-h::before{content:'';position:absolute;top:0;bottom:0;left:50%;width:14px;transform:translateX(-50%)}
+
+.atrim .at-h::after{content:'';display:block;width:5px;height:44px;border-radius:3px;background:var(--accent);box-shadow:0 0 0 1px rgba(0,0,0,.45)}
+
+.atrim .at-h:hover::after,.atrim .at-h:active::after{background:#fff}
+
+.atrim .at-sel > .at-h:first-child{left:-10px}
+
+.atrim .at-sel > .at-h:last-child{right:-10px}
+
+.atrim .at-body{display:grid;gap:10px}
+
+.at-pick{display:grid;gap:8px;margin-bottom:10px;padding:10px 12px;border:1px solid var(--line-2);border-radius:12px;background:var(--surface-2)}
+
+.at-pick.over{border-style:dashed;border-color:var(--accent);background:rgba(var(--accent-rgb),.08)}
+
+.at-pickrow{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+
+.at-pick label{display:flex;gap:8px;align-items:flex-start;font-size:12.5px;color:var(--muted);cursor:pointer;margin:0}
+
+.atrim .at-empty{border:1px dashed var(--line-2);border-radius:12px;padding:14px;color:var(--dim);font-size:12.5px;text-align:center}
+
+.atrim .at-modes{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);gap:4px;background:var(--bg-2);border:1px solid var(--line);border-radius:12px;padding:4px}
+
+.atrim .at-modes button{padding:8px 6px;border-radius:9px;font-weight:700;font-size:13px;color:var(--muted);text-align:center}
+
+.atrim .at-modes button small{display:block;font-weight:500;font-size:11px;color:var(--dim)}
+
+.atrim .at-modes button.on{background:var(--grad);color:#fff}
+
+.atrim .at-fade{position:absolute;inset:0;pointer-events:none}
+
+.atrim .at-fade[hidden]{display:none}
+
+.atrim .at-fd{position:absolute;top:50%;transform:translateY(-50%);width:34px;height:30px;padding:0;
+  display:grid;place-items:center;border-radius:9px;background:rgba(10,14,14,.82);border:1px solid var(--accent);
+  pointer-events:auto;cursor:pointer}
+
+.atrim .at-fd svg{width:20px;height:14px;fill:none;stroke:var(--accent);stroke-width:2.2;stroke-linejoin:round;stroke-linecap:round}
+
+.atrim .at-fd:hover{background:var(--accent)}
+
+.atrim .at-fd:hover svg{stroke:#fff}
+
+.atrim .at-modes button.on small{color:rgba(255,255,255,.8)}
+
+.atrim .at-hint{color:var(--dim);font-size:12.5px}
+
+.atrim .at-acts{display:flex;gap:8px;flex-wrap:wrap}
+
+.at-pz{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:8px 0 2px;padding:8px 10px;border:1px solid var(--line-2);border-radius:10px;background:var(--bg-2);font-size:12.5px;color:var(--muted)}
+
+.at-pz input{width:74px;padding:5px 8px;border-radius:8px;border:1px solid var(--line-2);background:var(--surface);color:var(--text);font-size:12.5px}
+
+.at-pz b{color:var(--dim);font-weight:600}
+
+.at-pz .at-pgo{margin-left:auto}
+
+.at-pp{flex:1 1 120px;min-width:90px;height:22px}
+
+.atrim .at-zoom{display:flex;align-items:center;gap:8px;flex-wrap:wrap;color:var(--dim);font-size:12.5px}
+
+.atrim .at-zoom input[type=range]{flex:1 1 140px;min-width:110px}
+
+.atrim .at-zl{font-weight:700;color:var(--muted)}
+
+.atrim .at-nums{display:grid;grid-template-columns:1fr 1fr auto;gap:12px;align-items:end}
+
+.atrim .at-nums label{display:grid;gap:5px;font-size:12.5px;color:var(--dim)}
+
+.atrim .at-nums .at-box{border:1px solid var(--line);border-radius:12px;padding:8px 12px;min-width:126px}
+
+.atrim .at-nums .at-cap{display:block;color:var(--dim);font-size:11.5px}
+
+.atrim .at-nums .at-dur{font-size:15px}
+
+.atrim .at-warn{border:1px solid rgba(230,170,60,.5);background:rgba(230,170,60,.10);color:#e9c37a;border-radius:12px;padding:9px 12px;font-size:12.5px}
+
+/* the row of the film's audio is an .arow inside its box: the same look as a scene's audio row */
+.arow{gap:8px}
+
+.arow>.btn.mini,.arow>.token{height:30px;padding:0 11px;font-size:12px;line-height:1;border-radius:8px;display:inline-flex;align-items:center}
+
+.arow>.btn.mini{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:700}
+
+.arow>.btn.mini:hover{filter:brightness(1.1)}
+
+.arow>.btn.mini:disabled{background:var(--surface-2);border-color:var(--line-2);color:var(--muted);filter:none;opacity:.6}
+
+.arow>.token .btn.mini{height:22px;padding:0 8px;font-size:11px;line-height:1}
+
+
+    /* thumbnails of the reference videos: they stand right under the heading of the card, and the
+       same grip as under the pictures makes them bigger; the size comes from the window's scale */
+     .vthumbs{display:flex;flex-wrap:wrap;align-items:flex-start;gap:10px;margin-bottom:2px}
+
+     .vthumbs[hidden]{display:none}
+
+     .vt2{position:relative;border:1px solid var(--line-2);border-radius:12px;overflow:hidden;background:#000;cursor:pointer}
+
+     .vt2:hover{border-color:var(--accent)}
+
+     .vt2 video{display:block;height:calc(112px * var(--tk,1));width:auto;max-width:calc(400px * var(--tk,1));min-width:calc(64px * var(--tk,1));object-fit:contain;background:#000}
+
+     .vt2 b{max-width:calc(100% - 8px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+     .vt2 b{position:absolute;left:6px;top:6px;font-size:11px;font-weight:700;color:#fff;background:rgba(10,12,18,.82);border:1px solid var(--line);border-radius:6px;padding:1px 6px}
+
+     .vt2 small{display:block;max-width:100%;padding:5px 7px;font-size:11.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;background:var(--surface-2)}
+
+
+    /* the film bench: a strip of frames with marks, a marker line and scissors on both sides of it */
+    .vtrim{display:grid;gap:8px;padding:10px;border:1px solid var(--line-2);border-radius:12px;background:var(--surface-2)}
+
+    .vt-view{width:100%;max-height:230px;border-radius:10px;background:#000;object-fit:contain}
+
+    .vt-body{display:grid;gap:8px}
+
+    .vt-stripwrap{overflow:hidden;border-radius:9px;border:1px solid var(--line-2);background:#0c0f14}
+
+    .vt-strip{position:relative;height:86px;cursor:pointer;touch-action:none;min-width:100%}
+
+    .vt-cv{display:block;width:100%;height:86px}
+
+    .vt-sel{position:absolute;top:0;bottom:0;border-left:2px solid var(--accent);border-right:2px solid var(--accent);
+      background:rgba(255,255,255,.06);box-shadow:0 0 0 9999px rgba(0,0,0,.42)}
+
+    .vt-cutl,.vt-cutr{background:#2b2f38;border-color:var(--line-2)}
+
+    .vt-acts{display:flex;gap:8px;flex-wrap:wrap}
+
+
+    /* the marker carries the arrows and the scissors: they belong to the place, not to a row below */
+    .vt-b{background:rgba(0,0,0,.72);color:#fff;border:1px solid var(--line-2);border-radius:6px;
+      width:22px;height:20px;line-height:1;font-size:10px;display:grid;place-items:center;cursor:pointer}
+
+    .vt-b:hover{background:var(--accent);border-color:var(--accent)}
+
+    .vt-pp{font-size:12px;opacity:.8}
+
+
+    /* the marker carries the arrows and the scissors: they belong to the place, not to a row below */
+    .vt-b{background:rgba(0,0,0,.74);color:#fff;border:1px solid var(--line-2);border-radius:6px;
+      min-width:22px;height:20px;line-height:1;font-size:10px;display:grid;place-items:center;cursor:pointer;padding:0 4px}
+
+    .vt-b:hover{background:var(--accent);border-color:var(--accent)}
+
+    .vt-span{position:absolute;top:2px;left:3px;background:rgba(0,0,0,.78);
+      color:#ffd34d;border-radius:6px;padding:1px 7px;font-size:11px;font-weight:600;white-space:nowrap;
+      pointer-events:none;z-index:6}
+
+    .vt-pp{font-size:12px;opacity:.8}
+
+
+    /* the marker is a place: a head you grab, arrows above it, a scissors on each side of the line.
+       The blue line is a different thing - it only shows where the preview stands right now. */
+    /* --k is the distance from the left edge of the grip to the real line: the grip slides to stay
+       inside the film, the line, the head and the buttons are placed from --k, so the marker stays
+       exactly where the time says while everything around it remains reachable */
+    .vt-ph{position:absolute;top:0;bottom:0;width:24px;z-index:5;cursor:grab;touch-action:none;background:transparent}
+
+    .vt-ph:active{cursor:grabbing}
+
+    .vt-line{position:absolute;left:var(--k,11px);top:0;bottom:0;width:2px;background:#ffd34d;
+      box-shadow:0 0 6px rgba(255,211,77,.85)}
+
+    .vt-head{position:absolute;left:calc(var(--k,11px) - 7px);top:0;width:16px;height:14px;background:#ffd34d;
+      clip-path:polygon(0 0,100% 0,50% 100%)}
+
+    .vt-step{position:absolute;top:4px;left:var(--k,11px);transform:translateX(-50%);display:flex;gap:2px}
+
+    .vt-cutl{position:absolute;top:34px;left:calc(var(--k,11px) - 27px)}
+
+    .vt-cutr{position:absolute;top:34px;left:calc(var(--k,11px) + 4px);transform:scaleX(-1)}
+
+    .vt-run{position:absolute;top:0;bottom:0;width:2px;background:#4c9cff;box-shadow:0 0 6px rgba(76,156,255,.7);
+      pointer-events:none;z-index:4}
+
+
+    /* at the edges both scissors stand side by side on the free side, the arrows slide along too:
+       two buttons in the same pixel is what made them look broken */
+    .vt-ph.near-left .vt-cutl{left:calc(var(--k,11px) + 32px)}
+
+    .vt-ph.near-right .vt-cutr{left:calc(var(--k,11px) - 30px)}
+
+    .vt-ph.near-right .vt-cutl{left:calc(var(--k,11px) - 61px)}
+
+    .vt-ph.near-left .vt-step{transform:none;left:calc(var(--k,11px) + 2px)}
+
+    .vt-ph.near-right .vt-step{transform:translateX(-100%);left:calc(var(--k,11px) - 2px)}

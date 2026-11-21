@@ -148,6 +148,46 @@ def state_text(repo):
     return "\n".join(f.read_text(encoding="utf-8", errors="replace") for f in state_files(repo))
 
 
+# --- интерфейс: страница, все JS, все CSS -------------------------------------
+
+def ui_page(repo):
+    """Текст app/ui/index.html (без инлайновых скриптов его уже не содержит - читать надо и js)."""
+    return (Path(repo) / "app" / "ui" / "index.html").read_text(encoding="utf-8", errors="replace")
+
+
+def ui_js(repo):
+    """Весь JS интерфейса: инлайновые блоки <script> страницы + все файлы app/ui/js/**/*.js."""
+    import re
+    html = ui_page(repo)
+    parts = re.findall(r"(?s)<script(?![^>]*\bsrc=)[^>]*>(.*?)</script>", html)
+    jsdir = Path(repo) / "app" / "ui" / "js"
+    if jsdir.is_dir():
+        parts += [f.read_text(encoding="utf-8", errors="replace") for f in sorted(jsdir.rglob("*.js"))]
+    return "\n".join(parts)
+
+
+def ui_css(repo):
+    """Весь CSS интерфейса: инлайновые блоки <style> + app/ui/css/**/*.css."""
+    import re
+    html = ui_page(repo)
+    parts = re.findall(r"(?s)<style[^>]*>(.*?)</style>", html)
+    cssdir = Path(repo) / "app" / "ui" / "css"
+    if cssdir.is_dir():
+        parts += [f.read_text(encoding="utf-8", errors="replace") for f in sorted(cssdir.rglob("*.css"))]
+    return "\n".join(parts)
+
+
+def ui_all(repo):
+    """Страница + весь JS + весь CSS одним текстом - для проверок 'есть ли такая строка в коде'."""
+    return ui_page(repo) + "\n" + ui_js(repo) + "\n" + ui_css(repo)
+
+
+def ui_js_files(repo):
+    """Список файлов app/ui/js (отсортированные пути) - для разбора node по одному."""
+    jsdir = Path(repo) / "app" / "ui" / "js"
+    return sorted(jsdir.rglob("*.js")) if jsdir.is_dir() else []
+
+
 # --- внешние инструменты ----------------------------------------------------
 
 def python():

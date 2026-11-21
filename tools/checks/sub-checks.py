@@ -92,11 +92,12 @@ def py_body(name, where):
 
 
 print("=== 1. каждый блок <script> отдельно: node --check ===")
-html = (app / "ui" / "index.html").read_text(encoding="utf-8")
+html = (app / "ui" / "index.html").read_text(encoding="utf-8") + "\n" + env.ui_js(repo)
 srv = (app / "server.py").read_text(encoding="utf-8")
 # таблица маршрутов осталась в фасаде, а тела обработчиков живут по областям (app/areas/*.py)
 state_src = env.state_text(repo)
-blocks = re.findall(r"<script(?![^>]*src=)[^>]*>([\s\S]*?)</script>", html)
+blocks = re.findall(r"<script(?![^>]*src=)[^>]*>([\s\S]*?)</script>", html) + \
+    [f.read_text(encoding="utf-8") for f in env.ui_js_files(repo)]
 if not NODE:
     env.missing("разбор блоков <script> и разметки метки", "KADR_NODE", "(node --check)")
     verdict("найдено %d блоков <script>" % len(blocks), bool(blocks),
@@ -105,7 +106,9 @@ else:
     bad = []
     with tempfile.TemporaryDirectory() as tmp:
         for i, b in enumerate(blocks, 1):
-            f = Path(tmp) / f"block{i}.js"
+            # файлы с import/export node разбирает как модуль (.mjs), прочие - как скрипт
+            mod = re.search(r"(?m)^\s*(import|export)\b", b)
+            f = Path(tmp) / ("block%d.%s" % (i, "mjs" if mod else "js"))
             f.write_text(b, encoding="utf-8")
             r = subprocess.run([str(NODE), "--check", str(f)], capture_output=True, text=True,
                                encoding="utf-8", errors="replace")
@@ -121,9 +124,12 @@ card = js_body("renderLib", html)
 verdict("метку ставит разметка карточки Библиотеки: renderLib вызывает libTag",
         bool(card) and "libTag(" in card,
         "тело renderLib: %d знаков" % len(card) if card else "функция renderLib не найдена")
-verdict("стиль метки описан на странице (класс li-tag)",
-        re.search(r"\.li-tag[\s,:{]", html) is not None,
-        "" if re.search(r"\.li-tag[\s,:{]", html) else "правила для .li-tag нет")
+css_all = html + "\n" + "\n".join(
+    f.read_text(encoding="utf-8") for f in sorted((app / "ui" / "css").glob("*.css"))
+) if (app / "ui" / "css").is_dir() else html
+verdict("стиль метки описан на странице или в app/ui/css (класс li-tag)",
+        re.search(r"\.li-tag[\s,:{]", css_all) is not None,
+        "" if re.search(r"\.li-tag[\s,:{]", css_all) else "правила для .li-tag нет")
 if m and not NODE:
     print("   ПРОПУСК: node нет - прогон libTag на подставных записях не выполнен")
 elif m:

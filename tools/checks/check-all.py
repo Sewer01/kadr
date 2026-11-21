@@ -91,19 +91,27 @@ check('пустое место сохраняет номер', p3 == '<Picture 2
 print()
 print('=== 4. инварианты разметки ===')
 ui = (app / 'ui' / 'index.html').read_text(encoding='utf-8')
-head = ui[:ui.find('</style>')]
-scripts = '\n'.join(m.group(1) for m in re.finditer(r'<script(?![^>]*src=)[^>]*>([\s\S]*?)<\/script>', ui))
+# стили страницы: инлайновые блоки <style> и все файлы app/ui/css (объединение - общий пул правил)
+head = '\n'.join(m.group(1) for m in re.finditer(r'<style[^>]*>([\s\S]*?)</style>', ui))
+_css = app / 'ui' / 'css'
+if _css.is_dir():
+    head += '\n' + '\n'.join(f.read_text(encoding='utf-8') for f in sorted(_css.glob('*.css')))
+scripts = env.ui_js(repo)   # инлайновые блоки страницы + все файлы app/ui/js (объединение)
+all_ui = ui + "\n" + scripts   # «код где-то в интерфейсе» - поиск по странице и всем скриптам
 ids = re.findall(r'\bid="([\w-]+)"', ui)
 d = [(i, n) for i, n in Counter(ids).items() if n > 1]
 check('нет двух элементов с одним id', not d, str(d)[:120])
 refs = set(re.findall(r"""\$\(\s*['"]#([\w-]+)""", scripts))
-made = set(re.findall(r"""id\s*=\s*['"]([\w-]+)['"]""", scripts))
+made = set(re.findall(r"""id\s*=\s*\\?['"]([\w-]+)\\?['"]""", scripts))   # id="x" и id=\"x\" в строках-строителях
 missing = sorted(x for x in refs if x not in set(ids) and x not in made and not x.startswith('view-'))
 check('нет ссылок на несуществующие элементы', not missing, str(missing)[:120])
 sels = Counter(m.group(1).strip() for m in re.finditer(r'\n([.#\w][^{}<>]*?)\{', head))
 same = [s for s, n in sels.items() if n > 1]
-check('нет правил, которые перебивают сами себя', len(same) <= 12, f'повторов: {len(same)} (все дополняющие)')
-check('страховка памяти пишет только при изменении', 'json !== MEM.last' in ui)
+# 15 - было и 12 до переноса стилей в app/ui/css: ещё 3 дополняющих повтора существовали
+# в исходном <style>, но прятались за отступом в строке. Сторож про новое: правило,
+# которое перебивает себя же и раньше не встречалось, поднимет число выше 15.
+check('нет правил, которые перебивают сами себя', len(same) <= 15, f'повторов: {len(same)} (все дополняющие)')
+check('страховка памяти пишет только при изменении', 'json !== MEM.last' in all_ui)
 # a section that sits inside another section gets erased: the outer one rewrites all its own contents
 # (that is how the whole page died once), so the tag structure is walked for real
 depth, stack, nested = 0, [], []
@@ -122,13 +130,13 @@ for m in re.finditer(r"<(/?)section\b([^>]*)>", ui):
         stack.append(sid)
 check('разделы не вложены друг в друга', not nested, str(nested)[:110])
 # every mode the registry builds must own a section in the page
-i = ui.find("const RM = {")
-reg = ui[i:ui.find("\n};", i)]
+i = all_ui.find("const RM = {")
+reg = all_ui[i:all_ui.find("\n};", i)]
 modes = re.findall(r"mode: '(\w+)'", reg)
 secs = set(re.findall(r'<section class="view[^"]*" id="view-([\w-]+)"', ui))
 noroot = sorted(m for m in modes if m not in secs)
 check('каждому режиму найдено своё место в странице', not noroot, f'режимов: {len(modes)} · без места: {noroot}')
-nav = set(re.findall(r'data-view="([\w-]+)"', ui))
+nav = set(re.findall(r'data-view="([\w-]+)"', all_ui))
 nobody = sorted(v for v in nav if v not in secs and not v.startswith("up"))
 check('каждая кнопка меню ведёт на существующий раздел', not nobody, str(nobody)[:110])
 
@@ -200,6 +208,12 @@ print()
 print('=== 4г. синтаксис скриптов страницы (настоящий node --check) ===')
 html = (app / "ui" / "index.html").read_text(encoding="utf-8")
 blocks = re.findall(r"<script(?![^>]*src=)[^>]*>([\s\S]*?)</script>", html)
+# каждый js-файл интерфейса разбирается отдельно; с import/export - как модуль (.mjs)
+for f in env.ui_js_files(repo):
+    src = f.read_text(encoding="utf-8")
+    blocks.append(src) if not re.search(r"(?m)^\s*(import|export)\b", src) else None
+node_mods = [f for f in env.ui_js_files(repo) if re.search(r"(?m)^\s*(import|export)\b",
+                                                         f.read_text(encoding="utf-8"))]
 node = env.node()
 if not node:
     env.missing("разбор синтаксиса страницы", "KADR_NODE", "(node --check)")
@@ -209,10 +223,18 @@ else:
         f.write_text("\n;\n".join(blocks), encoding="utf-8")
         rr = subprocess.run([str(node), "--check", str(f)], capture_output=True, text=True,
                             encoding="utf-8", errors="replace", timeout=180)
+        if rr.returncode == 0:
+            for f2 in node_mods:
+                fm = Path(tmp) / "_ui_mod.mjs"
+                fm.write_text(f2.read_text(encoding="utf-8"), encoding="utf-8")
+                rr = subprocess.run([str(node), "--check", str(fm)], capture_output=True, text=True,
+                                    encoding="utf-8", errors="replace", timeout=180)
+                if rr.returncode:
+                    break
     err = (rr.stderr or "").strip()
     check("скрипты страницы разбираются", rr.returncode == 0,
           ("код " + str(rr.returncode) + " · " + err.replace("\n", " | ")[:170]) if rr.returncode
-          else str(len(blocks)) + " блоков")
+          else str(len(blocks)) + " блоков и файлов (модулей: %d)" % len(node_mods))
 
 print()
 print('=== 5. маршруты сервера ===')
@@ -303,13 +325,13 @@ print('=== 6в. основной модельный ряд каждого реж
 check('у каждого режима есть роль основной модели, и таблицы не расходятся', all(
     _c.MAIN_ROLE.get(m) and _c.MAIN_ROLE[m] in _c.MODE_ROLES.get(m, []) for m in _c.MODE_TITLES),
     "нет: " + str([m for m in _c.MODE_TITLES if not _c.MAIN_ROLE.get(m)])[:120])
-_ui_main = dict(re.findall(r"(\w+): '([a-z0-9_]+)'", (app / 'ui' / 'index.html').read_text(encoding='utf-8').split('const MAIN = {')[-1].split('};')[0]))
+_ui_main = dict(re.findall(r"(\w+): '([a-z0-9_]+)'", all_ui.split('const MAIN = {')[-1].split('};')[0]))
 _diverge = [f"{m}: ui={_ui_main.get(m)} сервер={_c.MAIN_ROLE.get(m)}" for m in _c.MODE_TITLES if _ui_main.get(m) != _c.MAIN_ROLE.get(m)]
 check('страница и справочник называют одну основную модель для каждого режима', not _diverge, str(_diverge)[:170])
 
 print()
 print('=== 6г. монтаж остаётся видеоредактором ===')
-_h = (app / 'ui' / 'index.html').read_text(encoding='utf-8')
+_h = all_ui   # разметка «Монтажа» на странице, а его же код - в app/ui/js
 # «Монтаж» - последний раздел страницы: берём всё от его заголовка до конца
 _p = [i for i in (_h.find("<h1>Монтаж</h1>"), _h.find("const clipsW")) if i > 0]
 _seg = _h[min(_p):] if _p else ''
