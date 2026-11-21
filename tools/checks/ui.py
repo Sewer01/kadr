@@ -125,6 +125,10 @@ def class_pool(html, repo):
         pool |= set(re.findall(r"""['"]([\w-]+)['"]""", m.group(1)))
     for m in re.finditer(r"className\s*=\s*" + LITERAL, whole):
         pool |= {c for c in m.group(2).split() if c and "${" not in c}
+    # классы, которые окну «Сценарий» передают настройкой: само поле, ряд плашек, обёртка
+    # поля и счётчик в шапке. Без этого поле, собранное модулем, казалось бы несуществующим.
+    for m in re.finditer(r"\b(?:cls|chipsCls|wrap)\s*:\s*" + LITERAL, whole):
+        pool |= {c for c in m.group(2).split() if c and "${" not in c}
     return pool
 
 

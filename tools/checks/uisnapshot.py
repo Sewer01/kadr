@@ -146,6 +146,10 @@ def parse_markup(markup):
         start, end = m.start(), m.end()
         pos = end
         a = attrs_of(raw)
+        if not closing and "data-scenarobox" in a:
+            # сюда поле поставит модуль окна «Сценарий»: ставим метку, чтобы снимок
+            # вставил контрол ровно на это место, а не в конец списка раздела
+            controls.setdefault(region_of(stack), []).append("\x00сценарий:" + a["data-scenarobox"])
         if closing:
             for i in range(len(stack) - 1, -1, -1):
                 if stack[i][0] == tag:
@@ -288,6 +292,9 @@ def js_dynamic_classes(js, static_pool):
         pool |= {c for c in m.group(1).split() if c}
     for m in re.finditer(r"classList\.(?:add|remove|toggle)\(([^)]*)\)", js):
         pool |= set(re.findall(r"""["']([\w-]+)["']""", m.group(1)))
+    # классы, которые окну «Сценарий» передают настройкой: само поле, ряд плашек, обёртка
+    for m in re.finditer(r"""\b(?:cls|chipsCls|wrap)\s*:\s*["'`]([^"'`]*)["'`]""", js):
+        pool |= {c for c in m.group(1).split() if c and "${" not in c}
     return sorted(pool - static_pool)
 
 
@@ -304,6 +311,33 @@ def api_calls(js):
     return sorted({m.group(2) for m in re.finditer(r"([\"'`])(/api/[^\"'`]*)\1", js)})
 
 
+def fill_scenario_fields(regions, js):
+    """Поля окна «Сценарий» строит модуль, в разметке остаётся только место под него.
+
+    Снимок читает, чем модуль настраивают (id поля, его класс, подсказка), и вписывает
+    контрол на место метки. Без этого проверка ослепла бы: пропало бы id поля или его
+    подсказка - и ни один сторож не поднялся бы."""
+    for names in regions.values():
+        for i, name in enumerate(names):
+            if not name.startswith("\x00сценарий:"):
+                continue
+            kind = name.split(":", 1)[1]
+            mark = '[data-scenarobox="%s"]' % kind
+            body = js[js.find(mark):][:2600] if mark in js else ""
+            # cls поля и cls счётчика в настройке окна разные: счётчик вычитаем, чтобы
+            # он не притворился классом поля (у поля класса может и не быть)
+            body = re.sub(r"counter:\s*\{[^}]*\}", " ", body)
+            tid = re.search(r"""ta\.id\s*=\s*["']([^"']+)["']""", body)
+            ph = re.search(r"""placeholder:\s*["'`]([^"'`]*)""", body)
+            cls = re.search(r"""\bcls:\s*["'`]([^"'`]*)""", body)
+            out = "textarea" + ("#" + tid.group(1) if tid else "")
+            for c in (cls.group(1).split() if cls else []):
+                out += "." + c
+            if ph:
+                out += " [" + ph.group(1) + "]"
+            names[i] = out
+
+
 # --- снимок целиком и сверка ----------------------------------------------------
 
 def build_snapshot(repo):
@@ -312,6 +346,7 @@ def build_snapshot(repo):
     js = js_sources(repo)
     css = css_sources(repo)
     tabs, regions, nav_html = parse_markup(markup)
+    fill_scenario_fields(regions, js)      # поля, которые строит модуль окна «Сценарий»
     if not nav_html:                       # навигацию строит реестр js/core/tabs.js
         nav_html = rendered_nav(repo) or ""
     reg_tabs = tabs_from_registry(repo)

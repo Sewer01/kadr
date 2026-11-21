@@ -148,49 +148,6 @@ export async function agGenerate(btn, gen) {
     btn.disabled = false; btn.textContent = was;
   }
 }
-export function attachRu(ta, gen) {
-  if (!ta || ta._ru) return; ta._ru = true;
-  const wrap = document.createElement('div'); wrap.className = 'ru-wrap';
-  wrap.innerHTML = '<button class="btn ru-b" type="button" style="padding:4px 12px;font-size:12px" title="Русский перевод только для чтения: в модель уходит текст из поля">Показать по-русски</button><div class="ru-out" hidden></div>';
-  /* Кнопка перевода живёт сразу под своим полем: искать строку по всей карточке было ошибкой -
-     в карточке сцены таких строк несколько, и кнопка уезжала наверх, к чужому полю. */
-  const foot = ta.nextElementSibling && ta.nextElementSibling.classList.contains('ta-foot') ? ta.nextElementSibling : null;
-  (foot || ta).insertAdjacentElement('afterend', wrap);
-  /* Кнопки одного поля живут одним рядом: если под полем уже стоит кнопка очистки, созданная раньше,
-     она переезжает сюда, а не остаётся второй строкой. Строка с тегами остаётся только тегами. */
-  const home = wrap.closest('.sc') || wrap.closest('.card') || wrap.parentElement;
-  if (home) {
-    const stray = Array.prototype.slice.call(home.querySelectorAll('.ta-clear')).filter(b => b.parentElement !== wrap && !b.closest('.ru-wrap'));
-    stray.forEach(b => wrap.append(b));
-    home.querySelectorAll('.field-btns').forEach(r => { if (!r.children.length) r.remove(); });
-  }
-  const btn = $('.ru-b', wrap), out = $('.ru-out', wrap);
-  if (gen) {
-    // the draft lives here, so the way to finish it lives here too: the same row under the field
-    const g = document.createElement('button');
-    g.type = 'button'; g.className = 'btn gen-b';
-    g.style.cssText = 'padding:4px 12px;font-size:12px';
-    g.textContent = '🤖 Генерация промта';
-    g.title = 'Агент сделает из этого текста готовый промпт своего режима и заменит им текст в поле. Файлы раздела и черновик уйдут в чат Агента, ответ останется в его истории.';
-    g.onclick = () => agGenerate(g, gen);
-    wrap.insertBefore(g, btn);
-  }
-  btn.onclick = async () => {
-    if (!out.hidden) { out.hidden = true; btn.textContent = 'Показать по-русски'; return; }
-    const text = ta.value.trim();
-    if (!text) { toast('Поле пустое: переводить нечего'); return; }
-    if ((text.match(/[а-яё]/gi) || []).length > text.replace(/\s/g, '').length * 0.5) { toast('Текст уже на русском'); return; }
-    btn.disabled = true; btn.textContent = 'Переводим… (первый раз до минуты)';
-    try {
-      const r = await postJSON('/api/agent/translate', { text });
-      out._t = r.text || '';
-      out.innerHTML = '<div class="ru-h"><b>По-русски (только для чтения):</b><button class="btn" type="button" data-cp style="padding:3px 10px;font-size:12px">Копировать русский</button></div>' + esc(out._t).replace(/\n/g, '<br>');
-      $('[data-cp]', out).onclick = () => { copyText(out._t, 'Русский текст скопирован'); };
-      out.hidden = false; btn.textContent = 'Скрыть перевод';
-    } catch (e) { toast(e.message); btn.textContent = 'Показать по-русски'; }
-    btn.disabled = false;
-  };
-}
 $('#wzStart').onclick = async () => {
   $('#wzErr').textContent = ''; $('#wzStart').disabled = true;
   try {
@@ -1647,8 +1604,9 @@ $('#mlist').addEventListener('click', async e => {
 $('#vwUp').onclick = () => openUpscale((byId(openId) || openItem));
 export const agKreaMode = () => { const b = $('.kr-eng button.on', $('#view-krea')); return ({ kreareal: 'krea', flux: 'fluxt', h3img: 'h3t', qwen: 'qwent' }[((b && b.dataset.e) || 'krea')]) || 'krea'; };
 export const agQwenMode = () => { const b = $('.qw-eng button.on', $('#view-qwen')); return ((b && b.dataset.e) === 'h3img') ? 'h3e' : 'qwen'; };
-[['#vPrompt', () => 'video'], ['#lPrompt', () => 'lipsync'], ['.kr-prompt', agKreaMode], ['.qw-prompt', agQwenMode]]
-  .forEach(([sel, mode]) => $$(sel).forEach(ta => attachRu(ta, { mode, text: () => ta.value })));   // «Показать по-русски» и «Генерация промта»
+/* Кнопку «Генерация промта» больше не развешивают по полям: окно «Сценарий» (ui/scenario.js)
+   ставит её сам, и перевод своего же текста из окна убран - он нужен только под готовым
+   промптом Агента (data-ru в блоке ответа). */
 
 /* width of the left menu: drag the thin line on its edge */
 (() => {
@@ -2306,4 +2264,4 @@ export function agWireOtherWindows() {
    // a second pass for a window built later
 /* Общий хаб не импортирует разделы: сообщаем ему о своих значениях сами (core/state.js).
    Через них ui/audio.js дотягивается до агента, не импортируя этот раздел. */
-registerViews({ AG, agGo, agStatus, setChatAudio });
+registerViews({ AG, agGenerate, agGo, agStatus, setChatAudio });

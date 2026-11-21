@@ -6,9 +6,9 @@ import { goTo, onNav } from '../core/tabs.js';
 import { AudioRow, AudioTrimmer, VideoTrimmer, actx, wavSlice, setActx } from '../ui/audio.js';
 import { ASPECTS, QUALITY, QUALITY_ALL, loraForm, mountLoras, paramsCard, r32, resFor, seedForm, sizeForm, useSeed } from '../ui/params.js';
 import { previewPanel } from '../ui/preview.js';
-import { audioTokens, sceneAudioPlan } from '../ui/scenario.js';
+import { audioTokens, scenarioTagRow, scenarioWindow, sceneAudioPlan } from '../ui/scenario.js';
 import { fitAspect, fitSlot, repeatRefs, resetSlot, wireDrop, wireSlotSwap } from '../ui/slots.js';
-import { AG, agAttachFile, agCtx, agDraftOut, agGenerate, agGo, agMakeBtn, agPickTarget, agRefWarn, agScenesText, agStatus, agWords, agWordsFor, attachRu, hGrip, hGripAfter, setChatAudio, showAudioBox, speechReady, transcribeWav, wordsIntoPrompt } from './agent.js';
+import { AG, agAttachFile, agCtx, agDraftOut, agGenerate, agGo, agMakeBtn, agPickTarget, agRefWarn, agScenesText, agStatus, agWords, agWordsFor, hGrip, hGripAfter, setChatAudio, showAudioBox, speechReady, transcribeWav, wordsIntoPrompt } from './agent.js';
 import { addToLib, closeViewer, openUpscale, openViewer, renderLib, setFav } from './library.js';
 import { mdStart } from './models.js';
 import { PR, presetsHave, presetsPaint } from './presets.js';
@@ -554,13 +554,21 @@ export function makeRefMode(cfg) {
         <div class="note" style="margin-top:12px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 8h0M11 12h1v5h1"/></svg>
           <span>${cfg.refHint}</span></div>
       </div>
-      <div class="card">
-        <div class="card-h"><h3><span class="n">2</span>Промпт</h3><span class="hint">можно написать в разделе «Агент»</span></div>
-        <textarea class="rm-prompt" placeholder="${cfg.placeholder}"></textarea>
-        <div class="ta-foot"><div class="tokens rm-tokens"></div></div>
-      </div>
+      <div class="card" data-scenarobox="mode"></div>
       <div class="card rm-params"></div>
     </div><div class="preview rm-preview"></div></div>`;
+  /* Окно «Сценарий» ставит общий модуль: поле, ряд кнопок тегов и подписи собираются одним
+     кодом во всех разделах. В студиях сцен это место занимает карточка «Сцены» - поле
+     живёт в карточке каждой сцены, а общий ряд картинок остаётся под списком сцен. */
+  const scBox = $('[data-scenarobox="mode"]', root);
+  let scWin = null;
+  if (!cfg.scenes && !cfg.swap) {
+    scWin = scenarioWindow(scBox, {
+      kind: 'mode', num: 2, hint: 'можно написать в разделе «Агент»',
+      placeholder: cfg.placeholder, cls: 'rm-prompt', chips: 'below', chipsCls: 'rm-tokens',
+      generate: { mode: cfg.mode, text: () => ($('.rm-prompt', root) || {}).value },
+    });
+  }
   const imgsEl = $('.rm-imgs', root), vidsEl = $('.rm-vids', root), audsEl = $('.rm-auds', root), framesEl = $('.rm-frames', root);
 
   // one button instead of clicking every ✕ by hand: pictures, video, audio, text and scenes at once
@@ -1207,14 +1215,25 @@ export function makeRefMode(cfg) {
   let onScenes = () => {};
   const promptEl = () => $('.rm-prompt', root) || (cfg.scenes ? ($$('.sc textarea', root).find(t => t.value.trim()) || $('.sc textarea', root)) : (root._ta || $('.sc textarea', root)));   // video studio: the first scene that has a text (the focused field may be a stale one)
   if (cfg.swap) {   // beginner form: who to replace instead of a prompt; the program writes the prompt itself
-    const card = $('.rm-prompt', root).closest('.card');
-    card.innerHTML = `<div class="card-h"><h3><span class="n">2</span>Промпт</h3><span class="hint">можно написать в разделе «Агент»</span></div>
-      <textarea class="rm-prompt" placeholder="Напишите обычным промптом, кого на кого заменить. Например: Replace the man in the white shirt in <Video 1> with the character from <Picture 1>. Keep the background, camera and movements of the video."></textarea>
-      <div class="ta-foot"><div class="tokens rm-tokens"></div><button class="btn sw-example" type="button" style="padding:3px 10px;font-size:12px" title="Если поле промпта пустое - впишет готовый текст замены: «замените человека в &lt;Video 1&gt; на героя из &lt;Picture 1&gt;…». Поле с вашим текстом не тронет - пример вставляется только в пустое поле. Текст можно править как обычно.">Вставить пример</button></div>
-      <div class="hint" style="margin-top:6px">Изображения называются <b>Picture 1</b>, <b>Picture 2</b> (по порядку слотов), видео — <b>Video 1</b>. Если оставить пустым, программа сама заменит главного человека в видео на героя с первого изображения.</div>
+    scWin = scenarioWindow(scBox, {
+      kind: 'swap', num: 2, hint: 'можно написать в разделе «Агент»',
+      placeholder: 'Напишите обычным промптом, кого на кого заменить. Например: Replace the man in the white shirt in <Video 1> with the character from <Picture 1>. Keep the background, camera and movements of the video.',
+      cls: 'rm-prompt', chips: 'below', chipsCls: 'rm-tokens',
+      generate: { mode: cfg.mode, text: () => ($('.rm-prompt', root) || {}).value },
+      tail: `<div class="hint" style="margin-top:6px">Изображения называются <b>Picture 1</b>, <b>Picture 2</b> (по порядку слотов), видео — <b>Video 1</b>. Если оставить пустым, программа сама заменит главного человека в видео на героя с первого изображения.</div>
       <div hidden>
         <input class="sw-cuts"><input class="rm-who" data-i="0"><input class="rm-who" data-i="1">
-      </div>`;
+      </div>`,
+    });
+    /* Кнопка примера - не тег, а кнопка поля: она встаёт в ряд кнопок окна, перед очисткой. */
+    if (scWin && scWin.buttons) {
+      const ex = document.createElement('button');
+      ex.type = 'button'; ex.className = 'btn sw-example';
+      ex.style.cssText = 'padding:3px 10px;font-size:12px';
+      ex.title = 'Если поле промпта пустое - впишет готовый текст замены: «замените человека в &lt;Video 1&gt; на героя из &lt;Picture 1&gt;…». Поле с вашим текстом не тронет - пример вставляется только в пустое поле. Текст можно править как обычно.';
+      ex.textContent = 'Вставить пример';
+      scWin.buttons.append(ex);
+    }
     $('.sw-example', root).onclick = () => { const t = $('.rm-prompt', root); if (!t.value.trim()) { t.value = 'Replace the person in <Video 1> with the character from <Picture 1>. Retain the identity, attire and style of the character from <Picture 1>. Preserve the camera angle, background, lighting and the movements of the original video. Do not display the reference images or their backgrounds.'; t.dispatchEvent(new Event('input', { bubbles: true })); } };
     $('.rm-media .sub-l span', root).textContent = 'Видео, в котором меняем';
     $('.rm-media .media-hint', root).textContent = 'одно видео · брать можно до 25 секунд · лучше один непрерывный план · лишнее отрежьте: ✂ Монтаж под плитками';
@@ -1235,7 +1254,8 @@ export function makeRefMode(cfg) {
   const freshAt = () => { let run = 0; return $$('.sc', root).map((c, i) => { if (!i) { run = 0; return false; } const hand = !!$('.sc-fresh', c)?.checked; if (hand || run >= MAX_CHAIN) { run = 0; return true; } run++; return false; }); };
   const sceneList = () => { const fr = freshAt(); return $$('.sc', root).map((c, i) => ({ prompt: $('textarea', c).value.trim(), sec: +$('input[type=range]', c).value, lng: !!c._longSec, fresh: fr[i] })); };
   if (cfg.scenes) {
-    const card = $('.rm-prompt', root).closest('.card');
+    const card = scBox;                      // то же место в колонке, где у остальных режимов окно
+    card.removeAttribute('data-scenarobox');
     card.innerHTML = `<div class="card-h"><h3><span class="n">4</span>Сцены</h3><span class="counter lm-total"></span></div>
       <div class="tl-player"><video class="tl-vid" controls playsinline loop hidden></video><div class="hint tl-empty">Здесь покажется готовая сцена. Выберите фрагмент на ленте ниже и нажмите «Сделать эту сцену».</div></div>
       <div style="display:flex;gap:8px;margin-bottom:6px;flex-wrap:wrap"><button class="btn pri tl-all" type="button" title="Готовые сцены подряд, как один ролик: первая, вторая, третья...">▶ Смотреть готовые сцены подряд</button><button class="btn pri tl-join" type="button" title="Все готовые сцены по порядку отправляются в «Монтаж»: там остаётся нажать «Склеить», и весь ролик одним файлом появится в Библиотеке, откуда его можно сохранить">⇩ Собрать весь ролик и сохранить</button><span class="hint tl-note" style="align-self:center"></span></div>
@@ -1259,8 +1279,13 @@ export function makeRefMode(cfg) {
           <button class="btn lm-srclib" type="button" title="Взять ролик, который вы уже делали здесь">Из Библиотеки…</button>
         </div>
       </div>
-      <div class="ta-foot"><div class="tokens rm-tokens"></div></div>
+      <div data-tagrow></div>
       <div class="note" style="margin-top:12px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 8h0M11 12h1v5h1"/></svg><span>Изображения героя необязательны: без них ролик строится только по тексту (например, про Древний Рим). Сцены идут одна за другой, каждая продолжает прошлую: герой, место и звук переходят дальше. Но при каждом продолжении изображение немного портится, поэтому при смене плана или места ставьте у сцены галочку «Новый план»: она строится заново по вашим изображениям, и качество остаётся как в первой сцене. В каждой сцене опишите героя, что он делает и как движется камера. Длину сцены задаёт ползунок. Текст сцены можно составить в разделе «Агент».</span></div>`;
+    /* Общий ряд картинок студий сцен даёт тот же модуль окна, что и поля: ряд собирается
+       одним кодом, а ряды отдельных сцен помечены иначе, чтобы их не перепутать. */
+    const sharedRow = scenarioTagRow('rm-tokens');
+    sharedRow.row.dataset.tagrow = '1';
+    $('[data-tagrow]', card).replaceWith(sharedRow.row);
     const c1 = $('.rm-imgs', root).closest('.card');
     $('h3', c1).innerHTML = '<span class="n">1</span>Референсы';
     $('.rm-count', root).hidden = true;
@@ -1953,9 +1978,19 @@ export function makeRefMode(cfg) {
       const c = document.createElement('div'); c.className = 'sc'; c._dn = { draft: null, final: null };
       Object.defineProperty(c, '_done', { get: () => c._dn[root._q || 'final'], set: v => { c._dn[root._q || 'final'] = v; }, configurable: true });
       c.style.cssText = 'margin:0 0 10px;padding:12px;border:1px solid var(--line);border-radius:12px';
-      c.innerHTML = `<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px"><i class="sc-nav" data-dir="-1" title="К предыдущей сцене">‹</i><b class="sc-no" title="Номер сцены: под ним она лежит на ленте и в Библиотеке"></b><i class="sc-nav" data-dir="1" title="К следующей сцене">›</i><input type="range" min="3" max="15" step="1" value="${sec}" style="display:none"><button class="btn sc-m" type="button" title="Короче на секунду" style="padding:2px 9px">−</button><button class="btn sc-p" type="button" title="Длиннее на секунду" style="padding:2px 9px">+</button><output class="sc-sec" title="Длительность этой сцены"></output><label class="sc-long" title="Только для этой сцены: разрешить до 25 секунд. Модель обучена примерно до 15 с, дальше качество держит хуже, а расчёт идёт дольше; соседние сцены не меняются."><input type="checkbox" class="sc-long-c"> 25 с</label><span class="hint sc-win" style="flex:1"></span></div><textarea placeholder="Что происходит в этой сцене…" style="min-height:90px"></textarea>
+      c.innerHTML = `<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px"><i class="sc-nav" data-dir="-1" title="К предыдущей сцене">‹</i><b class="sc-no" title="Номер сцены: под ним она лежит на ленте и в Библиотеке"></b><i class="sc-nav" data-dir="1" title="К следующей сцене">›</i><input type="range" min="3" max="15" step="1" value="${sec}" style="display:none"><button class="btn sc-m" type="button" title="Короче на секунду" style="padding:2px 9px">−</button><button class="btn sc-p" type="button" title="Длиннее на секунду" style="padding:2px 9px">+</button><output class="sc-sec" title="Длительность этой сцены"></output><label class="sc-long" title="Только для этой сцены: разрешить до 25 секунд. Модель обучена примерно до 15 с, дальше качество держит хуже, а расчёт идёт дольше; соседние сцены не меняются."><input type="checkbox" class="sc-long-c"> 25 с</label><span class="hint sc-win" style="flex:1"></span></div>
+        <div data-scenarobox="scene"></div>
 <details class="sc-tdet" style="margin-top:8px"><summary class="hint" style="cursor:pointer;font-size:12px">Проба размера для этой сцены</summary><div class="sc-tst" style="margin-top:6px;display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span class="hint" style="font-size:12px">Попробовать только эту сцену в другом размере (остальные не меняются):</span><select class="sc-tq">${QUALITY.map(q => `<option value="${q.id}">${q.res}</option>`).join('')}</select><button class="btn sc-tbtn" type="button" title="Сцена считается отдельно, в выбранном размере, на 8 шагов. Результат появится ниже и в Библиотеке, остальные сцены не затрагиваются.">Сделать пробу</button></div><div class="sc-tests" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px"></div></details>
         <div class="sc-refs" style="margin-top:8px"><div class="hint sc-rhint" style="font-size:12px"></div><div class="sc-thumbs" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:6px"></div></div>`;
+      /* Окно «Сценарий» этой сцены: поле, ряд плашек и подпись - всё даёт общий модуль.
+         Ряд картинок и аудио у сцены свой, счётчик занятых мест стоит в подписи окна. */
+      const scWin = scenarioWindow($('[data-scenarobox="scene"]', c), {
+        card: false, kind: 'scene', min: '90px',
+        placeholder: 'Что происходит в этой сцене…',
+        counter: { cls: 'hint sc-left', text: '' },
+        chips: 'below', chipsCls: 'sc-tokens', buttons: true,
+      });
+      c._win = scWin;
       { const r0 = $('input[type=range]', c);
         if (r0 && sec > 15) { r0.max = '25'; r0.value = String(Math.min(25, sec)); window.sceneLongOn(c, true); } }
       // nine places of their own, made like the common ones: an empty place offers itself, a filled
@@ -2040,8 +2075,10 @@ export function makeRefMode(cfg) {
         renderTL(); recount(); refreshStates();
         if (root._save && !root._restoring) root._save();
       };
-      $('textarea', c).value = txt;
-      $('textarea', c).insertAdjacentHTML('afterend', '<div class="sc-tokens" style="display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 0"></div><div class="sc-auds" style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:6px"></div><div class="sc-trimhost" hidden style="margin-top:8px"></div>');
+      scWin.ta.value = txt;
+      /* Ряд плашек этой сцены даёт окно «Сценарий», поэтому сюда добавляются только полки
+         аудио: раньше они вставлялись сразу за полем, теперь - сразу за рядом плашек. */
+      scWin.foot.insertAdjacentHTML('afterend', '<div class="sc-auds" style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:6px"></div><div class="sc-trimhost" hidden style="margin-top:8px"></div>');
       // - - - audio of THIS scene: up to three files, trimmed with the same instrument as the
       // shared track. They reach the model as references; the text decides where one is used.
       c._auds = c._auds || [null, null, null]; c._audWords = c._audWords || [null, null, null];
@@ -2209,8 +2246,7 @@ export function makeRefMode(cfg) {
       c._paintAuds(); c._paintRefs = paintRefs;
       $('textarea', c).addEventListener('input', () => { try { paintRefs(); } catch (e) { } });   // the chips learn which tags the text already holds
       paintRefs();   // the chips row now knows about restored scene audio
-      box.append(c); attachRu($('textarea', c));
-      $('.ru-wrap', c)?.insertAdjacentHTML('beforeend', '<span class="sc-left hint" style="font-size:12px;margin-left:10px"></span>');
+      box.append(c);
       c._counter = () => {   // what counts is what the text calls; the frame of your video holds <Picture 1>
         const el = $('.sc-left', c); if (!el) return;
         const places = $$('.ref', imgsEl).map(r => !!r._file), ownPlaces = (c._files || []).map(f => !!f);
@@ -2257,6 +2293,10 @@ export function makeRefMode(cfg) {
         const ta = $('textarea', c), at = ta.selectionStart == null ? ta.value.length : ta.selectionStart, add = b.dataset.ins + ' ';
         ta.value = ta.value.slice(0, at) + add + ta.value.slice(at);
         ta.focus(); ta.selectionStart = ta.selectionEnd = at + add.length; recount(); c._counter?.();
+        /* Вставка тега плашкой тоже меняет текст сцены: без этого вставленный тег жил до
+           ближайшего набора букв и терялся при закрытии программы. */
+        ta.dispatchEvent(new Event('input', { bubbles: true }));
+        if (root._save && !root._restoring) root._save();
       };
       c.insertAdjacentHTML('beforeend', `<label class="sc-fl" style="display:flex;gap:6px;align-items:center;margin-top:8px;font-size:12.5px" title="Как смена плана в кино: сцена не продолжает прошлую, а строится заново по вашим изображениям. Качество в ней как в первой сцене. Программа делает так сама после трёх продолжений подряд."><input type="checkbox" class="sc-fresh"> Сменить план здесь (кино-склейка)</label><div class="hint sc-auto" hidden style="font-size:12px;margin-top:6px">Программа сама сделает здесь смену плана: цепочка продолжений стала длинной, а так качество не падает.</div><div class="sc-act" style="display:flex;gap:10px;align-items:center;margin-top:8px"><button class="btn mini sc-do" type="button" title="Сделать только эту сцену">Сделать эту сцену</button><button class="btn sc-undo" type="button" hidden title="Вернуть то, что было стёрто или удалено (то же, что Ctrl+Z)">↶ Отменить действие</button><button class="btn mini sc-redogo" type="button" hidden title="Эта сцена считается заново, а потом сами пересчитаются все следующие, уже продолжая новую версию">Переделать и продолжить</button><span class="hint sc-state"></span></div>`);
       $('.sc-fresh', c).checked = !!fresh;
@@ -2302,14 +2342,8 @@ export function makeRefMode(cfg) {
               clearSceneText(c);
             });
         };
-        // the row under the field, where the reading buttons of this field already live
-        const ta0 = $('textarea', c);
-        let row = ta0 ? ta0.nextElementSibling : null;
-        if (!row || (!row.classList.contains('ru-wrap') && !row.classList.contains('sc-tools'))) {
-          row = document.createElement('div'); row.className = 'sc-tools';
-          if (ta0) ta0.insertAdjacentElement('afterend', row);
-        }
-        row.append(clr);   // очистка - последняя в ряду, у правого края
+        // очистка - последняя в ряду кнопок окна сцены, у правого края
+        if (c._win) c._win.addButton(clr);
       }
       recount();
     };
@@ -3302,8 +3336,6 @@ export function makeRefMode(cfg) {
     },
   });
   root._upd = upd;
-  if (!cfg.scenes) $$('.rm-prompt', root).forEach(ta => attachRu(ta, { mode: cfg.mode, text: () => ta.value }));
-  else $$('.rm-prompt', root).forEach(attachRu);   // the scene studios write scene by scene, not one field
   if (cfg.swap) {
     S.sound = 'original'; S.smallRef = true;
     const SND_HINT = { lock: 'Пробный режим: модель рисует рот под звук вашего видео, голоса остаются на своих героях. Но при двух героях и смене плана вторая замена может не получиться. Нужен звук в видео.',

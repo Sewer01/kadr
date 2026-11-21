@@ -3,9 +3,9 @@ import { $, $$, confirmBox, esc, fmtDate, fmtTime, toast } from '../core/util.js
 import { IMG_PANELS, LIB, QUEUE, byId, registerViews } from '../core/state.js';
 import { goTo } from '../core/tabs.js';
 import { SZ_ROW, szWire } from '../ui/params.js';
-import { offPrompt, onPrompt, previewHandlers } from '../ui/scenario.js';
+import { offPrompt, onPrompt, previewHandlers, scenarioWindow } from '../ui/scenario.js';
 import { wireDrop } from '../ui/slots.js';
-import { agPromptButton, hGripAfter } from './agent.js';
+import { agKreaMode, agPromptButton, agQwenMode, hGripAfter } from './agent.js';
 import { dimTxt, openUpscale, saveItems, useMenu, zoomOpen } from './library.js';
 import { doReset } from './models.js';
 import { PR, presetsHave, presetsPaint } from './presets.js';
@@ -217,18 +217,7 @@ export const imgSeedForm = (S, fd) => { if (S.seedFixed && S.seed) fd.append('se
     <div class="head"><div><h1>Изображение по тексту</h1><p>Опишите изображение словами — модель Krea 2 нарисует его. Загрузить своё изображение здесь нельзя: для этого страница «Правка»</p></div>
       <div class="mode-pill"><i></i><span>Krea 2 · 1 МП</span></div></div>
     <div class="grid"><div class="col">
-      <div class="card"><div class="card-h"><h3><span class="n">1</span>Промпт</h3><span class="counter kr-count">0 символов</span></div>
-        <div class="seg kr-bm" style="grid-template-columns:minmax(0,1fr) minmax(0,1fr);margin-bottom:8px"><button type="button" data-b="0" class="on">Один промпт</button><button type="button" data-b="1">Список промптов<small>серия картинок</small></button></div>
-        <textarea class="kr-prompt" placeholder="Опишите картинку: кто или что в кадре, где, какой свет, какой стиль (фото, иллюстрация, постер)…"></textarea>
-        <div class="kr-batch" hidden style="margin-top:10px">
-          <div class="hint" style="margin-bottom:6px">Вставьте промпты одним куском: каждый отделите <b>пустой строкой</b> (или пронумеруйте: «1.», «Кадр 2:»). Приложение само разделит текст и поставит каждое изображение в очередь. Модель, формат и размер общие для всех.</div>
-          <div style="display:flex;justify-content:space-between;align-items:center"><b class="kr-bcount"></b></div>
-          <div class="kr-bl" style="max-height:220px;overflow:auto;margin:6px 0"></div>
-          <div class="note warn kr-bwarn" hidden><span></span></div>
-          <label style="display:flex;gap:8px;align-items:flex-start;margin:8px 0;cursor:pointer" title="Если нужна серия похожих кадров, включите. Для разных изображений оставьте выключенным: у каждой будет свой случайный seed."><input type="checkbox" class="kr-same" style="margin-top:3px"><span>Одинаковый seed для всей серии <span class="hint">(для серии кадров; для разных изображений не нужно). Если ниже задан фиксированный seed, возьмётся он.</span></span></label>
-          <div class="status kr-bstatus" style="margin-top:6px"></div>
-        </div>
-        <div class="ta-foot"><span class="hint">Лучше писать подробно, одним абзацем. Помощник в разделе «Агент» умеет писать такие промпты</span></div></div>
+      <div class="card" data-scenarobox="krea"></div>
       <div class="card"><div class="card-h"><h3><span class="n">2</span>Параметры</h3></div>
         <div class="row"><div class="row-l">Модель</div>
           <div class="seg kr-eng" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr))"><button data-e="krea">Krea 2<small>лучшее качество, можно в коммерцию</small></button><button data-e="h3img">MiniMax H3 Image<small>очень высоко: до 16 МП</small></button><button data-e="flux">FLUX klein<small>лёгкая модель; лицензию см. в списке моделей</small></button><button data-e="qwen">Qwen 2.1<small>текст на изображении, не для коммерции</small></button></div>
@@ -248,6 +237,28 @@ export const imgSeedForm = (S, fd) => { if (S.seedFixed && S.seed) fd.append('se
         ${SZ_ROW}
         ${imgSeedBox()}</div>
     </div><div class="preview kr-prev"></div></div>`;
+  /* Окно «Сценарий» этого режима даёт общий модуль: поле, ряд кнопок и подпись - одна сборка
+     на все разделы. Переключатель «Один промпт / Список промптов» и блок списка остаются
+     разметкой раздела: они встают до поля и сразу под кнопками, селекторы (.kr-bm, .kr-batch,
+     .kr-same, .kr-bl) не меняются. */
+  scenarioWindow($('[data-scenarobox="krea"]', root), {
+    kind: 'krea', num: 1, cls: 'kr-prompt',
+    counter: { cls: 'counter kr-count', text: '0 символов' },
+    head: '<div class="seg kr-bm" style="grid-template-columns:minmax(0,1fr) minmax(0,1fr);margin-bottom:8px">'
+      + '<button type="button" data-b="0" class="on">Один промпт</button>'
+      + '<button type="button" data-b="1">Список промптов<small>серия картинок</small></button></div>',
+    placeholder: 'Опишите картинку: кто или что в кадре, где, какой свет, какой стиль (фото, иллюстрация, постер)…',
+    mid: `<div class="kr-batch" hidden style="margin-top:10px">
+      <div class="hint" style="margin-bottom:6px">Вставьте промпты одним куском: каждый отделите <b>пустой строкой</b> (или пронумеруйте: «1.», «Кадр 2:»). Приложение само разделит текст и поставит каждое изображение в очередь. Модель, формат и размер общие для всех.</div>
+      <div style="display:flex;justify-content:space-between;align-items:center"><b class="kr-bcount"></b></div>
+      <div class="kr-bl" style="max-height:220px;overflow:auto;margin:6px 0"></div>
+      <div class="note warn kr-bwarn" hidden><span></span></div>
+      <label style="display:flex;gap:8px;align-items:flex-start;margin:8px 0;cursor:pointer" title="Если нужна серия похожих кадров, включите. Для разных изображений оставьте выключенным: у каждой будет свой случайный seed."><input type="checkbox" class="kr-same" style="margin-top:3px"><span>Одинаковый seed для всей серии <span class="hint">(для серии кадров; для разных изображений не нужно). Если ниже задан фиксированный seed, возьмётся он.</span></span></label>
+      <div class="status kr-bstatus" style="margin-top:6px"></div>
+    </div>`,
+    footNote: 'Лучше писать подробно, одним абзацем. Помощник в разделе «Агент» умеет писать такие промпты',
+    generate: { mode: () => agKreaMode(), text: () => ($('.kr-prompt', root) || {}).value },
+  });
   gridHandle(root);
   $('.kr-asp', root).innerHTML = IMG_ASPECTS.map(([id, name, w, h]) => { const k = 18 / Math.max(w, h);
     return `<button class="chip" data-a="${id}"><i class="ar" style="width:${w * k}px;height:${h * k}px"></i>${name}${name !== id ? ` <small>${id}</small>` : ''}</button>`; }).join('');
@@ -394,11 +405,7 @@ export const imgSeedForm = (S, fd) => { if (S.seedFixed && S.seed) fd.append('se
           <label class="drop qw-s5 qw-h3only" id="qwDrop5" hidden title="5-я картинка: только MiniMax H3 Image (до 5 референсов)"><input type="file" accept="image/*"><i class="cnt">5/5</i><div class="ph"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></div><span class="tag" hidden>5</span><button class="x" type="button">✕</button></label>
         </div>
         <div class="hint qw-morehint" style="margin-top:8px"></div></div>
-      <div class="card"><div class="card-h"><h3><span class="n">2</span>Промпт</h3><span class="hint">можно написать в разделе «Агент»</span></div>
-        <div class="qw-edit">
-          <div class="tokens qw-tokens" style="margin-bottom:8px"></div>
-          <textarea class="qw-prompt" placeholder="Что изменить и что оставить. Например: Этот человек сидит в кафе у окна и пьёт кофе. Лицо, причёска и одежда как на изображении."></textarea>
-          <div class="ta-foot"></div></div></div>
+      <div class="card" data-scenarobox="qwen"></div>
       <div class="card"><div class="card-h"><h3><span class="n">3</span>Параметры</h3></div>
           <div class="row qw-storyopts" hidden style="margin-bottom:12px"><div class="row-l">Как рисовать</div>
             <div class="seg qw-fr" style="grid-template-columns:minmax(0,1fr) minmax(0,1fr)"><button data-fr="1">По кадрам<small>каждый кадр отдельно, лист склеит программа</small></button><button data-fr="0">Одним листом<small>одно изображение сразу</small></button></div>
@@ -422,6 +429,15 @@ export const imgSeedForm = (S, fd) => { if (S.seedFixed && S.seed) fd.append('se
         ${imgSeedBox()}
         <div class="hint" style="margin-top:10px">Модель Qwen Image 2.1 — только для некоммерческого использования (лицензия Qwen Research).</div></div>
     </div><div class="preview qw-prev"></div></div>`;
+  /* Окно «Сценарий» правки картинки - тот же общий модуль: ряд плашек над полем, обёртка
+     .qw-edit сохранена (на неё смотрит лист персонажа, который прячет поле целиком), классы
+     поля и плашек прежние, так что код раскадровки и меток их находит как находил. */
+  scenarioWindow($('[data-scenarobox="qwen"]', root), {
+    kind: 'qwen', num: 2, hint: 'можно написать в разделе «Агент»',
+    wrap: 'qw-edit', cls: 'qw-prompt', chips: 'above', chipsCls: 'qw-tokens',
+    placeholder: 'Что изменить и что оставить. Например: Этот человек сидит в кафе у окна и пьёт кофе. Лицо, причёска и одежда как на изображении.',
+    generate: { mode: () => agQwenMode(), text: () => ($('.qw-prompt', root) || {}).value },
+  });
   gridHandle(root);
   const drop = $('#qwDrop');
   wireDrop(drop, () => {});
@@ -588,10 +604,10 @@ export function attachClearButtons(root) {
     if (ta.dataset.noClear === '1' || ta.id === 'agAudioText' || ta.closest('#agAudioBox') || ta.closest('.atrim') || ta.closest('.sp-menu') || ta.closest('.lm-scenes') || ta.closest('.sc') || ta.closest('.ag-comp') || ta.id === 'agIn') return;
     const card = ta.closest('.card') || ta.parentElement;
     if (!card || card.querySelector('.ta-clear')) return;
-    // ряд кнопок того же поля: тот, где уже лежат его собственные кнопки, а не попавшийся рядом
-    const wraps = Array.prototype.slice.call(card.querySelectorAll('.ru-wrap'));
-    let row = wraps.filter(r => r.querySelector('.ru-b, .gen-b')).pop() || wraps.pop()
-      || Array.prototype.slice.call(card.querySelectorAll('.ta-foot')).filter(f => !f.querySelector('.rm-tokens, .tokens')).pop();
+    // ряд кнопок того же поля: тот, что дало окно «Сценарий», а не попавшийся рядом
+    const rows = Array.prototype.slice.call(card.querySelectorAll('.field-btns'));
+    let row = rows.filter(r => r.querySelector('.gen-b')).pop() || rows.pop()
+      || Array.prototype.slice.call(card.querySelectorAll('.ta-foot')).filter(f => !f.querySelector('.rm-tokens, .tokens, .sc-tokens')).pop();
     if (!row) { row = document.createElement('div'); row.className = 'field-btns'; ta.insertAdjacentElement('afterend', row); }
     const b = document.createElement('button');
     b.type = 'button'; b.className = 'btn mini ta-clear'; b.textContent = 'Очистить текст';
@@ -614,8 +630,8 @@ export function attachClearButtons(root) {
 export function placeExampleButtons() {
   $$('.sw-example').forEach(el => {
     const card = el.closest('.card'); if (!card) return;
-    const wraps = Array.prototype.slice.call(card.querySelectorAll('.ru-wrap'));
-    const row = wraps.filter(r => r.querySelector('.ru-b, .gen-b')).pop() || wraps.pop();
+    const rows = Array.prototype.slice.call(card.querySelectorAll('.field-btns'));
+    const row = rows.filter(r => r.querySelector('.gen-b')).pop() || rows.pop();
     if (!row || el.parentElement === row) return;
     const clr = row.querySelector('.ta-clear');
     if (clr) row.insertBefore(el, clr); else row.append(el);

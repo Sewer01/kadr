@@ -94,13 +94,7 @@
             <div class="hresize" id="frameResize" title="Потяните вниз или вверх, чтобы изменить высоту кадров. Двойной клик — вернуть как было"></div>
           </div>
 
-          <div class="card">
-            <div class="card-h"><h3><span class="n">2</span>Промпт</h3><span class="hint" id="vCount">0 символов</span></div>
-            <textarea id="vPrompt" placeholder="Опишите сцену: кто в кадре, что происходит, как движется камера, свет, звук…"></textarea>
-            <div class="ta-foot">
-              <span class="hint">Картинки в этом режиме - первый и последний кадр: текст их не называет, теги не нужны. Имена героя тегами работают в «Видеостудии» и «Киностудии».</span>
-            </div>
-          </div>
+          <div class="card" data-scenarobox="video"></div>
 
           <div class="card" id="vParams"></div>
         </div>
@@ -148,14 +142,7 @@
             </div>
           </div>
 
-          <div class="card">
-            <div class="card-h"><h3><span class="n">3</span>Промпт</h3><span class="hint">опишите ровно те слова, что звучат во фрагменте</span></div>
-            <textarea id="lPrompt" placeholder="<Picture 1> стоит у окна и тихо поёт, глядя в камеру…"></textarea>
-            <div class="ta-foot">
-              <div class="tokens" id="tokens"></div>
-              
-            </div>
-          </div>
+          <div class="card" data-scenarobox="lipsync"></div>
 
           <div class="card" id="lParams"></div>
         </div>

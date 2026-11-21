@@ -1,10 +1,13 @@
 import { $, $$, toast } from '../core/util.js';
 import { goTo } from '../core/tabs.js';
-import { earlyEvents } from '../core/state.js';
+import { earlyEvents, views } from '../core/state.js';
 import { setDropFile } from './slots.js';
-import { AG } from '../views/agent.js';
-import { IMG } from '../views/images.js';
-import { RM } from '../views/modes.js';
+
+/* Этот модуль НЕ импортирует разделы: разделы сами объявляют себя в реестре. Прямой импорт
+   раздела отсюда замыкал круг, и тело этого модуля не успевало исполниться раньше раздела -
+   поле «Видео» не появлялось, а раздел падал на null.oninput. Значения разделов берутся из
+   реестра внутри функции, а не на уровне модуля: так имена не дублируются и порядок
+   загрузки модулей больше ничего не решает. */
 
 export const promptHandlers = new Map();
 export const previewHandlers = new Map();
@@ -13,6 +16,187 @@ export function onPrompt(id, fn) {
   (earlyEvents.get(id) || []).forEach(fn); earlyEvents.delete(id);
 }
 export function offPrompt(id) { promptHandlers.delete(id); }
+
+/* ── Окно «Сценарий»: единственное поле, где человек пишет текст для модели ─────────────
+   Раньше каждое окно собирали у себя в разделе руками: поле, ряд кнопок тегов, подписи -
+   семь копий одной и той же разметки, и в каждой она понемногу расходилась. Теперь окно
+   строит этот модуль, а раздел только говорит, какое ему нужно поле.
+
+   Контракт окна (именно так с ним и работают, поля руками больше не размечают):
+     scenarioWindow(host, cfg) - собирает окно и ставит его в контейнер host:
+       host  - пустая карточка вкладки (card) или место внутри чужой карточки (card: false,
+               так стоит поле внутри карточки сцены в студиях сцен);
+       cfg.kind        - короткое имя окна для раздела (по поле ищут только свои обработчики);
+       cfg.num         - цифра в шапке карточки (нумерацию карточек правит раздел);
+       cfg.hint        - подпись справа от заголовка; cfg.footNote - подпись под полем;
+       cfg.counter     - { id?, cls?, text } - счётчик справа от заголовка (символы, места);
+       cfg.placeholder, cfg.text, cfg.rows, cfg.min - чем задаётся поле;
+       cfg.chips       - ряд кнопок тегов: 'below' под полем, 'above' над полем, false - ряда нет;
+       cfg.chipsCls    - класс ряда тегов этого раздела (по нему раздел и рисует свои плашки);
+       cfg.head, cfg.tail - разметка раздела до поля и после окна (сегменты, поля «кусов»);
+       cfg.wrap        - класс обёртки поля, если разделу нужно прятать поле целиком;
+       cfg.buttons     - true - ряд кнопок поля, даже когда генерации в нём нет;
+       cfg.generate    - { mode, text, scenes } - кнопка «Генерация промта» окна: тем же текстом
+               и тем же вызовом, что и раньше; ответ Агента возвращается в это же окно
+               тем же путём sendPrompt.
+     чем читается значение: api.value(); чем задаётся: api.setValue(text) - поле само
+       сообщает об изменении; как вкладка узнаёт об изменении: api.onInput(fn);
+     как вставить тег: api.insertTag('<Picture 3>') - в место курсора, как это делали плашки;
+     ряд картинок и аудио: api.tokens - куда раздел кладёт плашки, api.showChips(on) -
+       выключить и включить весь ряд, api.showGroup('pictures'|'audio'|'video', on) - одну группу;
+     api.el, api.ta, api.foot, api.tokens, api.buttons, api.counter - живые ссылки, чтобы
+       раздел не искал их по всему документу. */
+/* Помощники окна объявлены функциями, а не стрелками в let/const, и это не придирка стиля:
+   окно собирают из тел разделов, а разделы с этим модулем образуют круг импортов. Объявление
+   функции готово до исполнения тела модуля, стрелка в const в такой момент ещё не существует,
+   и сборка поля падала с "Cannot access 'scNode' before initialization". */
+function scenarioTitle() { return 'Сценарий'; }
+function scNode(tag) { return document.createElement(tag); }
+function scHint(html) { const s = scNode('span'); s.className = 'hint'; s.innerHTML = html; return s; }
+
+/* Ряд кнопок тегов: одна сборка и для окна, и для общего ряда картинок студий сцен. */
+export function scenarioTagRow(tokensCls, tokensId) {
+  const row = scNode('div'); row.className = 'ta-foot';
+  const chips = scNode('div');
+  chips.className = 'tokens' + (tokensCls ? ' ' + tokensCls : '');
+  if (tokensId) chips.id = tokensId;
+  row.append(chips);
+  return { row, chips };
+}
+
+export function scenarioWindow(host, cfg = {}) {
+  if (!host) return null;
+  const inline = cfg.card === false;              // врезка в чужую карточку: карточка сцены
+  const root = inline ? scNode('div') : host;
+  root.dataset.scenario = cfg.kind || 'field';    // окно находится по этому признаку, без нового класса
+  const ta = scNode('textarea');
+  if (cfg.cls) ta.className = cfg.cls;
+  ta.placeholder = cfg.placeholder || '';
+  if (cfg.rows) ta.rows = cfg.rows;
+  if (cfg.min) ta.style.minHeight = cfg.min;
+  ta.value = cfg.text || '';
+  ta.setAttribute('spellcheck', 'true');          // промпт - текст, а не путь: опечатка стоит целого расчёта
+
+  /* Заголовок окна всегда один и тот же: в карточке - шапка с цифрой, во врезке - короткая строка. */
+  const caption = scNode('div');
+  let title, counter = null;
+  if (inline) {
+    caption.className = 'hint';
+    caption.style.cssText = 'display:flex;align-items:center;gap:8px;margin:0 0 6px';
+    title = scNode('b'); title.textContent = scenarioTitle();
+  } else {
+    caption.className = 'card-h';
+    title = scNode('h3');
+    if (cfg.num) { const n = scNode('span'); n.className = 'n'; n.textContent = String(cfg.num); title.append(n); }
+    title.append(document.createTextNode(scenarioTitle()));
+  }
+  caption.append(title);
+  if (cfg.hint) caption.append(scHint(cfg.hint));
+  if (cfg.counter) {
+    counter = scNode('span');
+    counter.className = cfg.counter.cls || 'hint';
+    counter.textContent = cfg.counter.text || '';
+    if (cfg.counter.id) counter.id = cfg.counter.id;
+    caption.append(counter);
+  }
+
+  let foot = null, tokens = null, buttons = null;
+  const tagRow = cfg.chips ? scenarioTagRow(cfg.chipsCls) : null;
+  if (tagRow) { tokens = tagRow.chips; foot = tagRow.row; }
+  if (!tagRow && cfg.footNote) { foot = scNode('div'); foot.className = 'ta-foot'; }
+  if (foot && cfg.footNote) foot.append(scHint(cfg.footNote));
+  if (cfg.generate || cfg.buttons || cfg.extra) { buttons = scNode('div'); buttons.className = 'field-btns'; }
+
+  const wrap = cfg.wrap ? scNode('div') : null;   // разделу нужно прятать поле целиком (лист персонажа)
+  if (wrap) wrap.className = cfg.wrap;
+  const into = wrap || root;
+  root.append(caption);
+  if (wrap) root.append(wrap);
+  if (cfg.head) into.insertAdjacentHTML('beforeend', cfg.head);
+  if (tagRow && cfg.chips === 'above') { tagRow.row.style.margin = '0 0 8px'; into.append(tagRow.row); }
+  into.append(ta);
+  if (tagRow && cfg.chips !== 'above') into.append(tagRow.row);
+  if (buttons) into.append(buttons);
+  /* cfg.mid - кусок раздела сразу под кнопками поля: у генерации картинки это блок списка
+     промптов, он относится к тексту и раньше всегда шёл следом за полем. */
+  if (cfg.mid) into.insertAdjacentHTML('beforeend', cfg.mid);
+  if (foot && foot !== (tagRow || {}).row) into.append(foot);
+  if (cfg.tail) root.insertAdjacentHTML('beforeend', cfg.tail);
+  if (inline) host.append(root);
+
+  if (cfg.generate) {
+    /* Кнопка окна та же, что висела над полем раньше: тот же текст, та же подсказка, тот же
+       вызов agGenerate. Перевод текста окна («Показать по-русски») из окна убран: человек
+       пишет сюда сам и свой же текст переводить не просит. */
+    const g = scNode('button');
+    g.type = 'button'; g.className = 'btn gen-b';
+    g.style.cssText = 'padding:4px 12px;font-size:12px';
+    g.textContent = '🤖 Генерация промта';
+    g.title = 'Агент сделает из этого текста готовый промпт своего режима и заменит им текст в поле. Файлы раздела и черновик уйдут в чат Агента, ответ останется в его истории.';
+    g.onclick = () => views.agGenerate(g, cfg.generate);
+    buttons.append(g);
+  }
+  /* Ряд кнопок поля - общий: сюда раздел ставит свои кнопки после основной («Очистить текст»,
+     «Вставить пример»). Кнопки раздела никогда не собираются внутри поля руками. */
+  const addButton = node => { if (node) { if (!buttons) { buttons = scNode('div'); buttons.className = 'field-btns'; into.append(buttons); } buttons.append(node); } return node; };
+  (cfg.extra || []).forEach(addButton);
+
+  const api = {
+    el: root, ta, foot, tokens, buttons, counter, addButton,
+    value: () => ta.value,
+    setValue: text => { ta.value = text == null ? '' : String(text); ta.dispatchEvent(new Event('input', { bubbles: true })); },
+    onInput: fn => { ta.addEventListener('input', fn); return fn; },
+    insertTag: tag => {
+      if (!tag) return;
+      const s = typeof ta.selectionStart === 'number' ? ta.selectionStart : ta.value.length;
+      ta.value = ta.value.slice(0, s) + tag + ' ' + ta.value.slice(ta.selectionEnd == null ? s : ta.selectionEnd);
+      ta.focus();
+      try { ta.setSelectionRange(s + tag.length + 1, s + tag.length + 1); } catch (e) { }
+      ta.dispatchEvent(new Event('input', { bubbles: true }));
+    },
+    showChips: on => { if (tokens) tokens.hidden = !on; },
+    /* Плашки одного ряда живут группами: у картинок нет признака, у аудио и видео он есть. */
+    showGroup: (kind, on) => {
+      if (!tokens) return;
+      $$('button', tokens).forEach(b => {
+        const isAudio = !!b.dataset.audio, isVideo = !!b.dataset.video;
+        const mine = kind === 'audio' ? isAudio : kind === 'video' ? isVideo : (!isAudio && !isVideo);
+        if (mine) b.hidden = !on;
+      });
+    },
+  };
+  return api;
+}
+
+/* Поля «Видео» и «Клип» лежат в разметке страницы пустыми карточками: окно в них ставит
+   этот модуль - так поле не собирается руками больше нигде. Имена полей названы здесь же
+   буквами: на них смотрят селекторы разделов и снимок интерфейса. */
+(() => {
+  const box = document.querySelector('[data-scenarobox="video"]');
+  if (box) {
+    const w = scenarioWindow(box, {
+      kind: 'video', num: 2,
+      counter: { cls: 'hint', text: '0 символов' },
+      placeholder: 'Опишите сцену: кто в кадре, что происходит, как движется камера, свет, звук…',
+      footNote: 'Картинки в этом режиме - первый и последний кадр: текст их не называет, теги не нужны. '
+        + 'Имена героя тегами работают в «Видеостудии» и «Киностудии».',
+      generate: { mode: 'video', text: () => ($('#vPrompt') || {}).value },
+    });
+    if (w) { w.ta.id = 'vPrompt'; if (w.counter) w.counter.id = 'vCount'; }
+  }
+  const lip = document.querySelector('[data-scenarobox="lipsync"]');
+  if (lip) {
+    const w = scenarioWindow(lip, {
+      kind: 'lipsync', num: 3,
+      hint: 'опишите ровно те слова, что звучат во фрагменте',
+      placeholder: '<Picture 1> стоит у окна и тихо поёт, глядя в камеру…',
+      chips: 'below',
+      generate: { mode: 'lipsync', text: () => ($('#lPrompt') || {}).value },
+    });
+    if (w) { w.ta.id = 'lPrompt'; if (w.tokens) w.tokens.id = 'tokens'; }
+  }
+})();
+
 export function audioTokens(c, bs, film) {
   const ta = c.querySelector('textarea'), text = ta ? ta.value : '';
   const used = new Set((text.match(/<Audio\s*\d+>/g) || []).map(s => +s.replace(/\D+/g, '')));
@@ -74,6 +258,7 @@ export function sceneAudioPlan(c, film, bs) {
 }
 
 export async function sendPrompt(blk, to) {
+  const { AG, IMG, RM } = views;   // разделы к этому моменту объявили себя в реестре
   let prompt = $('pre', blk).textContent;
   // pictures of a reopened chat exist only as data URLs; turn them back into files
   const toFile = (u, i) => { const [h, b] = u.split(','); const bin = atob(b); const a = new Uint8Array(bin.length); for (let k = 0; k < bin.length; k++) a[k] = bin.charCodeAt(k); return new File([a], `picture${i + 1}.jpg`, { type: h.slice(5, h.indexOf(';')) }); };
