@@ -2609,6 +2609,89 @@ class App:
         return web.json_response({"ok": True, "id": new["id"], "file": str(out),
                                   "text": got["text"], "lines": got["lines"]})
 
+    SMOOTH_FPS = (48, 60)   # частоту человек выбирает кнопкой в окне Библиотеки
+
+    def _smooth_core(self, ff, src, fps):
+        """Дорисовка промежуточных кадров готового клипа: движение становится плавнее на
+        экране, который показывает 48 или 60 кадров в секунду. Сначала кадры дорисовываются
+        по движению - это медленно, но видно глазами; если такой путь не вышел, ролик просто
+        начинают показывать чаще, повторяя кадры: плавность меньше, зато выходит всегда.
+        Возвращает путь нового файла и то, каким путём он получен."""
+        out_dir = self.default_results_dir()
+        out_dir.mkdir(parents=True, exist_ok=True)
+        stem = re.sub(r'[\\/:*?"<>|]', "", src.stem)[:80] or "клип"
+        out, k = out_dir / f"{stem}-{fps}.mp4", 1
+        while out.exists():   # прежний ролик не затираем: ему добавляется -2, -3...
+            k += 1
+            out = out_dir / f"{stem}-{fps}-{k}.mp4"
+
+        def encode(vf, secs):
+            cmd = [ff, "-hide_banner", "-loglevel", "error", "-y", "-i", str(src), "-vf", vf,
+                   "-c:v", "libx264", "-preset", "veryfast", "-crf", "18", "-pix_fmt", "yuv420p",
+                   "-movflags", "+faststart"]
+            last = None
+            for tail in (["-c:a", "copy"], ["-an"]):   # звуковой дорожки у клипа может не быть вовсе
+                last = subprocess.run([str(x) for x in cmd + tail + [out]], capture_output=True,
+                                      text=True, encoding="utf-8", errors="replace", timeout=secs,
+                                      creationflags=engine.CREATE_NO_WINDOW)
+                if last.returncode == 0 and out.exists() and out.stat().st_size > 2048:
+                    return last, True
+                out.unlink(missing_ok=True)
+            return last, False
+
+        # дорисовка по движению занимает на процессоре примерно втрое больше, чем длится ролик
+        r, ok = encode("minterpolate=fps=%d:mi_mode=mci:mc_mode=aobmc:me_mode=bidir:vsbmc=1" % fps, 2400)
+        if ok:
+            return {"file": out, "how": "дорисовкой движения"}
+        r, ok = encode("fps=%d" % fps, 900)
+        if not ok:
+            raise web.HTTPBadRequest(text="Плавность не вышла: " +
+                                      ((getattr(r, "stderr", "") or "").strip().splitlines() or
+                                       ["ffmpeg отказал"])[-1][:180])
+        return {"file": out, "how": "повтором кадров"}
+
+    async def h_smooth(self, req):
+        """Ролик становится плавнее: промежуточные кадры дорисовываются в НОВЫЙ файл,
+        исходник остаётся как был, а в Библиотеке появляется отдельная запись."""
+        try:
+            body = await req.json()
+        except Exception:
+            raise web.HTTPBadRequest(text="Не разобран запрос")
+        item = self.library.get(str(body.get("id") or ""))
+        if not item:
+            raise web.HTTPBadRequest(text="Файл не найден")
+        if item.get("kind") == "image":
+            raise web.HTTPBadRequest(text="Плавность делается для видео: картинку частить нечем")
+        path = self.file_path(item)
+        if not path or not path.exists():
+            raise web.HTTPBadRequest(text="Файл клипа не найден: возможно, папка результатов очищена")
+        ff = self._ffmpeg()
+        if not ff:
+            raise web.HTTPBadRequest(text="Не нашли ffmpeg: он идёт в комплекте с ComfyUI - "
+                                          "проверьте, что ComfyUI на месте")
+        fps = body.get("fps") if body.get("fps") in self.SMOOTH_FPS else 60
+        try:
+            got = await asyncio.to_thread(self._smooth_core, ff, path, fps)
+        except subprocess.TimeoutExpired:
+            raise web.HTTPBadRequest(text="Дорисовка не успела: ролик слишком длинный для одного захода. "
+                                          "Возьмите кусок короче")
+        out = got["file"]
+        new = dict(item)   # запись строится по образцу исходной: те же поля просят список и просмотрщик
+        new.update(id=uuid.uuid4().hex[:12], name=f"{path.stem} · {fps} к/с",
+                   file={"filename": out.name, "subfolder": "", "type": "local", "path": str(out)},
+                   date=datetime.now().isoformat(timespec="seconds"), t=time.time(),
+                   kind=item.get("kind") or "video", ext="mp4", fav=False,
+                   sub="Плавность: %d кадров в секунду" % fps, smoothed={"fps": fps, "how": got["how"]})
+        # адреса исходной записи новой не подходят: с ними новая запись указывала бы на прежний файл
+        for k in ("local", "src", "src_file", "ref_group", "refs"):
+            new.pop(k, None)
+        if isinstance(new.get("size"), int):
+            new["size"] = out.stat().st_size
+        self.library.add(new)
+        applog("плавность: %s - %d кадров в секунду, %s" % (out.name, fps, got["how"]))
+        return web.json_response({"ok": True, "id": new["id"], "file": str(out),
+                                  "how": got["how"], "fps": fps})
+
     async def h_generate_krea(self, req):
         await self.need_models("krea")
         form, _, seed = await self.read_image_form(req)
@@ -4876,6 +4959,7 @@ def build_app(comfy_override=None):
         web.post("/api/generate/krea", state.h_generate_krea),
         web.post("/api/upscale", state.h_upscale),
         web.post("/api/subtitles", state.h_subtitles),
+        web.post("/api/smooth", state.h_smooth),
         web.post("/api/upscale_file", state.h_upscale_file),
         web.post("/api/grain", state.h_grain),
         web.get("/api/version", lambda _req: web.json_response({"version": APP_VERSION, "built": build_stamp()})),
