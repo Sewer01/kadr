@@ -49,17 +49,20 @@ print("=== 1. импорт сервера без запуска приложен
 sys.path.insert(0, str(repo / "app"))
 try:
     import server                       # main() живёт под `if __name__ == "__main__"`, сервер не стартует
-    verdict("app/server.py импортируется, приложение не запускается", hasattr(server, "loudnorm_bed"),
-            "loudnorm_bed найдена" if hasattr(server, "loudnorm_bed") else "loudnorm_bed нет")
+    import ffrun                        # выравнивание громкости переехало из сервера в app/ffrun.py
+    import engine                       # CREATE_NO_WINDOW: та же константа, чем пользуется приложение
+    verdict("app/server.py импортируется, приложение не запускается", hasattr(ffrun, "loudnorm_bed"),
+            "loudnorm_bed найдена в app/ffrun.py" if hasattr(ffrun, "loudnorm_bed")
+            else "loudnorm_bed нет в app/ffrun.py")
 except Exception as e:
     verdict("app/server.py импортируется", False, "%s: %s" % (type(e).__name__, str(e)[:160]))
     print("\nИТОГ: падений: %d -> %s" % (len(fails), fails))
     sys.exit(1)
 
-if not hasattr(server, "loudnorm_bed"):
+if not hasattr(ffrun, "loudnorm_bed"):
     print("\nИТОГ: всё чисто")     # живой части без loudnorm_bed проверять нечего
     sys.exit(0)
-loudnorm_bed = server.loudnorm_bed
+loudnorm_bed = ffrun.loudnorm_bed
 
 ff = env.ffmpeg()                       # тот же порядок поиска, что у приложения
 print("декодер: %s" % (ff or "не найден"))
@@ -79,7 +82,7 @@ def probe(path):
     r = subprocess.run([str(ff), "-hide_banner", "-nostats", "-i", str(path), "-af",
                         "loudnorm=I=-16:TP=-1.5:LRA=11:print_format=json", "-f", "null", "-"],
                        capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=600,
-                       creationflags=getattr(server.engine, "CREATE_NO_WINDOW", 0))
+                       creationflags=getattr(engine, "CREATE_NO_WINDOW", 0))
     txt = (r.stderr or "") + (r.stdout or "")
     i = re.search(r'"input_i"\s*:\s*"?(-?[0-9.]+)"?', txt)
     d = re.search(r"Duration:\s*(\d+):(\d+):([\d.]+)", txt)

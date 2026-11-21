@@ -127,6 +127,27 @@ def repo(argv=None, prog=""):
     return p.resolve()
 
 
+def state_files(repo):
+    """Модули состояния: фасад app/server.py и модули областей app/areas/*.py.
+
+    Методы класса состояния разнесены по областям, поэтому проверка, которой нужен текст
+    обработчика, обязана смотреть все эти файлы, а не только app/server.py. Список путей нигде не
+    заморожен: области можно переносить и переименовывать, а имена обработчиков и таблица
+    маршрутов сторожатся отдельно (tools/checks/routes.py).
+    """
+    app = Path(repo) / "app"
+    files = [app / "server.py"]
+    areas = app / "areas"
+    if areas.is_dir():
+        files += sorted(p for p in areas.glob("*.py") if p.name != "__init__.py")
+    return [f for f in files if f.is_file()]
+
+
+def state_text(repo):
+    """Исходник всех модулей состояния одним текстом - для проверок, которые ищут в коде."""
+    return "\n".join(f.read_text(encoding="utf-8", errors="replace") for f in state_files(repo))
+
+
 # --- внешние инструменты ----------------------------------------------------
 
 def python():
@@ -263,6 +284,9 @@ def added_lines(repo, paths=()):
     Строки возвращаются только в режиме правки, когда git нашёлся и правка есть. Иначе
     вместо строк - None и одной фразой, почему (её печатают как ПРОПУСК): молча вернуть
     пустой список значило бы «проверили и всё хорошо».
+
+    Кроме git diff смотрятся и новые файлы (git status ??): git diff их не показывает вовсе, а
+    правка, которая добавила модуль, обязана проверяться наравне с правкой существующего.
     """
     if not diff_mode():
         return None, "режим правки выключен; включите %s=1, чтобы смотреть добавленные строки" % DIFF_VAR
@@ -277,6 +301,28 @@ def added_lines(repo, paths=()):
     if r.returncode != 0:
         return None, "git diff не вышел: %s" % ((r.stderr or "").strip()[:80] or "код %d" % r.returncode)
     added = [ln[1:] for ln in (r.stdout or "").splitlines() if ln.startswith("+") and not ln.startswith("+++")]
+    # Строки, которые этой же правкой убраны из существующих файлов. Если такой же строки нет в
+    # новом файле - это правда новая строка; если есть - код просто переехал, и требовать от него
+    # чего-то нового нельзя: иначе разбор большого файла на равные части падал бы на значках,
+    # которые в нём были всегда.
+    moved = {ln[1:].strip() for ln in (r.stdout or "").splitlines()
+             if ln.startswith("-") and not ln.startswith("---") and ln.strip() != "-"}
+    # новые файлы: git diff их не видит, поэтому читаем целиком
+    st = subprocess.run([tool, "-C", str(repo), "status", "--porcelain", "--untracked-files=all",
+                         "--"] + list(paths), capture_output=True, text=True,
+                        encoding="utf-8", errors="replace")
+    if st.returncode == 0:
+        for line in (st.stdout or "").splitlines():
+            if not line.startswith("?? "):
+                continue
+            rel = line[3:].strip().strip('"')
+            f = Path(repo) / rel.replace("/", os.sep)
+            try:
+                if f.is_file() and f.stat().st_size < 4_000_000:
+                    added += [ln for ln in f.read_text(encoding="utf-8", errors="replace").splitlines()
+                              if ln.strip() not in moved]
+            except OSError:
+                continue
     if not added:
         where = (" в " + ", ".join(paths)) if paths else ""
         return None, "незакоммиченной правки%s нет (git diff пуст): искать добавленные строки негде" % where

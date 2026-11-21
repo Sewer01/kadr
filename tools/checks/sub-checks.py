@@ -94,6 +94,8 @@ def py_body(name, where):
 print("=== 1. каждый блок <script> отдельно: node --check ===")
 html = (app / "ui" / "index.html").read_text(encoding="utf-8")
 srv = (app / "server.py").read_text(encoding="utf-8")
+# таблица маршрутов осталась в фасаде, а тела обработчиков живут по областям (app/areas/*.py)
+state_src = env.state_text(repo)
 blocks = re.findall(r"<script(?![^>]*src=)[^>]*>([\s\S]*?)</script>", html)
 if not NODE:
     env.missing("разбор блоков <script> и разметки метки", "KADR_NODE", "(node --check)")
@@ -165,20 +167,21 @@ verdict("запрос на субтитры идёт на '/api/subtitles' и с
         bool(make) and "/api/subtitles" in make and re.search(r"translate:\s*!!translate", make) is not None,
         str([ln.strip()[:100] for ln in make.splitlines() if "api/subtitles" in ln or "translate:" in ln])[:260])
 verdict("страница читает ответ translated (переведён текст или оставлен)", "j.translated" in make)
-handler = py_body("h_subtitles", srv)
+handler = py_body("h_subtitles", state_src)
 verdict("обработчик сервера читает поле translate из запроса",
         bool(handler) and 'body.get("translate")' in handler,
-        "обработчик: %d знаков" % len(handler) if handler else "h_subtitles не найден в app/server.py")
+        "обработчик: %d знаков" % len(handler) if handler else "h_subtitles не найден в модулях состояния")
 verdict("обработчик зовёт перевод и кладёт translated в ответ",
         bool(handler) and "_subtitles_translate(" in handler and '"translated": translated' in handler)
 verdict("маршрут '/api/subtitles' зарегистрирован на этот обработчик",
         re.search(r'web\.post\("/api/subtitles",\s*state\.h_subtitles\)', srv) is not None)
-verdict("функция перевода на модели существует", "async def _subtitles_translate(" in srv)
+verdict("функция перевода на модели существует", "async def _subtitles_translate(" in state_src)
 
 print()
 print("=== 3. разбор SRT в тройки и сборка файла обратно ===")
 sys.path.insert(0, str(app))
 import server  # noqa: E402
+import srt      # noqa: E402 - разбор и сборка SRT живут в app/srt.py
 
 RAW = """1
 00:00:01,200 --> 00:00:03,400
@@ -197,7 +200,7 @@ Fine, thanks.
 00:00:08,500 --> 00:00:10,250
 Goodbye
 """
-cues = server.srt_parse(RAW)
+cues = srt.srt_parse(RAW)
 for c in cues:
     print("   тройка:", c)
 verdict("пустые реплики ([BLANK_AUDIO], (music)) выкинуты", len(cues) == 3, "реплик: %d" % len(cues))
@@ -211,11 +214,11 @@ verdict("метки времени сохранены",
 
 RU = ["Привет, как дела?", "Хорошо, а у тебя?", "Прощай"]
 translated = [[a, b, t] for (a, b, _), t in zip(cues, RU)]
-built = server.srt_build(translated)
+built = srt.srt_build(translated)
 print("--- итоговый SRT после перевода ---")
 print(built, end="")
 print("--- конец файла ---")
-back = server.srt_parse(built)
+back = srt.srt_parse(built)
 verdict("пересобранный файл читается тем же разбором", [c[:2] for c in back] == TIMES)
 verdict("время не съехало после подмены текстов", [c[:2] for c in back] == [c[:2] for c in cues])
 verdict("номера в файле идут 1, 2, 3",
@@ -334,11 +337,11 @@ print("=== 4б. понимание, что речь и так по-русски 
 ru_text = "Ну что смотрим, как это всё работает вместе и что из этого выйдет"
 en_text = "Hello there, how are you today and what are we going to do next"
 mix_text = "Hello there, my friend, how are you"
-print("   по-русски:", server.srt_russian(ru_text), "| по-английски:", server.srt_russian(en_text),
-      "| только латиница:", server.srt_russian(mix_text))
-verdict("русский текст не просит перевода", server.srt_russian(ru_text) is True)
-verdict("английский текст просит перевода", server.srt_russian(en_text) is False)
-verdict("короткая латиница просит перевода", server.srt_russian(mix_text) is False)
+print("   по-русски:", srt.srt_russian(ru_text), "| по-английски:", srt.srt_russian(en_text),
+      "| только латиница:", srt.srt_russian(mix_text))
+verdict("русский текст не просит перевода", srt.srt_russian(ru_text) is True)
+verdict("английский текст просит перевода", srt.srt_russian(en_text) is False)
+verdict("короткая латиница просит перевода", srt.srt_russian(mix_text) is False)
 
 print()
 print("=== 5. запрещённые значки: постоянно по новому коду, дифф - только в режиме правки ===")
@@ -346,20 +349,20 @@ segs = (("код метки libTag", js_body("libTag", html)),
         ("выбор языка субтитров subAskLang", js_body("subAskLang", html)),
         ("меню субтитров subMenu", js_body("subMenu", html)),
         ("запрос субтитров subMake", js_body("subMake", html)),
-        ("обработчик перевода _subtitles_translate", py_body("_subtitles_translate", srv)),
-        ("обработчик субтитров h_subtitles", py_body("h_subtitles", srv)))
+        ("обработчик перевода _subtitles_translate", py_body("_subtitles_translate", state_src)),
+        ("обработчик субтитров h_subtitles", py_body("h_subtitles", state_src)))
 for label, text in segs:
     marks = env.bad_glyphs(text)
     verdict("постоянно: в коде «%s» нет значков U+2600-27BF, U+2190-21FF, U+3040-30FF, U+4E00-9FFF" % label,
             bool(text) and not marks,
             ("знаки: %s" % marks[:6]) if marks else ("%d знаков" % len(text) if text else "сегмент не найден"))
-added, why = env.added_lines(repo, ("app/server.py", "app/ui/index.html"))
+added, why = env.added_lines(repo, ("app",))
 if added is None:
     env.skip("поиск значков в добавленных строках незакоммиченной правки", why)
 else:
     hits = sorted({("%s U+%04X" % (c, ord(c))) for ln in added for c in ln if env.BAD_GLYPHS.match(c)})
-    verdict("в %d новых строках app/server.py и app/ui/index.html запрещённых значков нет" % len(added),
-            not hits, str(hits)[:200])
+    verdict("в %d новых строках app/ (фасад, области, помощники, страница) запрещённых значков нет"
+            % len(added), not hits, str(hits)[:200])
 
 print()
 print("ИТОГ:", "всё чисто" if not fails else "падений: %d -> %s" % (len(fails), fails))

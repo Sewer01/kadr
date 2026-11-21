@@ -22,6 +22,7 @@ from pathlib import Path
 import aiohttp
 
 import catalog
+from applog import applog        # тот же app.log, что пишет сервер: установка ядра тоже пишет в него
 
 _KILL_JOB = None          # one Windows job object for the whole app, created on the first child
 

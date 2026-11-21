@@ -35,6 +35,7 @@ import env  # noqa: E402
 # порядок: сначала самое дешёвое и самое главное (эталоны), потом остальное
 STEPS = [
     ("golden.py", "эталоны графов: все графы сверяются с эталонами"),
+    ("routes.py", "таблица маршрутов: метод, путь и имя обработчика заморожены побайтово"),
     ("ui.py", "страница интерфейса без браузера"),
     ("check-all.py", "сборка: компиляция, графы, разметка, маршруты, ноды ядра"),
     ("mix-checks.py", "звук в ролике: фон фоном, звук модели цел"),
@@ -44,18 +45,21 @@ STEPS = [
 
 
 def compile_app(repo):
-    """py_compile двух главных файлов приложения: сервера и сборки графов."""
+    """py_compile всех модулей приложения: фасада, сборки графов, областей и помощников."""
     print("=== 0. python-модули компилируются ===")
     ok = True
-    for name in ("server.py", "workflows.py"):
-        path = repo / "app" / name
+    targets = [("app/" + p.name, p) for p in sorted((repo / "app").glob("*.py"))]
+    targets += [("app/areas/" + p.name, p) for p in sorted((repo / "app" / "areas").glob("*.py"))]
+    if not targets:
+        targets = [("app/server.py", repo / "app" / "server.py")]
+    for label, path in targets:
         try:
             with tempfile.TemporaryDirectory() as tmp:      # байт-код во временную папку, не в app/
-                py_compile.compile(str(path), cfile=os.path.join(tmp, name + "c"), doraise=True)
-            print("   OK   app/" + name)
+                py_compile.compile(str(path), cfile=os.path.join(tmp, "x.pyc"), doraise=True)
+            print("   OK   " + label)
         except Exception as e:                              # noqa: BLE001
             ok = False
-            print("   ПАДЕНИЕ  app/%s · %s" % (name, str(e)[:160]))
+            print("   ПАДЕНИЕ  %s · %s" % (label, str(e)[:160]))
     print()
     return ok
 
@@ -122,7 +126,7 @@ def main(argv):
     fails = []
 
     if not compile_app(repo):
-        fails.append("компиляция app/server.py и app/workflows.py")
+        fails.append("компиляция модулей приложения (app/ и app/areas/)")
     whisper_probe(repo)
 
     for script, title in STEPS:

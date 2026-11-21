@@ -31,10 +31,13 @@ def check(name, ok, note=''):
 
 
 print('=== 1. python-модули компилируются ===')
-for f in ('server.py', 'workflows.py', 'agent.py', 'engine.py', 'catalog.py', 'main.py', 'version.py'):
+_mods = ['server.py', 'workflows.py', 'agent.py', 'engine.py', 'catalog.py', 'main.py', 'version.py']
+_mods += [p.name for p in sorted(app.glob('*.py'))]
+_mods += ['areas/' + p.name for p in sorted((app / 'areas').glob('*.py'))]
+for f in sorted(set(_mods)):
     try:
         with tempfile.TemporaryDirectory() as tmp:      # байт-код пишем во временную папку, не в app/
-            py_compile.compile(str(app / f), cfile=os.path.join(tmp, f + "c"), doraise=True)
+            py_compile.compile(str(app / f), cfile=os.path.join(tmp, Path(f).name + "c"), doraise=True)
         check(f, True)
     except Exception as e:
         check(f, False, str(e)[:120])
@@ -214,13 +217,19 @@ else:
 print()
 print('=== 5. маршруты сервера ===')
 srv = (app / 'server.py').read_text(encoding='utf-8')
+# таблица маршрутов живёт в фасаде, а обработчики - по областям (app/areas/*.py): ищем их там, где
+# они лежат сейчас; имена при этом заморожены в tools/checks/routes.json
+state_src = env.state_text(repo)
+state_where = ', '.join(f.name for f in env.state_files(repo))
 routes = re.findall(r'web\.(get|post|put|delete|patch)\("([^"]+)"', srv)
 dup = [(k, v) for k, v in Counter(routes).items() if v > 1]
 check('нет одинаковых метод+путь дважды', not dup, str(dup)[:120])
 handlers = set(re.findall(r'web\.(?:get|post|put|delete|patch)\("[^"]+",\s*state\.(\w+)', srv))
-lost = sorted(h for h in handlers if f'async def {h}' not in srv and f'def {h}' not in srv)
-check('каждый зарегистрированный обработчик существует', not lost, str(lost)[:100])
-orphan = sorted(set(re.findall(r'async def (h_\w+)\(', srv)) - handlers)
+lost = sorted(h for h in handlers if f'async def {h}' not in state_src and f'def {h}' not in state_src)
+check('каждый зарегистрированный обработчик существует (%d файлов состояния)'
+      % len(env.state_files(repo)), not lost, str(lost)[:100])
+orphan = sorted(set(re.findall(r'async def (h_\w+)\(', state_src)) - handlers)
+print('   (справка) файлов состояния: %d · %s' % (len(env.state_files(repo)), state_where[:150]))
 print('   (справка) обработчиков, не висящих ни на одном маршруте:', len(orphan), orphan[:6])
 
 print()
