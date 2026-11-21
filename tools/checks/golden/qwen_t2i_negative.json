@@ -1,0 +1,121 @@
+{
+ "graph": {
+  "1": {
+   "class_type": "UNETLoader",
+   "inputs": {
+    "unet_name": "Images\\qwen_image_2.1_int8_convrot.safetensors",
+    "weight_dtype": "default"
+   }
+  },
+  "10": {
+   "class_type": "VAEDecode",
+   "inputs": {
+    "samples": [
+     "9",
+     0
+    ],
+    "vae": [
+     "3",
+     0
+    ]
+   }
+  },
+  "11": {
+   "class_type": "SaveImage",
+   "inputs": {
+    "filename_prefix": "H3Workspace/qwen_t2i",
+    "images": [
+     "10",
+     0
+    ]
+   }
+  },
+  "2": {
+   "class_type": "CLIPLoader",
+   "inputs": {
+    "clip_name": "Images\\qwen3vl_8b_int8_convrot.safetensors",
+    "device": "default",
+    "type": "qwen_image"
+   }
+  },
+  "3": {
+   "class_type": "VAELoader",
+   "inputs": {
+    "vae_name": "Images\\qwen_image_2.1_vae_bf16.safetensors"
+   }
+  },
+  "4": {
+   "class_type": "QwenImage21Cache",
+   "inputs": {
+    "device": "auto",
+    "dtype": "default",
+    "model": [
+     "1",
+     0
+    ]
+   }
+  },
+  "7": {
+   "class_type": "TextEncodeQwenImage21",
+   "inputs": {
+    "clip": [
+     "2",
+     0
+    ],
+    "negative_prompt": "размытие",
+    "prompt": "лиса в снегу",
+    "resolution": 0,
+    "vae": [
+     "3",
+     0
+    ]
+   }
+  },
+  "8": {
+   "class_type": "EmptyLatentImage",
+   "inputs": {
+    "batch_size": 1,
+    "height": 640,
+    "width": 1152
+   }
+  },
+  "9": {
+   "class_type": "KSampler",
+   "inputs": {
+    "cfg": 3,
+    "denoise": 1,
+    "latent_image": [
+     "8",
+     0
+    ],
+    "model": [
+     "4",
+     0
+    ],
+    "negative": [
+     "7",
+     1
+    ],
+    "positive": [
+     "7",
+     0
+    ],
+    "sampler_name": "euler",
+    "scheduler": "simple",
+    "seed": 20261121,
+    "steps": 25
+   }
+  }
+ },
+ "stages": {
+  "1": "load",
+  "10": "decode",
+  "11": "save",
+  "2": "load",
+  "3": "load",
+  "4": "load",
+  "7": "encode",
+  "8": "encode",
+  "9": "sample"
+ }
+}

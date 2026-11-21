@@ -1,0 +1,169 @@
+{
+ "graph": {
+  "1": {
+   "class_type": "UNETLoader",
+   "inputs": {
+    "unet_name": "MinimaxH3\\minimax_h3_image_pruned_w4a8.safetensors",
+    "weight_dtype": "default"
+   }
+  },
+  "2": {
+   "class_type": "CLIPLoader",
+   "inputs": {
+    "clip_name": "MinimaxH3\\qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors",
+    "device": "default",
+    "type": "minimax"
+   }
+  },
+  "200": {
+   "class_type": "LoadImage",
+   "inputs": {
+    "image": "h3studio/char-a.png"
+   }
+  },
+  "201": {
+   "class_type": "ResizeImageMaskNode",
+   "inputs": {
+    "input": [
+     "200",
+     0
+    ],
+    "resize_type": "scale total pixels",
+    "resize_type.megapixels": 2.0,
+    "scale_method": "area"
+   }
+  },
+  "220": {
+   "class_type": "ResizeImageMaskNode",
+   "inputs": {
+    "input": [
+     "201",
+     0
+    ],
+    "resize_type": "scale to multiple",
+    "resize_type.multiple": 32,
+    "scale_method": "area"
+   }
+  },
+  "221": {
+   "class_type": "GetImageSize",
+   "inputs": {
+    "image": [
+     "220",
+     0
+    ]
+   }
+  },
+  "3": {
+   "class_type": "VAELoader",
+   "inputs": {
+    "vae_name": "MinimaxH3\\minimax_h3_image_vae_fp16.safetensors"
+   }
+  },
+  "4": {
+   "class_type": "ModelAttentionBackend",
+   "inputs": {
+    "attention": "comfy kitchen attention",
+    "model": [
+     "1",
+     0
+    ]
+   }
+  },
+  "5": {
+   "class_type": "MiniMaxH3ImageConditioning",
+   "inputs": {
+    "clip": [
+     "2",
+     0
+    ],
+    "height": 1920,
+    "images.image_0": [
+     "220",
+     0
+    ],
+    "prompt": "A character reference sheet of the character from <Picture 1>, split into six equal tall panels side by side in one row, all at the same scale, in the same art style as <Picture 1>.\nPanel one: full-body front view, the figure has no head at all, not a mannequin and not a neck stump, the collar is simply empty and the plain background shows through the neckline, standing in a relaxed neutral pose, showing the whole outfit from the neckline to the shoes.\nPanel two: full-body three-quarter view of the same character, turned about forty-five degrees to the left, same pose and outfit, head fully visible.\nPanel three: full-body side view in profile facing left, same pose and outfit, head fully visible.\nPanel four: full-body back view of the same character, same pose and outfit, seen from behind, head fully visible.\nPanel five: close-up head-and-shoulders portrait facing the viewer with a neutral expression.\nPanel six: close-up head-and-shoulders portrait in three-quarter view, with the same lighting and scale as panel five.\nKeep the same face, hairstyle, веснушки, clothing, colors, proportions and art style as in <Picture 1> in every panel.\nPlain solid white background, soft even lighting, no text, no labels.",
+    "vae": [
+     "3",
+     0
+    ],
+    "width": 4192
+   }
+  },
+  "6": {
+   "class_type": "ConditioningZeroOut",
+   "inputs": {
+    "conditioning": [
+     "5",
+     0
+    ]
+   }
+  },
+  "7": {
+   "class_type": "KSampler",
+   "inputs": {
+    "cfg": 1,
+    "denoise": 1,
+    "latent_image": [
+     "5",
+     1
+    ],
+    "model": [
+     "4",
+     0
+    ],
+    "negative": [
+     "6",
+     0
+    ],
+    "positive": [
+     "5",
+     0
+    ],
+    "sampler_name": "euler",
+    "scheduler": "simple",
+    "seed": 20261121,
+    "steps": 6
+   }
+  },
+  "8": {
+   "class_type": "VAEDecode",
+   "inputs": {
+    "samples": [
+     "7",
+     0
+    ],
+    "vae": [
+     "3",
+     0
+    ]
+   }
+  },
+  "9": {
+   "class_type": "SaveImage",
+   "inputs": {
+    "filename_prefix": "H3Workspace/h3img_edit",
+    "images": [
+     "8",
+     0
+    ]
+   }
+  }
+ },
+ "prompt": "A character reference sheet of the character from <Picture 1>, split into six equal tall panels side by side in one row, all at the same scale, in the same art style as <Picture 1>.\nPanel one: full-body front view, the figure has no head at all, not a mannequin and not a neck stump, the collar is simply empty and the plain background shows through the neckline, standing in a relaxed neutral pose, showing the whole outfit from the neckline to the shoes.\nPanel two: full-body three-quarter view of the same character, turned about forty-five degrees to the left, same pose and outfit, head fully visible.\nPanel three: full-body side view in profile facing left, same pose and outfit, head fully visible.\nPanel four: full-body back view of the same character, same pose and outfit, seen from behind, head fully visible.\nPanel five: close-up head-and-shoulders portrait facing the viewer with a neutral expression.\nPanel six: close-up head-and-shoulders portrait in three-quarter view, with the same lighting and scale as panel five.\nKeep the same face, hairstyle, веснушки, clothing, colors, proportions and art style as in <Picture 1> in every panel.\nPlain solid white background, soft even lighting, no text, no labels.",
+ "stages": {
+  "1": "load",
+  "2": "load",
+  "200": "encode",
+  "201": "encode",
+  "220": "encode",
+  "221": "encode",
+  "3": "load",
+  "4": "load",
+  "5": "encode",
+  "6": "encode",
+  "7": "sample",
+  "8": "decode",
+  "9": "save"
+ }
+}

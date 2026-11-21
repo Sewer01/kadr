@@ -1,0 +1,362 @@
+{
+ "graph": {
+  "1": {
+   "class_type": "UNETLoader",
+   "inputs": {
+    "unet_name": "Images\\flux-2-klein-4b-fp8.safetensors",
+    "weight_dtype": "default"
+   }
+  },
+  "10": {
+   "class_type": "ReferenceLatent",
+   "inputs": {
+    "conditioning": [
+     "7",
+     0
+    ],
+    "latent": [
+     "9",
+     0
+    ]
+   }
+  },
+  "11": {
+   "class_type": "ReferenceLatent",
+   "inputs": {
+    "conditioning": [
+     "8",
+     0
+    ],
+    "latent": [
+     "9",
+     0
+    ]
+   }
+  },
+  "12": {
+   "class_type": "CFGGuider",
+   "inputs": {
+    "cfg": 1,
+    "model": [
+     "1",
+     0
+    ],
+    "negative": [
+     "341",
+     0
+    ],
+    "positive": [
+     "331",
+     0
+    ]
+   }
+  },
+  "13": {
+   "class_type": "EmptyFlux2LatentImage",
+   "inputs": {
+    "batch_size": 1,
+    "height": [
+     "6",
+     1
+    ],
+    "width": [
+     "6",
+     0
+    ]
+   }
+  },
+  "14": {
+   "class_type": "Flux2Scheduler",
+   "inputs": {
+    "height": [
+     "6",
+     1
+    ],
+    "steps": 4,
+    "width": [
+     "6",
+     0
+    ]
+   }
+  },
+  "15": {
+   "class_type": "KSamplerSelect",
+   "inputs": {
+    "sampler_name": "euler"
+   }
+  },
+  "16": {
+   "class_type": "RandomNoise",
+   "inputs": {
+    "noise_seed": 20261121
+   }
+  },
+  "17": {
+   "class_type": "SamplerCustomAdvanced",
+   "inputs": {
+    "guider": [
+     "12",
+     0
+    ],
+    "latent_image": [
+     "13",
+     0
+    ],
+    "noise": [
+     "16",
+     0
+    ],
+    "sampler": [
+     "15",
+     0
+    ],
+    "sigmas": [
+     "14",
+     0
+    ]
+   }
+  },
+  "18": {
+   "class_type": "VAEDecode",
+   "inputs": {
+    "samples": [
+     "17",
+     0
+    ],
+    "vae": [
+     "3",
+     0
+    ]
+   }
+  },
+  "19": {
+   "class_type": "SaveImage",
+   "inputs": {
+    "filename_prefix": "H3Workspace/flux",
+    "images": [
+     "18",
+     0
+    ]
+   }
+  },
+  "2": {
+   "class_type": "CLIPLoader",
+   "inputs": {
+    "clip_name": "Images\\qwen_3_4b.safetensors",
+    "device": "default",
+    "type": "flux2"
+   }
+  },
+  "3": {
+   "class_type": "VAELoader",
+   "inputs": {
+    "vae_name": "Images\\flux2-vae.safetensors"
+   }
+  },
+  "300": {
+   "class_type": "LoadImage",
+   "inputs": {
+    "image": "h3studio/char-a.png"
+   }
+  },
+  "301": {
+   "class_type": "LoadImage",
+   "inputs": {
+    "image": ""
+   }
+  },
+  "310": {
+   "class_type": "ImageScaleToTotalPixels",
+   "inputs": {
+    "image": [
+     "300",
+     0
+    ],
+    "megapixels": 2.0,
+    "resolution_steps": 16,
+    "upscale_method": "lanczos"
+   }
+  },
+  "311": {
+   "class_type": "ImageScaleToTotalPixels",
+   "inputs": {
+    "image": [
+     "301",
+     0
+    ],
+    "megapixels": 2.0,
+    "resolution_steps": 16,
+    "upscale_method": "lanczos"
+   }
+  },
+  "320": {
+   "class_type": "VAEEncode",
+   "inputs": {
+    "pixels": [
+     "310",
+     0
+    ],
+    "vae": [
+     "3",
+     0
+    ]
+   }
+  },
+  "321": {
+   "class_type": "VAEEncode",
+   "inputs": {
+    "pixels": [
+     "311",
+     0
+    ],
+    "vae": [
+     "3",
+     0
+    ]
+   }
+  },
+  "330": {
+   "class_type": "ReferenceLatent",
+   "inputs": {
+    "conditioning": [
+     "10",
+     0
+    ],
+    "latent": [
+     "320",
+     0
+    ]
+   }
+  },
+  "331": {
+   "class_type": "ReferenceLatent",
+   "inputs": {
+    "conditioning": [
+     "330",
+     0
+    ],
+    "latent": [
+     "321",
+     0
+    ]
+   }
+  },
+  "340": {
+   "class_type": "ReferenceLatent",
+   "inputs": {
+    "conditioning": [
+     "11",
+     0
+    ],
+    "latent": [
+     "320",
+     0
+    ]
+   }
+  },
+  "341": {
+   "class_type": "ReferenceLatent",
+   "inputs": {
+    "conditioning": [
+     "340",
+     0
+    ],
+    "latent": [
+     "321",
+     0
+    ]
+   }
+  },
+  "4": {
+   "class_type": "LoadImage",
+   "inputs": {
+    "image": "h3studio/char-a.png"
+   }
+  },
+  "5": {
+   "class_type": "ImageScale",
+   "inputs": {
+    "crop": "center",
+    "height": 896,
+    "image": [
+     "4",
+     0
+    ],
+    "upscale_method": "lanczos",
+    "width": 1184
+   }
+  },
+  "6": {
+   "class_type": "GetImageSize",
+   "inputs": {
+    "image": [
+     "5",
+     0
+    ]
+   }
+  },
+  "7": {
+   "class_type": "CLIPTextEncode",
+   "inputs": {
+    "clip": [
+     "2",
+     0
+    ],
+    "text": "тот же персонаж в студии"
+   }
+  },
+  "8": {
+   "class_type": "ConditioningZeroOut",
+   "inputs": {
+    "conditioning": [
+     "7",
+     0
+    ]
+   }
+  },
+  "9": {
+   "class_type": "VAEEncode",
+   "inputs": {
+    "pixels": [
+     "5",
+     0
+    ],
+    "vae": [
+     "3",
+     0
+    ]
+   }
+  }
+ },
+ "stages": {
+  "1": "load",
+  "10": "encode",
+  "11": "encode",
+  "12": "encode",
+  "13": "encode",
+  "14": "encode",
+  "15": "encode",
+  "16": "encode",
+  "17": "sample",
+  "18": "decode",
+  "19": "save",
+  "2": "load",
+  "3": "load",
+  "300": "encode",
+  "301": "encode",
+  "310": "encode",
+  "311": "encode",
+  "320": "encode",
+  "321": "encode",
+  "330": "encode",
+  "331": "encode",
+  "340": "encode",
+  "341": "encode",
+  "4": "encode",
+  "5": "encode",
+  "6": "encode",
+  "7": "encode",
+  "8": "encode",
+  "9": "encode"
+ }
+}

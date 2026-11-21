@@ -1,0 +1,378 @@
+{
+ "graph": {
+  "1": {
+   "class_type": "UNETLoader",
+   "inputs": {
+    "unet_name": "Images\\qwen_image_2.1_int8_convrot.safetensors",
+    "weight_dtype": "default"
+   }
+  },
+  "101": {
+   "class_type": "LoadImage",
+   "inputs": {
+    "image": "h3studio/char-a.png"
+   }
+  },
+  "102": {
+   "class_type": "LoadImage",
+   "inputs": {
+    "image": ""
+   }
+  },
+  "111": {
+   "class_type": "ImageScaleToTotalPixels",
+   "inputs": {
+    "image": [
+     "101",
+     0
+    ],
+    "megapixels": 1.0,
+    "resolution_steps": 32,
+    "upscale_method": "lanczos"
+   }
+  },
+  "112": {
+   "class_type": "ImageScaleToTotalPixels",
+   "inputs": {
+    "image": [
+     "102",
+     0
+    ],
+    "megapixels": 1.0,
+    "resolution_steps": 32,
+    "upscale_method": "lanczos"
+   }
+  },
+  "2": {
+   "class_type": "CLIPLoader",
+   "inputs": {
+    "clip_name": "Images\\qwen3vl_8b_int8_convrot.safetensors",
+    "device": "default",
+    "type": "qwen_image"
+   }
+  },
+  "200": {
+   "class_type": "TextEncodeQwenImage21",
+   "inputs": {
+    "clip": [
+     "2",
+     0
+    ],
+    "images.image_1": [
+     "111",
+     0
+    ],
+    "images.image_2": [
+     "112",
+     0
+    ],
+    "negative_prompt": "",
+    "prompt": "кадр первый",
+    "resolution": 0,
+    "vae": [
+     "3",
+     0
+    ]
+   }
+  },
+  "201": {
+   "class_type": "KSampler",
+   "inputs": {
+    "cfg": 1,
+    "denoise": 1,
+    "latent_image": [
+     "8",
+     0
+    ],
+    "model": [
+     "4",
+     0
+    ],
+    "negative": [
+     "200",
+     1
+    ],
+    "positive": [
+     "200",
+     0
+    ],
+    "sampler_name": "euler",
+    "scheduler": "simple",
+    "seed": 20261121,
+    "steps": 25
+   }
+  },
+  "202": {
+   "class_type": "VAEDecode",
+   "inputs": {
+    "samples": [
+     "201",
+     0
+    ],
+    "vae": [
+     "3",
+     0
+    ]
+   }
+  },
+  "203": {
+   "class_type": "SaveImage",
+   "inputs": {
+    "filename_prefix": "H3Workspace/story_frame",
+    "images": [
+     "202",
+     0
+    ]
+   }
+  },
+  "210": {
+   "class_type": "TextEncodeQwenImage21",
+   "inputs": {
+    "clip": [
+     "2",
+     0
+    ],
+    "images.image_1": [
+     "111",
+     0
+    ],
+    "images.image_2": [
+     "112",
+     0
+    ],
+    "negative_prompt": "",
+    "prompt": "кадр второй",
+    "resolution": 0,
+    "vae": [
+     "3",
+     0
+    ]
+   }
+  },
+  "211": {
+   "class_type": "KSampler",
+   "inputs": {
+    "cfg": 1,
+    "denoise": 1,
+    "latent_image": [
+     "8",
+     0
+    ],
+    "model": [
+     "4",
+     0
+    ],
+    "negative": [
+     "210",
+     1
+    ],
+    "positive": [
+     "210",
+     0
+    ],
+    "sampler_name": "euler",
+    "scheduler": "simple",
+    "seed": 20261122,
+    "steps": 25
+   }
+  },
+  "212": {
+   "class_type": "VAEDecode",
+   "inputs": {
+    "samples": [
+     "211",
+     0
+    ],
+    "vae": [
+     "3",
+     0
+    ]
+   }
+  },
+  "213": {
+   "class_type": "SaveImage",
+   "inputs": {
+    "filename_prefix": "H3Workspace/story_frame",
+    "images": [
+     "212",
+     0
+    ]
+   }
+  },
+  "220": {
+   "class_type": "TextEncodeQwenImage21",
+   "inputs": {
+    "clip": [
+     "2",
+     0
+    ],
+    "images.image_1": [
+     "111",
+     0
+    ],
+    "images.image_2": [
+     "112",
+     0
+    ],
+    "negative_prompt": "",
+    "prompt": "кадр третий",
+    "resolution": 0,
+    "vae": [
+     "3",
+     0
+    ]
+   }
+  },
+  "221": {
+   "class_type": "KSampler",
+   "inputs": {
+    "cfg": 1,
+    "denoise": 1,
+    "latent_image": [
+     "8",
+     0
+    ],
+    "model": [
+     "4",
+     0
+    ],
+    "negative": [
+     "220",
+     1
+    ],
+    "positive": [
+     "220",
+     0
+    ],
+    "sampler_name": "euler",
+    "scheduler": "simple",
+    "seed": 20261123,
+    "steps": 25
+   }
+  },
+  "222": {
+   "class_type": "VAEDecode",
+   "inputs": {
+    "samples": [
+     "221",
+     0
+    ],
+    "vae": [
+     "3",
+     0
+    ]
+   }
+  },
+  "223": {
+   "class_type": "SaveImage",
+   "inputs": {
+    "filename_prefix": "H3Workspace/story_frame",
+    "images": [
+     "222",
+     0
+    ]
+   }
+  },
+  "3": {
+   "class_type": "VAELoader",
+   "inputs": {
+    "vae_name": "Images\\qwen_image_2.1_vae_bf16.safetensors"
+   }
+  },
+  "4": {
+   "class_type": "QwenImage21Cache",
+   "inputs": {
+    "device": "auto",
+    "dtype": "default",
+    "model": [
+     "1",
+     0
+    ]
+   }
+  },
+  "400": {
+   "class_type": "ImageStitch",
+   "inputs": {
+    "direction": "right",
+    "image1": [
+     "202",
+     0
+    ],
+    "image2": [
+     "212",
+     0
+    ],
+    "match_image_size": true,
+    "spacing_color": "white",
+    "spacing_width": 6
+   }
+  },
+  "401": {
+   "class_type": "ImageStitch",
+   "inputs": {
+    "direction": "right",
+    "image1": [
+     "400",
+     0
+    ],
+    "image2": [
+     "222",
+     0
+    ],
+    "match_image_size": true,
+    "spacing_color": "white",
+    "spacing_width": 6
+   }
+  },
+  "500": {
+   "class_type": "SaveImage",
+   "inputs": {
+    "filename_prefix": "H3Workspace/story_sheet",
+    "images": [
+     "401",
+     0
+    ]
+   }
+  },
+  "8": {
+   "class_type": "EmptyLatentImage",
+   "inputs": {
+    "batch_size": 1,
+    "height": 768,
+    "width": 1376
+   }
+  }
+ },
+ "stages": {
+  "1": "load",
+  "101": "encode",
+  "102": "encode",
+  "111": "encode",
+  "112": "encode",
+  "2": "load",
+  "200": "encode",
+  "201": "sample",
+  "202": "decode",
+  "203": "save",
+  "210": "encode",
+  "211": "sample",
+  "212": "decode",
+  "213": "save",
+  "220": "encode",
+  "221": "sample",
+  "222": "decode",
+  "223": "save",
+  "3": "load",
+  "4": "load",
+  "400": "decode",
+  "401": "decode",
+  "500": "save",
+  "8": "encode"
+ },
+ "titles": {
+  "203": "Кадр 1",
+  "213": "Кадр 2",
+  "223": "Кадр 3",
+  "500": "Лист раскадровки"
+ }
+}

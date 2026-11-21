@@ -1,0 +1,169 @@
+{
+ "graph": {
+  "B": {
+   "class_type": "ImageScaleBy",
+   "inputs": {
+    "image": [
+     "K",
+     0
+    ],
+    "scale_by": 2.0,
+    "upscale_method": "bilinear"
+   }
+  },
+  "F": {
+   "class_type": "ImageBlend",
+   "inputs": {
+    "blend_factor": 0.7,
+    "blend_mode": "soft_light",
+    "image1": [
+     "N",
+     0
+    ],
+    "image2": [
+     "B",
+     0
+    ]
+   }
+  },
+  "G": {
+   "class_type": "ImageBlend",
+   "inputs": {
+    "blend_factor": 0.5,
+    "blend_mode": "normal",
+    "image1": [
+     "Z",
+     0
+    ],
+    "image2": [
+     "I",
+     0
+    ]
+   }
+  },
+  "H": {
+   "class_type": "ImageScaleBy",
+   "inputs": {
+    "image": [
+     "N",
+     0
+    ],
+    "scale_by": 0.5,
+    "upscale_method": "area"
+   }
+  },
+  "I": {
+   "class_type": "ImageInvert",
+   "inputs": {
+    "image": [
+     "Z",
+     0
+    ]
+   }
+  },
+  "K": {
+   "class_type": "MaskToImage",
+   "inputs": {
+    "mask": [
+     "M",
+     0
+    ]
+   }
+  },
+  "L": {
+   "class_type": "LoadVideo",
+   "inputs": {
+    "file": "h3studio/clip.mp4"
+   }
+  },
+  "M": {
+   "class_type": "ImageToMask",
+   "inputs": {
+    "channel": "red",
+    "image": [
+     "R",
+     0
+    ]
+   }
+  },
+  "N": {
+   "class_type": "GetVideoComponents",
+   "inputs": {
+    "video": [
+     "L",
+     0
+    ]
+   }
+  },
+  "R": {
+   "class_type": "ImageNoiseAugmentation",
+   "inputs": {
+    "image": [
+     "G",
+     0
+    ],
+    "noise_aug_strength": 0.3,
+    "seed": 20261121
+   }
+  },
+  "S": {
+   "class_type": "SaveVideo",
+   "inputs": {
+    "codec": "auto",
+    "filename_prefix": "H3Workspace/grain",
+    "format": "auto",
+    "video": [
+     "W",
+     0
+    ]
+   }
+  },
+  "W": {
+   "class_type": "CreateVideo",
+   "inputs": {
+    "audio": [
+     "N",
+     1
+    ],
+    "fps": [
+     "N",
+     2
+    ],
+    "images": [
+     "F",
+     0
+    ]
+   }
+  },
+  "Z": {
+   "class_type": "ImageBlend",
+   "inputs": {
+    "blend_factor": 1.0,
+    "blend_mode": "difference",
+    "image1": [
+     "H",
+     0
+    ],
+    "image2": [
+     "H",
+     0
+    ]
+   }
+  }
+ },
+ "stages": {
+  "B": "encode",
+  "F": "encode",
+  "G": "encode",
+  "H": "encode",
+  "I": "encode",
+  "K": "encode",
+  "L": "encode",
+  "M": "encode",
+  "N": "encode",
+  "R": "encode",
+  "S": "save",
+  "W": "decode",
+  "Z": "encode"
+ }
+}

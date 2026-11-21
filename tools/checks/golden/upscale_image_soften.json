@@ -1,0 +1,170 @@
+{
+ "graph": {
+  "1": {
+   "class_type": "LoadImage",
+   "inputs": {
+    "image": "h3studio/frame.png"
+   }
+  },
+  "10": {
+   "class_type": "VAEDecodeTiled",
+   "inputs": {
+    "overlap": 128,
+    "samples": [
+     "9",
+     0
+    ],
+    "temporal_overlap": 8,
+    "temporal_size": 64,
+    "tile_size": 512,
+    "vae": [
+     "5",
+     0
+    ]
+   }
+  },
+  "11": {
+   "class_type": "SeedVR2PostProcessing",
+   "inputs": {
+    "color_correction_method": "lab",
+    "images": [
+     "10",
+     0
+    ],
+    "original_resized_images": [
+     "3",
+     0
+    ]
+   }
+  },
+  "12": {
+   "class_type": "SaveImage",
+   "inputs": {
+    "filename_prefix": "H3Workspace/upscale",
+    "images": [
+     "13",
+     0
+    ]
+   }
+  },
+  "13": {
+   "class_type": "ImageBlend",
+   "inputs": {
+    "blend_factor": 0.5,
+    "blend_mode": "normal",
+    "image1": [
+     "11",
+     0
+    ],
+    "image2": [
+     "3",
+     0
+    ]
+   }
+  },
+  "3": {
+   "class_type": "ImageScaleBy",
+   "inputs": {
+    "image": [
+     "1",
+     0
+    ],
+    "scale_by": 1.5,
+    "upscale_method": "lanczos"
+   }
+  },
+  "4": {
+   "class_type": "SeedVR2Preprocess",
+   "inputs": {
+    "resized_images": [
+     "3",
+     0
+    ]
+   }
+  },
+  "5": {
+   "class_type": "VAELoader",
+   "inputs": {
+    "vae_name": "Images\\seedvr2_ema_vae_fp16.safetensors"
+   }
+  },
+  "6": {
+   "class_type": "UNETLoader",
+   "inputs": {
+    "unet_name": "Images\\seedvr2_3b_int8_convrot.safetensors",
+    "weight_dtype": "default"
+   }
+  },
+  "7": {
+   "class_type": "VAEEncodeTiled",
+   "inputs": {
+    "overlap": 128,
+    "pixels": [
+     "4",
+     0
+    ],
+    "temporal_overlap": 8,
+    "temporal_size": 64,
+    "tile_size": 512,
+    "vae": [
+     "5",
+     0
+    ]
+   }
+  },
+  "8": {
+   "class_type": "SeedVR2Conditioning",
+   "inputs": {
+    "model": [
+     "6",
+     0
+    ],
+    "vae_conditioning": [
+     "7",
+     0
+    ]
+   }
+  },
+  "9": {
+   "class_type": "KSampler",
+   "inputs": {
+    "cfg": 1,
+    "denoise": 1,
+    "latent_image": [
+     "7",
+     0
+    ],
+    "model": [
+     "6",
+     0
+    ],
+    "negative": [
+     "8",
+     1
+    ],
+    "positive": [
+     "8",
+     0
+    ],
+    "sampler_name": "euler",
+    "scheduler": "simple",
+    "seed": 20261121,
+    "steps": 1
+   }
+  }
+ },
+ "stages": {
+  "1": "load",
+  "10": "decode",
+  "11": "decode",
+  "12": "save",
+  "13": "decode",
+  "3": "encode",
+  "4": "encode",
+  "5": "load",
+  "6": "load",
+  "7": "encode",
+  "8": "encode",
+  "9": "sample"
+ }
+}

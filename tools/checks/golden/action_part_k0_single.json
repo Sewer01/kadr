@@ -1,0 +1,521 @@
+{
+ "graph": {
+  "1": {
+   "class_type": "UNETLoader",
+   "inputs": {
+    "unet_name": "MinimaxH3\\minimax_h3_hybrid_fl2va_ref2va_b25-49-int8.safetensors",
+    "weight_dtype": "default"
+   }
+  },
+  "10": {
+   "class_type": "BasicScheduler",
+   "inputs": {
+    "denoise": 1.0,
+    "model": [
+     "30",
+     0
+    ],
+    "scheduler": "simple",
+    "steps": 12
+   }
+  },
+  "100": {
+   "class_type": "LoadImage",
+   "inputs": {
+    "image": "h3studio/char-a.png"
+   }
+  },
+  "101": {
+   "class_type": "LoadImage",
+   "inputs": {
+    "image": "h3studio/char-c.png"
+   }
+  },
+  "102": {
+   "class_type": "LoadImage",
+   "inputs": {
+    "image": "h3studio/place.png"
+   }
+  },
+  "12": {
+   "class_type": "KSamplerSelect",
+   "inputs": {
+    "sampler_name": "euler"
+   }
+  },
+  "2": {
+   "class_type": "ModelAttentionBackend",
+   "inputs": {
+    "attention": "comfy kitchen attention",
+    "model": [
+     "61",
+     0
+    ]
+   }
+  },
+  "201": {
+   "class_type": "MiniMaxH3ReferenceToVideo",
+   "inputs": {
+    "audio_vae": [
+     "6",
+     0
+    ],
+    "clip": [
+     "4",
+     0
+    ],
+    "height": 640,
+    "length": 124,
+    "prompt": "бег по крыше, <Picture 1> в кадре",
+    "ref_image_size": "max",
+    "ref_images.ref_image_0": [
+     "100",
+     0
+    ],
+    "ref_images.ref_image_1": [
+     "101",
+     0
+    ],
+    "ref_images.ref_image_2": [
+     "102",
+     0
+    ],
+    "vae": [
+     "5",
+     0
+    ],
+    "width": 1152
+   }
+  },
+  "202": {
+   "class_type": "LTXVSeparateAVLatent",
+   "inputs": {
+    "av_latent": [
+     "201",
+     1
+    ]
+   }
+  },
+  "203": {
+   "class_type": "LTXVConcatAVLatent",
+   "inputs": {
+    "audio_latent": [
+     "202",
+     1
+    ],
+    "video_latent": [
+     "202",
+     0
+    ]
+   }
+  },
+  "204": {
+   "class_type": "RandomNoise",
+   "inputs": {
+    "noise_seed": 20261121
+   }
+  },
+  "205": {
+   "class_type": "BasicGuider",
+   "inputs": {
+    "conditioning": [
+     "201",
+     0
+    ],
+    "model": [
+     "30",
+     0
+    ]
+   }
+  },
+  "206": {
+   "class_type": "SamplerCustomAdvanced",
+   "inputs": {
+    "guider": [
+     "205",
+     0
+    ],
+    "latent_image": [
+     "203",
+     0
+    ],
+    "noise": [
+     "204",
+     0
+    ],
+    "sampler": [
+     "12",
+     0
+    ],
+    "sigmas": [
+     "10",
+     0
+    ]
+   }
+  },
+  "207": {
+   "class_type": "VAEDecode",
+   "inputs": {
+    "samples": [
+     "206",
+     1
+    ],
+    "vae": [
+     "5",
+     0
+    ]
+   }
+  },
+  "208": {
+   "class_type": "VAEDecodeAudio",
+   "inputs": {
+    "samples": [
+     "206",
+     1
+    ],
+    "vae": [
+     "6",
+     0
+    ]
+   }
+  },
+  "209": {
+   "class_type": "TrimAudioDuration",
+   "inputs": {
+    "audio": [
+     "208",
+     0
+    ],
+    "duration": 4.967,
+    "start_index": 0.0
+   }
+  },
+  "210": {
+   "class_type": "TrimAudioDuration",
+   "inputs": {
+    "audio": [
+     "208",
+     0
+    ],
+    "duration": 0.05,
+    "start_index": 4.967
+   }
+  },
+  "211": {
+   "class_type": "AudioAdjustVolume",
+   "inputs": {
+    "audio": [
+     "210",
+     0
+    ],
+    "volume": -4
+   }
+  },
+  "212": {
+   "class_type": "TrimAudioDuration",
+   "inputs": {
+    "audio": [
+     "208",
+     0
+    ],
+    "duration": 0.05,
+    "start_index": 5.017
+   }
+  },
+  "213": {
+   "class_type": "AudioAdjustVolume",
+   "inputs": {
+    "audio": [
+     "212",
+     0
+    ],
+    "volume": -9
+   }
+  },
+  "214": {
+   "class_type": "TrimAudioDuration",
+   "inputs": {
+    "audio": [
+     "208",
+     0
+    ],
+    "duration": 0.05,
+    "start_index": 5.067
+   }
+  },
+  "215": {
+   "class_type": "AudioAdjustVolume",
+   "inputs": {
+    "audio": [
+     "214",
+     0
+    ],
+    "volume": -18
+   }
+  },
+  "216": {
+   "class_type": "TrimAudioDuration",
+   "inputs": {
+    "audio": [
+     "208",
+     0
+    ],
+    "duration": 0.05,
+    "start_index": 5.117
+   }
+  },
+  "217": {
+   "class_type": "AudioAdjustVolume",
+   "inputs": {
+    "audio": [
+     "216",
+     0
+    ],
+    "volume": -40
+   }
+  },
+  "218": {
+   "class_type": "AudioConcat",
+   "inputs": {
+    "audio1": [
+     "209",
+     0
+    ],
+    "audio2": [
+     "211",
+     0
+    ],
+    "direction": "after"
+   }
+  },
+  "219": {
+   "class_type": "AudioConcat",
+   "inputs": {
+    "audio1": [
+     "218",
+     0
+    ],
+    "audio2": [
+     "213",
+     0
+    ],
+    "direction": "after"
+   }
+  },
+  "220": {
+   "class_type": "AudioConcat",
+   "inputs": {
+    "audio1": [
+     "219",
+     0
+    ],
+    "audio2": [
+     "215",
+     0
+    ],
+    "direction": "after"
+   }
+  },
+  "221": {
+   "class_type": "AudioConcat",
+   "inputs": {
+    "audio1": [
+     "220",
+     0
+    ],
+    "audio2": [
+     "217",
+     0
+    ],
+    "direction": "after"
+   }
+  },
+  "222": {
+   "class_type": "CreateVideo",
+   "inputs": {
+    "audio": [
+     "221",
+     0
+    ],
+    "bit_depth": "auto",
+    "codec": "none",
+    "color_space": "sRGB",
+    "fps": 24.0,
+    "images": [
+     "207",
+     0
+    ]
+   }
+  },
+  "223": {
+   "class_type": "SaveVideo",
+   "inputs": {
+    "filename_prefix": "H3Workspace/long_part",
+    "format": "auto",
+    "format.codec": "auto",
+    "video": [
+     "222",
+     0
+    ]
+   }
+  },
+  "224": {
+   "class_type": "LTXVSeparateAVLatent",
+   "inputs": {
+    "av_latent": [
+     "206",
+     1
+    ]
+   }
+  },
+  "225": {
+   "class_type": "LatentCut",
+   "inputs": {
+    "amount": 17,
+    "dim": "t",
+    "index": -17,
+    "samples": [
+     "224",
+     0
+    ]
+   }
+  },
+  "226": {
+   "class_type": "SaveLatent",
+   "inputs": {
+    "filename_prefix": "H3Workspace/long_state",
+    "samples": [
+     "225",
+     0
+    ]
+   }
+  },
+  "3": {
+   "class_type": "BlockSparseAttention",
+   "inputs": {
+    "dense_blocks": "",
+    "end_percent": 1.0,
+    "extra_tokens": 256,
+    "min_tokens": 12288,
+    "model": [
+     "2",
+     0
+    ],
+    "selection": "sol-attn",
+    "selection.tau": 1.3,
+    "sink_conditioning": "exact_kv_and_rows",
+    "start_percent": 0.2,
+    "verbose": false
+   }
+  },
+  "30": {
+   "class_type": "ModelPreviewOverrideKJ",
+   "inputs": {
+    "jpeg_quality": 80,
+    "max_resolution": 1024,
+    "model": [
+     "7",
+     0
+    ],
+    "preview_fps": 12,
+    "preview_frames": 1024,
+    "suppress_default_preview": true,
+    "tiny_vae": "taeh3.safetensors",
+    "vae": [
+     "5",
+     0
+    ]
+   }
+  },
+  "4": {
+   "class_type": "CLIPLoader",
+   "inputs": {
+    "clip_name": "MinimaxH3\\qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors",
+    "device": "default",
+    "type": "minimax"
+   }
+  },
+  "5": {
+   "class_type": "VAELoader",
+   "inputs": {
+    "vae_name": "MinimaxH3\\minimax_h3_video_vae_int8_convrot.safetensors"
+   }
+  },
+  "6": {
+   "class_type": "VAELoader",
+   "inputs": {
+    "vae_name": "MinimaxH3\\minimax_h3_audio_vae_fp32.safetensors"
+   }
+  },
+  "60": {
+   "class_type": "LoraLoaderModelOnly",
+   "inputs": {
+    "lora_name": "MinimaxH3\\minimax_h3_DMAD_4step_full_lora_avg_rank_39_bf16.safetensors",
+    "model": [
+     "1",
+     0
+    ],
+    "strength_model": 0.8
+   }
+  },
+  "61": {
+   "class_type": "LoraLoaderModelOnly",
+   "inputs": {
+    "lora_name": "MinimaxH3\\H3_speed_slider_1.1.safetensors",
+    "model": [
+     "60",
+     0
+    ],
+    "strength_model": 4.0
+   }
+  },
+  "7": {
+   "class_type": "MiniMaxH3SigmaShift",
+   "inputs": {
+    "model": [
+     "3",
+     0
+    ],
+    "shift_audio": 3.0,
+    "shift_video": 12.0
+   }
+  },
+  "9": {
+   "class_type": "SplitSigmas",
+   "inputs": {
+    "sigmas": [
+     "10",
+     0
+    ],
+    "step": 8
+   }
+  }
+ },
+ "stages": {
+  "1": "load",
+  "2": "load",
+  "201": "encode",
+  "206": "sample",
+  "207": "decode",
+  "208": "decode",
+  "222": "save",
+  "223": "save",
+  "224": "save",
+  "225": "save",
+  "226": "save",
+  "3": "load",
+  "30": "load",
+  "4": "load",
+  "5": "load",
+  "6": "load",
+  "60": "load",
+  "61": "load",
+  "7": "load",
+  "__scenes__": {
+   "map": {
+    "206": 0
+   },
+   "n": 3
+  }
+ }
+}

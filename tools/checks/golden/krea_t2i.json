@@ -1,0 +1,113 @@
+{
+ "graph": {
+  "1": {
+   "class_type": "UNETLoader",
+   "inputs": {
+    "unet_name": "Images\\krea2_turbo_int8_convrot.safetensors",
+    "weight_dtype": "default"
+   }
+  },
+  "2": {
+   "class_type": "CLIPLoader",
+   "inputs": {
+    "clip_name": "Images\\qwen3vl_4b_fp8_scaled.safetensors",
+    "device": "default",
+    "type": "krea2"
+   }
+  },
+  "3": {
+   "class_type": "VAELoader",
+   "inputs": {
+    "vae_name": "Images\\qwen_image_vae.safetensors"
+   }
+  },
+  "4": {
+   "class_type": "CLIPTextEncode",
+   "inputs": {
+    "clip": [
+     "2",
+     0
+    ],
+    "text": "портрет, 50mm"
+   }
+  },
+  "5": {
+   "class_type": "ConditioningZeroOut",
+   "inputs": {
+    "conditioning": [
+     "4",
+     0
+    ]
+   }
+  },
+  "6": {
+   "class_type": "EmptyLatentImage",
+   "inputs": {
+    "batch_size": 1,
+    "height": 640,
+    "width": 1152
+   }
+  },
+  "7": {
+   "class_type": "KSampler",
+   "inputs": {
+    "cfg": 1,
+    "denoise": 1,
+    "latent_image": [
+     "6",
+     0
+    ],
+    "model": [
+     "1",
+     0
+    ],
+    "negative": [
+     "5",
+     0
+    ],
+    "positive": [
+     "4",
+     0
+    ],
+    "sampler_name": "euler",
+    "scheduler": "simple",
+    "seed": 20261121,
+    "steps": 10
+   }
+  },
+  "8": {
+   "class_type": "VAEDecode",
+   "inputs": {
+    "samples": [
+     "7",
+     0
+    ],
+    "vae": [
+     "3",
+     0
+    ]
+   }
+  },
+  "9": {
+   "class_type": "SaveImage",
+   "inputs": {
+    "filename_prefix": "H3Workspace/krea",
+    "images": [
+     "8",
+     0
+    ]
+   }
+  }
+ },
+ "stages": {
+  "1": "load",
+  "2": "load",
+  "3": "load",
+  "4": "encode",
+  "5": "encode",
+  "6": "encode",
+  "7": "sample",
+  "8": "decode",
+  "9": "save"
+ }
+}

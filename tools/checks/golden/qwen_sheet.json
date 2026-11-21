@@ -1,0 +1,150 @@
+{
+ "graph": {
+  "1": {
+   "class_type": "UNETLoader",
+   "inputs": {
+    "unet_name": "Images\\qwen_image_2.1_int8_convrot.safetensors",
+    "weight_dtype": "default"
+   }
+  },
+  "10": {
+   "class_type": "VAEDecode",
+   "inputs": {
+    "samples": [
+     "9",
+     0
+    ],
+    "vae": [
+     "3",
+     0
+    ]
+   }
+  },
+  "11": {
+   "class_type": "SaveImage",
+   "inputs": {
+    "filename_prefix": "H3Workspace/qwen",
+    "images": [
+     "10",
+     0
+    ]
+   }
+  },
+  "2": {
+   "class_type": "CLIPLoader",
+   "inputs": {
+    "clip_name": "Images\\qwen3vl_8b_int8_convrot.safetensors",
+    "device": "default",
+    "type": "qwen_image"
+   }
+  },
+  "3": {
+   "class_type": "VAELoader",
+   "inputs": {
+    "vae_name": "Images\\qwen_image_2.1_vae_bf16.safetensors"
+   }
+  },
+  "4": {
+   "class_type": "QwenImage21Cache",
+   "inputs": {
+    "device": "auto",
+    "dtype": "default",
+    "model": [
+     "1",
+     0
+    ]
+   }
+  },
+  "5": {
+   "class_type": "LoadImage",
+   "inputs": {
+    "image": "h3studio/char-a.png"
+   }
+  },
+  "6": {
+   "class_type": "ImageScaleToTotalPixels",
+   "inputs": {
+    "image": [
+     "5",
+     0
+    ],
+    "megapixels": 1.93359375,
+    "resolution_steps": 32,
+    "upscale_method": "lanczos"
+   }
+  },
+  "7": {
+   "class_type": "TextEncodeQwenImage21",
+   "inputs": {
+    "clip": [
+     "2",
+     0
+    ],
+    "images.image_1": [
+     "6",
+     0
+    ],
+    "negative_prompt": "",
+    "prompt": "A character reference sheet of the character from <image1>, split into six equal tall panels side by side in one row, all at the same scale, in the same art style as <image1>.\nPanel one: full-body front view facing the viewer, standing in a relaxed neutral pose, showing the whole outfit from head to shoes.\nPanel two: full-body three-quarter view of the same character, turned about forty-five degrees to the left, same pose and outfit, head fully visible.\nPanel three: full-body side view in profile facing left, same pose and outfit, head fully visible.\nPanel four: full-body back view of the same character, same pose and outfit, seen from behind, head fully visible.\nPanel five: close-up head-and-shoulders portrait facing the viewer with a neutral expression.\nPanel six: close-up head-and-shoulders portrait in three-quarter view, with the same lighting and scale as panel five.\nKeep the same face, hairstyle, веснушки, clothing, colors, proportions and art style as in <image1> in every panel.\nPlain solid black background, soft even lighting, no text, no labels.",
+    "resolution": 0,
+    "vae": [
+     "3",
+     0
+    ]
+   }
+  },
+  "8": {
+   "class_type": "EmptyLatentImage",
+   "inputs": {
+    "batch_size": 1,
+    "height": 960,
+    "width": 2112
+   }
+  },
+  "9": {
+   "class_type": "KSampler",
+   "inputs": {
+    "cfg": 1,
+    "denoise": 1,
+    "latent_image": [
+     "8",
+     0
+    ],
+    "model": [
+     "4",
+     0
+    ],
+    "negative": [
+     "7",
+     1
+    ],
+    "positive": [
+     "7",
+     0
+    ],
+    "sampler_name": "euler",
+    "scheduler": "simple",
+    "seed": 20261121,
+    "steps": 25
+   }
+  }
+ },
+ "prompt": "A character reference sheet of the character from <image1>, split into six equal tall panels side by side in one row, all at the same scale, in the same art style as <image1>.\nPanel one: full-body front view facing the viewer, standing in a relaxed neutral pose, showing the whole outfit from head to shoes.\nPanel two: full-body three-quarter view of the same character, turned about forty-five degrees to the left, same pose and outfit, head fully visible.\nPanel three: full-body side view in profile facing left, same pose and outfit, head fully visible.\nPanel four: full-body back view of the same character, same pose and outfit, seen from behind, head fully visible.\nPanel five: close-up head-and-shoulders portrait facing the viewer with a neutral expression.\nPanel six: close-up head-and-shoulders portrait in three-quarter view, with the same lighting and scale as panel five.\nKeep the same face, hairstyle, веснушки, clothing, colors, proportions and art style as in <image1> in every panel.\nPlain solid black background, soft even lighting, no text, no labels.",
+ "stages": {
+  "1": "load",
+  "10": "decode",
+  "11": "save",
+  "122": "encode",
+  "123": "encode",
+  "132": "encode",
+  "133": "encode",
+  "2": "load",
+  "3": "load",
+  "4": "load",
+  "5": "encode",
+  "6": "encode",
+  "7": "encode",
+  "8": "encode",
+  "9": "sample"
+ }
+}

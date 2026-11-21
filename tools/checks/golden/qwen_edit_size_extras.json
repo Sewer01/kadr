@@ -1,0 +1,193 @@
+{
+ "graph": {
+  "1": {
+   "class_type": "UNETLoader",
+   "inputs": {
+    "unet_name": "Images\\qwen_image_2.1_int8_convrot.safetensors",
+    "weight_dtype": "default"
+   }
+  },
+  "10": {
+   "class_type": "VAEDecode",
+   "inputs": {
+    "samples": [
+     "9",
+     0
+    ],
+    "vae": [
+     "3",
+     0
+    ]
+   }
+  },
+  "11": {
+   "class_type": "SaveImage",
+   "inputs": {
+    "filename_prefix": "H3Workspace/qwen",
+    "images": [
+     "10",
+     0
+    ]
+   }
+  },
+  "122": {
+   "class_type": "LoadImage",
+   "inputs": {
+    "image": "h3studio/char-a.png"
+   }
+  },
+  "123": {
+   "class_type": "LoadImage",
+   "inputs": {
+    "image": ""
+   }
+  },
+  "132": {
+   "class_type": "ImageScaleToTotalPixels",
+   "inputs": {
+    "image": [
+     "122",
+     0
+    ],
+    "megapixels": 1.0,
+    "resolution_steps": 32,
+    "upscale_method": "lanczos"
+   }
+  },
+  "133": {
+   "class_type": "ImageScaleToTotalPixels",
+   "inputs": {
+    "image": [
+     "123",
+     0
+    ],
+    "megapixels": 1.0,
+    "resolution_steps": 32,
+    "upscale_method": "lanczos"
+   }
+  },
+  "2": {
+   "class_type": "CLIPLoader",
+   "inputs": {
+    "clip_name": "Images\\qwen3vl_8b_int8_convrot.safetensors",
+    "device": "default",
+    "type": "qwen_image"
+   }
+  },
+  "3": {
+   "class_type": "VAELoader",
+   "inputs": {
+    "vae_name": "Images\\qwen_image_2.1_vae_bf16.safetensors"
+   }
+  },
+  "4": {
+   "class_type": "QwenImage21Cache",
+   "inputs": {
+    "device": "auto",
+    "dtype": "default",
+    "model": [
+     "1",
+     0
+    ]
+   }
+  },
+  "5": {
+   "class_type": "LoadImage",
+   "inputs": {
+    "image": "h3studio/char-a.png"
+   }
+  },
+  "6": {
+   "class_type": "ImageScaleToTotalPixels",
+   "inputs": {
+    "image": [
+     "5",
+     0
+    ],
+    "megapixels": 1.0,
+    "resolution_steps": 32,
+    "upscale_method": "lanczos"
+   }
+  },
+  "7": {
+   "class_type": "TextEncodeQwenImage21",
+   "inputs": {
+    "clip": [
+     "2",
+     0
+    ],
+    "images.image_1": [
+     "6",
+     0
+    ],
+    "images.image_2": [
+     "132",
+     0
+    ],
+    "images.image_3": [
+     "133",
+     0
+    ],
+    "negative_prompt": "",
+    "prompt": "тот же персонаж в студии",
+    "resolution": 0,
+    "vae": [
+     "3",
+     0
+    ]
+   }
+  },
+  "8": {
+   "class_type": "EmptyLatentImage",
+   "inputs": {
+    "batch_size": 1,
+    "height": 1088,
+    "width": 1952
+   }
+  },
+  "9": {
+   "class_type": "KSampler",
+   "inputs": {
+    "cfg": 1,
+    "denoise": 1,
+    "latent_image": [
+     "8",
+     0
+    ],
+    "model": [
+     "4",
+     0
+    ],
+    "negative": [
+     "7",
+     1
+    ],
+    "positive": [
+     "7",
+     0
+    ],
+    "sampler_name": "euler",
+    "scheduler": "simple",
+    "seed": 20261121,
+    "steps": 25
+   }
+  }
+ },
+ "stages": {
+  "1": "load",
+  "10": "decode",
+  "11": "save",
+  "122": "encode",
+  "123": "encode",
+  "132": "encode",
+  "133": "encode",
+  "2": "load",
+  "3": "load",
+  "4": "load",
+  "5": "encode",
+  "6": "encode",
+  "7": "encode",
+  "8": "encode",
+  "9": "sample"
+ }
+}

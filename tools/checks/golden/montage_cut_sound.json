@@ -1,0 +1,208 @@
+{
+ "graph": {
+  "A0": {
+   "class_type": "LoadAudio",
+   "inputs": {
+    "audio": "h3studio/a.mp4"
+   }
+  },
+  "A2": {
+   "class_type": "LoadAudio",
+   "inputs": {
+    "audio": "h3studio/c.mp4"
+   }
+  },
+  "C": {
+   "class_type": "ConcatenateVideo",
+   "inputs": {
+    "codec": "auto",
+    "complete_audio": [
+     "J2",
+     0
+    ],
+    "videos.video0": [
+     "T0",
+     0
+    ],
+    "videos.video1": [
+     "V1",
+     0
+    ],
+    "videos.video2": [
+     "T2",
+     0
+    ]
+   }
+  },
+  "G1": {
+   "class_type": "GetVideoComponents",
+   "inputs": {
+    "video": [
+     "L1",
+     0
+    ]
+   }
+  },
+  "J1": {
+   "class_type": "AudioConcat",
+   "inputs": {
+    "audio1": [
+     "R0",
+     0
+    ],
+    "audio2": [
+     "Q1",
+     0
+    ],
+    "direction": "after"
+   }
+  },
+  "J2": {
+   "class_type": "AudioConcat",
+   "inputs": {
+    "audio1": [
+     "J1",
+     0
+    ],
+    "audio2": [
+     "R2",
+     0
+    ],
+    "direction": "after"
+   }
+  },
+  "L0": {
+   "class_type": "LoadVideo",
+   "inputs": {
+    "file": "h3studio/a.mp4"
+   }
+  },
+  "L1": {
+   "class_type": "LoadVideo",
+   "inputs": {
+    "file": "h3studio/b.mp4"
+   }
+  },
+  "L2": {
+   "class_type": "LoadVideo",
+   "inputs": {
+    "file": "h3studio/c.mp4"
+   }
+  },
+  "Q1": {
+   "class_type": "EmptyAudio",
+   "inputs": {
+    "channels": 2,
+    "duration": 2.0,
+    "sample_rate": 48000
+   }
+  },
+  "R0": {
+   "class_type": "TrimAudioDuration",
+   "inputs": {
+    "audio": [
+     "A0",
+     0
+    ],
+    "duration": 3.0,
+    "start_index": 1.0
+   }
+  },
+  "R2": {
+   "class_type": "TrimAudioDuration",
+   "inputs": {
+    "audio": [
+     "A2",
+     0
+    ],
+    "duration": 2.0,
+    "start_index": 0.0
+   }
+  },
+  "S": {
+   "class_type": "SaveVideo",
+   "inputs": {
+    "codec": "auto",
+    "filename_prefix": "H3Workspace/montage",
+    "format": "auto",
+    "video": [
+     "C",
+     0
+    ]
+   }
+  },
+  "T0": {
+   "class_type": "Video Slice",
+   "inputs": {
+    "duration": 3.5,
+    "start_time": 1.0,
+    "strict_duration": false,
+    "video": [
+     "L0",
+     0
+    ]
+   }
+  },
+  "T2": {
+   "class_type": "Video Slice",
+   "inputs": {
+    "duration": 2.0,
+    "start_time": 0.0,
+    "strict_duration": false,
+    "video": [
+     "L2",
+     0
+    ]
+   }
+  },
+  "V1": {
+   "class_type": "CreateVideo",
+   "inputs": {
+    "audio": [
+     "G1",
+     1
+    ],
+    "fps": [
+     "G1",
+     2
+    ],
+    "images": [
+     "Z1",
+     0
+    ]
+   }
+  },
+  "Z1": {
+   "class_type": "ImageScale",
+   "inputs": {
+    "crop": "center",
+    "height": 640,
+    "image": [
+     "G1",
+     0
+    ],
+    "upscale_method": "lanczos",
+    "width": 1152
+   }
+  }
+ },
+ "stages": {
+  "A0": "decode",
+  "A2": "decode",
+  "C": "decode",
+  "G1": "encode",
+  "J1": "decode",
+  "J2": "decode",
+  "L0": "encode",
+  "L1": "encode",
+  "L2": "encode",
+  "Q1": "decode",
+  "R0": "decode",
+  "R2": "decode",
+  "S": "save",
+  "T0": "encode",
+  "T2": "encode",
+  "V1": "decode",
+  "Z1": "encode"
+ }
+}

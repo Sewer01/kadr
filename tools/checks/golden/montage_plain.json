@@ -1,0 +1,90 @@
+{
+ "graph": {
+  "C": {
+   "class_type": "ConcatenateVideo",
+   "inputs": {
+    "codec": "auto",
+    "videos.video0": [
+     "L0",
+     0
+    ],
+    "videos.video1": [
+     "V1",
+     0
+    ]
+   }
+  },
+  "G1": {
+   "class_type": "GetVideoComponents",
+   "inputs": {
+    "video": [
+     "L1",
+     0
+    ]
+   }
+  },
+  "L0": {
+   "class_type": "LoadVideo",
+   "inputs": {
+    "file": "h3studio/a.mp4"
+   }
+  },
+  "L1": {
+   "class_type": "LoadVideo",
+   "inputs": {
+    "file": "h3studio/b.mp4"
+   }
+  },
+  "S": {
+   "class_type": "SaveVideo",
+   "inputs": {
+    "codec": "auto",
+    "filename_prefix": "H3Workspace/montage",
+    "format": "auto",
+    "video": [
+     "C",
+     0
+    ]
+   }
+  },
+  "V1": {
+   "class_type": "CreateVideo",
+   "inputs": {
+    "audio": [
+     "G1",
+     1
+    ],
+    "fps": [
+     "G1",
+     2
+    ],
+    "images": [
+     "Z1",
+     0
+    ]
+   }
+  },
+  "Z1": {
+   "class_type": "ImageScale",
+   "inputs": {
+    "crop": "center",
+    "height": 640,
+    "image": [
+     "G1",
+     0
+    ],
+    "upscale_method": "lanczos",
+    "width": 1152
+   }
+  }
+ },
+ "stages": {
+  "C": "decode",
+  "G1": "encode",
+  "L0": "encode",
+  "L1": "encode",
+  "S": "save",
+  "V1": "decode",
+  "Z1": "encode"
+ }
+}
