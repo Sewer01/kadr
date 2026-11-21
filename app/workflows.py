@@ -129,7 +129,7 @@ def scene_prompt(prompt, images, own, frame=None, base=10, auds=()):
             if i >= len(images) or not images[i]:
                 return m.group(0)                     # an empty place: the text is left alone
             n = place(images, i, 0)
-        elif k < base + 10:
+        elif base <= k < base + 10:   # номер из десятка этой сцены; чужой десят оставляем как написано
             j = k - base
             if j >= len(own) or not own[j]:
                 return m.group(0)

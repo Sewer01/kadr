@@ -7347,7 +7347,7 @@ function makeRefMode(cfg) {
   }
   if (cfg.swap) $('.rm-vids input', root).addEventListener('change', async e => {
     const f = e.target.files[0]; if (!f) return;
-    const box = $('.sw-cuts', root), hint = $('.sw-cuts-hint', root); box.value = '';
+    const box = $('.sw-cuts', root); box.value = '';
     try { const c = await detectCuts(f); box.value = c.join(', '); } catch { /* one piece then */ }
   });
   let onScenes = () => {};
@@ -14433,7 +14433,7 @@ const agQwenMode = () => { const b = $('.qw-eng button.on', $('#view-qwen')); re
       document.querySelectorAll(sel).forEach(b => { if (!b.getAttribute('title')) b.title = T[sel]; });
     }
     // chips and filter buttons pages build themselves
-    document.querySelectorAll('#libFilter .chip, .lf-chip').forEach(b => {
+    document.querySelectorAll('#libFilter .chip').forEach(b => {
       if (b.getAttribute('title')) return;
       const t = (b.textContent || '').trim();
       if (t && !/^[on✓]+$/.test(t)) b.title = 'Показывать только: ' + t.toLowerCase();
@@ -14474,12 +14474,12 @@ const agQwenMode = () => { const b = $('.qw-eng button.on', $('#view-qwen')); re
         ? 'Модель думает дольше и рассуждает: лучше для длинной истории и нескольких героев'
         : 'Модель отвечает сразу: быстрее, хватает для простой сцены';
     });
-    const conn = document.querySelector('#view-agent #agOwnGo, #view-agent .wz-go .btn.pri');
+    const conn = document.querySelector('#view-agent .wz-go .btn.pri');
     if (conn && !conn.getAttribute('title')) conn.title = 'Проверить, отвечает ли выбранная модель, и начать с ней разговаривать';
     document.querySelectorAll('#view-models #mdGpuUiCb, #mdGpuUiCb').forEach(b => {
       if (!b.getAttribute('title')) b.title = 'Следить за загрузкой видеопамяти во время работы: полоска внизу окна';
     });
-    document.querySelectorAll('#view-models [data-x], #view-models #mdHelp, #view-models .btn').forEach(b => {
+    document.querySelectorAll('#view-models [data-x], #view-models .btn').forEach(b => {
       if (b.getAttribute('title')) return;
       const x = (b.textContent || '').trim();
       if (x === 'Как это работает') b.title = 'Объяснение раздела: что скачивается, где лежит и как это связано с работой';
