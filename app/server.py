@@ -108,6 +108,63 @@ def _sub_run(cmd, secs, cwd):
                           creationflags=engine.CREATE_NO_WINDOW)
 
 
+# Цель выравнивания фона: одна заданная громкость, чтобы ползунок «Уровень музыки» значил одно и то
+# же в тихом файле и в громком. -16 LUFS - обычный уровень фонового звучания, TP и LRA как в ffmpeg.
+LOUDNORM_I, LOUDNORM_TP, LOUDNORM_LRA = -16.0, -1.5, 11
+
+
+def loudnorm_bed(ff, src, dst):
+    """Ровная по громкости копия фоновой музыки: два прохода ffmpeg loudnorm. Первый измеряет файл,
+    второй применяет ровно измеренные значения, поэтому трек приходит к одной заданной громкости
+    независимо от того, громким был исходный файл или тихим. Так положение ползунка значит
+    «насколько фон тише речи», а не «насколько повезло с файлом». На выходе wav 44100 стерео.
+    Возвращает (удалось ли, измеренная громкость входа в LUFS, текст отказа по-русски): отказ -
+    повод взять подлинный файл, а не ронять задание. Временное - в tempfile рядом с папкой цели."""
+    src, dst, work = str(src), str(dst), Path(dst).parent
+    meas = "loudnorm=I=%g:TP=%g:LRA=%d:print_format=json" % (LOUDNORM_I, LOUDNORM_TP, LOUDNORM_LRA)
+    try:   # первый проход: только измеряет, ничего не пишет
+        first = _sub_run([ff, "-hide_banner", "-nostats", "-i", src, "-af", meas, "-f", "null", "-"], 600, work)
+    except Exception as e:   # декодер не запустился или не успел
+        return False, None, "декодер не смог открыть этот файл (%s): музыка играет как есть" % type(e).__name__
+    txt = (first.stderr or "") + (first.stdout or "")
+
+    def num(name):
+        """Одно число из отчёта loudnorm: вместо числа там может быть inf или nan."""
+        m = re.search(r'"%s"\s*:\s*"?(-?[0-9.]+|-?inf|nan)"?' % name, txt)
+        if not m or m.group(1).lower() in ("inf", "-inf", "nan", "+inf"):
+            return None
+        try:
+            return float(m.group(1))
+        except ValueError:
+            return None
+
+    in_i = num("input_i")
+    if first.returncode or in_i is None:   # файл битый или без звука: чисел нет - выравнивать нечего
+        return False, None, "декодер не смог измерить громкость этого файла: музыка играет как есть"
+    filt = ["loudnorm=I=%g:TP=%g:LRA=%d:linear=true" % (LOUDNORM_I, LOUDNORM_TP, LOUDNORM_LRA)]
+    for key, val in (("measured_I", in_i), ("measured_TP", num("input_tp")), ("measured_LRA", num("input_lra")),
+                     ("measured_thresh", num("input_thresh")), ("offset", num("target_offset"))):
+        if val is not None:
+            filt.append("%s=%.2f" % (key, val))
+    filt.append("print_format=summary")
+    tmp = None
+    try:   # пишу в tempfile: неудачный проход не должен оставить хвост в папке цели
+        fd, tmp_name = tempfile.mkstemp(suffix=".wav", dir=str(work))
+        os.close(fd)
+        tmp = Path(tmp_name)
+        second = _sub_run([ff, "-hide_banner", "-loglevel", "error", "-y", "-i", src, "-af", ":".join(filt),
+                           "-ar", "44100", "-ac", "2", str(tmp)], 900, work)
+        if second.returncode or not tmp.is_file() or tmp.stat().st_size < 1024:
+            return False, in_i, "декодер не смог переписать файл ровно: музыка играет как есть"
+        os.replace(tmp, dst)
+        return True, in_i, ""
+    except Exception as e:
+        return False, in_i, "выравнивание не вышло (%s): музыка играет как есть" % type(e).__name__
+    finally:
+        if tmp is not None:
+            tmp.unlink(missing_ok=True)
+
+
 def _ssl_context():
     # Windows store + the bundled certifi list: helps PCs with an outdated root-certificate store
     import ssl
@@ -1084,19 +1141,16 @@ class App:
             raise web.HTTPBadGateway(text="Не удалось передать состояние сцены в ComfyUI")
         return res["name"]
 
-    async def upload_input(self, field, rh=None):
-        """Put an image/audio/video file into ComfyUI's input/h3studio folder (or upload it to RunningHub)."""
-        data = aiohttp.FormData()
-        name = f"h3s_{uuid.uuid4().hex[:8]}{Path(field.filename or 'img.png').suffix or '.png'}"
-        content_type = field.headers.get("Content-Type", "application/octet-stream")
-        raw = await field.read()
-        if getattr(self, "_capture", None) is not None:
-            self._capture[field.name] = (Path(field.filename or "x.png").suffix.lower() or ".png", raw)
+    async def put_input(self, name, raw, content_type, rh=None):
+        """Кладёт готовые байты в папку input/h3studio своего ComfyUI (или отдаёт RunningHub) и
+        возвращает имя, под которым файл видит ядро. Имя здесь своё, а не из формы: так им можно
+        поделиться с графом, не имея за спиной загружаемой страницы."""
         if rh:
             try:
                 return await rh.upload(name, raw, content_type)
             except cloud.CloudError as e:
                 raise web.HTTPBadGateway(text=str(e))
+        data = aiohttp.FormData()
         data.add_field("image", raw, filename=name, content_type=content_type)
         data.add_field("subfolder", "h3studio")
         data.add_field("type", "input")
@@ -1104,6 +1158,15 @@ class App:
         if status != 200:
             raise web.HTTPBadGateway(text="Не удалось загрузить файл в ComfyUI")
         return f'{res["subfolder"]}/{res["name"]}' if res.get("subfolder") else res["name"]
+
+    async def upload_input(self, field, rh=None):
+        """Put an image/audio/video file into ComfyUI's input/h3studio folder (or upload it to RunningHub)."""
+        name = f"h3s_{uuid.uuid4().hex[:8]}{Path(field.filename or 'img.png').suffix or '.png'}"
+        content_type = field.headers.get("Content-Type", "application/octet-stream")
+        raw = await field.read()
+        if getattr(self, "_capture", None) is not None:
+            self._capture[field.name] = (Path(field.filename or "x.png").suffix.lower() or ".png", raw)
+        return await self.put_input(name, raw, content_type, rh)
 
     # ---------- HTTP handlers ----------
 
@@ -3195,6 +3258,45 @@ class App:
                     old.unlink(missing_ok=True)
                 (d / (key + ext)).write_bytes(raw)
 
+    async def bed_norm(self, run, raw, suffix, rh=None):
+        """Ровная по громкости копия общего аудио фильма: её слышит ролик, а модель - подлинный файл.
+        Делается из тех же байтов, что пришли в форме, кладётся в папку refs проекта под именем
+        aud0n.wav и отдаёт имя, которым её видит ядро (именно его несут графы). Не вышло - вместо
+        имени короткий текст по-русски: фон тогда берётся из подлинного файла, задание не падает."""
+        ff = self._ffmpeg()
+        if not ff:
+            return None, "декодера нет - громкость не выровнена"
+
+        def once():   # ffmpeg вне цикла событий; временное живёт в tempfile и после не остаётся
+            root = Path(os.environ.get("TEMP") or ".")
+            tmp = Path(tempfile.mkdtemp(prefix="h3bed-", dir=str(root)))
+            try:
+                src = tmp / ("in" + (suffix or ".mp3"))
+                src.write_bytes(raw)
+                dst = tmp / "aud0n.wav"
+                ok, _lufs, why = loudnorm_bed(ff, src, dst)
+                return (dst.read_bytes() if ok and dst.is_file() else None), why
+            finally:
+                shutil.rmtree(tmp, ignore_errors=True)
+
+        try:
+            wav, why = await asyncio.to_thread(once)
+        except Exception as e:   # выравнивание дороже пары децибел разницы: считаем, как считали
+            return None, "выравнивание не вышло (%s) - музыка играет как есть" % type(e).__name__
+        if not wav:
+            return None, why or "выравнивание не вышло - музыка играет как есть"
+        if run:
+            try:
+                d = LONG_DIR / run / "refs"
+                d.mkdir(parents=True, exist_ok=True)
+                (d / "aud0n.wav").write_bytes(wav)   # копия живёт вместе с проектом
+            except OSError as e:
+                applog(f"ровная копия музыки не сохранена в проект: {e}")
+        try:   # ядро читает файл по своему имени, поэтому копия лежит в его папке input
+            return await self.put_input(f"h3s_{uuid.uuid4().hex[:8]}_aud0n.wav", wav, "audio/wav", rh), ""
+        except web.HTTPBadGateway:
+            return None, "ровную копию не принял ComfyUI - музыка играет как есть"
+
     async def h_long_project(self, req):
         """The project of a long video (scenes, settings) is kept on disk too, so it survives anything that happens to the browser storage."""
         if req.method == "POST":
@@ -3334,6 +3436,16 @@ class App:
         # used to ignore this and always pass "match".
         ref_size = form.get("ref_size") if form.get("ref_size") in ("match", "max") else "max"
         audio = files.get("aud0")
+        # Уровень музыки в готовом ролике берётся с ползунка (децибелы), а не захардкожен. С флагом
+        # «выровнять громкость» фон берётся из ровной копии файла: положение ползунка тогда значит
+        # одно и то же в тихом и в громком файле. Модель при этом слушает подлинный файл.
+        bed_db = bed_level(form)
+        bed_file, bed_note = None, ""
+        if audio and form.get("bed_norm") == "1":
+            got = (self._capture or {}).get("aud0")
+            if got:
+                bed_file, bed_note = await self.bed_norm(self._long_run, got[1], got[0], self.rh())
+        bed_say = (" · " + bed_note) if bed_note else ""   # короткая правда о выравнивании - в задании и в Библиотеке
         try:
             start = max(0.0, float(form.get("start") or 0))
         except ValueError:
@@ -3412,6 +3524,7 @@ class App:
                 graph, stages = wf.action_part_graph(self.model_names, scenes, k, width, height, seed, images, aloras,
                                                      audio=audio, audio_at=audio_at, audio_dur=float(form.get("audio_dur") or 0),
                                                      loop=form.get("music_loop") == "1", vocals=vocals, scene_audios=sc_audios,
+                                                     bed_db=bed_db, bed_file=bed_file,
                                                      preview=await self.preview_opts(), state=state, fresh=fresh,
                                                      faithful=faithful and k == 0, usarp=usarp,
                 ltxv=await self.has_node("LTXVSetVideoLatentNoiseMasks"))
@@ -3426,23 +3539,25 @@ class App:
                                                    dmad if draft else self.model_names["pika_lora"], self.custom_loras("long"), ref_size, vocals, state,
                                                    await self.preview_opts(), cont, form.get("src_project") == "1", fresh, draft,
                                                    loop=form.get("music_loop") == "1", audio_dur=float(form.get("audio_dur") or 0),
-                                                   scene_audios=sc_audios)
+                                                   scene_audios=sc_audios, bed_db=bed_db, bed_file=bed_file)
             plan = wf.long_plan([sc[1] for sc in scenes], cont_first=bool(cont) or form.get("src_project") == "1", fresh=fresh)
-            sub = f"сцена {k + 1} из {len(scenes)}" + (" · музыка" if audio else " · звук от модели")
+            sub = f"сцена {k + 1} из {len(scenes)}" + (" · музыка" if audio else " · звук от модели") + bed_say
             return await self.queue(graph, stages, {
                 "mode": "actionsc" if act else "long", "sub": sub + (" · черновик" if draft else f" · проба {width}×{height}" if test else ""), "prompt": scenes[k][0], "aspect": aspect, "q": quality,
+                "bed_db": bed_db, "bed_note": bed_note,   # уровень музыки и честно про выравнивание: попадут в запись Библиотеки
                 "len": round((plan[k]["total"] - plan[k]["ov"]) / wf.FPS, 1), "res": f"{width}×{height}", "seed": seed,
                 "long": {"run": run, "part": k, "n": len(scenes), "draft": draft, "test": test},
                 "ref_size": ref_size})
         graph, stages = wf.long_graph(self.model_names, scenes, width, height, seed, images, audio, start,
                                       dmad if draft else self.model_names["pika_lora"], self.custom_loras("long"), ref_size, vocals, await self.preview_opts(), fresh, False, draft,
                                       frame=files.get("srcframe"), loop=form.get("music_loop") == "1", audio_dur=float(form.get("audio_dur") or 0),
-                                                   scene_audios=sc_audios)   # the continued video's last frame: a picture of its own
+                                      scene_audios=sc_audios, bed_db=bed_db, bed_file=bed_file)   # the continued video's last frame: a picture of its own
         run = re.sub(r"[^A-Za-z0-9]", "", form.get("run", ""))[:32]
         self._long_run = run
         total = wf.long_plan([sc[1] for sc in scenes], fresh=fresh)[-1]["acc"] / wf.FPS
-        sub = f"{len(scenes)} сцен · {len(images)} карт." + (", музыка" if audio else ", звук от модели") + (" · черновик" if draft else "")
+        sub = f"{len(scenes)} сцен · {len(images)} карт." + (", музыка" if audio else ", звук от модели") + (" · черновик" if draft else "") + bed_say
         meta = {"mode": "long", "sub": sub, "prompt": "\n\n".join(sc[0] for sc in scenes), "aspect": aspect, "q": quality,
+                "bed_db": bed_db, "bed_note": bed_note,   # то же, что у сцен по частям: уровень музыки и честно про выравнивание
                 "len": round(total, 1), "res": f"{width}×{height}", "seed": seed}
         if run:
             meta["long"] = {"run": run, "part": len(scenes) - 1, "n": len(scenes), "all": True}
@@ -4858,6 +4973,16 @@ def lora_strength(form, key, default):
         return float(v)
     except ValueError:
         return default
+
+
+def bed_level(form):
+    """Уровень музыки из формы: целые децибелы с ползунка, в его границах. Пустое или чужое значение -
+    прежний захардкоженный -10, чтобы старая страница и чужой запрос считали как считали."""
+    try:
+        v = int(str(form.get("bed_db", "")).strip())
+    except (TypeError, ValueError):
+        return wf.MUSIC_BG_DB
+    return max(wf.BED_DB_MIN, min(wf.BED_DB_MAX, v))
 
 
 def re_chat_id(cid):

@@ -7932,6 +7932,7 @@ function makeRefMode(cfg) {
       try {
         const run = root._run, slotA = $('.rm-auds .slot', root);
         const proj = { run, t: Date.now(), sec: cfg.mode, mode: root._mode, qm: root._q, qBy: { ...(root._qBy || {}), [root._q]: S.q }, snd: root._snd, loop: root._loop !== false, start: $('.lm-start', root).value, vocals: $('.lm-vocals', root).checked,
+          bed: $('.lm-beddb', root).value, bednorm: !!$('.lm-bednorm', root).checked,   // уровень музыки и выравнивание: их помним тоже
           aspect: S.aspect, q: S.q, cw: S.cw || 0, ch: S.ch || 0, src: root._src ? { id: root._src.id || '', name: root._src.name } : null,
           scenes: $$('.sc', root).map(c => ({ prompt: $('textarea', c).value, sec: +$('input[type=range]', c).value, lng: !!c._longSec, fresh: !!$('.sc-fresh', c)?.checked, nimg: 9, var: c._var || 0, words: (c._audWords || []).slice(), base: c._baseFixed || 0,
             done: c._dn.final ? { sig: c._dn.final.sig, url: c._dn.final.url, id: c._dn.final.id, text: c._dn.final.text } : null,
@@ -7977,6 +7978,9 @@ function makeRefMode(cfg) {
       const slotA = $('.rm-auds .slot', root); $('.x', slotA)?.click();
       const aud = await getRef('aud0'); if (aud instanceof File) await putInto($('input', slotA), aud);
       root._loop = p.loop !== false; setSnd(p.snd || 'none'); $('.lm-start', root).value = p.start || '0'; $('.lm-vocals', root).checked = !!p.vocals; setSndState(root._snd);   // подсказка про звук зависит от галочки, а её ставим только что
+      // сохранённый уровень музыки ставим в границах ползунка: проект мог быть записан другой версией
+      const bdb = Number.isFinite(+p.bed) ? Math.max(-30, Math.min(6, Math.round(+p.bed))) : -10;
+      $('.lm-beddb', root).value = bdb; $('.lm-beddbv', root).textContent = String(bdb); $('.lm-bednorm', root).checked = p.bednorm === true;
       $$('.sc', root).forEach(c => c.remove());
       for (const x of p.scenes) addScene(x.prompt, Math.min(x.lng ? 25 : 15, x.sec), !!x.fresh, x.base || 0);
       renumber(); sceneReconcile(root);   // в проекте номер места не хранится: его надо поделить заново
@@ -8894,6 +8898,8 @@ function makeRefMode(cfg) {
         extra.append(lp);
         const voc = $('.lm-vocals', root), vocRow = voc && voc.closest('label');
         if (vocRow) extra.append(vocRow);   // «музыка в готовом ролике целиком» - флаг остаётся на виду
+        const bedRow = $('.lm-bed', root);
+        if (bedRow) extra.append(bedRow);   // ползунок уровня музыки и выравнивание - рядом с остальными флагами фона
         lp.querySelector('input').checked = root._loop !== false;
         lp.onchange = e => { root._loop = e.target.checked; if (root._save) root._save(); };
         Object.defineProperty(root, '_trim', { get: () => frow._tr, configurable: true });
@@ -9057,6 +9063,13 @@ function makeRefMode(cfg) {
         <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin-top:8px"><label>Начать с <input class="lm-start" inputmode="numeric" value="0" style="width:60px"> секунды</label>
           <button class="btn" type="button" id="lmVoice" title="Оставить в аудио только голос, без музыки (как в «Клипе»)">Отделить голос от музыки</button><button class="btn" type="button" id="lmVoiceBack" hidden>Вернуть исходное аудио</button></div>
         <label style="display:flex;gap:6px;align-items:center;margin-top:10px" title="Модель держит ваш голос: губы точные, голос в ролике ваш. Музыка из файла играет в ролике фоном тише"><input type="checkbox" class="lm-vocals"> Музыку в ролике оставить, но модель слушает только голос (точнее губы)</label>
+        <div class="lm-bed" style="margin-top:10px">
+          <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap">
+            <label style="display:flex;gap:8px;align-items:center" title="Насколько слышна ваша музыка под звуком ролика: 0 - играть своей громкостью, -10 - примерно втрое тише, -30 - почти не слышно"><span>Уровень музыки</span><input type="range" class="lm-beddb" min="-30" max="6" step="1" value="-10" style="width:150px"><b class="lm-beddbv">-10</b> дБ</label>
+            <label style="display:flex;gap:6px;align-items:center" title="Файл приводится к одной заданной громкости, и положение ползунка перестаёт зависеть от того, насколько громким был файл"><input type="checkbox" class="lm-bednorm"> Выровнять громкость трека</label>
+          </div>
+          <div class="hint" style="margin-top:4px">Выравнивание приводит трек к одной заданной громкости: после него -12 дБ одинаково тихо и в громком файле, и в тихом. Без него ползунок отсчитывает громкость от вашего файла, каким он пришёл.</div>
+        </div>
       </div>`;
     $('.mus-slot', mus).append($('.rm-media', root));
       const sendAllToAgent = async () => {
@@ -9114,11 +9127,18 @@ function makeRefMode(cfg) {
         + (voc ? 'Модель слушает только ваш голос и держит его как есть: губы точные, голос в ролике ваш, а музыка из файла играет фоном тише.'
                : 'Модель сочиняет звук сама, а ваша музыка играет в ролике фоном тише, чтобы речь была слышна.')
         + ' Тег <Audio 1> в тексте сцены говорит модели, что это фоновый звук именно этой сцены.'
+        + ' Уровень музыки задаётся ползунком, а «Выровнять громкость трека» приводит файл к общей громкости; если трек короче фильма, музыка кончится там, где кончился файл, а звук ролика продолжится.'
     };
     const setSndState = v => { const el = $('.lm-sndstate', root), voc = $('.lm-vocals', root); if (el && HINT[v]) el.textContent = HINT[v](!!(voc && voc.checked)); };
     // галочка меняет не только расчёт, но и то, что написано над ней: подсказка должна говорить правду
     const vocBox = $('.lm-vocals', root);
     if (vocBox) vocBox.onchange = () => setSndState(root._snd);
+    // ползунок уровня музыки: число показываем сразу же, проект запоминаем при каждом движении
+    const bedDb = $('.lm-beddb', root), bedVal = $('.lm-beddbv', root), bedNorm = $('.lm-bednorm', root);
+    const bedShow = () => { if (bedDb && bedVal) bedVal.textContent = bedDb.value; };
+    if (bedDb) bedDb.oninput = () => { bedShow(); if (root._save) root._save(); };
+    if (bedNorm) bedNorm.onchange = () => { if (root._save) root._save(); };
+    bedShow();
     const setSnd = v => {
       root._snd = v; $$('.lm-snd button', root).forEach(b => b.classList.toggle('on', b.dataset.s === v));
       setSndState(v); recount();
@@ -9342,7 +9362,7 @@ function makeRefMode(cfg) {
             if (plan.lostPics && plan.lostPics.length) toast('Сцена ' + (i + 1) + ': под тегами ' + plan.lostPics.map(t => '<Picture ' + t + '>').join(', ')
               + ' в этой сцене нет фото - они убраны из текста, чтобы модель не рисовала наугад');
             if (plan.dropped && plan.dropped.length) toast('Сцена ' + (i + 1) + ': модель слушает три аудио, поэтому ' + plan.dropped.map(t => '<Audio ' + t + '>').join(', ') + ' в этот раз не пойдёт - уберите лишний тег или замените его');
-          }); fd.append('start', $('.lm-start', root).value || '0'); if (root._loop !== false) fd.append('music_loop', '1'); if (root._adur) fd.append('audio_dur', String(Math.round(root._adur * 1000) / 1000)); fd.append('vocals', root._snd === 'own' && $('.lm-vocals', root).checked ? '1' : '0'); if (cfg.mode === 'actionsc') loraForm(S, fd); }
+          }); fd.append('start', $('.lm-start', root).value || '0'); if (root._loop !== false) fd.append('music_loop', '1'); if (root._adur) fd.append('audio_dur', String(Math.round(root._adur * 1000) / 1000)); fd.append('vocals', root._snd === 'own' && $('.lm-vocals', root).checked ? '1' : '0'); fd.append('bed_db', $('.lm-beddb', root).value); fd.append('bed_norm', $('.lm-bednorm', root).checked ? '1' : '0'); if (cfg.mode === 'actionsc') loraForm(S, fd); }
         else loraForm(S, fd);
         seedForm(S, fd);
         /* The scene studios read the reference files BY PLACE: the server takes img0, img1, img2…

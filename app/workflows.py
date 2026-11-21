@@ -683,8 +683,10 @@ FADE_STEP = 0.05
 
 # Своё аудио и звук, который сочинила модель, могут играть в готовом ролике вместе: музыка
 # человека остаётся фоном, но приглушённой, а звук модели идёт своей громкостью, чтобы речь
-# была слышна. -10 дБ - примерно втрое тише: фоном играет, но голоса не перекрывает.
+# была слышна. -10 дБ - примерно втрое тише: фоном играет, но голоса не перекрывает. Это значение
+# по умолчанию: в студии уровень задаёт ползунок, и он же приходит в графы как `bed_db`.
 MUSIC_BG_DB = -10
+BED_DB_MIN, BED_DB_MAX = -30, 6   # границы ползунка «Уровень музыки», децибелы: server.py сверяет с ними то, что пришло из формы
 
 
 def _audio_fade(add, audio, dur, head=False, tail=False):
@@ -736,18 +738,23 @@ def _loop_track(add, src, have, need):
     return acc
 
 
-def _audio_bed_mix(add, bed, model_audio, stages=None):
+def _audio_bed_mix(add, bed, model_audio, stages=None, db=MUSIC_BG_DB):
     """Свой трек человека и звук модели остаются в ролике оба: трек лежит фоном приглушённым,
     а звук модели (или голос, который модель держит из файла) играет своей громкостью, чтобы речь
     была слышна. `bed` - готовая дорожка человека: та же, что считается сейчас (обрезанная с
     выбранного начала, а при повторе зацикленная `_loop_track`); `model_audio` - звук из звукового
-    латента модели. Глушим только свою копию трека: то, что слушает модель, остаётся исходной
-    громкости, иначе модель слышала бы музыку тише, а это другое поведение. Сложение двух дорожек
-    может дать пик выше единицы, и тогда AudioMerge сам протянет вниз всю смесь, а баланс речи с
-    музыкой поедет, поэтому смесь сразу чуть тише. Возвращает звук для CreateVideo, а новые ноды
-    помечает в `stages` так же, как соседние звуковые ноды."""
-    bg = add("AudioAdjustVolume", audio=bed, volume=MUSIC_BG_DB)
-    mix = add("AudioMerge", audio1=[bg, 0], audio2=model_audio, merge_method="add")
+    латента модели; `db` - насколько глушить трек, те самые децибелы с ползунка «Уровень музыки»
+    (по умолчанию MUSIC_BG_DB). Глушим только свою копию трека: то, что слушает модель, остаётся
+    исходной громкости, иначе модель слышала бы музыку тише, а это другое поведение. Сложение двух
+    дорожек может дать пик выше единицы, и тогда AudioMerge сам протянет вниз всю смесь, а баланс
+    речи с музыкой поедет, поэтому смесь сразу чуть тише. Возвращает звук для CreateVideo, а новые
+    ноды помечает в `stages` так же, как соседние звуковые ноды.
+    Первый вход AudioMerge - звук модели, а не трек человека: ядро задаёт длину смеси по первому
+    входу, а второй обрезает или добирает тишиной до него (comfy_extras/nodes_audio.py, AudioMerge).
+    Первым лежал трек человека, и короткий файл обрывал хвост звука модели ровно на своей длине;
+    теперь длина смеси = длина звука ролика, а музыка кончается там, где кончился файл."""
+    bg = add("AudioAdjustVolume", audio=bed, volume=db)
+    mix = add("AudioMerge", audio1=model_audio, audio2=[bg, 0], merge_method="add")
     out = add("AudioAdjustVolume", audio=[mix, 0], volume=-3)
     if stages is not None:
         stages.update({bg: "decode", mix: "decode", out: "decode"})
@@ -755,26 +762,31 @@ def _audio_bed_mix(add, bed, model_audio, stages=None):
 
 
 
-def long_graph(m, scenes, width, height, seed, images, audio=None, start=0.0, pika=None, extra_loras=(), ref_size="match", vocals=None, preview=None, fresh=(), audio_cont=False, draft=False, frame=None, loop=False, audio_dur=0.0, scene_audios=()):
+def long_graph(m, scenes, width, height, seed, images, audio=None, start=0.0, pika=None, extra_loras=(), ref_size="match", vocals=None, preview=None, fresh=(), audio_cont=False, draft=False, frame=None, loop=False, audio_dur=0.0, scene_audios=(), bed_db=MUSIC_BG_DB, bed_file=None):
     """Scenes [(prompt, seconds), ...] rendered one after another; every next scene continues the last second of the
     previous one (latent cut + noise mask), with the same reference pictures, and optionally follows a music track.
 
     Singularity Ref2V + Pika H3 Flex Turbo (8 steps), as chosen for the app. Without `audio` the model makes its own sound
     for every scene (voices and music are written in the prompts). С общим файлом звук модели тоже
     остаётся в ролике, а файл играет под ним фоном тише (`_audio_bed_mix`); модель держит дорожку
-    файла, только когда задан `vocals`.
+    файла, только когда задан `vocals`. `bed_db` - уровень фона в децибелах (ползунок), `bed_file` -
+    ровная по громкости копия файла: фон берётся из неё, а модель по-прежнему слушает подлинный файл.
     """
     g, model, sched, sampler_name, steps = _long_base(m, pika, extra_loras, draft)
     model = _with_preview(g, model, preview)
     g["9"] = {"class_type": "KSamplerSelect", "inputs": {"sampler_name": sampler_name}}
     g["10"] = {"class_type": "BasicScheduler", "inputs": {"model": model, "scheduler": sched, "steps": steps, "denoise": 1.0}}
     heard = ["11", 0]  # what the model hears; the finished video always carries the full track
+    bed_src = ["11", 0]   # откуда берётся фон фильма: свой файл, а с выравниванием - его ровная копия
     if audio:
         g["11"] = {"class_type": "LoadAudio", "inputs": {"audio": audio}}
         if vocals:  # voice only: helps lip sync, the music in the result stays complete
             g["12"] = {"class_type": "MelBandRoFormerModelLoader", "inputs": {"model_name": vocals}}
             g["13"] = {"class_type": "MelBandRoFormerSampler", "inputs": {"model": ["12", 0], "audio": ["11", 0]}}
             heard = ["13", 0]
+        if bed_file:   # ровная копия грузится СВОЕЙ нодой: нумерованные ноды референсов и то, что
+            g["15"] = {"class_type": "LoadAudio", "inputs": {"audio": bed_file}}   # слушает модель, не сдвигаются
+            bed_src = ["15", 0]
     # прижатие звукового латента: с галочкой «модель слушает только голос» кусок голоса из файла
     # держится нулевой маской (ноль в маске - держи как есть), поэтому губы точные, а голос в
     # ролике подлинный. Без галочки латент чистый, как когда файла нет вовсе, и модель сочиняет
@@ -865,14 +877,15 @@ def long_graph(m, scenes, width, height, seed, images, audio=None, start=0.0, pi
         if loop and left > 0.4:
             # the same background, repeated until the film ends: a three-minute clip must not
             # lose its music after the first thirty seconds
-            looped = _loop_track(add, ["11", 0], left, need)
+            looped = _loop_track(add, bed_src, left, need)
             if looped:
                 final_a = [add("TrimAudioDuration", audio=looped, start_index=0.0, duration=need), 0]
         if final_a is None:
-            final_a = [add("TrimAudioDuration", audio=["11", 0], start_index=float(start), duration=need), 0]
+            final_a = [add("TrimAudioDuration", audio=bed_src, start_index=float(start), duration=need), 0]
         # Дорожка человека в фильме не одна: сверху играет звук модели (или голос, который модель
-        # из файла держит), а файл - фоном тише, иначе музыка забивает речь.
-        final_a = _audio_bed_mix(add, final_a, prev_aud, stages)
+        # из файла держит), а файл - фоном тише, иначе музыка забивает речь. Уровень фона берётся
+        # с ползунка, а длину смеси задаёт звук модели, поэтому короткий трек не обрывает ролик.
+        final_a = _audio_bed_mix(add, final_a, prev_aud, stages, db=bed_db)
     else:
         final_a = prev_aud
     vid = add("CreateVideo", images=prev_img, audio=final_a, fps=float(FPS), bit_depth="auto", color_space="sRGB", codec="none")
@@ -890,21 +903,27 @@ LONG_STATE_TOKENS = 17   # latent tokens of the last second(s) of a scene that t
 
 
 def long_part_graph(m, scenes, k, width, height, seed, images, audio=None, start=0.0, pika=None, extra_loras=(),
-                    ref_size="match", vocals=None, state=None, preview=None, src=None, cont_plan=False, fresh=(), draft=False, loop=False, audio_dur=0.0, scene_audios=()):
+                    ref_size="match", vocals=None, state=None, preview=None, src=None, cont_plan=False, fresh=(), draft=False, loop=False, audio_dur=0.0, scene_audios=(),
+                    bed_db=MUSIC_BG_DB, bed_file=None):
     """Scene number `k` (0-based) of the long video as its own job. Scene 0 starts fresh; scene k > 0 continues from the saved
     latent tail of scene k-1 (`state`, a .latent file in ComfyUI's input folder). The clip it saves has the overlap with the
-    previous scene cut off, so the clips join end to end. Also saves the tail of its own latent for scene k+1."""
+    previous scene cut off, so the clips join end to end. Also saves the tail of its own latent for scene k+1.
+    `bed_db` и `bed_file` - то же, что в long_graph: уровень фона в децибелах и его ровная копия."""
     g, model, sched, sampler_name, steps = _long_base(m, pika, extra_loras, draft)
     model = _with_preview(g, model, preview)
     g["9"] = {"class_type": "KSamplerSelect", "inputs": {"sampler_name": sampler_name}}
     g["10"] = {"class_type": "BasicScheduler", "inputs": {"model": model, "scheduler": sched, "steps": steps, "denoise": 1.0}}
     heard = ["11", 0]
+    bed_src = ["11", 0]   # откуда берётся фон клипа: свой файл, а с выравниванием - его ровная копия
     if audio:
         g["11"] = {"class_type": "LoadAudio", "inputs": {"audio": audio}}
         if vocals:
             g["12"] = {"class_type": "MelBandRoFormerModelLoader", "inputs": {"model_name": vocals}}
             g["13"] = {"class_type": "MelBandRoFormerSampler", "inputs": {"model": ["12", 0], "audio": ["11", 0]}}
             heard = ["13", 0]
+        if bed_file:   # ровная копия грузится СВОЕЙ нодой: то, что слушает модель, не меняется
+            g["15"] = {"class_type": "LoadAudio", "inputs": {"audio": bed_file}}
+            bed_src = ["15", 0]
     # прижатие звукового латента, то же правило, что в long_graph: с галочкой «модель слушает только
     # голос» модель держит голос из файла, без неё сочиняет звук сама, как когда файла нет
     held = bool(audio and vocals)
@@ -981,13 +1000,14 @@ def long_part_graph(m, scenes, k, width, height, seed, images, audio=None, start
         a0 = start + (p["acc_before"] / FPS if k else 0)
         if loop and audio_dur and a0 > float(audio_dur) - 0.4:
             # this scene sits past the end of the track: take its place inside the repeated copy
-            src11 = _loop_track(add, ["11", 0], float(audio_dur), a0 + 20.0) or ["11", 0]
+            srcb = _loop_track(add, bed_src, float(audio_dur), a0 + 20.0) or bed_src
             a0 = a0 % float(audio_dur)
         else:
-            src11 = ["11", 0]
-        bed = [add("TrimAudioDuration", audio=src11, start_index=round(a0, 3), duration=round(clip_len / FPS, 3)), 0]
-        # трек человека играет фоном тише, звук модели (или удержанный голос) - сверху, речь слышна
-        aud = _audio_bed_mix(add, bed, aud, stages)
+            srcb = bed_src
+        bed = [add("TrimAudioDuration", audio=srcb, start_index=round(a0, 3), duration=round(clip_len / FPS, 3)), 0]
+        # трек человека играет фоном тише (уровень с ползунка), звук модели (или удержанный голос) -
+        # сверху и задаёт длину смеси, поэтому короткий трек не обрывает клип; речь слышна
+        aud = _audio_bed_mix(add, bed, aud, stages, db=bed_db)
     vid = add("CreateVideo", images=frames_out, audio=aud, fps=float(FPS), bit_depth="auto", color_space="sRGB", codec="none")
     save = add("SaveVideo", video=[vid, 0], filename_prefix="H3Workspace/long_part", format="auto", **{"format.codec": "auto"})
     sep2 = add("LTXVSeparateAVLatent", av_latent=[smp, 1])
@@ -1137,7 +1157,8 @@ def upscaler_node(name, usarp=2, target=None):
 def action_part_graph(m, scenes, k, width, height, seed, images, loras, preview=None, state=None, fresh=(), faithful=False,
                       ltxv=True,
                       refiner_args=None, single=False, sing=False, steps=12, usarp=2,
-                      audio=None, audio_at=0.0, audio_dur=0.0, loop=False, vocals=None, scene_audios=()):
+                      audio=None, audio_at=0.0, audio_dur=0.0, loop=False, vocals=None, scene_audios=(),
+                      bed_db=MUSIC_BG_DB, bed_file=None):
     """ACTION scene number `k` (0-based) of a scene-by-scene video, the same idea as long_part_graph (scene k continues the saved
     latent tail of scene k-1, the clip is cut off at the overlap) but with the action model: hybrid, DMAD + Speed Slider,
     8 steps at 0.6x size, learned latent upscale, 4 steps at full size. The sound is made by the model.
@@ -1213,18 +1234,24 @@ def action_part_graph(m, scenes, k, width, height, seed, images, loras, preview=
             g["15"] = {"class_type": "MelBandRoFormerModelLoader", "inputs": {"model_name": vocals}}
             g["16"] = {"class_type": "MelBandRoFormerSampler", "inputs": {"model": ["15", 0], "audio": ["14", 0]}}
             heard = ["16", 0]
-        src, at = heard, float(audio_at)
-        need = round(total / FPS, 3)
-        if loop and float(audio_dur or 0) > 0.4 and max(0.0, float(audio_dur) - at) < need - 0.2:
-            repeated = _loop_track(add, heard, float(audio_dur), at + need)
-            if repeated:
-                src, at = repeated, at % float(audio_dur)
         # фон ролика - подготовленная дорожка человека, то есть файл, а не тот звук, что слушает
         # модель. Без галочки это один и тот же источник; с галочкой в отделённом голосе музыки нет,
-        # поэтому файл зацикливаем по тому же правилу отдельно
-        bed, bed_at = (src, at) if not held else (["14", 0], float(audio_at))
+        # поэтому файл зацикливаем по тому же правилу отдельно. Выравнивание даёт фону СВОЮ ноду
+        # LoadAudio с ровной копией: модель продолжает слушать подлинный файл (нода 14)
+        bed0 = heard if not held else ["14", 0]
+        if bed_file:
+            g["17"] = {"class_type": "LoadAudio", "inputs": {"audio": bed_file}}
+            bed0 = ["17", 0]
+        # прижатый латент режется из того, что слушает модель (heard), фон - из дорожки выше (bed0)
+        src, at = (heard if held else bed0), float(audio_at)
+        need = round(total / FPS, 3)
+        if loop and float(audio_dur or 0) > 0.4 and max(0.0, float(audio_dur) - at) < need - 0.2:
+            repeated = _loop_track(add, src, float(audio_dur), at + need)
+            if repeated:
+                src, at = repeated, at % float(audio_dur)
+        bed, bed_at = (src, at) if not held else (bed0, float(audio_at))
         if held and loop and float(audio_dur or 0) > 0.4 and max(0.0, float(audio_dur) - bed_at) < need - 0.2:
-            rep = _loop_track(add, ["14", 0], float(audio_dur), bed_at + need)
+            rep = _loop_track(add, bed0, float(audio_dur), bed_at + need)
             if rep:
                 bed, bed_at = rep, bed_at % float(audio_dur)
         if held:
@@ -1329,7 +1356,8 @@ def action_part_graph(m, scenes, k, width, height, seed, images, loras, preview=
         mus_tr = add("TrimAudioDuration", audio=bed, start_index=round(bed_at + (ov / FPS if cont else 0.0), 3),
                      duration=round((clip_len if cont else total) / FPS, 3))
         stages[mus_tr] = "decode"
-        aud = _audio_bed_mix(add, [mus_tr, 0], aud, stages)
+        # уровень фона - с ползунка; длину смеси задаёт звук модели, поэтому короткий трек не режет клип
+        aud = _audio_bed_mix(add, [mus_tr, 0], aud, stages, db=bed_db)
     vid = add("CreateVideo", images=frames_out, audio=aud, fps=float(FPS), bit_depth="auto", color_space="sRGB", codec="none")
     save = add("SaveVideo", video=[vid, 0], filename_prefix="H3Workspace/long_part", format="auto", **{"format.codec": "auto"})
     sep2 = add("LTXVSeparateAVLatent", av_latent=final)
