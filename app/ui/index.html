@@ -2181,6 +2181,7 @@ equirements.txt</code><br>
         <button class="btn" id="vwRepeat">Повторить с этими настройками</button>
         <button class="btn pri" id="vwCmpBtn" hidden>Только результат</button>
         <button class="btn" id="vwUp" title="Увеличить разрешение и добавить чёткости (SeedVR2). Долго: минуты на каждые несколько секунд видео">Увеличить видео…</button>
+        <button class="btn" id="vwSub" title="Распознать речь из звуковой дорожки этого клипа и положить слова текстом поверх видео. Готовый ролик станет отдельной записью Библиотеки, исходник останется как был">Субтитры…</button>
         <button class="btn pri" id="vwContinue" hidden>Продолжить это видео</button>
         <button class="btn" id="vwSeed" hidden>Зафиксировать seed этого видео</button>
         <button class="btn" id="vwFav">В избранное</button>
@@ -6489,6 +6490,8 @@ function openViewer(id, fallback) {
   $('#vwContinue').hidden = pic || !it.url || !!it.missing;
   $('#vwUp').hidden = it.mode === 'upscale' || it.mode === 'custom' || !it.url || !!it.missing;
   $('#vwUp').textContent = pic ? 'Увеличить изображение…' : 'Увеличить видео…';
+  // слова кладутся поверх видео: для картинки кнопки нет, как нет её у пропавшего с диска файла
+  $('#vwSub').hidden = pic || !it.url || !!it.missing;
   const canCmp = it.mode === 'upscale' && (it.src || it.src_file) && !!it.url && !it.missing;
   $('#vwCmpBtn').hidden = !canCmp; cmpSet(canCmp, it);
   $('#viewer').hidden = false;
@@ -11472,6 +11475,54 @@ $('#mlist').addEventListener('click', async e => {
 
 /* ---------- improve quality of a finished video (SeedVR2) ---------- */
 $('#vwUp').onclick = () => openUpscale((byId(openId) || openItem));
+/* ---------- субтитры поверх готового клипа ---------- */
+$('#vwSub').onclick = e => {
+  const it = byId(openId) || openItem; if (!it) return;
+  document.querySelectorAll('.ctxm').forEach(x => x.remove());   // старое меню не должно остаться под новым
+  const menu = document.createElement('div'); menu.className = 'ctxm';
+  const close = () => {
+    menu.remove();
+    removeEventListener('mousedown', off, true); removeEventListener('keydown', onKey);
+    removeEventListener('resize', close); removeEventListener('scroll', close, true);
+  };
+  const off = ev => { if (!menu.contains(ev.target)) close(); };
+  const onKey = ev => { if (ev.key === 'Escape') close(); };
+  [['Понизу, обычные', 'bottom'], ['Понизу, крупные', 'big'], ['По центру', 'center']].forEach(([label, place]) => {
+    const b = document.createElement('button'); b.type = 'button'; b.textContent = label;
+    b.title = 'Слова лягут поверх видео: ' + label.toLowerCase();
+    b.onclick = () => { close(); subMake(it, place); };
+    menu.append(b);
+  });
+  document.body.append(menu);
+  window.placeAtCursor(menu, e.clientX, e.clientY);
+  window.watchMenu(menu);
+  addEventListener('mousedown', off, true); addEventListener('keydown', onKey);
+  addEventListener('resize', close); addEventListener('scroll', close, true);
+};
+// речь из клипа распознаётся на процессоре: десятки секунд на короткий ролик, поэтому запас большой
+async function subMake(it, place) {
+  const b = $('#vwSub'); if (!b || b.disabled) return;
+  const was = b.textContent;
+  b.disabled = true; b.textContent = 'Распознаю…';
+  toast('Распознаю речь из клипа - нужно подождать');
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), 600000);   // 10 минут: ждёт даже длинный ролик
+  try {
+    const r = await fetch('/api/subtitles', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: it.id, place, lang: 'auto' }), signal: ctl.signal });
+    const txt = await r.text(); let j; try { j = JSON.parse(txt); } catch { j = { error: txt }; }
+    if (!r.ok) throw new Error(j.error || r.statusText);
+    if (!j.ok) { toast(j.error || 'Субтитры не вышли'); return; }
+    await window.h3ReloadLibrary();   // список Библиотеки обновляется общим способом
+    toast(`Субтитры готовы: реплик ${j.lines}. Ролик лёг в Библиотеку отдельно, исходник как был`);
+    if (byId(j.id)) openViewer(j.id);
+  } catch (err) {
+    toast('Субтитры не вышли: ' + String((err && err.message) || err).slice(0, 180));
+  } finally {
+    clearTimeout(timer);
+    const now = $('#vwSub'); if (now) { now.disabled = false; now.textContent = was; }
+  }
+}
 async function openUpscale(it, file, into) {   // `file`: the person's own file; `into`: draw into a card on the page
   if (!it) return;
   const st = await (await fetch('/api/status')).json();

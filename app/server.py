@@ -20,6 +20,7 @@ import shutil
 import struct
 import subprocess
 import sys
+import tempfile
 import time
 import uuid
 import urllib.parse
@@ -2495,6 +2496,119 @@ class App:
             "aspect": item.get("aspect", ""), "q": item.get("q", ""), "len": item.get("len", 0.0), "res": res, "seed": seed,
             "src": item.get("id", ""), "src_file": src_file})
 
+    SUB_PLACES = ("bottom", "big", "center")   # куда ложатся слова: выбор человека в окне Библиотеки
+
+    def _subtitles_core(self, ff, wh, src, place, lang):
+        """Всё, что тут блокирует: вынуть звук из клипа, распознать речь и положить слова поверх
+        видео. Работает в рабочей нити; временные папка и файлы живут только пока идёт работа.
+        wav называется in.wav и лежит в рабочей папке, поэтому в фильтре ffmpeg путь не надо
+        ни экранировать, ни куда-то класть целиком."""
+        styles = {   # три варианта, о которых человек просит кнопкой
+            "bottom": "FontName=Arial,FontSize=22,Bold=0,BorderStyle=1,Outline=2,Shadow=0,Alignment=2,MarginV=34",
+            "big": "FontName=Arial,FontSize=34,Bold=1,BorderStyle=1,Outline=3,Shadow=0,Alignment=2,MarginV=48",
+            "center": "FontName=Arial,FontSize=26,Bold=0,BorderStyle=1,Outline=2,Shadow=0,Alignment=5,MarginV=0",
+        }
+
+        def run(cmd, secs, cwd):   # тот же запуск, что у распознавания речи в speech._run
+            return subprocess.run([str(x) for x in cmd], cwd=str(cwd), capture_output=True, text=True,
+                                  encoding="utf-8", errors="replace", timeout=secs,
+                                  creationflags=engine.CREATE_NO_WINDOW)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            work = Path(tmp)
+            wav = work / "in.wav"
+            r = run([ff, "-hide_banner", "-loglevel", "error", "-y", "-i", str(src),
+                     "-vn", "-ac", "1", "-ar", "16000", wav.name], 600, work)
+            if r.returncode != 0 or not wav.exists() or wav.stat().st_size < 1024:
+                raise web.HTTPBadRequest(text="В этом клипе нет звуковой дорожки: распознавать нечего")
+            # метки времени здесь нужны, поэтому не -nt, а -osrt: на выходе получится subs.srt
+            r = run([wh["exe"], "-m", str(wh["model"]), "-f", wav.name, "-l", lang, "-osrt",
+                     "-of", "subs", "-t", "6"], 1800, work)
+            srt = work / "subs.srt"
+            if r.returncode != 0 or not srt.exists():
+                raise web.HTTPBadRequest(text="Речь не удалось распознать: " +
+                                          ((r.stderr or "").strip().splitlines() or ["движок молчит"])[-1][:180])
+            cues = []
+            for block in srt.read_text(encoding="utf-8", errors="replace").replace("\r", "").split("\n\n"):
+                rows = [x.strip() for x in block.splitlines() if x.strip()]
+                # номер реплики и строка времени - служебные, человеку нужен только текст
+                rows = [x for x in rows if "-->" not in x and not x.isdigit()]
+                got = re.sub(r"\s+", " ", speech.NOISE.sub("", " ".join(rows))).strip()   # (музыка), [BLANK_AUDIO]
+                if got:
+                    cues.append(got)
+            text = " ".join(cues).strip()
+            if not text:
+                return {"error": "Речь в этом клипе не нашлась - субтитры не нужны"}
+            out_dir = self.default_results_dir()
+            out_dir.mkdir(parents=True, exist_ok=True)
+            stem = re.sub(r'[\\/:*?"<>|]', "", src.stem)[:80] or "клип"
+            out, n = out_dir / f"{stem}-субтитры.mp4", 1
+            while out.exists():   # прежний ролик с субтитрами не затираем: ему добавляется -2, -3...
+                n += 1
+                out = out_dir / f"{stem}-субтитры-{n}.mp4"
+            vf = "subtitles=subs.srt:force_style='%s'" % styles.get(place, styles["bottom"])
+            cmd = [ff, "-hide_banner", "-loglevel", "error", "-y", "-i", str(src), "-vf", vf,
+                   "-c:v", "libx264", "-preset", "veryfast", "-crf", "18", "-pix_fmt", "yuv420p",
+                   "-movflags", "+faststart"]
+            r = run(cmd + ["-c:a", "copy", out], 1800, work)
+            if r.returncode != 0 or not out.exists() or out.stat().st_size < 2048:
+                # звука может не быть вовсе (или он не переносится в mp4 без перекодирования):
+                # пробуем ещё раз без него, чтобы слова не пропали из-за одной только дорожки
+                out.unlink(missing_ok=True)
+                r = run(cmd + ["-an", out], 1800, work)
+            if r.returncode != 0 or not out.exists() or out.stat().st_size < 2048:
+                out.unlink(missing_ok=True)
+                raise web.HTTPBadRequest(text="Субтитры не леглись на видео: " +
+                                          ((r.stderr or "").strip().splitlines() or ["ffmpeg отказал"])[-1][:180])
+            return {"file": out, "text": text, "lines": len(cues)}
+
+    async def h_subtitles(self, req):
+        """Слова поверх готового клипа: речь из его звука распознаётся и ложится текстом в НОВЫЙ
+        файл, который становится отдельной записью Библиотеки. Исходник не трогается."""
+        try:
+            body = await req.json()
+        except Exception:
+            raise web.HTTPBadRequest(text="Не разобран запрос")
+        item = self.library.get(str(body.get("id") or ""))
+        if not item:
+            raise web.HTTPBadRequest(text="Файл не найден")
+        if item.get("kind") == "image":
+            raise web.HTTPBadRequest(text="Субтитры кладутся на видео: в изображении речи нет")
+        path = self.file_path(item)
+        if not path or not path.exists():
+            raise web.HTTPBadRequest(text="Файл клипа не найден: возможно, папка результатов очищена")
+        ff = self._ffmpeg()
+        if not ff:
+            raise web.HTTPBadRequest(text="Не нашли ffmpeg: он идёт в комплекте с ComfyUI - проверьте, что ComfyUI на месте")
+        wh = speech.locate(self.llm.root, self.config.get("whisper_dir"))
+        if not (wh.get("exe") and wh.get("model")):
+            raise web.HTTPBadRequest(text="Распознавание речи не установлено: скачайте его в разделе «Модели»")
+        place = body.get("place") if body.get("place") in self.SUB_PLACES else "bottom"
+        lang = body.get("lang") if body.get("lang") in ("auto", "ru", "en") else "auto"
+        try:
+            got = await asyncio.to_thread(self._subtitles_core, ff, wh, path, place, lang)
+        except subprocess.TimeoutExpired:
+            raise web.HTTPBadRequest(text="Клип слишком длинный: распознавание не успело закончиться. Возьмите кусок короче")
+        if got.get("error"):
+            return web.json_response({"ok": False, "error": got["error"]})
+        out = got["file"]
+        new = dict(item)   # запись строится по образцу исходной: те же поля просят список и просмотрщик
+        new.update(id=uuid.uuid4().hex[:12], name=f"{path.stem} · субтитры",
+                   file={"filename": out.name, "subfolder": "", "type": "local", "path": str(out)},
+                   date=datetime.now().isoformat(timespec="seconds"), t=time.time(),
+                   kind=item.get("kind") or "video", ext="mp4", fav=False,
+                   sub="Субтитры" + {"bottom": " понизу", "big": " понизу, крупные", "center": " по центру"}[place],
+                   subtitled={"place": place, "lang": lang})
+        # адреса исходной записи новой не подходят: с ними новая запись указывала бы на прежний файл
+        for k in ("local", "src", "src_file", "ref_group", "refs"):
+            new.pop(k, None)
+        if isinstance(new.get("size"), int):
+            new["size"] = out.stat().st_size
+        self.library.add(new)
+        applog("субтитры: %s - реплик %d, вариант %s" % (out.name, got["lines"], place))
+        return web.json_response({"ok": True, "id": new["id"], "file": str(out),
+                                  "text": got["text"], "lines": got["lines"]})
+
     async def h_generate_krea(self, req):
         await self.need_models("krea")
         form, _, seed = await self.read_image_form(req)
@@ -4761,6 +4875,7 @@ def build_app(comfy_override=None):
         web.post("/api/generate/video", state.h_generate_video),
         web.post("/api/generate/krea", state.h_generate_krea),
         web.post("/api/upscale", state.h_upscale),
+        web.post("/api/subtitles", state.h_subtitles),
         web.post("/api/upscale_file", state.h_upscale_file),
         web.post("/api/grain", state.h_grain),
         web.get("/api/version", lambda _req: web.json_response({"version": APP_VERSION, "built": build_stamp()})),
