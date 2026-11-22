@@ -662,6 +662,16 @@
   ],
   [
    "get",
+   "/api/refsheet/presets",
+   "state.h_refsheet_presets"
+  ],
+  [
+   "post",
+   "/api/refsheet",
+   "state.h_refsheet_make"
+  ],
+  [
+   "get",
    "/api/events",
    "state.h_events"
   ],
@@ -756,6 +766,8 @@
   "h_queue_resume",
   "h_queue_saved",
   "h_ref_file",
+  "h_refsheet_make",
+  "h_refsheet_presets",
   "h_rent_info",
   "h_rent_open",
   "h_results_backfill",

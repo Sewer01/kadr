@@ -278,6 +278,7 @@
    "button#resApply.btn.pri [Применить]",
    "button#resBackfill.btn [Сохранить копии старых файлов]",
    "button#resClean.btn [Убрать записи, у которых нет файла]",
+   "button#rsMake.btn.pri [Нарезать лист]",
    "button#selAll.btn [Выбрать все] hidden",
    "button#selToggle.btn [Выбрать]",
    "button.btn [Обзор…]",
@@ -294,7 +295,9 @@
    "button.chip [★ Избранное]",
    "button.chip.on [Все]",
    "input#resDir type=text",
-   "input#resKeep type=checkbox [Сохранять копию каждого результата]"
+   "input#resKeep type=checkbox [Сохранять копию каждого результата]",
+   "input#rsVideo type=file [Видео для листа] hidden",
+   "select#rsPreset"
   ],
   "view-lipsync": [
    "textarea#lPrompt [<Picture 1> стоит у окна и тихо поёт, глядя в камеру…]",
@@ -782,6 +785,8 @@
   "/api/queue/resume",
   "/api/queue/saved",
   "/api/refs/${it.ref_group}/${encodeURIComponent(nm)}",
+  "/api/refsheet/presets",
+  "/api/refsheet?preset=",
   "/api/rent/info",
   "/api/rent/open",
   "/api/results",

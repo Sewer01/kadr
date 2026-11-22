@@ -478,7 +478,19 @@
         </div>
         <div class="hint" id="resInfo" style="margin-top:8px"></div>
       </details>
-      <div class="lib-bar">
+            <div class="card">
+        <div class="card-h"><h3>Лист референсов из короткого ролика</h3></div>
+        <div class="ac-row">
+          <select id="rsPreset" title="Как камера двигается: программа возьмёт кадры в нужные моменты ролика"></select>
+          <label class="btn">Видео для листа<input type="file" id="rsVideo" accept="video/*" hidden></label>
+          <button class="btn pri" type="button" id="rsMake">Нарезать лист</button>
+          <span class="hint" id="rsNote">видео не выбрано</span>
+        </div>
+        <small class="hint">Программа возьмёт из ролика несколько кадров - по одному на каждый момент выбранного движения камеры - и положит их сюда, в библиотеку: их уже видят все режимы. Фраза про камеру кладётся в памятку кадра, и её можно поставить в поле «Сценарий».</small>
+        <div id="rsOut" class="rs-out" hidden></div>
+      </div>
+
+<div class="lib-bar">
         <div class="chips" id="libFilter">
           <button class="chip on" data-f="all">Все</button>
           <button class="chip" data-f="videos">Все видео</button>

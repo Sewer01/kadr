@@ -2,9 +2,10 @@ import { API, postJSON } from '../core/net.js';
 import { $, $$, ICON, copyPictureToClipboard, copyText, esc, fileName, fmtDate, fmtTime, paintRange, toast } from '../core/util.js';
 import { MODE_NAME } from '../core/modes.js';
 import { IMG_PANELS, LIB, byId, libFilter, openId, openItem, selecting, selected, setLibFilter, setOpenId, setOpenItem, setSelecting, setUpJob } from '../core/state.js';
-import { goTo } from '../core/tabs.js';
+import { TABS, goTo, onNav } from '../core/tabs.js';
 import { frames } from '../ui/params.js';
 import { setDropFile } from '../ui/slots.js';
+import { insertAtCursor, scenarioResolvers, scenarioWindowOf } from '../ui/scenario.js';
 import { agAttachFile, agGo } from './agent.js';
 import { continueLong } from './modes.js';
 import { qAdd } from './queue.js';
@@ -641,3 +642,79 @@ export function useMenu(it) {
     try { await setDropFile(input, await libToFile(it, /video/i.test(input.accept || ''), dragName)); toast(it.kind === 'audio' ? 'Звук взят из Библиотеки' : it.kind === 'video' ? 'Видео взято из Библиотеки' : 'Изображение взята из Библиотеки'); } catch { toast('Не удалось взять файл'); }
   }, true);
 })();
+
+/* Лист референсов: кадры движения камеры из короткого ролика. Кадры становятся обычными
+   памятками библиотеки - их видят все режимы, отдельной проводки не нужно. Фраза кадра
+   лежит в памятке, её можно поставить в поле «Сценарий» любого режима. */
+const RS = { presets: [], file: null, frames: [] };
+
+function rsFill() {
+  const sel = $('#rsPreset');
+  if (!sel || sel.options.length || !RS.presets.length) return;
+  const groups = {};
+  RS.presets.forEach(p => { (groups[p.kindName] = groups[p.kindName] || []).push(p); });
+  sel.innerHTML = Object.keys(groups).sort().map(kind => `<optgroup label="${esc(kind)}">` + groups[kind].map(p =>
+    `<option value="${esc(p.id)}" title="${esc(p.hint)}">${esc(p.title)} - ${esc(p.beats.map(b => b.name).join(' · '))}</option>`).join('') + '</optgroup>').join('');
+}
+
+async function rsLoad() {
+  if (!RS.presets.length) {
+    try { RS.presets = (await (await fetch('/api/refsheet/presets')).json()).presets || []; }
+    catch (e) { RS.presets = []; }
+  }
+  rsFill();
+}
+
+/* Режимы для вставки берутся из реестра окон «Сценарий», а не из списка, который пришлось бы
+   подерживать руками: что умеет принимать текст, то и предлагается. */
+const rsModes = () => TABS.filter(t => !t.hidden && scenarioResolvers.has(t.key)).map(t => ({ key: t.key, title: t.caption }));
+
+function rsPaint(frames) {
+  RS.frames = frames || [];
+  const box = $('#rsOut');
+  if (!box) return;
+  if (!RS.frames.length) { box.hidden = true; box.innerHTML = ''; return; }
+  const modes = rsModes();
+  box.innerHTML = RS.frames.map(f => `<div class="rs-frame" data-id="${esc(f.id)}">
+    <span><b>${esc(f.name)}</b> <span class="hint">на ${Number(f.at).toFixed(1)} с · ${esc(f.text)}</span></span>
+    <select data-mode>${modes.map(m => `<option value="${esc(m.key)}">${esc(m.title)}</option>`).join('')}</select>
+    <button class="btn mini" type="button" data-put>Фраза в поле</button>
+  </div>`).join('');
+  box.hidden = false;
+}
+
+$('#rsVideo').onchange = e => {
+  RS.file = e.target.files[0] || null;
+  $('#rsNote').textContent = RS.file ? 'видео: ' + RS.file.name : 'видео не выбрано';
+};
+
+$('#rsMake').onclick = async () => {
+  if (!RS.file) { toast('Сначала выбери короткое видео'); return; }
+  const preset = $('#rsPreset').value;
+  if (!preset) { toast('Список движений камеры ещё не пришёл'); return; }
+  $('#rsNote').textContent = 'Берём кадры: по одному на каждый момент движения...';
+  try {
+    const url = '/api/refsheet?preset=' + encodeURIComponent(preset) + '&name=' + encodeURIComponent(RS.file.name);
+    const r = await fetch(url, { method: 'POST', body: RS.file });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error || 'Программа не смогла взять кадры');
+    rsPaint(j.frames);
+    try { await window.h3ReloadLibrary(); } catch (e) { }
+    renderLib();
+    $('#rsNote').textContent = 'кадров ' + j.frames.length + (j.skipped.length ? ' · не вышло: ' + j.skipped.join(', ') : '')
+      + ' · ролик ' + j.seconds + ' с';
+    toast('Лист «' + j.preset + '» лёг в библиотеку');
+  } catch (e) { $('#rsNote').textContent = 'не вышло'; toast(e.message); }
+};
+
+$('#rsOut').onclick = e => {
+  const row = e.target.closest('.rs-frame'); if (!row || !e.target.closest('[data-put]')) return;
+  const f = RS.frames.find(x => x.id === row.dataset.id); if (!f) return;
+  const mode = ($('select[data-mode]', row) || {}).value;
+  const win = scenarioWindowOf(mode);
+  if (!win) { toast('В этом режиме нет поля «Сценарий»'); return; }
+  insertAtCursor(win.ta, f.text);
+  toast('Фраза кадра встала в поле');
+};
+
+onNav('library', rsLoad);

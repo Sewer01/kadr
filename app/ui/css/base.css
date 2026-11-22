@@ -1141,3 +1141,9 @@ body.dropping::after{content:'Отпустите — программа разл
 .ac-note{font-size:12.5px;line-height:1.55;margin:0 0 8px}
 .ac-actors{margin-top:8px}
 .ac-empty{color:var(--dim);font-size:13px}
+
+/* Лист референсов: ряд кадров, которые программа взяла из ролика. */
+.rs-out{display:grid;gap:6px;margin-top:10px}
+.rs-frame{display:grid;grid-template-columns:minmax(150px,1fr) auto auto;gap:8px;align-items:center;border:1px solid var(--line);border-radius:10px;padding:7px 10px;background:var(--bg-1)}
+.rs-frame b{font-size:13px}
+.rs-frame .hint{font-size:12px}
