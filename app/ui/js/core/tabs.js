@@ -10,7 +10,7 @@ export const TABS = [
   {order: 2, section: "Создать", key: "agent", caption: "Сценарист", sub: false, active: false, hidden: false},
   {order: 3, section: "Создать", key: "actors", caption: "Карточки", sub: false, active: false, hidden: false},
   {order: 4, section: "Создать", key: "video", caption: "Видео", sub: true, active: true, hidden: false},
-  {order: 5, section: "Создать", key: "lipsync", caption: "Клип", sub: true, active: false, hidden: false, group: "long"},
+  {order: 5, section: "Создать", key: "lipsync", caption: "Клип", sub: true, active: false, hidden: false},
   {order: 6, section: "Создать", key: "refs", caption: "Видеостудия", sub: true, active: false, hidden: false},
   {order: 7, section: "Создать", key: "actor", caption: "Актёр", sub: true, active: false, hidden: false},
   {order: 8, section: "Создать", key: "swap", caption: "Замена", sub: true, active: false, hidden: false},
@@ -33,11 +33,11 @@ export const TABS = [
    расчёт - меню просто перестаёт их плодить. Кнопкой группы открывается тот режим,
    на котором человек останавливался. */
 export const NAV_GROUPS = [
-  { nav: "long", store: "h3-grp-film", parts: ["long", "actionsc", "lipsync"] },
+  { nav: "long", store: "h3-grp-film", parts: ["long", "actionsc"] },
   { nav: "refs", store: "h3-grp-video", parts: ["refs", "action"] },
 ];
 export const NAV_GROUP_TITLES = {
-  long: "Киностудия", actionsc: "Экшн-студия", lipsync: "Клип-студия",
+  long: "Киностудия", actionsc: "Экшн-студия",
   refs: "Видеостудия", action: "Экшн-видео",
 };
 export const groupOf = key => NAV_GROUPS.find(g => g.parts.includes(key)) || null;

@@ -1528,6 +1528,16 @@ export function makeRefMode(cfg) {
     };
     root._setScenes = list => {   // from the agent: replace all scenes
       if (!list.length) return 0;
+      /* Границы сцен человек задаёт в карточке «Сценарий». Сюда приходит ответ
+         Сценариста, и он обязан уложиться: иначе «не больше 4 сцен по 8 секунд»
+         значит «сколько модель посчитала». Других путей сюда нет - загрузка
+         проекта список сцен через эту функцию не проходит. */
+      const sl = (root._scLimits && root._scLimits()) || null;
+      if (sl) {
+        if (sl.cnt && list.length > sl.cnt) toast('Сценарист вернул ' + list.length + ' сцен, а вы просили не больше ' + sl.cnt + ': лишние убраны');
+        list = list.slice(0, sl.cnt || list.length)
+          .map(x => (x && Object.assign({}, x, { sec: Math.max(sl.min, Math.min(sl.max, Math.round(x.sec) || sl.min)) })) || x);
+      }
       /* The usual round trip is the same scenes with better texts. Rebuilding the cards for it threw
          away what the person had put in them - a photo gone from a scene was the price of a cleaner
          sentence. When the number of scenes is the same, only the words change: the text and the
@@ -2748,10 +2758,65 @@ export function makeRefMode(cfg) {
           text: () => (srWin.sc || {}).value,
           caption: '🤖 Сценарист пишет сцены',
           captionTitle: 'Сценарист прочитает сценарий и вернёт список сцен: каждая строка «SCENE N | секунды» станет отдельной сценой в карточке «Сцены». Картинки героев и песни студии уйдут в чат сами, ответ вернётся в сцены.',
-          instruction: 'Сценарий ролика из раздела «' + cfg.title + '». Разложи его на сцены так, чтобы из них можно было собрать ролик: по 5-10 секунд на сцену, в одной сцене одно событие и одно движение камеры. Верни только список сцен, одним блоком кода, без пояснений до и после: каждая сцена начинается строкой «SCENE N | секунды», ниже идёт описание кадра на английском (60-110 слов) с тегами картинок и звука этого режима (<Picture N>, <Audio N>), а реплики - строкой <d>[Язык] текст</d> дословно. Если сценария почти нет, разрежь его на 2-3 сцены по смыслу, но новые имена и события не выдумывай.\n\n',
+          /* Границы сцен человек задаёт сам, но по умолчанию стоит «авто»: тогда
+             Сценарист решает, сколько сцен нужно сюжету, держась только длительности.
+             Те же границы действуют и на ответ: строка «SCENE N | секунды» укладывается
+             в них, а лишних сцен не становится. */
+          get instruction() {
+            const a = Math.min(lim.min, lim.max), b = Math.max(lim.min, lim.max);
+            return 'Сценарий ролика из раздела «' + cfg.title + '». Разложи его на сцены так, чтобы из них можно было собрать ролик: от '
+              + a + ' до ' + b + ' секунд на сцену'
+              + (lim.cnt ? ', всего не больше ' + lim.cnt + ' сцен' : ', сколько сцен - реши сам по смыслу, но не меньше двух')
+              + ', в одной сцене одно событие и одно движение камеры. Верни только список сцен, одним блоком кода, без пояснений до и после: каждая сцена начинается строкой «SCENE N | секунды», ниже идёт описание кадра на английском (60-110 слов) с тегами картинок и звука этого режима (<Picture N>, <Audio N>), а реплики - строкой <d>[Язык] текст</d> дословно. Если сценария почти нет, разрежь его на 2-3 сцены по смыслу, но новые имена и события не выдумывай.\n\n';
+          },
         },
       });
       root._srWin = srWin;
+      /* Длительность сцен и их количество. «авто» - значит Сценарист сам решает, на
+         сколько сцен резать сюжет; число - потолок, при котором общая длина сохраняется,
+         просто сцены становятся длиннее. Выбор запоминается для каждой студии. */
+      const lim = { min: 5, max: 10, cnt: 0 };
+      try { const s = JSON.parse(localStorage.getItem('h3-scene-limits-' + cfg.mode) || 'null'); if (s) Object.assign(lim, s); } catch (e) { }
+      root._scLimits = () => ({ min: Math.min(lim.min, lim.max), max: Math.max(lim.min, lim.max), cnt: lim.cnt });
+      const nums = [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
+      const mkOpt = (v, t, on) => { const o = document.createElement('option'); o.value = v; o.textContent = t; o.selected = !!on; return o; };
+      const limRow = document.createElement('div');
+      limRow.className = 'row sr-limits';
+      limRow.innerHTML = '<div class="row-l">Сцены</div>';
+      const box = document.createElement('div');
+      box.className = "sr-limit-in";
+      const sMin = document.createElement('select'), sMax = document.createElement('select'), sCnt = document.createElement('select');
+      sMin.className = 'sr-min'; sMax.className = 'sr-max'; sCnt.className = 'sr-cnt';
+      sMin.title = 'Короче этого сцены не будут';
+      sMax.title = 'Длиннее этого сцены не будут';
+      sCnt.title = '«авто»: Сценарист сам решает, сколько нужно сцен. Число: не больше стольких сцен на весь сюжет (общая длина сохранится, сцены станут длиннее)';
+      nums.forEach(n => { sMin.append(mkOpt(n, n, n === lim.min)); sMax.append(mkOpt(n, n, n === lim.max)); });
+      [0, 2, 3, 4, 5, 6, 8, 10, 12, 15, 20].forEach(n => sCnt.append(mkOpt(n, n ? 'не больше ' + n : 'авто', n === lim.cnt)));
+      box.append(document.createTextNode('Сцена от '), sMin, document.createTextNode(' до '), sMax,
+        document.createTextNode(' секунд · сцен '), sCnt);
+      limRow.append(box);
+      const readLim = () => {
+        lim.min = +sMin.value; lim.max = +sMax.value; lim.cnt = +sCnt.value;
+        if (lim.min > lim.max) {   // границы не должны спорить: двигаем ту, которую человек не трогал
+          if (document.activeElement === sMin) { sMax.value = lim.min; lim.max = lim.min; }
+          else { sMin.value = lim.max; lim.min = lim.max; }
+        }
+        try { localStorage.setItem('h3-scene-limits-' + cfg.mode, JSON.stringify(lim)); } catch (e) { }
+      };
+      [sMin, sMax, sCnt].forEach(s => s.addEventListener('change', readLim));
+      srCard.append(limRow);
+      /* Написанный сценарий не должен пропадать: его снимаем с ленты при закрытии
+         программы и кладем обратно при открытии - как у карточки «Промпт» в других разделах. */
+      const SR_KEY = 'h3-story-' + cfg.mode;
+      try {
+        const saved = localStorage.getItem(SR_KEY);
+        if (saved && srWin.sc && !srWin.sc.value.trim()) srWin.setDraft(saved);
+      } catch (e) { }
+      let srSave = 0;
+      if (srWin.sc) srWin.sc.addEventListener('input', () => {
+        clearTimeout(srSave);
+        srSave = setTimeout(() => { try { localStorage.setItem(SR_KEY, srWin.sc.value); } catch (e) { } }, 500);
+      });
       /* Вставка тега в текст сценария - в то место, где стоит курсор. */
       const srInsert = tag => {
         const field = srWin.sc, t = String(tag || '').trim();
@@ -2946,21 +3011,42 @@ export function makeRefMode(cfg) {
       col.append(top);
       if (root._baseHost) col.prepend(root._baseHost);   // the switch, the file and the button, above card one
       /* undo: what was cleared or deleted can be brought back (button «Отменить действие» or Ctrl+Z) */
-      root._undo = [];
+      root._undo = []; root._redo = [];
       const refsFiles = () => $$('.ref', imgsEl).map(r => r._file || null);
+      const snapStep = () => ({ run: root._run, sel: root._sel, refs: refsFiles(), scenes: $$('.sc', root).map(c => ({ prompt: $('textarea', c).value, sec: +$('input[type=range]', c).value, fresh: !!$('.sc-fresh', c)?.checked, base: c._baseFixed || 0, files: [...c._files], dn: { ...c._dn }, old: c._old, tests: [...c._tests], var: c._var || 0 })) });
       root._pushUndo = () => {
-        root._undo.push({ run: root._run, sel: root._sel, refs: refsFiles(), scenes: $$('.sc', root).map(c => ({ prompt: $('textarea', c).value, sec: +$('input[type=range]', c).value, fresh: !!$('.sc-fresh', c)?.checked, base: c._baseFixed || 0, files: [...c._files], dn: { ...c._dn }, old: c._old, tests: [...c._tests], var: c._var || 0 })) });
-        if (root._undo.length > 10) root._undo.shift();
+        root._undo.push(snapStep());
+        if (root._undo.length > 15) root._undo.shift();
+        root._redo.length = 0;   // новое действие закрывает дорогу вперёд
+        paintStep();
       };
-      root._doUndo = async () => {
-        const u = root._undo.pop(); if (!u) return;
+      const restore = async u => {
         $$('.sc', root).forEach(c => c.remove()); root._run = u.run;
         u.scenes.forEach(x => { addScene(x.prompt, x.sec, x.fresh, x.base || 0); const c = $$('.sc', root).pop(); c._files = x.files; c._paint(); c._dn = x.dn; c._old = x.old; c._tests = x.tests; c._paintTests(); c._var = x.var; });
         const names = a => JSON.stringify(a.map(f => f && f.name));
         if (names(refsFiles()) !== names(u.refs)) { $$('.ref .x', imgsEl).forEach(x => x.click()); for (let i = 0; i < u.refs.length; i++) if (u.refs[i]) await putInto($$('.ref input', imgsEl)[i], u.refs[i]); }
-        root._sel = u.sel; renumber(); sceneReconcile(root); recount(); refreshStates(); toast('Действие отменено');
+        root._sel = u.sel; renumber(); sceneReconcile(root); recount(); refreshStates(); paintStep();
       };
-      document.addEventListener('keydown', e => { if ((e.ctrlKey || e.metaKey) && !e.shiftKey && String(e.key).toLowerCase() === 'z' && $('#view-long.active') && !e.target.closest('textarea, input') && root._undo.length) { e.preventDefault(); root._doUndo(); } });
+      root._doUndo = async () => { const u = root._undo.pop(); if (!u) return; root._redo.push(snapStep()); await restore(u); toast('Действие отменено'); };
+      root._doRedo = async () => { const u = root._redo.pop(); if (!u) return; root._undo.push(snapStep()); await restore(u); toast('Действие возвращено'); };
+      /* «Отменить» и «Вернуть» стоят в шапке карточки «Сцены»: без кнопок про Ctrl+Z
+         люди не догадываются, а откатывать надо и то, что натворил Сценарист. */
+      const bUndo = document.createElement('button'), bRedo = document.createElement('button');
+      bUndo.type = bRedo.type = 'button'; bUndo.className = 'btn mini sc-undo'; bRedo.className = 'btn mini sc-redo';
+      bUndo.textContent = 'Отменить'; bRedo.textContent = 'Вернуть';
+      bUndo.title = 'Вернуть ленту сцен к тому, что было до последнего изменения (Ctrl+Z): тексты сцен, их длина, свои фото и песни';
+      bRedo.title = 'Вернуть то, что вы только что отменили (Ctrl+Shift+Z)';
+      bUndo.onclick = () => root._doUndo(); bRedo.onclick = () => root._doRedo();
+      const paintStep = () => { bUndo.disabled = !root._undo.length; bRedo.disabled = !root._redo.length; };
+      (scCard.querySelector('.card-h') || scCard).append(bUndo, bRedo);
+      paintStep();
+      document.addEventListener('keydown', e => {
+        if (!(e.ctrlKey || e.metaKey) || !root.classList.contains('active')) return;
+        if (e.target && e.target.closest && e.target.closest('textarea, input')) return;
+        if (String(e.key).toLowerCase() !== 'z') return;
+        const back = !e.shiftKey;
+        if ((back ? root._undo : root._redo).length) { e.preventDefault(); (back ? root._doUndo : root._doRedo)(); }
+      });
       /* One scene, then all of them: the button that empties a single scene stands first, right
          under the ribbon, in the same quiet style, so the two are read as one pair - and both ask. */
       const clrOne = document.createElement('button'); clrOne.type = 'button'; clrOne.className = 'btn mini lm-clearone';
