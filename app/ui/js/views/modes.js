@@ -548,9 +548,11 @@ export function makeRefMode(cfg) {
   cfg.draftPass = cfg.draftPass !== false;
   cfg.baseVideo = cfg.baseVideo !== false;
   cfg.partsOnly = !!cfg.partsOnly;
+  cfg.stepsUI = !!cfg.stepsUI; cfg.stepCount = cfg.stepCount || 'graph'; cfg.accel = !!cfg.accel;
   STUDIO_CAPS[cfg.mode] = {
     scenes: cfg.scenes, graph: cfg.graph, draftPass: cfg.draftPass,
     baseVideo: cfg.baseVideo, partsOnly: cfg.partsOnly,
+    stepsUI: cfg.stepsUI, stepCount: cfg.stepCount, accel: cfg.accel,
   };
   const root = $('#view-' + cfg.mode);
   const S = { aspect: '16:9', q: 'HD+', dur: cfg.dur, steps: 6, refSize: 'max', accel: 'old', len: () => S.dur };
@@ -3156,9 +3158,9 @@ export function makeRefMode(cfg) {
     singleScene: () => cfg.scenes && root._mode === 'parts' && root._chainPart == null,
     goLabel: () => !cfg.scenes ? 'Сгенерировать' : root._mode === 'parts'
       ? `Сделать сцену ${root._sel + 1}` : 'Сгенерировать видеоролик',   // the number follows the scene you picked
-    extraLabel: cfg.mode === 'refs' || cfg.mode === 'actor' || cfg.swap || cfg.scenes ? 'Шаги' : 'Схема',
-    extra: () => cfg.scenes ? (root._paintQ?.(), root._mode === 'parts' ? (root._q === 'draft' ? '4 шага · черновик' : (cfg.graph === 'hybrid' ? '8 + 4 шага · гибрид' : '8 шагов · Pika')) : (root._q === 'draft' ? '4 шага · черновик' : '8 шагов · Pika')) : cfg.mode === 'actor' || cfg.swap ? '10 · 1 проход' : cfg.mode === 'refs' ? `${S.steps} · 1 проход` : (S.faithful ? 'точная копия' : '8 + 4 шага'),
-    passes: () => cfg.scenes ? $$('.sc', root).map(() => root._q === 'draft' ? 4 : 8) : cfg.mode === 'actor' || cfg.swap ? [10] : cfg.mode === 'refs' ? [S.steps] : S.faithful ? [13] : [8, 4],
+    extraLabel: cfg.stepsUI || cfg.swap || cfg.scenes ? 'Шаги' : 'Схема',
+    extra: () => cfg.scenes ? (root._paintQ?.(), root._mode === 'parts' ? (root._q === 'draft' ? '4 шага · черновик' : (cfg.graph === 'hybrid' ? '8 + 4 шага · гибрид' : '8 шагов · Pika')) : (root._q === 'draft' ? '4 шага · черновик' : '8 шагов · Pika')) : cfg.stepCount === 10 ? '10 · 1 проход' : cfg.stepCount === 'user' ? `${S.steps} · 1 проход` : (S.faithful ? 'точная копия' : '8 + 4 шага'),
+    passes: () => cfg.scenes ? $$('.sc', root).map(() => root._q === 'draft' ? 4 : 8) : cfg.stepCount === 10 ? [10] : cfg.stepCount === 'user' ? [S.steps] : S.faithful ? [13] : [8, 4],
     get twoPass() { return cfg.graph === 'hybrid' && !S.faithful; },
     target: () => $('.ref img', imgsEl),
     meta: () => ({ mode: cfg.mode, prompt: promptEl().value.trim(), sub: '' }),
@@ -3202,7 +3204,7 @@ export function makeRefMode(cfg) {
           }
         }
         sizeForm(S, fd); fd.append('aspect', S.aspect); fd.append('quality', S.q); fd.append('duration', S.dur);
-        fd.append('steps', S.steps); fd.append('ref_size', S.refSize); if (cfg.mode === 'refs' || cfg.swap) fd.append('accel', S.accel);
+        fd.append('steps', S.steps); fd.append('ref_size', S.refSize); if (cfg.accel) fd.append('accel', S.accel);
         if (cfg.swap) { fd.append('sound', S.sound); fd.append('small_ref', S.smallRef ? '1' : '0'); }
         if (cfg.graph === 'hybrid') {
           const us = $('#usSharp', root);
@@ -3309,7 +3311,7 @@ export function makeRefMode(cfg) {
     <div class="row"><label class="cw-chk" style="display:flex;gap:8px;align-items:center"><input type="checkbox" class="sw-auto" checked> Длина как у загруженного видео</label>
       <div class="hint">Выключите, чтобы задать длину ползунком ниже.</div></div>
     <div class="note warn rm-swapneed" hidden><span>Для этого пресета нужен маленький файл (0,16 ГБ). <button class="btn mini pri" type="button" id="swapGet">Скачать</button></span></div>`
-    : cfg.mode === 'refs' ? `
+    : cfg.stepCount === 'user' ? `   <!-- ряды шагов и ускорения - у режима, где число шагов выбирает человек -->
     <div class="row"><div class="row-l">Ускорение</div>
       <div class="seg rm-acc" style="grid-template-columns:minmax(0,1fr) minmax(0,1fr)"><button data-x="pika">Pika Flex<small>8 шагов, лучше звук</small></button><button data-x="old">Прежнее<small>4–8 шагов</small></button></div>
       <div class="hint rm-acc-hint"></div></div>
@@ -3372,13 +3374,17 @@ export function makeRefMode(cfg) {
     const x = e.target.closest('.rm-acc button'); if (x) { S.accel = x.dataset.x; if (S.accel === 'pika' && S.steps < 6) S.steps = 8; upd(); }
   });
   upd();
-  if (cfg.mode === 'refs') mountLoras($('.rm-loras', root), S, ['realism', 'motion']);
-  if ((cfg.mode === 'refs' || cfg.swap) && API) fetch('/api/status').then(r => r.json()).then(st => {  // Pika is the default when its file is there
+  /* Лоры и выбор ускорителя - свойства режима, а не его имени: список и
+     включённый по умолчанию вид объявлены в описании. */
+  if (cfg.loras) {
+    if (cfg.loras.def) S.loras = cfg.loras.def;
+    mountLoras($('.rm-loras', root), S, cfg.loras.list);
+  }
+  if (cfg.accel && API) fetch('/api/status').then(r => r.json()).then(st => {  // Pika is the default when its file is there
     const m = (st.models || []).find(x => x.role === 'pika_lora'); S.pikaHave = !!(m && m.have);
     if (S.pikaHave) { S.accel = 'pika'; S.steps = 8; }
     upd();
   }).catch(() => {});
-  if (cfg.mode === 'actor') { S.loras = { realism: { on: true, v: .7 } }; mountLoras($('.rm-loras', root), S, ['realism']); }
 
   if (cfg.graph === 'hybrid' && API) {
     const box = $('.rm-act', root);
@@ -3555,18 +3561,21 @@ export function makeRefMode(cfg) {
 export const RM = {
   refs: makeRefMode({
     mode: 'refs', title: 'Видеостудия', pill: 'Singularity Ref2V · 1 проход', dur: 6, maxImages: 9, videos: true, frames: true,
+    stepsUI: true, stepCount: 'user', accel: true, loras: { list: ['realism', 'motion'] },
     sub: 'Видео по изображениям, видео и аудио: персонаж, локация, движение, голос',
     refHint: 'Изображения — персонажи, локация, предметы (до 9). Видео задаёт движение или камеру, аудио — голос, ритм или атмосферу (всего до 12 файлов). В промпте ссылайтесь на изображения как &lt;Picture 1&gt;, &lt;Picture 2&gt;…',
     placeholder: '<Picture 1> идёт по ночной улице к камере, дождь, неон…',
   }),
   actor: makeRefMode({
     mode: 'actor', title: 'Актёр', pill: 'Singularity Ref2V · 10 шагов', dur: 14, maxImages: 3, videos: false,
+    stepsUI: true, stepCount: 10, loras: { list: ['realism'], def: { realism: { on: true, v: .7 } } },
     sub: 'Диалоги и крупные планы: актёрская игра, эмоции и голос по образцу — лучше всего для реализма',
     refHint: 'Первое изображение — стартовый кадр видео (его композиция сохранится). Аудио — образец голоса: из него берётся только тембр и манера, а слова произносятся новые, из вашего промпта. Нужны два голоса — запишите оба в одно аудио. Промпт удобно писать в разделе «Сценарист» (цель «Актёр»).',
     placeholder: '@image1 - keyframe, first frame of the target video… Лучше всего писать в «Сценаристе»: он знает формат этого режима',
   }),
   swap: makeRefMode({
     mode: 'swap', title: 'Замена', pill: 'Готовый пресет · Ref2V + LoRA замены', dur: 6, maxImages: 2, videos: true, swap: true,
+    stepsUI: true, stepCount: 10, accel: true,
     sub: 'Берём ваше видео и меняем в нём человека на своего персонажа',
     refHint: '<b>Важно:</b> видео до 15 секунд. Размер результата не больше 720p (1280×736), иначе очень долго. На изображении один герой и простой фон. Используйте лица людей только с их согласия.',
     placeholder: '',
