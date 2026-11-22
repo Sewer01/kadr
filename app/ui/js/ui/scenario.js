@@ -1,4 +1,5 @@
-import { $, $$, toast } from '../core/util.js';
+import { $, $$, copyText, toast } from '../core/util.js';
+import { postJSON } from '../core/net.js';
 import { goTo } from '../core/tabs.js';
 import { earlyEvents, views } from '../core/state.js';
 import { setDropFile } from './slots.js';
@@ -54,7 +55,7 @@ export function putScenario(mode, text) {
   goTo(mode);
   win.setValue(text);
   win.ta.focus();
-  toast('Сценарий лёг в окно «Сценарий»: картинки и звук привязываете здесь же, потом «Генерация промта»');
+  toast('Промт лёг в окно «Промт»: картинки и звук привязываете здесь же, потом «Генерация»');
   return true;
 }
 
@@ -93,6 +94,27 @@ export function putScenario(mode, text) {
    и сборка поля падала с "Cannot access 'scNode' before initialization". */
 function scenarioTitle() { return 'Сценарий'; }
 function scNode(tag) { return document.createElement(tag); }
+/* Ряд над полем промта: человек должен видеть, какое из двух полей уходит в модель. */
+function scPromptCaption() {
+  const row = scNode('div');
+  row.className = 'sc-prompt-cap';
+  row.innerHTML = '<b>Промт</b><span class="hint">то, что уходит в модель: сюда кладёт ответ «Генерация промта», ниже - перевод только для чтения</span>';
+  return row;
+}
+
+/* Наши слова в окне: поле сценария, а если раздела без него не трогает - то же поле. */
+export function ownWords(ta) {
+  const host = ta && ta.closest ? ta.closest('[data-scenario]') : null;
+  const sc = host ? $('.sc-draft', host) : null;
+  return String((sc && sc.value) || (ta && ta.value) || '').trim();
+}
+
+export function scenarioDraftOf(mode) {
+  const win = scenarioWindowOf(mode);
+  if (!win) return null;
+  return win.sc || win.ta;
+}
+
 function scHint(html) { const s = scNode('span'); s.className = 'hint'; s.innerHTML = html; return s; }
 
 /* Ряд кнопок тегов: одна сборка и для окна, и для общего ряда картинок студий сцен. */
@@ -118,6 +140,27 @@ export function scenarioWindow(host, cfg = {}) {
   ta.value = cfg.text || '';
   ta.setAttribute('spellcheck', 'true');          // промпт - текст, а не путь: опечатка стоит целого расчёта
 
+  /* Выше поля промта стоит поле сценария: то, что пишет человек своими словами. Поле промта -
+     то, что уходит в модель. Пока промт никто не генерировал, он повторяет сценарий, иначе
+     запрос ушёл бы пустым; «Генерация промта» или правка промта рукой повтор гасят, и правки
+     сценария готовый промт больше не перезаписывают. */
+  /* Окно сценария не ставим там, где карточка врезана в чужую (сцены студий) и в разделах
+     картинок: там поле одно и человек пишет в него сам. */
+  const sc = (cfg.prompt === false || cfg.card === false) ? null : scNode('textarea');
+  let mirroring = false, mirrored = true;
+  if (sc) {
+    sc.className = 'sc-draft';
+    sc.placeholder = cfg.scPlaceholder || 'Что должно произойти: своими словами, можно по-русски';
+    sc.rows = cfg.scRows || Math.max(3, Math.round((cfg.rows || 6) * 0.7));
+    sc.style.minHeight = cfg.scMin || '72px';
+    sc.value = cfg.scText || '';
+    sc.setAttribute('spellcheck', 'true');
+    /* Раздел мог вернуть в поле промта сохранённый черновик: тогда сценарий пустой, и наши
+       слова живут в промте. Перекладываем их в сценарий, чтобы «Генерация промта» читала их. */
+    if (!sc.value.trim() && String(ta.value || '').trim()) { sc.value = ta.value; }
+    mirrored = true;
+  }
+
   /* Заголовок окна всегда один и тот же: в карточке - шапка с цифрой, во врезке - короткая строка. */
   const caption = scNode('div');
   let title, counter = null;
@@ -142,6 +185,8 @@ export function scenarioWindow(host, cfg = {}) {
   }
 
   let foot = null, tokens = null, buttons = null;
+  let scButtons = null;                            // ряд под полем сценария: диктовка стоит там
+  if (sc && cfg.mic !== false) { scButtons = scNode('div'); scButtons.className = 'field-btns'; }
   const tagRow = cfg.chips ? scenarioTagRow(cfg.chipsCls) : null;
   if (tagRow) { tokens = tagRow.chips; foot = tagRow.row; }
   if (!tagRow && cfg.footNote) { foot = scNode('div'); foot.className = 'ta-foot'; }
@@ -155,6 +200,7 @@ export function scenarioWindow(host, cfg = {}) {
   if (wrap) root.append(wrap);
   if (cfg.head) into.insertAdjacentHTML('beforeend', cfg.head);
   if (tagRow && cfg.chips === 'above') { tagRow.row.style.margin = '0 0 8px'; into.append(tagRow.row); }
+  if (sc) { into.append(sc); if (scButtons) into.append(scButtons); into.append(scPromptCaption()); }
   into.append(ta);
   if (tagRow && cfg.chips !== 'above') into.append(tagRow.row);
   if (buttons) into.append(buttons);
@@ -174,7 +220,11 @@ export function scenarioWindow(host, cfg = {}) {
     g.style.cssText = 'padding:4px 12px;font-size:12px';
     g.textContent = '🤖 Генерация промта';
     g.title = 'Сценарист сделает из этого текста готовый промпт своего режима и заменит им текст в поле. Файлы раздела и черновик уйдут в чат сценариста, ответ останется в его истории.';
-    g.onclick = () => views.agGenerate(g, cfg.generate);
+    /* Текст для сценариста берётся из поля сценария: из него делают промт, а не из готового
+       промта. Раздел своё значение не перечёркивает, если окна сценария у него нет. */
+    g.onclick = () => views.agGenerate(g, sc
+      ? Object.assign({}, cfg.generate, { text: () => (sc ? sc.value : ta.value) })
+      : cfg.generate);
     buttons.append(g);
   }
   /* Ряд кнопок поля - общий: сюда раздел ставит свои кнопки после основной («Очистить текст»,
@@ -183,25 +233,85 @@ export function scenarioWindow(host, cfg = {}) {
   (cfg.extra || []).forEach(addButton);
   /* Голос под полем: диктует прямо в это поле, в то место, где стоит курсор. Кнопка одна и та же
      машина, что и в чате сценариста; про скачанную модель спрашиваем раздел через реестр. */
-  if (cfg.mic !== false) addButton((() => {
+  if (cfg.mic !== false) {
+    /* Диктовка - значок микрофона, как в чате сценариста: знак узнаётся сразу, а слово
+       «Голос» спорило бы с подписями рядом. Диктуем в поле сценария: там наши слова. */
+    const where = sc || ta;
     const m = scNode('button');
-    m.type = 'button'; m.className = 'btn';
-    m.style.cssText = 'padding:4px 12px;font-size:12px';
-    m.textContent = 'Голос';
-    m.title = 'Продиктовать текст в это поле: нажмите, говорите, нажмите ещё раз. Распознавание идёт на вашей машине.';
+    m.type = 'button'; m.className = 'btn sc-mic';
+    m.title = 'Продиктовать текст в поле сценария: нажмите, говорите, нажмите ещё раз. Распознавание идёт на вашей машине.';
+    m.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="3" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0"/><line x1="12" y1="18" x2="12" y2="21"/></svg>';
     m.onclick = () => micToggle(m, {
       guard: () => (views.speechReady ? views.speechReady() : false),
       hint: m.title,
-      busy: text => { const was = ta.placeholder; ta.placeholder = text; return () => { ta.placeholder = was; }; },
-      onText: text => insertAtCursor(ta, text)
+      busy: text => { const was = where.placeholder; where.placeholder = text; return () => { where.placeholder = was; }; },
+      onText: text => insertAtCursor(where, text)
     });
-    return m;
-  })());
+    if (scButtons) scButtons.append(m); else addButton(m);
+  }
+
+  /* Перевод промта: «как это по-русски» для человека, который пишет модели по-английски.
+     Только чтение: в модель уходит текст поля, перевод никуда не подставляется. */
+  let ruOut = null;
+  if (cfg.translate !== false && cfg.prompt !== false) {
+    const b = scNode('button');
+    b.type = 'button'; b.className = 'btn ru-b';
+    b.style.cssText = 'padding:4px 12px;font-size:12px';
+    b.textContent = 'Перевод';
+    b.title = 'Перевести промт на русский только для чтения: в модель уходит текст из поля';
+    ruOut = scNode('div'); ruOut.className = 'ru-out'; ruOut.hidden = true;
+    b.onclick = async () => {
+      if (!ruOut.hidden) { ruOut.hidden = true; b.textContent = 'Перевод'; return; }
+      const text = ta.value.trim();
+      if (!text) { toast('В окне промта пока нет текста'); return; }
+      b.disabled = true; b.textContent = 'Переводим...';
+      try {
+        const j = await postJSON('/api/agent/translate', { text });
+        ruOut.innerHTML = '';
+        const head = scNode('div'); head.className = 'ru-h';
+        const cap = scNode('b'); cap.textContent = 'По-русски (только для чтения)';
+        const cp = scNode('button'); cp.type = 'button'; cp.className = 'btn';
+        cp.style.cssText = 'padding:3px 10px;font-size:12px'; cp.textContent = 'Копировать';
+        cp.onclick = () => copyText(j.text || '');
+        head.append(cap, cp);
+        const body = scNode('div'); body.textContent = j.text || 'Перевод не пришёл';
+        ruOut.append(head, body);
+        ruOut.hidden = false; b.textContent = 'Скрыть перевод';
+      } catch (e) { toast(e.message || 'Перевести не вышло'); b.textContent = 'Перевод'; }
+      b.disabled = false;
+    };
+    addButton(b);
+    into.append(ruOut);                            // блок перевода - сразу под рядом кнопок промта
+  }
+
+  /* Пока промт не генерировали, он повторяет сценарий: человек видит в окне промта ровно то,
+     что уйдёт в модель. Правка промта рукой зеркало гасит. */
+  if (sc) {
+    sc.addEventListener('input', () => {
+      if (!mirrored) return;
+      mirroring = true;
+      ta.value = sc.value;
+      ta.dispatchEvent(new Event('input', { bubbles: true }));
+      mirroring = false;
+    });
+    ta.addEventListener('input', () => { if (!mirroring) mirrored = false; });
+  }
 
   const api = {
-    el: root, ta, foot, tokens, buttons, counter, addButton,
+    el: root, ta, sc, foot, tokens, buttons, counter, addButton,
     value: () => ta.value,
-    setValue: text => { ta.value = text == null ? '' : String(text); ta.dispatchEvent(new Event('input', { bubbles: true })); },
+    draft: () => (sc ? sc.value : ta.value),
+    setDraft: text => {
+      const field = sc || ta;
+      field.value = text == null ? '' : String(text);
+      field.dispatchEvent(new Event('input', { bubbles: true }));
+    },
+    /* Ответ сценариста - это промт: он ложится в поле промта, и с этой минуты зеркало гаснет. */
+    setValue: text => {
+      ta.value = text == null ? '' : String(text);
+      mirrored = false;
+      ta.dispatchEvent(new Event('input', { bubbles: true }));
+    },
     onInput: fn => { ta.addEventListener('input', fn); return fn; },
     insertTag: tag => {
       if (!tag) return;
@@ -255,7 +365,7 @@ export function scenarioWindow(host, cfg = {}) {
 })();
 
 export function audioTokens(c, bs, film) {
-  const ta = c.querySelector('textarea'), text = ta ? ta.value : '';
+  const ta = c.querySelector('textarea:not(.sc-draft)') || c.querySelector('textarea'), text = ta ? ta.value : '';
   const used = new Set((text.match(/<Audio\s*\d+>/g) || []).map(s => +s.replace(/\D+/g, '')));
   const list = [];
   (film || []).forEach((f, j) => { if (f && j > 0) list.push({ tag: 1 + j, name: f.name, own: false }); });   // №1 is the film's own sound, not a sample
@@ -282,7 +392,7 @@ export function sceneAudioPlan(c, film, bs) {
      own decade is moved onto the place the file really takes; a number with no file behind it in
      THIS scene is taken out of the text and named in the report, because a tag with nothing behind
      it is a lie to the model. */
-  const ta = c.querySelector('textarea'), raw = ta ? ta.value : '';
+  const ta = c.querySelector('textarea:not(.sc-draft)') || c.querySelector('textarea'), raw = ta ? ta.value : '';
   const own = (c && c._baseFixed) || bs;      // the decade written on the cards of this scene
   const byTag = new Map();
   (film || []).forEach((f, j) => { if (f && j > 0) byTag.set(1 + j, f); });   // the background has its own road to the model

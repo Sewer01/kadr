@@ -548,3 +548,10 @@
 .pr-rent i{margin-left:auto;flex:none;font-style:normal;font-weight:700;font-size:13px;color:var(--accent,#c0405a);white-space:nowrap}
 
     .sc-auds>.counter{font-size:12px;opacity:.75;padding:0 2px}
+
+/* Окно «Сценарий» над полем промта: наши слова и подпись промта. */
+.sc-draft{margin-bottom:8px}
+.sc-prompt-cap{display:flex;align-items:center;gap:8px;margin:0 0 6px;font-size:13px}
+.sc-prompt-cap b{font-weight:700}
+.sc-mic{display:inline-flex;align-items:center;justify-content:center;padding:5px 9px!important;line-height:0}
+.sc-mic.rec{border-color:var(--accent);color:var(--accent)}

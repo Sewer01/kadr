@@ -6,7 +6,7 @@ import { goTo, onNav } from '../core/tabs.js';
 import { AudioRow, AudioTrimmer, VideoTrimmer, actx, wavSlice, setActx } from '../ui/audio.js';
 import { ASPECTS, QUALITY, QUALITY_ALL, loraForm, mountLoras, paramsCard, r32, resFor, seedForm, sizeForm, useSeed } from '../ui/params.js';
 import { previewPanel } from '../ui/preview.js';
-import { audioTokens, scenarioResolvers, scenarioTagRow, scenarioWindow, sceneAudioPlan } from '../ui/scenario.js';
+import { audioTokens, ownWords, scenarioResolvers, scenarioTagRow, scenarioWindow, sceneAudioPlan } from '../ui/scenario.js';
 import { fitAspect, fitSlot, repeatRefs, resetSlot, wireDrop, wireSlotSwap } from '../ui/slots.js';
 import { AG, agAttachFile, agCtx, agDraftOut, agGenerate, agGo, agMakeBtn, agPickTarget, agRefWarn, agScenesText, agStatus, agWords, agWordsFor, hGrip, hGripAfter, setChatAudio, showAudioBox, speechReady, wordsIntoPrompt } from './agent.js';
 import { transcribeWav } from '../ui/mic.js';
@@ -29,7 +29,7 @@ export const vPrev = previewPanel($('#vPreview'), V, {
     form: () => {
       const fd = new FormData();
       fd.append('prompt', $('#vPrompt').value.trim());
-      fd.append('note', $('#vPrompt').value.trim());   // what you typed, apart from what the model read
+      fd.append('note', ownWords($('#vPrompt')));      // our own words from the scenario field
       sizeForm(V, fd); fd.append('aspect', V.aspect); fd.append('quality', V.q); fd.append('duration', V.dur);
       seedForm(V, fd);
       if ($('#dFirst')._file) fd.append('first', $('#dFirst')._file);
@@ -106,7 +106,7 @@ export const lPrev = previewPanel($('#lPreview'), L, {
     form: () => {
       const fd = new FormData();
       fd.append('prompt', wordsIntoPrompt($('#lPrompt').value.trim(), [], CL_HEARD.text ? [{ words: CL_HEARD.text, lang: CL_HEARD.lang }] : []));
-      fd.append('note', $('#lPrompt').value.trim());   // what you typed, apart from what the model read
+      fd.append('note', ownWords($('#lPrompt')));      // our own words from the scenario field
       sizeForm(L, fd); fd.append('aspect', L.aspect); fd.append('quality', L.q); fd.append('ref_size', L.refSize);
       loraForm(L, fd); seedForm(L, fd);
       fd.append('audio', new File([wavSlice(abuf, L.start, L.end)], 'clip.wav', { type: 'audio/wav' }));
@@ -3164,7 +3164,7 @@ export function makeRefMode(cfg) {
         const base = cfg.swap ? ($('.rm-who[data-i="0"]', root).value.trim() || 'замена персонажа') : promptEl().value.trim();
         fd.append('prompt', cfg.scenes ? base : wordsIntoPrompt(base, files('.rm-auds .slot').map(s => s && s._file)));
       }
-        fd.append('note', promptEl().value.trim());   // your own words: the repeat puts these back, not the composed text
+        fd.append('note', ownWords(promptEl()));       // our own words: the repeat puts these back, not the composed text
         if (cfg.swap) {
           const own = promptEl().value.trim();   // the user's own prompt is used as it is, in one pass; empty: the program writes it (and swaps shot by shot)
           if (own) fd.append('raw_prompt', own);

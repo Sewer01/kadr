@@ -161,7 +161,7 @@ $('#acList').onclick = async e => {
 document.addEventListener('click', e => {
   const chip = e.target.closest('[data-ac]'); if (!chip) return;
   const root = chip.closest('[data-scenario]'); if (!root) return;
-  const ta = root.querySelector('textarea'); if (!ta) return;
+  const ta = root.querySelector('textarea.sc-draft') || root.querySelector('textarea'); if (!ta) return;
   e.stopPropagation(); e.preventDefault();
   insertAtCursor(ta, '@' + chip.dataset.ac);
 }, true);

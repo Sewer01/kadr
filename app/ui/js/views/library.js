@@ -5,7 +5,7 @@ import { IMG_PANELS, LIB, byId, libFilter, openId, openItem, selecting, selected
 import { TABS, goTo, onNav } from '../core/tabs.js';
 import { frames } from '../ui/params.js';
 import { setDropFile } from '../ui/slots.js';
-import { insertAtCursor, scenarioResolvers, scenarioWindowOf } from '../ui/scenario.js';
+import { insertAtCursor, scenarioDraftOf, scenarioResolvers } from '../ui/scenario.js';
 import { agAttachFile, agGo } from './agent.js';
 import { continueLong } from './modes.js';
 import { qAdd } from './queue.js';
@@ -711,9 +711,9 @@ $('#rsOut').onclick = e => {
   const row = e.target.closest('.rs-frame'); if (!row || !e.target.closest('[data-put]')) return;
   const f = RS.frames.find(x => x.id === row.dataset.id); if (!f) return;
   const mode = ($('select[data-mode]', row) || {}).value;
-  const win = scenarioWindowOf(mode);
-  if (!win) { toast('В этом режиме нет поля «Сценарий»'); return; }
-  insertAtCursor(win.ta, f.text);
+  const field = scenarioDraftOf(mode);
+  if (!field) { toast('В этом режиме нет окна сценария'); return; }
+  insertAtCursor(field, f.text);
   toast('Фраза кадра встала в поле');
 };
 

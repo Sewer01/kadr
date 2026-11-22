@@ -242,6 +242,7 @@ export const imgSeedForm = (S, fd) => { if (S.seedFixed && S.seed) fd.append('se
      разметкой раздела: они встают до поля и сразу под кнопками, селекторы (.kr-bm, .kr-batch,
      .kr-same, .kr-bl) не меняются. */
   scenarioWindow($('[data-scenarobox="krea"]', root), {
+    prompt: false,
     kind: 'krea', num: 1, cls: 'kr-prompt',
     counter: { cls: 'counter kr-count', text: '0 символов' },
     head: '<div class="seg kr-bm" style="grid-template-columns:minmax(0,1fr) minmax(0,1fr);margin-bottom:8px">'
@@ -433,6 +434,7 @@ export const imgSeedForm = (S, fd) => { if (S.seedFixed && S.seed) fd.append('se
      .qw-edit сохранена (на неё смотрит лист персонажа, который прячет поле целиком), классы
      поля и плашек прежние, так что код раскадровки и меток их находит как находил. */
   scenarioWindow($('[data-scenarobox="qwen"]', root), {
+    prompt: false,
     kind: 'qwen', num: 2, hint: 'можно написать в разделе «Сценарист»',
     wrap: 'qw-edit', cls: 'qw-prompt', chips: 'above', chipsCls: 'qw-tokens',
     placeholder: 'Что изменить и что оставить. Например: Этот человек сидит в кафе у окна и пьёт кофе. Лицо, причёска и одежда как на изображении.',

@@ -52,13 +52,13 @@ export function agRefCheck(mode) {
     one(($('textarea', c) || {}).value, 'сцена ' + (i + 1), own);
   });
   if (!cards.length) {
-    const ta = root.querySelector('textarea.rm-prompt') || root.querySelector('textarea');
+    const ta = root.querySelector('textarea.rm-prompt') || root.querySelector('textarea:not(.sc-draft)');
     if (ta) one(ta.value, 'текст', []);
   }
   const out = [];
   fill.forEach((where, tag) => {
     const anywhere = cards.length ? cards.some(c => (($('textarea', c) || {}).value || '').indexOf('<' + tag + '>') >= 0)
-      : ((root.querySelector('textarea.rm-prompt') || root.querySelector('textarea') || {}).value || '').indexOf('<' + tag + '>') >= 0;
+      : ((root.querySelector('textarea.rm-prompt') || root.querySelector('textarea:not(.sc-draft)') || {}).value || '').indexOf('<' + tag + '>') >= 0;
     if (!anywhere) out.push(where + ' - <' + tag + '> ни в одном тексте не назван');
   });
   return out.concat(bad.filter((x, i) => bad.indexOf(x) === i));
@@ -2116,7 +2116,7 @@ export function agScenesText(root) {
   const cards = (typeof $$ === 'function' ? $$('.sc', root) : []);
   const parts = [];
   cards.forEach((c, i) => {
-    const ta = c.querySelector('textarea');
+    const ta = c.querySelector('textarea:not(.sc-draft)') || c.querySelector('textarea');
     const rg = c.querySelector('input[type=range]');
     const fresh = c.querySelector('.sc-fresh');
     const txt = ((ta && ta.value) || '').trim();
