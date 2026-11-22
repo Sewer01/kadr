@@ -9,8 +9,8 @@ from applog import applog
 from datetime import datetime
 from netutil import _ssl_context
 from pathlib import Path
-from paths import CLIENT_ID, DATA_DIR, LIBRARY_FILE, ROOT
-from store import JobStore, Library
+from paths import CLIENT_ID, DATA_DIR, LIBRARY_FILE, ROOT, VOICE_DIR
+from store import JobStore, Library, VoiceStore
 import agent as ag
 import aiohttp
 import asyncio
@@ -42,6 +42,7 @@ class CoreMixin:
         self.saved_queue = self.load_queue()  # unfinished jobs of the previous run (asked about at start)
         self.jobs = JobStore(self.save_queue)  # prompt_id -> job dict
         self.library = Library(LIBRARY_FILE)
+        self.voices = VoiceStore(VOICE_DIR)   # Voice Lab: сохранённые голоса и последние варианты озвучки
         self.output_dir = None
         self.comfy_online = False
         self._relay_ok = None  # does this ComfyUI know the RelayVSR nodes (cached, see relay_ready)

@@ -1680,7 +1680,7 @@ export const agQwenMode = () => { const b = $('.qw-eng button.on', $('#view-qwen
 (() => {
   // роль основной модели на раздел: без неё строка «своя модель» в разделе молчит (role=undefined),
     // поэтому список должен покрывать ВСЕ режимы - раньше в нём не было реализма, FLUX, H3 Image и обоих увеличений
-    const MAIN = { video: 'fast_unet', lipsync: 'lipsync_unet', refs: 'lipsync_unet', actor: 'lipsync_unet', swap: 'lipsync_unet', long: 'lipsync_unet', actionsc: 'action_unet', action: 'action_unet', krea: 'krea_unet', kreareal: 'kreareal_unet', qwen: 'qwen_unet', flux: 'flux_unet', h3img: 'h3img_unet', upscale: 'seedvr_unet', relayvsr: 'relayvsr_unet' };
+    const MAIN = { video: 'fast_unet', lipsync: 'lipsync_unet', clipsc: 'lipsync_unet', refs: 'lipsync_unet', actor: 'lipsync_unet', swap: 'lipsync_unet', long: 'lipsync_unet', actionsc: 'action_unet', action: 'action_unet', krea: 'krea_unet', kreareal: 'kreareal_unet', qwen: 'qwen_unet', flux: 'flux_unet', h3img: 'h3img_unet', upscale: 'seedvr_unet', relayvsr: 'relayvsr_unet' };
   const refresh = async box => {
     const { mode, role } = box.dataset;
     try {

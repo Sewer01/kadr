@@ -47,6 +47,19 @@ NODE_PACKS = [
      "commit": "efbe83f69ffa97a251a575ce42edc7bf8005da0c"},          # MIT; the version the workflow was made with
 ]
 
+# Voice Lab: паки нод, которые человек ставит сам кнопкой в разделе. Их НЕТ в NODE_PACKS выше:
+# голосовая модель каждого пакета весит около 2-3 ГБ, и свежей установке незачем качать их, пока
+# человек не открыл раздел. Способ скачивания тот же - архив коммита с GitHub, git не нужен.
+VOICE_PACK = {"name": "ComfyUI-omnivoice-tts", "repo": "Saganaki22/ComfyUI-OmniVoice-TTS",
+              "commit": "3fe8e42a6d4a03628471aa1ba8506657e2e96dea"}
+# «Своя интонация» (преобразование голоса): запись переозвучивается чужим голосом, слова и подача остаются
+VC_PACK = {"name": "ComfyUI-Chatterbox", "repo": "wildminder/ComfyUI-Chatterbox",
+           "commit": "7175b1e42d652e12482da57c1b44f74194649c4a"}
+# имена нод, о которых раздел спрашивает движок: первая отвечает ещё и списком голосовых моделей
+VOICE_CLASS = "OmniVoiceVoiceDesignTTS"
+VOICE_CLASSES = ("OmniVoiceVoiceDesignTTS", "OmniVoiceVoiceCloneTTS", "OmniVoiceLongformTTS", "OmniVoiceMultiSpeakerTTS")
+VC_CLASS = "ChatterboxVC"
+
 # What each mode needs from custom nodes: checked in a user's own ComfyUI (a new install gets them by itself).
 # `classes` are node names ComfyUI must know; `optional` ones only switch a feature on.
 NODE_CHECKS = [

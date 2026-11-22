@@ -29,6 +29,7 @@ from areas.window import WindowMixin
 from areas.core import CoreMixin
 from areas.actors import ActorsMixin
 from areas.refsheet import RefsheetMixin
+from areas.voicelab import VoicelabMixin
 from aiohttp import web
 from applog import applog
 from pathlib import Path
@@ -59,7 +60,8 @@ class App(QueueMixin,
           WindowMixin,
           CoreMixin,
 ActorsMixin,
-RefsheetMixin):
+RefsheetMixin,
+VoicelabMixin):
     """Класс состояния собран из mixin-ов областей: поля и __init__ в areas/core.py,
     обработчики - по файлам app/areas/. Имя, поля и все вызовы self остались теми же,
     поэтому таблица маршрутов ниже обращается к state.h_* ровно как раньше."""
@@ -241,6 +243,24 @@ def build_app(comfy_override=None):
         web.post("/api/speech/transcribe", state.h_transcribe),
         web.post("/api/speech/folder", state.h_speech_folder),
         web.post("/api/speech/model", state.h_speech_model),
+        # Voice Lab: голоса и озвучка (see areas/voicelab.py). Ноды человек ставит кнопкой в разделе,
+        # поэтому порядок такой: сначала узнать состояние, потом ставить, озвучивать и смотреть варианты.
+        web.get("/api/voice/status", state.h_voice_status),
+        web.post("/api/voice/install", state.h_voice_install),
+        web.get("/api/voice/progress", state.h_voice_progress),
+        web.post("/api/voice/restart", state.h_voice_restart),
+        web.post("/api/voice/generate", state.h_voice_generate),
+        web.post("/api/voice/cancel", state.h_voice_cancel),
+        web.get("/api/voice/saved", state.h_voice_saved_list),
+        web.post("/api/voice/saved", state.h_voice_saved_save),
+        web.get("/api/voice/saved/{id}/file", state.h_voice_saved_file),
+        web.delete("/api/voice/saved/{id}", state.h_voice_saved_delete),
+        web.get("/api/voice/takes", state.h_voice_takes),
+        web.post("/api/voice/takes/clear", state.h_voice_takes_clear),
+        web.post("/api/voice/takes/{id}/star", state.h_voice_take_star),
+        web.post("/api/voice/takes/{id}/rename", state.h_voice_take_rename),
+        web.delete("/api/voice/takes/{id}", state.h_voice_take_delete),
+        web.get("/api/voice/out/{name}", state.h_voice_out),
         web.post("/api/agent/chat", state.h_agent_chat),
         web.post("/api/comfy/free", state.h_comfy_free),
         web.get("/api/agent/chats", state.h_chats),

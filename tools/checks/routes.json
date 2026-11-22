@@ -536,6 +536,86 @@
    "state.h_speech_model"
   ],
   [
+   "get",
+   "/api/voice/status",
+   "state.h_voice_status"
+  ],
+  [
+   "post",
+   "/api/voice/install",
+   "state.h_voice_install"
+  ],
+  [
+   "get",
+   "/api/voice/progress",
+   "state.h_voice_progress"
+  ],
+  [
+   "post",
+   "/api/voice/restart",
+   "state.h_voice_restart"
+  ],
+  [
+   "post",
+   "/api/voice/generate",
+   "state.h_voice_generate"
+  ],
+  [
+   "post",
+   "/api/voice/cancel",
+   "state.h_voice_cancel"
+  ],
+  [
+   "get",
+   "/api/voice/saved",
+   "state.h_voice_saved_list"
+  ],
+  [
+   "post",
+   "/api/voice/saved",
+   "state.h_voice_saved_save"
+  ],
+  [
+   "get",
+   "/api/voice/saved/{id}/file",
+   "state.h_voice_saved_file"
+  ],
+  [
+   "delete",
+   "/api/voice/saved/{id}",
+   "state.h_voice_saved_delete"
+  ],
+  [
+   "get",
+   "/api/voice/takes",
+   "state.h_voice_takes"
+  ],
+  [
+   "post",
+   "/api/voice/takes/clear",
+   "state.h_voice_takes_clear"
+  ],
+  [
+   "post",
+   "/api/voice/takes/{id}/star",
+   "state.h_voice_take_star"
+  ],
+  [
+   "post",
+   "/api/voice/takes/{id}/rename",
+   "state.h_voice_take_rename"
+  ],
+  [
+   "delete",
+   "/api/voice/takes/{id}",
+   "state.h_voice_take_delete"
+  ],
+  [
+   "get",
+   "/api/voice/out/{name}",
+   "state.h_voice_out"
+  ],
+  [
    "post",
    "/api/agent/chat",
    "state.h_agent_chat"
@@ -807,6 +887,22 @@
   "h_upscale_file",
   "h_video_cut",
   "h_video_lastframe",
+  "h_voice_cancel",
+  "h_voice_generate",
+  "h_voice_install",
+  "h_voice_out",
+  "h_voice_progress",
+  "h_voice_restart",
+  "h_voice_saved_delete",
+  "h_voice_saved_file",
+  "h_voice_saved_list",
+  "h_voice_saved_save",
+  "h_voice_status",
+  "h_voice_take_delete",
+  "h_voice_take_rename",
+  "h_voice_take_star",
+  "h_voice_takes",
+  "h_voice_takes_clear",
   "h_wf_add",
   "h_wf_delete",
   "h_wf_get",

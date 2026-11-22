@@ -34,6 +34,9 @@ LONG_DIR = DATA_DIR / "long"   # saved scene states of the long video made scene
 REF_DIR = DATA_DIR / "refs"    # copies of the pictures a result was made of, one folder per calculation
 
 
+VOICE_DIR = DATA_DIR / "voicelab"   # Voice Lab: сохранённые голоса (voices) и готовые варианты (out)
+
+
 LIBRARY_FILE = DATA_DIR / "library.json"
 
 

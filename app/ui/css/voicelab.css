@@ -1,0 +1,87 @@
+/* Озвучка: раздел с голосами (app/ui/js/views/voicelab.js).
+   Классы начинаются с vl- и живут только здесь: разметка раздела не зависит от стилей режимов. */
+
+.vl-tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+.vl-tabs .chip{cursor:pointer}
+
+/* слева форма, справа варианты: палка между ними двигается, ширину помнит окно */
+.vl-layout{display:grid;grid-template-columns:var(--vl-left,440px) 12px minmax(0,1fr);gap:6px;align-items:start}
+.vl-left{display:grid;gap:14px;align-content:start}
+.vl-left .card{margin:0}
+.vl-split{align-self:stretch;min-height:200px;cursor:col-resize;border-radius:6px;position:relative;touch-action:none}
+.vl-split::after{content:'';position:absolute;left:5px;top:0;bottom:0;width:2px;border-radius:2px;background:var(--line-2);transition:background .15s}
+.vl-split:hover::after,.vl-split.drag::after{background:var(--accent);width:3px;left:4.5px}
+@media(max-width:1000px){.vl-layout{grid-template-columns:1fr}.vl-split{display:none}}
+
+/* поля */
+.vl-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:12px}
+.vl-f{display:flex;flex-direction:column;gap:5px;min-width:0}
+.vl-f label,.vl-lbl{font-size:12px;font-weight:700;color:var(--muted)}
+.vl-f small{font-weight:400}
+.vl-f input[type=text],.vl-f input[type=number],.vl-f select,.vl-dir input,
+.vl-sm select,.vl-sm input[type=text],.vl-sp input[type=text]{background:var(--bg-2);border:1px solid var(--line);border-radius:10px;padding:9px 11px;outline:none;color:var(--text)}
+.vl-f input:focus,.vl-f select:focus,.vl-sm select:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.vl-f input[type=number],.vl-f select,.vl-f input[type=text]{width:100%}
+.vl-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.vl-text{width:100%;min-height:120px;height:130px}
+.vl-chk{display:flex;gap:10px;align-items:flex-start;line-height:1.35}
+.vl-chk input{margin-top:3px}
+.vl-chk span{display:grid;gap:2px}
+.vl-chk small{font-weight:400}
+.vl-adv{border-top:1px solid var(--line);margin-top:12px;padding-top:4px}
+.vl-adv summary{cursor:pointer;padding:8px 0;font-weight:700;font-size:13px}
+.vl-note{color:var(--muted);font-size:12.5px;line-height:1.5}
+.vl-empty{padding:26px 16px;text-align:center;color:var(--muted);line-height:1.6;border:1px dashed var(--line-2);border-radius:16px}
+.vl-dir{display:flex;gap:8px;align-items:center}
+.vl-dir input{flex:1;min-width:0}
+
+/* когда модуля ещё нет: то, что человек должен сделать, стоит на видном месте */
+.vl-warn{border:1px solid var(--line-2);border-radius:12px;padding:14px;line-height:1.6;display:grid;gap:10px}
+.vl-req{margin-top:10px;padding:10px 12px;border:1px solid var(--accent);border-radius:12px;background:var(--accent-soft)}
+
+/* окно образца голоса: волна, удержание куска, вырезание пауз */
+.vl-sm{display:grid;gap:8px;border:1px solid var(--line);border-radius:12px;padding:10px 12px;background:var(--surface)}
+.vl-sm.on{border-color:var(--accent)}
+.vl-smwave{position:relative;height:70px;border-radius:10px;border:1px solid var(--line);background:var(--bg-2);cursor:ew-resize;touch-action:none}
+.vl-smwave canvas{display:block;width:100%;height:70px}
+.vl-smtools{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.vl-smtools .hint{flex:1;min-width:140px}
+.vl-smtools .bad{color:var(--accent-2)}
+.vl-tag{cursor:pointer}
+
+/* голоса диалога */
+.vl-sp{border:1px solid var(--line);border-radius:12px;padding:10px 12px;display:grid;gap:8px}
+
+/* варианты озвучки: волна, прослушивание, избранное, повтор настроек */
+.vl-takes{display:grid;gap:12px;align-content:start}
+.vl-th{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.vl-th h3{margin:0;display:flex;gap:8px;align-items:center}
+.vl-take{display:grid;grid-template-columns:46px minmax(0,1fr);gap:6px 14px;border:1px solid var(--line);border-radius:16px;padding:14px;background:var(--surface)}
+.vl-take.pend{opacity:.9}
+.vl-take.star{border-color:var(--accent)}
+.vl-tt{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.vl-tt b{font-size:15px;cursor:text}
+.vl-tt span{font-size:12px;color:var(--muted);display:flex;gap:8px;align-items:center}
+.vl-play{width:46px;height:46px;border-radius:50%;border:1px solid var(--line-2);background:var(--bg-2);display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text)}
+.vl-play:hover{border-color:var(--accent);color:var(--accent)}
+.vl-play svg{width:17px;height:17px}
+.vl-wave{grid-column:2;height:50px;border-radius:10px;cursor:pointer;position:relative}
+.vl-wave canvas{display:block;width:100%;height:100%}
+.vl-quote{grid-column:2;font-style:italic;font-size:13px;color:var(--muted);line-height:1.45;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.vl-marks{grid-column:2;display:flex;gap:6px;flex-wrap:wrap}
+.vl-marks i{font-style:normal;font-size:11px;padding:2px 9px;border:1px solid var(--line-2);border-radius:99px;color:var(--muted)}
+.vl-marks i.m{color:var(--accent);border-color:var(--accent)}
+.vl-acts{grid-column:2;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.vl-acts .sp{flex:1}
+.vl-star{background:none;border:1px solid var(--line);border-radius:8px;color:var(--muted);cursor:pointer;padding:3px 9px;font-size:11px}
+.vl-star.on{color:var(--accent);border-color:var(--accent)}
+.vl-pb{height:6px;border-radius:6px;background:var(--surface-2);overflow:hidden;margin-top:6px}
+.vl-pb i{display:block;height:100%;background:var(--accent);width:0;transition:width .8s}
+.vl-stop{border-color:#e5484d;color:#e5484d}
+.vl-big{width:100%;height:48px;font-size:15px}
+
+/* сохранённый голос: название, образец, примечание */
+.vl-sv{display:flex;gap:12px;align-items:center;flex-wrap:wrap;border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.vl-sv audio{height:32px;max-width:260px}
+.vl-sv b{min-width:120px}
+.vl-sv input{flex:1;min-width:180px}
