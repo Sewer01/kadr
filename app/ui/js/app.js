@@ -22,6 +22,7 @@ import './views/images.js';
 import './views/workflows.js';
 import './views/montage.js';
 import './views/voicelab.js';
+import './views/reflab.js';
 
 import { H3_TOKEN } from './core/net.js';
 import { PIC_EXT, clipboardHasImage, toast } from './core/util.js';

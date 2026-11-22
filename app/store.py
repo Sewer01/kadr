@@ -1,7 +1,8 @@
 """Хранилища, которые переживают закрытие программы: очередь заданий на диске,
-список Библиотеки и голоса раздела Voice Lab."""
+список Библиотеки, голоса раздела Voice Lab и работы Студии референсов."""
 
 import json
+import shutil
 import uuid
 from datetime import datetime
 from pathlib import Path
@@ -52,6 +53,14 @@ class Library:
 KEEP_TAKES = 60   # сколько свежих немеченых вариантов держать на диске
 
 
+def _dump_list(path, data):
+    """Запись списка через временный файл: обрыв посередине не оставляет полсписка."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(".tmp")
+    tmp.write_text(json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")
+    tmp.replace(path)
+
+
 class VoiceStore:
     """Голоса раздела Voice Lab.
 
@@ -82,10 +91,7 @@ class VoiceStore:
     @staticmethod
     def _dump(path, data):
         """Запись списка через временный файл: обрыв посередине не оставляет полсписка."""
-        path.parent.mkdir(parents=True, exist_ok=True)
-        tmp = path.with_suffix(".tmp")
-        tmp.write_text(json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")
-        tmp.replace(path)
+        _dump_list(path, data)
 
     def save(self):
         self._dump(self.index, self.items)
@@ -147,3 +153,98 @@ class VoiceStore:
         self.takes["items"] = list(reversed(keep))
         self.save_takes()
         return self.take_public(take)
+
+
+KEEP_RUNS = 80   # сколько свежих немеченых работ держать на диске
+
+
+class RefLabStore:
+    """Работы Студии референсов: листы референсов, собранные из одного короткого ролика.
+
+    Индекс runs.json и папка на каждую работу (runs/<id>/): кадры-ракурсы и сам лист. Видео к
+    работе не кладём - оно и так живёт в Библиотеке, здесь остаётся только его id. Рядом лежит
+    presets.json: наборы ракурсов, которые человек собрал сам. Меченые работы не удаляются,
+    когда список переполняется: уходят только немеченые сверх меры и те, что удалили руками.
+    """
+
+    def __init__(self, root):
+        self.root = Path(root)
+        self.rdir = self.root / "runs"
+        self.index = self.root / "runs.json"
+        self.presets_file = self.root / "presets.json"
+        self.runs = self._load(self.index)
+        self.presets = self._load(self.presets_file)
+
+    @staticmethod
+    def _load(path):
+        """Список с диска: битый файл не роняет раздел и не перезаписывается молча."""
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return []
+        return data if isinstance(data, list) else []
+
+    def ready(self):
+        """Папки появляются, когда в них правда что-то кладут, а не при каждом запуске программы."""
+        self.rdir.mkdir(parents=True, exist_ok=True)
+
+    def save(self):
+        _dump_list(self.index, self.runs)
+
+    def save_presets(self):
+        _dump_list(self.presets_file, self.presets)
+
+    def get(self, rid):
+        return next((x for x in self.runs if x["id"] == rid), None)
+
+    def folder(self, rid):
+        """Папка работы: id у нас генерируется сам, но лишние символы из адреса всё равно режем."""
+        return self.rdir / "".join(c for c in str(rid) if c.isalnum())[:40]
+
+    def file(self, run, name):
+        """Файл работы, если он ещё на месте. Имя берётся из адреса, поэтому путь наружу не уходит."""
+        f = self.folder(run["id"]) / Path(str(name)).name
+        return f if f.is_file() else None
+
+    def public(self, run):
+        """Работа для интерфейса: у кадров и листа появляется адрес, по которому их отдают."""
+        out = dict(run)
+        base = f"/api/reflab/file/{run['id']}/"
+        out["beats"] = [{**b, "url": (base + b["file"]) if b.get("file") else ""} for b in run.get("beats", [])]
+        out["sheet_url"] = (base + run["sheet"]) if run.get("sheet") else ""
+        return out
+
+    def add(self, run):
+        """Положить работу в список: та же работа встаёт на своё место, новая - первой."""
+        old = self.get(run["id"])
+        if old:
+            self.runs[self.runs.index(old)] = run
+        else:
+            self.runs.insert(0, run)
+        self.trim()
+        self.save()
+        return run
+
+    def trim(self):
+        """Избыток немеченых работ уходит вместе со своими файлами."""
+        keep, drop = [], []
+        for it in self.runs:
+            (keep if it.get("star") or sum(1 for k in keep if not k.get("star")) < KEEP_RUNS else drop).append(it)
+        for it in drop:
+            shutil.rmtree(self.folder(it["id"]), ignore_errors=True)
+        self.runs = keep
+
+    def remove(self, run):
+        """Убрать работу и её файлы: папка обязана остаться внутри runs/."""
+        self.runs = [x for x in self.runs if x is not run]
+        self.save()
+        folder = self.folder(run["id"]).resolve()
+        if folder.is_dir() and self.rdir.resolve() in folder.parents:
+            shutil.rmtree(folder, ignore_errors=True)
+
+    def clear_unstarred(self):
+        """Убрать немеченые работы: помеченные человеком всегда остаются."""
+        gone = [r for r in self.runs if not r.get("star")]
+        for r in gone:
+            self.remove(r)
+        return len(gone)

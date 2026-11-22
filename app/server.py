@@ -30,6 +30,7 @@ from areas.core import CoreMixin
 from areas.actors import ActorsMixin
 from areas.refsheet import RefsheetMixin
 from areas.voicelab import VoicelabMixin
+from areas.reflab import ReflabMixin
 from aiohttp import web
 from applog import applog
 from pathlib import Path
@@ -61,7 +62,8 @@ class App(QueueMixin,
           CoreMixin,
 ActorsMixin,
 RefsheetMixin,
-VoicelabMixin):
+VoicelabMixin,
+ReflabMixin):
     """Класс состояния собран из mixin-ов областей: поля и __init__ в areas/core.py,
     обработчики - по файлам app/areas/. Имя, поля и все вызовы self остались теми же,
     поэтому таблица маршрутов ниже обращается к state.h_* ровно как раньше."""
@@ -288,6 +290,20 @@ def build_app(comfy_override=None):
         web.get("/api/actors/{id}/file/{name}", state.h_actors_file),
         web.get("/api/refsheet/presets", state.h_refsheet_presets),
         web.post("/api/refsheet", state.h_refsheet_make),
+        # Студия референсов: листы референсов из одного ролика (see areas/reflab.py). Порядок такой:
+        # взять наборы ракурсов и собрать текст, ролик делает режим «Видео по референсам», а кадры,
+        # лист и история работ живут здесь.
+        web.get("/api/reflab/presets", state.h_reflab_presets),
+        web.post("/api/reflab/prompt", state.h_reflab_prompt),
+        web.post("/api/reflab/presets", state.h_reflab_preset_save),
+        web.delete("/api/reflab/presets/{id}", state.h_reflab_preset_delete),
+        web.get("/api/reflab/runs", state.h_reflab_list),
+        web.post("/api/reflab/runs", state.h_reflab_save),
+        web.post("/api/reflab/runs/clear", state.h_reflab_clear),
+        web.post("/api/reflab/runs/{id}/rate", state.h_reflab_rate),
+        web.delete("/api/reflab/runs/{id}", state.h_reflab_delete),
+        web.get("/api/reflab/file/{id}/{name}", state.h_reflab_file),
+        web.post("/api/reflab/describe", state.h_reflab_describe),
         web.get("/api/events", state.h_events),
         web.static("/ui", UI_DIR),
     ])

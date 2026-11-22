@@ -81,17 +81,19 @@ export function setEngine(on) {
   const bar = document.createElement('div'); bar.id = 'modeBar'; document.body.appendChild(bar);
   // the names people read all day; the side menu keeps its own, longer ones for now
   const SHORT = { video: 'Видео', lipsync: 'Клип', refs: 'Видеостудия', actor: 'Актёр', swap: 'Замена', voicelab: 'Озвучка',
+    reflab: 'Референсы',
     long: 'Киностудия', actionsc: 'Экшн-студия', action: 'Экшн-видео',
     krea: 'Изображение по тексту', qwen: 'Изменение изображения', upfile: 'Апскейлинг' };
   // what a button really opens, said in one line: the bar is short by design, the tooltip is not
   const TIP = { video: 'Видео из картинки', lipsync: 'Музыкальный клип', voicelab: 'Голос по описанию, клон по образцу, диалог', refs: 'Видео по референсам',
+    reflab: 'Листы референсов персонажа, предмета и места из одного ролика',
     actor: 'Актёрская игра', swap: 'Замена персонажа', long: 'Фильм по сценам',
     actionsc: 'Динамичное видео по сценам', action: 'Динамичное видео',
     krea: 'Изображение по тексту', qwen: 'Изменение изображения', upfile: 'Апскейлинг' };
   // the order a person works in: the picture, then the references, then the studios, then the clip
   // and the actor; pictures and the retouching stay in their own groups, the separators as they were
   const GROUPS = [['video', 'refs', 'long', 'action', 'actionsc', 'clipsc', 'lipsync', 'actor', 'swap'],
-                  ['krea', 'qwen'], ['voicelab'], ['upfile']];
+                  ['reflab'], ['krea', 'qwen'], ['voicelab'], ['upfile']];
   function paint() {
     const cur = ($('.view.active')?.id || '').replace('view-', '');
     let html = '';

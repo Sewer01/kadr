@@ -37,6 +37,9 @@ REF_DIR = DATA_DIR / "refs"    # copies of the pictures a result was made of, on
 VOICE_DIR = DATA_DIR / "voicelab"   # Voice Lab: сохранённые голоса (voices) и готовые варианты (out)
 
 
+REFLAB_DIR = DATA_DIR / "reflab"    # Студия референсов: свои типы листов (presets.json) и работы (runs)
+
+
 LIBRARY_FILE = DATA_DIR / "library.json"
 
 

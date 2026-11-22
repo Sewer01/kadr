@@ -1,0 +1,121 @@
+/* Студия референсов: листы референсов из одного короткого ролика
+   (app/ui/js/views/reflab.js, сервер - app/areas/reflab.py).
+
+   Классы начинаются с rl- и живут только здесь: разметка раздела не зависит от стилей режимов.
+   Размеры и пропорции сняты с авторского окна Студии референсов, цвета - с переменных темы,
+   потому что в программе тема выбирается человеком и жёлтого «золота» в ней нет. */
+
+/* слева форма, справа ролик, лист и история: палка между ними двигается, ширину помнит окно */
+.rl-layout{display:grid;grid-template-columns:var(--rl-left,430px) 12px minmax(0,1fr);gap:6px;align-items:start}
+.rl-left{display:grid;gap:8px;align-content:start;overflow-y:auto;max-height:calc(var(--vh,1vh) * 100 - 120px);padding-right:4px}
+.rl-left .card{margin:0;padding:10px 12px}
+.rl-left .card-h{margin-bottom:8px}
+.rl-left .card-h h3{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.rl-left details.card summary{cursor:pointer;font-size:13px}
+.rl-left .hint{font-size:11px;line-height:1.4}
+.rl-split{align-self:stretch;min-height:200px;cursor:col-resize;border-radius:6px;position:relative;touch-action:none}
+.rl-split::after{content:'';position:absolute;left:5px;top:0;bottom:0;width:2px;border-radius:2px;background:var(--line-2);transition:background .15s}
+.rl-split:hover::after,.rl-split.drag::after{background:var(--accent);width:3px;left:4.5px}
+
+/* переключатели: тип листа и откуда берётся первая картинка */
+.rl-tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;padding:3px;border:1px solid var(--line);border-radius:10px}
+.rl-tabs button{display:grid;gap:2px;padding:6px 4px;border:1px solid transparent;border-radius:8px;background:none;color:var(--text);cursor:pointer;text-align:center;font:inherit;font-size:13px}
+.rl-tabs button small{display:none}
+.rl-tabs button.on{border-color:var(--accent);background:var(--accent-soft)}
+@media(min-width:1400px){.rl-tabs button small{display:block;font-size:10px;color:var(--muted)}}
+
+/* поля: один вид и в форме, и в маленьких окошках */
+.rl-f{display:grid;gap:4px;margin-bottom:8px;min-width:0}
+.rl-f label{font-size:11px;font-weight:700;display:flex;justify-content:space-between;gap:8px}
+.rl-f label small{font-weight:400;font-size:10px;color:var(--muted)}
+.rl-f textarea{min-height:38px;height:40px;resize:vertical;line-height:1.35}
+.rl-f input,.rl-f select,.rl-f textarea{width:100%;min-width:0}
+.rl-in{background:var(--bg-2);border:1px solid var(--line);border-radius:8px;padding:6px 9px;font-size:12.5px;color:var(--text);box-sizing:border-box}
+.rl-in:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft)}
+select.rl-in{-webkit-appearance:none;appearance:none;padding-right:26px;cursor:pointer;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' fill='none' stroke='%23999' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M1 1.5l5 5 5-5'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 9px center}
+select.rl-in option{background:Canvas;color:CanvasText}
+textarea.rl-in{resize:vertical;line-height:1.35}
+.rl-2{display:grid;grid-template-columns:1fr 1.4fr;gap:8px}
+.rl-ctl{display:grid;grid-template-columns:1fr 1fr;gap:6px 8px;align-items:end}
+.rl-ctl .rl-f{margin:0}
+.rl-chips{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.rl-chips .hint{flex:1;min-width:120px}
+.rl-chip{border:1px solid var(--line);border-radius:999px;padding:5px 10px;background:var(--bg-2);cursor:pointer;font:inherit;font-size:12px;color:var(--text)}
+.rl-chip.on{border-color:var(--accent);background:var(--accent-soft);font-weight:700}
+.rl-chip i{font-style:normal;margin-left:6px;opacity:.6;cursor:pointer}
+.rl-chip i:hover{opacity:1;color:var(--accent)}
+.rl-note{font-size:12px;color:var(--muted);line-height:1.5}
+
+/* картинки-основа */
+.rl-pics{display:grid;gap:5px;border:1px dashed var(--line-2);border-radius:12px;padding:6px}
+.rl-pic{display:grid;grid-template-columns:48px 1fr auto;gap:8px;align-items:center;border:1px solid var(--line);border-radius:10px;padding:4px 6px}
+.rl-pic img{width:48px;height:36px;object-fit:cover;border-radius:6px;background:var(--bg)}
+.rl-pic b{font-size:12px}
+.rl-pic small{display:block;color:var(--muted);font-size:11px}
+
+/* ракурсы набора: название, момент, доля, удаление; ниже - русская строка и текст для модели */
+.rl-beat{display:grid;grid-template-columns:minmax(0,1fr) auto auto auto;gap:4px 6px;align-items:center;border:1px solid var(--line);border-radius:10px;padding:6px;margin-bottom:6px}
+.rl-beat input[type=number]{width:58px}
+.rl-beat .rl-ru{grid-column:1/-1;font-size:12px;line-height:1.4;color:var(--muted)}
+.rl-beat details{grid-column:1/-1}
+
+/* справа: ролик, лист, кадры */
+.rl-rcol{display:grid;gap:10px;min-width:0}
+.rl-rcol .card{margin:0}
+.rl-cols{display:grid;grid-template-columns:minmax(220px,290px) minmax(0,1fr);gap:14px;align-items:start}
+.rl-vidbox video{width:100%;max-height:440px;background:#000;border-radius:12px;border:1px solid var(--line);display:block;object-fit:contain}
+.rl-vrow{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px}
+.rl-vrow input[type=range]{flex:1;min-width:140px}
+.rl-sheetbox{border:1px solid var(--line);border-radius:12px;padding:8px;background:var(--bg);overflow:auto}
+.rl-sheetbox canvas{display:block;width:100%;height:auto;border-radius:8px;background:var(--surface)}
+.rl-stat{font-size:13px;line-height:1.5;border-radius:10px}
+.rl-stat:empty{display:none}
+.rl-stat.ok,.rl-stat.bad{padding:9px 12px}
+.rl-stat.ok{background:var(--accent-soft);border:1px solid var(--accent)}
+.rl-stat.bad{background:rgba(229,72,77,.14);border:1px solid #e5484d}
+.rl-empty{padding:30px 16px;text-align:center;color:var(--muted);line-height:1.7;border:1px dashed var(--line-2);border-radius:16px}
+.rl-fin{display:flex;gap:12px;align-items:center;flex-wrap:wrap;border:1px solid var(--accent);border-radius:10px;padding:6px 10px;background:var(--accent-soft);margin-top:8px}
+.rl-fin span{flex:1;min-width:200px;font-size:12px}
+.rl-bar{height:16px;border-radius:8px;background:var(--bg-2);overflow:hidden;position:relative;margin-top:8px}
+.rl-bar[hidden]{display:none}
+.rl-bar i{display:block;height:100%;background:var(--accent);transition:width .5s}
+.rl-bar span{position:absolute;inset:0;text-align:center;font-size:11px;line-height:16px;font-weight:700;color:var(--text)}
+
+/* кадры-ракурсы */
+.rl-thumbs{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:6px;margin-top:12px}
+.rl-t{position:relative;border:1px solid var(--line);border-radius:10px;padding:4px;display:grid;gap:3px;cursor:pointer;background:var(--surface)}
+.rl-t.on{border-color:var(--accent)}
+.rl-t.off{opacity:.45}
+.rl-t canvas{display:block;width:100%;height:62px;background:#000;border-radius:6px}
+.rl-t label{display:flex;gap:3px;align-items:center;font-size:10px;line-height:1.3;min-width:0}
+.rl-t label b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rl-t .x{position:absolute;top:6px;right:6px;width:18px;height:18px;border-radius:50%;border:0;background:rgba(0,0,0,.65);color:#fff;cursor:pointer;font-size:10px;line-height:18px;padding:0}
+.rl-t .x:hover{background:#e5484d}
+.rl-addv{display:grid;place-items:center;min-height:86px;border:1px dashed var(--line-2);border-radius:10px;background:none;color:var(--muted);cursor:pointer;font:inherit;font-size:11px}
+
+/* лист: способы раскладки и список кадров */
+.rl-laybox{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:6px;align-items:end;margin-top:8px}
+.rl-laybox .rl-f{margin:0}
+.rl-lay{border:1px solid var(--line);border-radius:10px;padding:8px;display:grid;gap:6px;margin-top:8px}
+.rl-lay div{display:grid;grid-template-columns:26px minmax(0,1fr) auto;gap:6px;align-items:center}
+
+/* картинки Библиотеки под листом */
+.rl-libh{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;margin:14px 0 6px}
+.rl-libs{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:6px;max-height:230px;overflow:auto}
+.rl-libs img{width:100%;height:58px;object-fit:cover;border-radius:8px;border:1px solid var(--line);cursor:grab;background:var(--bg)}
+
+/* история работ */
+.rl-hist{display:grid;grid-template-columns:repeat(auto-fill,minmax(126px,1fr));gap:8px;max-height:340px;overflow-y:auto;padding:0 4px 4px 0}
+.rl-h{position:relative;border:1px solid var(--line);border-radius:12px;padding:5px;display:grid;gap:4px;cursor:pointer;background:var(--surface)}
+.rl-h.on{border-color:var(--accent)}
+.rl-hx{position:absolute;top:8px;right:8px;width:18px;height:18px;border-radius:50%;border:0;background:rgba(0,0,0,.65);color:#fff;cursor:pointer;font-size:10px;line-height:18px;padding:0}
+.rl-hx:hover{background:#e5484d}
+.rl-hn{height:48px;border-radius:6px;background:#000;color:var(--muted);display:grid;place-items:center;font-size:11px}
+.rl-h img{width:100%;height:48px;object-fit:cover;border-radius:6px;background:#000}
+.rl-h b{font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rl-h small{font-size:10px;color:var(--muted)}
+.rl-h .rt{display:flex;gap:4px}
+.rl-h .rt button{background:none;border:1px solid var(--line);border-radius:6px;cursor:pointer;padding:0 5px;font:inherit;font-size:11px;color:var(--text)}
+.rl-h .rt button.on{border-color:var(--accent);background:var(--accent-soft)}
+
+@media(max-width:1000px){.rl-layout,.rl-cols{grid-template-columns:1fr}.rl-split{display:none}.rl-left{max-height:none}}

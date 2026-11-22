@@ -752,6 +752,61 @@
   ],
   [
    "get",
+   "/api/reflab/presets",
+   "state.h_reflab_presets"
+  ],
+  [
+   "post",
+   "/api/reflab/prompt",
+   "state.h_reflab_prompt"
+  ],
+  [
+   "post",
+   "/api/reflab/presets",
+   "state.h_reflab_preset_save"
+  ],
+  [
+   "delete",
+   "/api/reflab/presets/{id}",
+   "state.h_reflab_preset_delete"
+  ],
+  [
+   "get",
+   "/api/reflab/runs",
+   "state.h_reflab_list"
+  ],
+  [
+   "post",
+   "/api/reflab/runs",
+   "state.h_reflab_save"
+  ],
+  [
+   "post",
+   "/api/reflab/runs/clear",
+   "state.h_reflab_clear"
+  ],
+  [
+   "post",
+   "/api/reflab/runs/{id}/rate",
+   "state.h_reflab_rate"
+  ],
+  [
+   "delete",
+   "/api/reflab/runs/{id}",
+   "state.h_reflab_delete"
+  ],
+  [
+   "get",
+   "/api/reflab/file/{id}/{name}",
+   "state.h_reflab_file"
+  ],
+  [
+   "post",
+   "/api/reflab/describe",
+   "state.h_reflab_describe"
+  ],
+  [
+   "get",
    "/api/events",
    "state.h_events"
   ],
@@ -846,6 +901,17 @@
   "h_queue_resume",
   "h_queue_saved",
   "h_ref_file",
+  "h_reflab_clear",
+  "h_reflab_delete",
+  "h_reflab_describe",
+  "h_reflab_file",
+  "h_reflab_list",
+  "h_reflab_preset_delete",
+  "h_reflab_preset_save",
+  "h_reflab_presets",
+  "h_reflab_prompt",
+  "h_reflab_rate",
+  "h_reflab_save",
   "h_refsheet_make",
   "h_refsheet_presets",
   "h_rent_info",
