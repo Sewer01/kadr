@@ -4,6 +4,7 @@ import { goTo } from '../core/tabs.js';
 import { earlyEvents, views } from '../core/state.js';
 import { setDropFile } from './slots.js';
 import { micToggle } from './mic.js';
+import { MODE_NAME, studioCaps } from '../core/modes.js';
 
 /* Вставить текст в поле туда, где курсор (или в конец, если курсора нет), и сказать полю, что
    текст изменился - иначе автосохранение его не увидит. Один способ на весь интерфейс: им
@@ -534,7 +535,7 @@ export async function sendPrompt(blk, to) {
     if (files.length) { $('#dFirst .x')?.click(); if (fix) $('#dLast .x')?.click(); }   // a fix replaces both frames
     if (files[0]) await setDropFile($('#dFirst input'), files[0]);
     if (files[1]) await setDropFile($('#dLast input'), files[1]);
-  } else if (to === 'long' || to === 'actionsc') {
+  } else if (studioCaps(to).scenes) {   // сценная лента общая: её собирает любой сценный режим
     const L2 = RM[to] || RM.long, list = []; let cur = null;   // the same sheet of scenes fits both studios
     const hasHead = /^\s*SCENE\s*\d+\s*\|/im.test(prompt);   // text before "SCENE 1" (a stray roles line) is not a scene
     for (const line of prompt.split('\n')) {
@@ -627,12 +628,13 @@ export async function sendPrompt(blk, to) {
     // the studio never receives the frames from the chat: a <Video N> in the text would point at nothing,
     // and the numbers would land on the person's photos. What the studio really has is the base frame.
     prompt = prompt.replace(/<\s*Video\s*\d+\s*>/g, '<Frame>');
-    if (to === 'long' && vidFiles.length) {   // only the video studio continues a finished video; the action one has no base yet
+    if (studioCaps(to).baseVideo && vidFiles.length) {   // видео продолжает только тот режим, у которого есть база
       const got = await L2.root._takeVideo(vidFiles[0]);
       vUsed = 1; vAll = 1;
+      const who = MODE_NAME[to] || 'Студия';
       toast(got.frame
-        ? `Киностудия продолжит «${vidFiles[0].name}»: режим «продолжить своё видео» включён, его последний кадр встал перед вашими фото`
-        : `Киностудия продолжит «${vidFiles[0].name}», но последний кадр взять не удалось (${got.why || 'не читается'}): ваших мест тогда 9`);
+        ? `${who} продолжит «${vidFiles[0].name}»: режим «продолжить своё видео» включён, его последний кадр встал перед вашими фото`
+        : `${who} продолжит «${vidFiles[0].name}», но последний кадр взять не удалось (${got.why || 'не читается'}): ваших мест тогда 9`);
     }
     if (fix && files.length) $$('label.ref.filled .x', L2.root).forEach(x => x.click());   // a fix replaces the pictures; a continuation keeps the old ones
     for (const f of files) {   // existing references (e.g. the last frame of the video being continued) stay; new pictures take the free slots

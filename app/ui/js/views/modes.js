@@ -1,6 +1,6 @@
 import { API, postJSON } from '../core/net.js';
 import { $, $$, GB, ICON_AUD, ICON_IMG, ICON_VID, confirmBox, copyText, foldSlots, isImage, normItem, noteMsg, paintRange, sceneReconcile, toast, watchSlots } from '../core/util.js';
-import { REF_HINT } from '../core/modes.js';
+import { REF_HINT, STUDIO_CAPS, studioCaps } from '../core/modes.js';
 import { LIB, MEM, QUEUE, abuf, audioName, byId, memFile, memSave, openId, openItem, registerViews, setClipAudio, setUpJob, views } from '../core/state.js';
 import { goTo, onNav } from '../core/tabs.js';
 import { AudioRow, AudioTrimmer, VideoTrimmer, actx, wavSlice, setActx } from '../ui/audio.js';
@@ -507,8 +507,10 @@ $('#vwRepeat').onclick = async () => {
   if (it.mode === 'custom') { toast('Для своих workflow настройки переносятся вручную: откройте раздел «Свои workflow»'); goTo('custom'); return; }
   // a video studio project keeps its pictures next to the program: repeat means the whole project,
   // scenes, settings AND the pictures - otherwise the texts would point at empty places
-  if (it.mode === 'long' && it.long && it.long.run) {
-    goTo('long');
+  if (studioCaps(it.mode).scenes && it.long && it.long.run) {
+    /* сценные студии живут одной механикой: проект целиком (сцены, настройки,
+       картинки) переносится в ту студию, откуда ролик, а не только в Киностудию */
+    goTo(RM[it.mode] ? it.mode : 'long');
     try {
       if (await (RM[it.mode] || RM.long).root._openRun(it.long.run)) { toast('Перенесли проект целиком: сцены, настройки и все картинки'); return; }
     } catch { }
@@ -536,6 +538,20 @@ $('#lib').addEventListener('mouseover', e => e.target.closest('.li-th')?.querySe
 $('#lib').addEventListener('mouseout', e => { const v = e.target.closest('.li-th')?.querySelector('video'); if (v && !e.target.closest('.li-th').contains(e.relatedTarget)) v.pause(); });
 
 export function makeRefMode(cfg) {
+  /* Способности режима объявлены в cfg и записаны в общую таблицу: отсюда их читают
+     и этот раздел, и окно сценария, и сценарист. Проверок вида «это Экшн-студия» в
+     коде больше нет - студии различаются настройками, а не своим именем.
+     Значения по умолчанию подставляются здесь же: ветки читают cfg напрямую, и
+     пропущенное свойство должно означать обычное поведение, а не режим без черновика. */
+  cfg.graph = cfg.graph || 'single';
+  cfg.scenes = !!cfg.scenes;
+  cfg.draftPass = cfg.draftPass !== false;
+  cfg.baseVideo = cfg.baseVideo !== false;
+  cfg.partsOnly = !!cfg.partsOnly;
+  STUDIO_CAPS[cfg.mode] = {
+    scenes: cfg.scenes, graph: cfg.graph, draftPass: cfg.draftPass,
+    baseVideo: cfg.baseVideo, partsOnly: cfg.partsOnly,
+  };
   const root = $('#view-' + cfg.mode);
   const S = { aspect: '16:9', q: 'HD+', dur: cfg.dur, steps: 6, refSize: 'max', accel: 'old', len: () => S.dur };
   root.innerHTML = `
@@ -1794,7 +1810,7 @@ export function makeRefMode(cfg) {
       refreshStates();
     };
     baseSeg.onclick = e => { const b = e.target.closest('button'); if (b) setBase(b.dataset.b); };
-    const setMode = v => { if (cfg.mode === 'actionsc') v = 'parts';   // this studio has one way to run: scene after scene
+    const setMode = v => { if (cfg.partsOnly) v = 'parts';   // this studio has one way to run: scene after scene
       root._mode = v; $$('.lm-mode button', root).forEach(b => b.classList.toggle('on', b.dataset.m === v)); $('.lm-mode-hint', root).textContent = MODE_HINT[v]; refreshStates(); };
     $('.lm-mode', root).onclick = e => { const b = e.target.closest('button'); if (b) setMode(b.dataset.m); };
     queueMicrotask(() => setMode('parts'));
@@ -2305,7 +2321,7 @@ export function makeRefMode(cfg) {
       $('.sc-redogo', c).onclick = () => { const i = $$('.sc', root).indexOf(c); c._var = (c._var || 0) + 1; root._chainEnd = null; root._chainPart = i; root._target = i; $('.go', $('.rm-preview', root)).click(); };
       $('.sc-do', c).onclick = () => {
         const i = $$('.sc', root).indexOf(c), ready = readyUpTo();
-        const active = QUEUE.some(j => j.mode === 'long' && (j.state === 'queued' || j.state === 'running'));
+        const active = QUEUE.some(j => j.mode === cfg.mode && (j.state === 'queued' || j.state === 'running'));
         if (!root._canGo(i)) {   // the previous scene is not ready
           if (active && root._pending && i === root._pending.k + 1) { root._chainPart = root._pending.k; root._chainEnd = i; toast(`Сцена ${i + 1} запустится сама, когда будет готова сцена ${i}.`); return; }
           $('.sc-fresh', c).checked = true; recount();   // it does not wait: it is made as a new shot (not continuing the previous scene)
@@ -2386,9 +2402,14 @@ export function makeRefMode(cfg) {
       return `<div class="tl-b${i === root._sel ? ' sel' : ''}${done ? (draft ? ' draft' : ' done') : old ? ' stale' : ''}${fr[i] ? ' cut' : ''}" data-i="${i}" title="${fr[i] ? 'Новый план (смена кадра). ' : ''}Тяните внутри фрагмента - время сцены · за правый край - точно · ручкой слева - порядок"><i class="tl-grip" draggable="true" data-grip="${i}" title="Сцена ${i + 1}. Кружок перетаскивает сцену и открывает её; когда сцена выбрана - кружок залит">${i + 1}</i><i class="tl-fill" style="width:calc((100% - 42px - 44px) * ${pct} / 100)"></i>${mk}<div class="tl-l">${sec} с${done ? (draft ? ' · черновик ✓' : ' · готово ✓') : old ? ' · старая версия' : ''}${mkTxt}${fr[i] ? ' · ✂ новый план' : ''}</div><i class="tl-x" data-scdel="${i}" title="Убрать эту сцену">✕</i><i class="tl-h" title="Тяните: длина сцены"></i></div>`;
       }).join('') + '<div class="tl-b tl-add" data-add="1" style="align-items:center;justify-content:center" title="Добавить фрагмент">+</div>';
       const dmb = $('.lm-q button[data-mq="draft"]', root);
-      dmb.disabled = false;   // pressing it is how you find out you need a file - and how you get it
-      dmb.classList.toggle('need', root._dmad === false);
-      dmb.title = root._dmad === false ? 'Для черновика нужен файл ускорения: нажмите, и программа предложит его скачать' : ''
+      /* Черновик доступен, только если он у режима есть. Раньше здесь всегда стояло
+         «нажимается»: режим перестраивает ленту чаще, чем собирается карточка, и
+         кнопка возвращалась живой даже в режиме без черновика - нажатие молча
+         сбрасывалось на хорошее качество, а подсказка обещала черновик. */
+      dmb.disabled = !cfg.draftPass;
+      dmb.classList.toggle('need', cfg.draftPass && root._dmad === false);
+      dmb.title = !cfg.draftPass ? 'Черновика в этом режиме нет: сцена сразу считается 8 шагов в уменьшенном кадре и 4 в полном.'
+        : (root._dmad === false ? 'Для черновика нужен файл ускорения: нажмите, и программа предложит его скачать' : '')
     }
     root._renderTL = renderTL;
     function showClip() {
@@ -2532,7 +2553,7 @@ export function makeRefMode(cfg) {
     const szOf = v => sz(v === root._q ? S.q : (root._qBy || {})[v] || S.q);
     const Q_HINT = v => v === 'draft'
       ? `Черновик: ${szOf('draft')}, 4 шага, быстро. Понравился, его можно просто увеличить или пересчитать кнопкой «Сделать всё в хорошем качестве».`
-      : `Хорошее качество: ${szOf('final')}, ${cfg.mode === 'actionsc' ? '8 + 4 шага на гибридной модели' : '8 шагов'}. Размер выбирается ниже, в «Формат» и «Качество».`;
+      : `Хорошее качество: ${szOf('final')}, ${cfg.graph === 'hybrid' ? '8 + 4 шага на гибридной модели' : '8 шагов'}. Размер выбирается ниже, в «Формат» и «Качество».`;
     root._paintQ = () => {
       $('.lm-q button[data-mq="draft"] small', root).textContent = `${szOf('draft')} · 4 шага, быстро`;
       $('.lm-q button[data-mq="final"] small', root).textContent = `${szOf('final')} · 8 шагов, итог`;
@@ -2546,7 +2567,7 @@ export function makeRefMode(cfg) {
     root._qBy = { draft: S.q, final: S.q };
     function setQ(v, force) {
       if (!force && v !== root._q) { root._qBy[root._q] = S.q; S.q = QUALITY_ALL.some(x => x.id === root._qBy[v]) ? root._qBy[v] : '720p'; S._upd?.(); }   // the size chosen in «Параметры» belongs to the row that is open
-      root._q = cfg.mode === 'actionsc' ? 'final' : v;   // the action graph has no draft pass:
+      root._q = cfg.draftPass ? v : 'final';   // the hybrid graph has no draft pass:
     // the switch stays visible so the size is readable, but the draft answer is disabled and explained
     $$('.lm-q button', root).forEach(b => b.classList.toggle('on', b.dataset.mq === v));
       root._paintQ();
@@ -2616,11 +2637,8 @@ export function makeRefMode(cfg) {
       const baseSeg = $('.lm-base', root), baseHint = $('.lm-base-hint', root), ownBox = $('.lm-srcpick', root);
       if (baseSeg) {
         const baseRow = mk('row', '');   // no caption: the two buttons say everything
-        if (cfg.mode === 'actionsc') {
-    const dq = $('.lm-q [data-mq="draft"]', root);   // черновика в этом режиме нет: 8 + 4 шага сразу
-    if (dq) { dq.disabled = true; dq.title = 'Черновика в Экшн-видеостудии нет: сцена сразу считается 8 шагов в уменьшенном кадре и 4 в полном. Здесь видно размер хорошего качества.'; }
-  }
-  if (cfg.mode === 'actionsc') baseRow.classList.add('no-base');   // this studio has no base video yet: the row and its guide would only stand empty
+        // черновик выключается там же, где и включается: в перерисовке ленты (см. dmb выше)
+        if (!cfg.baseVideo) baseRow.classList.add('no-base');   // this studio has no base video yet: the row and its guide would only stand empty
         baseSeg.style.marginBottom = '0';
         baseSeg.style.gridTemplateColumns = '';   // the inline halves made the buttons as wide as the strip
         baseRow.append(baseSeg);
@@ -2631,7 +2649,7 @@ export function makeRefMode(cfg) {
            handler on it. In the action studio this row is hidden, and there the button stays in the
            card, where it is still reachable. */
         { const cbtn = $('.rm-clear', root);
-          if (cbtn && cfg.mode !== 'actionsc') { cbtn.style.marginLeft = 'auto'; cbtn.style.flex = 'none'; baseRow.append(cbtn); } }
+          if (cbtn && cfg.baseVideo) { cbtn.style.marginLeft = 'auto'; cbtn.style.flex = 'none'; baseRow.append(cbtn); } }
         if (ownBox) ownBox.style.marginTop = '8px';   // appended after the guide button, see below
         root._baseHost = baseRow;   // put above the first card once the whole set-up is done
       // the video you continue is part of this choice, so the note with «Убрать» stands right here
@@ -3139,9 +3157,9 @@ export function makeRefMode(cfg) {
     goLabel: () => !cfg.scenes ? 'Сгенерировать' : root._mode === 'parts'
       ? `Сделать сцену ${root._sel + 1}` : 'Сгенерировать видеоролик',   // the number follows the scene you picked
     extraLabel: cfg.mode === 'refs' || cfg.mode === 'actor' || cfg.swap || cfg.scenes ? 'Шаги' : 'Схема',
-    extra: () => cfg.scenes ? (root._paintQ?.(), root._mode === 'parts' ? (root._q === 'draft' ? '4 шага · черновик' : (cfg.mode === 'actionsc' ? '8 + 4 шага · гибрид' : '8 шагов · Pika')) : (root._q === 'draft' ? '4 шага · черновик' : '8 шагов · Pika')) : cfg.mode === 'actor' || cfg.swap ? '10 · 1 проход' : cfg.mode === 'refs' ? `${S.steps} · 1 проход` : (S.faithful ? 'точная копия' : '8 + 4 шага'),
+    extra: () => cfg.scenes ? (root._paintQ?.(), root._mode === 'parts' ? (root._q === 'draft' ? '4 шага · черновик' : (cfg.graph === 'hybrid' ? '8 + 4 шага · гибрид' : '8 шагов · Pika')) : (root._q === 'draft' ? '4 шага · черновик' : '8 шагов · Pika')) : cfg.mode === 'actor' || cfg.swap ? '10 · 1 проход' : cfg.mode === 'refs' ? `${S.steps} · 1 проход` : (S.faithful ? 'точная копия' : '8 + 4 шага'),
     passes: () => cfg.scenes ? $$('.sc', root).map(() => root._q === 'draft' ? 4 : 8) : cfg.mode === 'actor' || cfg.swap ? [10] : cfg.mode === 'refs' ? [S.steps] : S.faithful ? [13] : [8, 4],
-    get twoPass() { return (cfg.mode === 'action' || cfg.mode === 'actionsc') && !S.faithful; },
+    get twoPass() { return cfg.graph === 'hybrid' && !S.faithful; },
     target: () => $('.ref img', imgsEl),
     meta: () => ({ mode: cfg.mode, prompt: promptEl().value.trim(), sub: '' }),
     onDone: item => { addToLib(item); if (cfg.scenes && item.long && root._partDone) root._partDone(item); },
@@ -3186,7 +3204,7 @@ export function makeRefMode(cfg) {
         sizeForm(S, fd); fd.append('aspect', S.aspect); fd.append('quality', S.q); fd.append('duration', S.dur);
         fd.append('steps', S.steps); fd.append('ref_size', S.refSize); if (cfg.mode === 'refs' || cfg.swap) fd.append('accel', S.accel);
         if (cfg.swap) { fd.append('sound', S.sound); fd.append('small_ref', S.smallRef ? '1' : '0'); }
-        if (cfg.mode === 'action' || cfg.mode === 'actionsc') {
+        if (cfg.graph === 'hybrid') {
           const us = $('#usSharp', root);
           fd.append('usarp', String(us ? +us.value : 2));
         }
@@ -3303,9 +3321,7 @@ export function makeRefMode(cfg) {
       <div class="seg rm-rs" style="grid-template-columns:minmax(0,1fr) minmax(0,1fr)"><button data-r="match">Быстро<small>изображения уменьшаются</small></button><button data-r="max">Максимум<small>лучшее сходство</small></button></div>
       <div class="hint rm-rs-hint"></div></div>
     <div class="rm-loras"></div>`
-    : cfg.mode === 'actionsc' ? `<div class="row"><div class="row-l">Как запускается</div><div class="status-box rm-act"><span class="hint">Проверяем ComfyUI…</span></div></div>
-    <div class="rm-loras"></div>`
-    : cfg.scenes ? `<details class="agvar" open><summary>Как работает</summary><div class="hint" style="font-size:12.5px;line-height:1.55">
+    : cfg.scenes && cfg.draftPass ? `<details class="agvar" open><summary>Как работает</summary><div class="hint" style="font-size:12.5px;line-height:1.55">
       <b>1.</b> Загрузите изображения героя и места (необязательно: можно только текстом). <b>2.</b> Выберите формат и размер. <b>3.</b> Добавьте сцены: нажмите «+» на ленте, напишите, что происходит. Длину сцены меняйте, потянув правый край блока на ленте. У каждой сцены можно загрузить свои изображения, иначе берутся общие.<br>
       <b>Черновик</b> считается быстро (4 шага, меньший размер): так видно, что получится. Когда всё нравится, нажмите «Сделать всё в хорошем качестве»: сцены пересчитаются с теми же текстами, детали станут лучше. Одну сцену можно переделать отдельно кнопкой «Переделать».<br>
       Каждая следующая сцена по умолчанию продолжает конец прошлой, но при долгой цепочке изображение портится, поэтому смену плана программа ставит сама (знак ✂ на ленте). Ориентир по времени: около минуты расчёта на секунду на RTX 4060 Ti 16 ГБ.</div></details>`
@@ -3315,7 +3331,7 @@ export function makeRefMode(cfg) {
     <div class="rm-loras"></div>`;
   const upd = paramsCard($('.rm-params', root), S, {
     n: cfg.scenes ? 2 : 3, duration: !cfg.scenes,
-    extraRow: (cfg.mode === 'action' || cfg.mode === 'actionsc' ? `
+    extraRow: (cfg.graph === 'hybrid' ? `
       <div class="row">
         <div class="row-l">Резкость второго прохода <b id="usSharpV">2</b></div>
         <input type="range" id="usSharp" min="1" max="6" step="1" value="2">
@@ -3364,7 +3380,7 @@ export function makeRefMode(cfg) {
   }).catch(() => {});
   if (cfg.mode === 'actor') { S.loras = { realism: { on: true, v: .7 } }; mountLoras($('.rm-loras', root), S, ['realism']); }
 
-  if ((cfg.mode === 'action' || cfg.mode === 'actionsc') && API) {
+  if (cfg.graph === 'hybrid' && API) {
     const box = $('.rm-act', root);
     const check = async () => {
       try {
@@ -3556,19 +3572,21 @@ export const RM = {
     placeholder: '',
   }),
   long: makeRefMode({
-    mode: 'long', title: 'Киностудия', pill: 'Сцены подряд · Pika', dur: 20, maxImages: 5, videos: false, scenes: true,
+    mode: 'long', title: 'Киностудия', pill: 'Сцены подряд · Pika', dur: 20, maxImages: 5, videos: false, scenes: true, graph: 'pika',
     sub: 'Клипы и ролики по сценам: каждая сцена до 15 секунд и продолжает прошлую. Музыка — общая на ролик или своя в каждой сцене',
     refHint: 'До 5 изображений-референсов: персонаж, локация, предмет, одежда, стиль — всё, что должно сохраняться. Они подаются в каждую сцену, поэтому лицо и место не «плывут». В тексте сцены ссылайтесь на них как &lt;Picture 1&gt;, &lt;Picture 2&gt;… Чем больше референсов, тем тяжелее и дольше считается сцена.',
     placeholder: '',
   }),
   action: makeRefMode({
-    mode: 'action', title: 'Экшн-видео', pill: 'Hybrid · 8 + 4 шага', dur: 8, maxImages: 6, videos: false,
+    mode: 'action', title: 'Экшн-видео', pill: 'Hybrid · 8 + 4 шага', dur: 8, maxImages: 6, videos: false, graph: 'hybrid',
     sub: 'Бой, погоня, бег, стрельба — динамичные сцены с вашими персонажами',
     refHint: 'До 6 изображений: персонажи и локация. До 3 аудио: голос, ритм или атмосфера (вместе с изображениями). В промпте: &lt;Picture 1&gt; или роли вида «@image1 - character reference».',
     placeholder: '@image1 - character reference. Девушка с @image1 убегает по ночному рынку, опрокидывает корзины…',
   }),
   actionsc: makeRefMode({
     mode: 'actionsc', title: 'Экшн-студия', pill: 'Гибрид · 8 + 4 шага · сцены подряд', dur: 10, maxImages: 5, videos: false, scenes: true,
+    graph: 'hybrid', draftPass: false,   // черновика нет: сцена сразу считается 8 + 4 шага
+    baseVideo: false, partsOnly: true,   // готового видео не продолжает; режим «весь ролик» не нужен
     sub: 'Длинный экшн по сценам: каждая следующая продолжает прошлую, готовые клипы склеиваются в один ролик',
     refHint: 'До 5 изображений: персонажи, локация, предмет. В тексте сцены ссылайтесь на них &lt;Picture 1&gt;, &lt;Picture 2&gt; - программа сама поставит номера по местам. Звук модель делает сама, но им можно управлять: в карточке «Аудио» кладут фон на весь ролик (один файл) и до трёх аудио на каждую сцену — их номера идут десятками, и промпт решает, где какой слушать.',
     placeholder: '',

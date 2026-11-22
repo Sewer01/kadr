@@ -6,6 +6,7 @@ import { wavSlice } from '../ui/audio.js';
 import { putScenario, putScenarioDraft, scenarioWindowOf, sendPrompt } from '../ui/scenario.js';
 import { micToggle, transcribeWav } from '../ui/mic.js';
 import { dropBox } from '../ui/slots.js';
+import { MODE_NAME, studioCaps } from '../core/modes.js';
 import { openUpscale } from './library.js';
 import { MD_ENGINE, mdStart } from './models.js';
 import { L, RM, V } from './modes.js';
@@ -273,7 +274,7 @@ export function agVideoMax() {
      - and there the new video replaces the old one - while the modes without a video place do not take
      a video at all, and the tray's button says so. */
   const t = AG.target;
-  if (t === 'long') return 1;                       // the studio's one video is the one it continues
+  if (studioCaps(t).baseVideo) return 1;                // the studio's one video is the one it continues
   const box = dropBox(t);
   return box ? $$('.rm-vids input', box).length : 0;
 }
@@ -332,7 +333,7 @@ export async function agFramesFromFile(f) {   // the only way the agent can look
     // The studio continues a video from its last frame and receives nothing else from the chat, so the
     // agent is shown exactly that one frame - what it sees is what the model will get. The other modes
     // have to recognise heroes and action, they look through the whole clip.
-    const want = AG.target === 'long' ? 1 : Math.min(12, AG_FRAME_MAX);
+    const want = studioCaps(AG.target).baseVideo ? 1 : Math.min(12, AG_FRAME_MAX);
     const { frames, dur } = await agVideoFrames(f, want);
     frames.forEach(fr => AG.att.push({ file: fr.file, url: fr.url, frame: true, label: fr.t.toFixed(1) + ' с', vname: f.name, vdur: dur, vfile: f }));
     const cut = agShareFrames();
@@ -393,11 +394,11 @@ $('#agTarget').onclick = agTargetClick; $('#agTarget2').onclick = agTargetClick;
 // what will become of the videos in the tray, said before the person presses anything
 export function agVidNote() {
   const names = [...new Set(AG.att.filter(a => a.frame).map(a => a.vname))];
-  if (AG.target === 'long') {
+  if (studioCaps(AG.target).baseVideo) {   // только такой режим берёт из чата один кадр - последний
     return names.length
-      ? ` Киностудия продолжит видео «${names[0]}»: режим «продолжить своё видео» включится сам, а его последний кадр встанет отдельной плиткой перед вашими фото. Из видео сценаристу нужен только этот последний кадр - его и берём, другие не пересылаем.`
+      ? ` ${(MODE_NAME[AG.target] || 'Студия')} продолжит видео «${names[0]}»: режим «продолжить своё видео» включится сам, а его последний кадр встанет отдельной плиткой перед вашими фото. Из видео сценаристу нужен только этот последний кадр - его и берём, другие не пересылаем.`
         + (names.length > 1 ? ` Остальные ${names.length - 1} видео студия не принимает - они останутся в чате.` : '')
-      : ' Если приложите видео, Киностудия продолжит именно его: режим включится сам, последний кадр встанет перед вашими фото.';
+      : ' Если приложите видео, ' + (MODE_NAME[AG.target] || 'Студия') + ' продолжит именно его: режим включится сам, последний кадр встанет перед вашими фото.';
   }
   if (!names.length) return '';
   const max = agVideoMax();
@@ -409,10 +410,11 @@ export function agPlaceholder() {
      about to type into - not only in a line above, which the eye skips. */
   const el = $('#agIn'); if (!el) return;
   const v = [...new Set(AG.att.filter(a => a.frame).map(a => a.vname))];
-  const src = (RM.long && RM.long.root && RM.long.root._src) || null;
+  const rr = (RM[AG.target] || {}).root;   // окно того режима, для которого сейчас пишется промт
+  const src = (rr && rr._src) || null;
   const nm = v[0] || (src && src.name) || 'ваше видео';
-  el.placeholder = AG.target === 'long' && (v.length || src)
-    ? `Киностудия продолжит «${nm.length > 28 ? nm.slice(0, 28) + '…' : nm}» с его последнего кадра. Напишите, что происходит дальше: одно движение, один ход камеры. (Enter — создать промт)`
+  el.placeholder = studioCaps(AG.target).baseVideo && (v.length || src)
+    ? `${MODE_NAME[AG.target] || 'Студия'} продолжит «${nm.length > 28 ? nm.slice(0, 28) + '…' : nm}» с его последнего кадра. Напишите, что происходит дальше: одно движение, один ход камеры. (Enter — написать сценарий)`
     : AG_IN_HINT;
 }
 export function agCtx() {
@@ -434,7 +436,7 @@ export function agCtx() {
     ? `Опишите историю или набор изображений («герой утром, героиня днём, вечер у моря…») и скажите, сколько нужно. Сценарист напишет промпт для каждого изображения, а кнопка вставит их на страницу «Изображение», в режим «Список промптов».`
     : AG.target === 'swap'
     ? `Скажите, кого в видео заменить (например, «старика в пиджаке») и каким изображением. Изображения героев приложите скрепкой по порядку: они станут Picture 1, 2. Своё видео приложите кнопкой с камерой: программа вырежет из него кадры, и Сценарист увидит, кто в кадре (видео уйдёт на страницу «Замена»). Изображений героев в чате: ${n}.`
-    : AG.target === 'long'
+    : studioCaps(AG.target).scenes
     ? `Опишите историю по сценам («сначала… потом… в конце…») и скажите, с песней ролик или без. Сценарист разобьёт её на сцены и подпишет длину каждой. Изображения в чате: ${n} — станут референсами героя и места (Picture 1, 2…).`
     : AG.target === 'video'
     ? `Берём ${V.dur} с — столько стоит на странице «Видео» (меняется там же). Картинки в чате: ${n} — первая станет первым кадром, вторая последним.`
@@ -826,9 +828,12 @@ export async function agSend() {
   AG.busy = true; $('#agSend').textContent = 'Стоп'; AG.ctrl = new AbortController();
   // «Правка картинки» делается и на Qwen, и на FLUX klein, а теги картинок у них разные: сценаристу нужен движок раздела
   const qwBtn = $('.qw-eng button.on', $('#view-qwen'));
-  const ctx = { cont: AG.target === 'long' && (AG.att.some(a => a.frame) || !!RM.long.root._src) ? 1 : 0, model: AG.target === 'qwen' ? ((qwBtn && qwBtn.dataset.e) || 'qwen') : (AG.storyFrames && AG.storyModel === 'krea' ? 'flux' : AG.storyModel), frames: AG.target === 'story' && AG.storyFrames, duration: AG_IMG.includes(AG.target) ? null : AG.target === 'video' ? V.dur : AG.target === 'lipsync' ? (L.dur0 ? L.len() : null) : RM[AG.target].S.dur };
+  const ctx = { cont: studioCaps(AG.target).baseVideo && (AG.att.some(a => a.frame) || !!((RM[AG.target] || {}).root || {})._src) ? 1 : 0, model: AG.target === 'qwen' ? ((qwBtn && qwBtn.dataset.e) || 'qwen') : (AG.storyFrames && AG.storyModel === 'krea' ? 'flux' : AG.storyModel), frames: AG.target === 'story' && AG.storyFrames, duration: AG_IMG.includes(AG.target) ? null : AG.target === 'video' ? V.dur : AG.target === 'lipsync' ? (L.dur0 ? L.len() : null) : RM[AG.target].S.dur };
   if (AG.target === 'actor') ctx.voice = RM.actor.voice() ? 1 : 0;
-  if (AG.target === 'long') { const lr = RM.long.root; ctx.long = { sound: lr._snd, secs: $$('.sc input[type=range]', RM.long.root).map(r => +r.value),
+  /* Состояние звука и длины сцен берутся из окна того режима, для которого пишут,
+     а не из окна Киностудии: иначе сценаристу про другую сценную студию рассказывали
+     чужие настройки. */
+  if (studioCaps(AG.target).scenes) { const lr = RM[AG.target].root; ctx.long = { sound: lr._snd, secs: $$('.sc input[type=range]', lr).map(r => +r.value),
       music: lr._snd === 'own' ? { loop: lr._loop !== false, sec: Math.round((lr._adur || 0) * 10) / 10 } : null,
       // the songs of the scenes are told apart from the model's own sound: without this the agent was
       // told "there is no audio of yours", wrote non_diegetic_music: N/A and left the lyrics out
