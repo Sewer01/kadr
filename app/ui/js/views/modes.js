@@ -1584,7 +1584,7 @@ export function makeRefMode(cfg) {
       /* Номер места решается до того, как карточка появилась. Новый текст сам называет номер
          своих файлов: если его позвала сцена, этот номер за ней и закрепляется, а прежняя
          владелица получает свободный. Так подпись плитки и тег в тексте всегда одинаковы. */
-      const fresh = list.slice(0, 20);
+      const fresh = list.slice(0, 80);
       const used0 = new Set();
       const baseFor = fresh.map(() => 0);
       // очереди: сначала те, кого текст назвал сам, потом прежний номер сцены, и лишь потом свободный
@@ -2378,7 +2378,7 @@ export function makeRefMode(cfg) {
       recount();
     };
 
-    $('#lmAdd', root).onclick = () => { if ($$('.sc', root).length >= 20) { toast('Не больше 20 сцен — это уже полчаса расчёта'); return; } root._sel = $$('.sc', root).length; addScene('', 10); };
+    $('#lmAdd', root).onclick = () => { if ($$('.sc', root).length >= 80) { toast('Не больше 80 сцен: это больше часа расчёта - делайте ролик частями'); return; } root._sel = $$('.sc', root).length; addScene('', 10); };
     queueMicrotask(() => { addScene('', 10); });   // a blank start holds ONE scene; «+» in the ribbon makes the next  // after the rest of the set-up is done
     root._addScene = addScene;
     /* --- video studio: a ribbon of fragments, one fragment is open for settings, a player, draft / finished quality --- */
@@ -2791,16 +2791,17 @@ export function makeRefMode(cfg) {
       sMax.title = 'Длиннее этого сцены не будут';
       sCnt.title = '«авто»: Сценарист сам решает, сколько нужно сцен. Число: не больше стольких сцен на весь сюжет (общая длина сохранится, сцены станут длиннее)';
       nums.forEach(n => { sMin.append(mkOpt(n, n, n === lim.min)); sMax.append(mkOpt(n, n, n === lim.max)); });
-      [0, 2, 3, 4, 5, 6, 8, 10, 12, 15, 20].forEach(n => sCnt.append(mkOpt(n, n ? 'не больше ' + n : 'авто', n === lim.cnt)));
+      [0, 2, 3, 4, 5, 6, 8, 10, 12, 15, 20, 30, 40, 60, 80].forEach(n => sCnt.append(mkOpt(n, n ? 'не больше ' + n : 'авто', n === lim.cnt)));
       box.append(document.createTextNode('Сцена от '), sMin, document.createTextNode(' до '), sMax,
         document.createTextNode(' секунд · сцен '), sCnt);
       limRow.append(box);
       const readLim = () => {
-        lim.min = +sMin.value; lim.max = +sMax.value; lim.cnt = +sCnt.value;
-        if (lim.min > lim.max) {   // границы не должны спорить: двигаем ту, которую человек не трогал
-          if (document.activeElement === sMin) { sMax.value = lim.min; lim.max = lim.min; }
-          else { sMin.value = lim.max; lim.min = lim.max; }
-        }
+        let a = +sMin.value, b = +sMax.value;
+        /* Границы не должны спорить. Двигаем ту, которую человек не трогал: её видно
+           по тому, что значение осталось прежним. Прежняя догадка по фокусу подводила:
+           без фокуса нижняя граница молча падала до верхней. */
+        if (a > b) { if (a !== lim.min) { b = a; sMax.value = String(b); } else { a = b; sMin.value = String(a); } }
+        lim.min = a; lim.max = b; lim.cnt = +sCnt.value;
         try { localStorage.setItem('h3-scene-limits-' + cfg.mode, JSON.stringify(lim)); } catch (e) { }
       };
       [sMin, sMax, sCnt].forEach(s => s.addEventListener('change', readLim));
@@ -3093,7 +3094,7 @@ export function makeRefMode(cfg) {
       // the base choice and its file button were placed in the settings card above
     }));
     $('#lmAdd', root).onclick = () => {
-      if ($$('.sc', root).length >= 20) { toast('Не больше 20 сцен — это уже полчаса расчёта'); return; }
+      if ($$('.sc', root).length >= 80) { toast('Не больше 80 сцен: это больше часа расчёта - делайте ролик частями'); return; }
       addScene('', 10);
       // the scene you asked for is the scene you want to write: it opens right away
       root._sel = $$('.sc', root).length - 1; root._target = root._sel;
