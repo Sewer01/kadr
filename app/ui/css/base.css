@@ -1147,3 +1147,11 @@ body.dropping::after{content:'Отпустите — программа разл
 .rs-frame{display:grid;grid-template-columns:minmax(150px,1fr) auto auto;gap:8px;align-items:center;border:1px solid var(--line);border-radius:10px;padding:7px 10px;background:var(--bg-1)}
 .rs-frame b{font-size:13px}
 .rs-frame .hint{font-size:12px}
+
+/* Переключатель режимов под заголовком страницы: в меню одна кнопка, а режимов
+   под ней несколько (Киностудия, Экшн-студия, Клип-студия; Видеостудия и Экшн-видео). */
+.nav-sw{display:inline-flex;gap:4px;padding:3px;margin-top:10px;background:var(--surface-2);border:1px solid var(--line);border-radius:10px}
+.nav-sw[hidden]{display:none}
+.nav-sw button{border:0;background:none;color:var(--dim);font-weight:700;font-size:12.5px;padding:5px 12px;border-radius:8px;cursor:pointer}
+.nav-sw button:hover{color:var(--text)}
+.nav-sw button.on{background:var(--accent);color:#fff}

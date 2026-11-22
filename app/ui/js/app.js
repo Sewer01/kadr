@@ -8,6 +8,7 @@ import './ui/params.js';
 import './ui/preview.js';
 import './core/modes.js';
 import './views/modes.js';
+import './core/navgroups.js';   // переключатели режимов: ставятся уже на готовые страницы
 import './ui/audio.js';
 import './views/setup.js';
 import './views/agent.js';

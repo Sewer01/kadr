@@ -2733,9 +2733,11 @@ export function makeRefMode(cfg) {
          стоит курсор. */
       const srCard = document.createElement('div');
       srCard.className = 'card rm-scenarist';
-      srCard.innerHTML = '<div data-scenarobox="scenarist"></div>';
+      /* карточка и есть окно: заголовок тогда - прямой ребёнок карточки, и общий
+         порядок сворачивает её так же, как все остальные карточки («под кат») */
+      srCard.dataset.scenarobox = 'scenarist';
       musCard.after(srCard);
-      const srWin = scenarioWindow($('[data-scenarobox="scenarist"]', srCard), {
+      const srWin = scenarioWindow(srCard, {
         promptless: true,
         kind: 'scenarist', num: 3, hint: 'одним текстом: Сценарист разложит его по сценам',
         scPlaceholder: 'Что происходит в ролике: кто, где, что меняется, чем кончается. Можно репликами и по-русски - теги под окном.',

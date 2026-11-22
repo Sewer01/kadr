@@ -10,13 +10,13 @@ export const TABS = [
   {order: 2, section: "Создать", key: "agent", caption: "Сценарист", sub: false, active: false, hidden: false},
   {order: 3, section: "Создать", key: "actors", caption: "Карточки", sub: false, active: false, hidden: false},
   {order: 4, section: "Создать", key: "video", caption: "Видео", sub: true, active: true, hidden: false},
-  {order: 5, section: "Создать", key: "lipsync", caption: "Клип", sub: true, active: false, hidden: false},
+  {order: 5, section: "Создать", key: "lipsync", caption: "Клип", sub: true, active: false, hidden: false, group: "long"},
   {order: 6, section: "Создать", key: "refs", caption: "Видеостудия", sub: true, active: false, hidden: false},
   {order: 7, section: "Создать", key: "actor", caption: "Актёр", sub: true, active: false, hidden: false},
   {order: 8, section: "Создать", key: "swap", caption: "Замена", sub: true, active: false, hidden: false},
   {order: 9, section: "Создать", key: "long", caption: "Киностудия", sub: true, active: false, hidden: false},
-  {order: 10, section: "Создать", key: "action", caption: "Экшн-видео", sub: true, active: false, hidden: false},
-  {order: 11, section: "Создать", key: "actionsc", caption: "Экшн-студия", sub: true, active: false, hidden: false},
+  {order: 10, section: "Создать", key: "action", caption: "Экшн-видео", sub: true, active: false, hidden: false, group: "refs"},
+  {order: 11, section: "Создать", key: "actionsc", caption: "Экшн-студия", sub: true, active: false, hidden: false, group: "long"},
   {order: 12, section: "Создать", key: "krea", caption: "Изображение по тексту", sub: true, active: false, hidden: false},
   {order: 13, section: "Создать", key: "qwen", caption: "Изменение изображения", sub: true, active: false, hidden: false},
   {order: 14, section: "Создать", key: "custom", caption: "Свои workflow", sub: false, active: false, hidden: true},
@@ -27,6 +27,28 @@ export const TABS = [
   {order: 19, section: "Система", key: "models", caption: "Настройки", sub: false, active: false, hidden: false},
   {order: 20, section: "Система", key: "about", caption: "О программе", sub: false, active: false, hidden: false},
 ];
+
+/* Группы режимов: в меню одна кнопка, а режимы внутри неё выбираются переключателем
+   на странице. Страницы при этом остаются собой: у каждой своё тело, свои файлы и свой
+   расчёт - меню просто перестаёт их плодить. Кнопкой группы открывается тот режим,
+   на котором человек останавливался. */
+export const NAV_GROUPS = [
+  { nav: "long", store: "h3-grp-film", parts: ["long", "actionsc", "lipsync"] },
+  { nav: "refs", store: "h3-grp-video", parts: ["refs", "action"] },
+];
+export const NAV_GROUP_TITLES = {
+  long: "Киностудия", actionsc: "Экшн-студия", lipsync: "Клип-студия",
+  refs: "Видеостудия", action: "Экшн-видео",
+};
+export const groupOf = key => NAV_GROUPS.find(g => g.parts.includes(key)) || null;
+/* кнопка в меню есть только у головы группы; у остальных режимов группы кнопки нет */
+export const navKeyOf = key => { const g = groupOf(key); return g && key !== g.nav ? g.nav : key; };
+export function partOfGroup(nav) {
+  const g = NAV_GROUPS.find(x => x.nav === nav);
+  if (!g) return nav;
+  try { const v = localStorage.getItem(g.store); if (g.parts.includes(v)) return v; } catch (e) { }
+  return g.nav;
+}
 
 /* значки и хвосты кнопок: строки, записанные один в один со старой разметкой;
    что между маркерами UISNAP - статическая разметка навигации, а не динамические классы раннера */
@@ -90,6 +112,7 @@ const NAV_SEP = ["", "\n    ", "\n    ", "\n    ", "\n    ", "\n    ", "\n    ",
 export function renderNavHtml() {
   let html = "", sec = "", i = 0;
   for (const t of TABS) {
+    if (t.group) continue;                 // режим группы: своей кнопки в меню у него нет
     if (t.section !== sec) {
       sec = t.section;
       html += NAV_SEP[i++] + '<div class="nav-label">' + sec + '</div>';
@@ -127,11 +150,31 @@ export function setNavLocked(lock) {
 
 export function firstRun(on) { document.body.classList.toggle('first-run', !!on); }
 
+/* открыть страницу: тот же порядок, что был у кнопок. Уйти из раздела - значит
+   не оставить за другой страницей играющий клип или песню; последняя страница
+   запоминается, чтобы программа открывалась там, где человек её оставил. */
+export function navActivate(view) {
+  document.querySelectorAll('video, audio').forEach(m => { try { if (!m.paused) m.pause(); } catch (e) { } });
+  if (view !== 'custom') { try { localStorage.setItem('h3-last-view', view); } catch (e) { } }
+  /* у режима группы своей кнопки в меню нет - светится кнопка группы */
+  const b = document.querySelector('.nav[data-view="' + view + '"]')
+    || document.querySelector('.nav[data-view="' + navKeyOf(view) + '"]');
+  document.querySelectorAll('.nav').forEach(n => n.classList.toggle('active', n === b || (!!b && b.classList.contains('sub') && n.dataset.view === 'presets')));   // a section opened from the start page keeps it lit
+  document.querySelectorAll('.view').forEach(v => v.classList.toggle('active', v.id === 'view-' + view));
+}
+
+/* переключатель на странице: человек выбирает режим своей группы */
+export function setGroupPart(part) {
+  const g = groupOf(part);
+  if (!g || !g.parts.includes(part)) return;
+  try { localStorage.setItem(g.store, part); } catch (e) { }
+  navActivate(part);
+}
+
 export function goTo(view) {
   const n = document.querySelector('.nav[data-view="' + view + '"]');
   if (n) { n.click(); return; }
-  document.querySelectorAll('.nav').forEach(x => x.classList.remove('active'));   // a page that has no button of its own (a preset)
-  document.querySelectorAll('.view').forEach(v => v.classList.toggle('active', v.id === 'view-' + view));
+  navActivate(view);   // a page that has no button of its own (a preset, a mode of a group)
   if (view === 'swap' && window.h3SwapCheck) window.h3SwapCheck();
 }
 
@@ -141,14 +184,8 @@ function mountNav() {
   if (!slot) return;
   slot.outerHTML = renderNavHtml();
   navMounted = true;
-  // та же обвязка, что была у статических кнопок: уйти из раздела - не оставить
-  // за другой страницей играющий клип или песню; последняя страница запоминается
-  document.querySelectorAll('.nav[data-view]').forEach(b => b.onclick = () => {
-    document.querySelectorAll('video, audio').forEach(m => { try { if (!m.paused) m.pause(); } catch (e) { } });
-    if (b.dataset.view !== 'custom') { try { localStorage.setItem('h3-last-view', b.dataset.view); } catch {} }   // the program opens on the page where the user was last
-    document.querySelectorAll('.nav').forEach(n => n.classList.toggle('active', n === b || (b.classList.contains('sub') && n.dataset.view === 'presets')));   // a section opened from the start page keeps it lit
-    document.querySelectorAll('.view').forEach(v => v.classList.toggle('active', v.id === 'view-' + b.dataset.view));
-  });
+  // кнопка группы открывает тот её режим, на котором человек останавливался
+  document.querySelectorAll('.nav[data-view]').forEach(b => b.onclick = () => navActivate(partOfGroup(b.dataset.view)));
   // обработчики, пришедшие до сборки, получают свои кнопки
   NAV_EXTRA.forEach((fns, key) => {
     const b = document.querySelector('.nav[data-view="' + key + '"]');

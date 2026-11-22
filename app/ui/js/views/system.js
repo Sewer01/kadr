@@ -1,7 +1,7 @@
 import { API, postJSON } from '../core/net.js';
 import { $, confirmBox, esc, g1, meter, shortCpu, toast } from '../core/util.js';
 import { MD_NEED, QUEUE } from '../core/state.js';
-import { goTo } from '../core/tabs.js';
+import { goTo, groupOf, NAV_GROUP_TITLES, partOfGroup } from '../core/tabs.js';
 import { CLOUD, mdStart, renderModels } from './models.js';
 import { qAdd } from './queue.js';
 import { resetProgress, setStep, setupInfo, showSetupPane, setSetupInfo } from './setup.js';
@@ -98,14 +98,19 @@ export function setEngine(on) {
     GROUPS.forEach(g => {
       const part = g.map(v => {
         const n = $(`.nav[data-view="${v}"]`); if (!n || n.hidden) return '';
-        return `<button type="button" class="mb${v === cur ? ' on' : ''}" data-go="${v}" title="${(TIP[v] || SHORT[v] || '').replace(/["<>&]/g, '')}">${n.querySelector('svg')?.outerHTML || ''}<i>${SHORT[v]}</i></button>`;
+        const gp = groupOf(v); if (gp && gp.nav !== v) return '';   // режим группы: своей кнопки на полосе у него нет
+        // светится кнопка группы, когда открыт любой режим из неё; подсказка говорит, что там не один режим
+        const on = gp ? gp.parts.includes(cur) : v === cur;
+        const extra = gp ? ' · режимы: ' + gp.parts.map(k => NAV_GROUP_TITLES[k] || SHORT[k] || k).join(', ') : '';
+        return `<button type="button" class="mb${on ? ' on' : ''}" data-go="${v}" title="${((TIP[v] || SHORT[v] || '') + extra).replace(/["<>&]/g, '')}">${n.querySelector('svg')?.outerHTML || ''}<i>${SHORT[v]}</i></button>`;
       }).join('');
       if (part) html += (html ? '<i class="mb-sep"></i>' : '') + part;
     });
     if (bar.innerHTML !== html) bar.innerHTML = html;
     const on = bar.querySelector('.on'); if (on && on.offsetLeft + on.offsetWidth > bar.scrollLeft + bar.clientWidth) bar.scrollLeft = on.offsetLeft - 20;
   }
-  bar.addEventListener('click', e => { const b = e.target.closest('[data-go]'); if (b) goTo(b.dataset.go); });
+  // кнопка группы открывает тот её режим, на котором человек останавливался
+  bar.addEventListener('click', e => { const b = e.target.closest('[data-go]'); if (b) goTo(partOfGroup(b.dataset.go)); });
   new MutationObserver(paint).observe($('.main'), { attributes: true, attributeFilter: ['class'], subtree: true });
   new MutationObserver(paint).observe($('aside') || document.body, { attributes: true, attributeFilter: ['hidden', 'class'], subtree: true });
   paint();
