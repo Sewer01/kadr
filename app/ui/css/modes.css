@@ -567,3 +567,8 @@
 .sr-limits select{padding:4px 8px;border-radius:8px;border:1px solid var(--line);background:var(--surface-2);color:var(--text);font-size:13px}
 /* «Отменить» и «Вернуть» - в правом конце шапки карточки «Сцены» */
 .sc-undo{margin-left:auto}
+/* Поле своего числа сцен: показывается только когда выбрано «вручную». */
+.sr-cnt-n{width:64px;padding:4px 8px;border-radius:8px;border:1px solid var(--line);background:var(--surface-2);color:var(--text);font-size:13px;text-align:center}
+.sr-cnt-n[hidden]{display:none}
+.sr-cnt-cap{font-size:12px}
+.sr-cnt-cap[hidden]{display:none}

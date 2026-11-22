@@ -91,6 +91,9 @@ $('#vClear').onclick = () => {
 vUpd();
 
 /* ---------- LIPSYNC view ---------- */
+/* Больше стольких сцен лента не держит: это уже больше часа расчёта и лента, которую человек не прочтёт. */
+export const SCENES_MAX = 80;
+
 export const L = { aspect: '9:16', q: '1080p', refSize: 'max', start: 0, end: 0, dur0: 0, refs: 0, len: () => Math.max(0, L.end - L.start) };
 export const MAX_LEN = 15, REC_LEN = 12;
 export const lPrev = previewPanel($('#lPreview'), L, {
@@ -1532,6 +1535,8 @@ export function makeRefMode(cfg) {
          Сценариста, и он обязан уложиться: иначе «не больше 4 сцен по 8 секунд»
          значит «сколько модель посчитала». Других путей сюда нет - загрузка
          проекта список сцен через эту функцию не проходит. */
+      if (list.length > SCENES_MAX) toast('Лента держит ' + SCENES_MAX + ' сцен: лишние убраны - это уже больше часа расчёта');
+      list = list.slice(0, SCENES_MAX);
       const sl = (root._scLimits && root._scLimits()) || null;
       if (sl) {
         if (sl.cnt && list.length > sl.cnt) toast('Сценарист вернул ' + list.length + ' сцен, а вы просили не больше ' + sl.cnt + ': лишние убраны');
@@ -1584,7 +1589,7 @@ export function makeRefMode(cfg) {
       /* Номер места решается до того, как карточка появилась. Новый текст сам называет номер
          своих файлов: если его позвала сцена, этот номер за ней и закрепляется, а прежняя
          владелица получает свободный. Так подпись плитки и тег в тексте всегда одинаковы. */
-      const fresh = list.slice(0, 80);
+      const fresh = list.slice(0, SCENES_MAX);
       const used0 = new Set();
       const baseFor = fresh.map(() => 0);
       // очереди: сначала те, кого текст назвал сам, потом прежний номер сцены, и лишь потом свободный
@@ -2378,7 +2383,7 @@ export function makeRefMode(cfg) {
       recount();
     };
 
-    $('#lmAdd', root).onclick = () => { if ($$('.sc', root).length >= 80) { toast('Не больше 80 сцен: это больше часа расчёта - делайте ролик частями'); return; } root._sel = $$('.sc', root).length; addScene('', 10); };
+    $('#lmAdd', root).onclick = () => { if ($$('.sc', root).length >= SCENES_MAX) { toast('Не больше ' + SCENES_MAX + ' сцен: это больше часа расчёта - делайте ролик частями'); return; } root._sel = $$('.sc', root).length; addScene('', 10); };
     queueMicrotask(() => { addScene('', 10); });   // a blank start holds ONE scene; «+» in the ribbon makes the next  // after the rest of the set-up is done
     root._addScene = addScene;
     /* --- video studio: a ribbon of fragments, one fragment is open for settings, a player, draft / finished quality --- */
@@ -2766,45 +2771,74 @@ export function makeRefMode(cfg) {
             const a = Math.min(lim.min, lim.max), b = Math.max(lim.min, lim.max);
             return 'Сценарий ролика из раздела «' + cfg.title + '». Разложи его на сцены так, чтобы из них можно было собрать ролик: от '
               + a + ' до ' + b + ' секунд на сцену'
-              + (lim.cnt ? ', всего не больше ' + lim.cnt + ' сцен' : ', сколько сцен - реши сам по смыслу, но не меньше двух')
+              + root._scWords()
               + ', в одной сцене одно событие и одно движение камеры. Верни только список сцен, одним блоком кода, без пояснений до и после: каждая сцена начинается строкой «SCENE N | секунды», ниже идёт описание кадра на английском (60-110 слов) с тегами картинок и звука этого режима (<Picture N>, <Audio N>), а реплики - строкой <d>[Язык] текст</d> дословно. Если сценария почти нет, разрежь его на 2-3 сцены по смыслу, но новые имена и события не выдумывай.\n\n';
           },
         },
       });
       root._srWin = srWin;
-      /* Длительность сцен и их количество. «авто» - значит Сценарист сам решает, на
-         сколько сцен резать сюжет; число - потолок, при котором общая длина сохраняется,
-         просто сцены становятся длиннее. Выбор запоминается для каждой студии. */
-      const lim = { min: 5, max: 10, cnt: 0 };
-      try { const s = JSON.parse(localStorage.getItem('h3-scene-limits-' + cfg.mode) || 'null'); if (s) Object.assign(lim, s); } catch (e) { }
-      root._scLimits = () => ({ min: Math.min(lim.min, lim.max), max: Math.max(lim.min, lim.max), cnt: lim.cnt });
+      /* Сколько сцен и какой длины. «авто» - Сценарист сам решает, сколько нужно сюжету;
+         «без ограничений» - резать только по смыслу (лента всё равно держит 80 сцен);
+         «вручную» - своё число. Выбор запоминается для каждой студии. */
+      const lim = { min: 5, max: 10, how: 'auto', n: 6 };
+      try {
+        const s = JSON.parse(localStorage.getItem('h3-scene-limits-' + cfg.mode) || 'null');
+        if (s && typeof s.how === 'string') Object.assign(lim, s);
+        else if (s && typeof s.cnt === 'number') {   // прежний вид: число в списке «не больше N»
+          lim.min = s.min || 5; lim.max = s.max || 10; lim.how = s.cnt ? 'man' : 'auto'; lim.n = s.cnt || 6;
+        }
+      } catch (e) { }
+      root._scLimits = () => ({
+        min: Math.min(lim.min, lim.max), max: Math.max(lim.min, lim.max),
+        cnt: lim.how === 'man' ? Math.max(1, Math.min(SCENES_MAX, lim.n | 0)) : 0,
+      });
+      root._scWords = () => lim.how === 'man' ? ', всего не больше ' + root._scLimits().cnt + ' сцен'
+        : lim.how === 'off' ? ', количество сцен не ограничивай, режь по смыслу'
+          : ', сколько сцен - реши сам по смыслу, но не меньше двух';
       const nums = [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
       const mkOpt = (v, t, on) => { const o = document.createElement('option'); o.value = v; o.textContent = t; o.selected = !!on; return o; };
       const limRow = document.createElement('div');
       limRow.className = 'row sr-limits';
       limRow.innerHTML = '<div class="row-l">Сцены</div>';
       const box = document.createElement('div');
-      box.className = "sr-limit-in";
+      box.className = 'sr-limit-in';
       const sMin = document.createElement('select'), sMax = document.createElement('select'), sCnt = document.createElement('select');
+      const sNum = document.createElement('input');
       sMin.className = 'sr-min'; sMax.className = 'sr-max'; sCnt.className = 'sr-cnt';
+      sNum.type = 'number'; sNum.className = 'sr-cnt-n'; sNum.min = '1'; sNum.max = String(SCENES_MAX); sNum.step = '1';
+      sNum.value = String(Math.max(1, Math.min(SCENES_MAX, lim.n | 0)));
       sMin.title = 'Короче этого сцены не будут';
       sMax.title = 'Длиннее этого сцены не будут';
-      sCnt.title = '«авто»: Сценарист сам решает, сколько нужно сцен. Число: не больше стольких сцен на весь сюжет (общая длина сохранится, сцены станут длиннее)';
+      sCnt.title = '«авто»: Сценарист сам решает, сколько нужно сцен. «без ограничений»: резать только по смыслу. «вручную»: своё число сцен.';
+      sNum.title = 'Сколько сцен максимум. Больше ' + SCENES_MAX + ' лента не держит: это уже больше часа расчёта.';
       nums.forEach(n => { sMin.append(mkOpt(n, n, n === lim.min)); sMax.append(mkOpt(n, n, n === lim.max)); });
-      [0, 2, 3, 4, 5, 6, 8, 10, 12, 15, 20, 30, 40, 60, 80].forEach(n => sCnt.append(mkOpt(n, n ? 'не больше ' + n : 'авто', n === lim.cnt)));
+      [['auto', 'авто'], ['off', 'без ограничений'], ['man', 'вручную']].forEach(o => sCnt.append(mkOpt(o[0], o[1], o[0] === lim.how)));
+      const cap = document.createElement('span');
+      cap.className = 'hint sr-cnt-cap';
+      cap.textContent = 'сцен не больше · максимум ' + SCENES_MAX;
       box.append(document.createTextNode('Сцена от '), sMin, document.createTextNode(' до '), sMax,
-        document.createTextNode(' секунд · сцен '), sCnt);
+        document.createTextNode(' секунд · '), sCnt, sNum, cap);
+      const showNum = () => { sNum.hidden = cap.hidden = lim.how !== 'man'; };
       limRow.append(box);
+      showNum();
       const readLim = () => {
         let a = +sMin.value, b = +sMax.value;
         /* Границы не должны спорить. Двигаем ту, которую человек не трогал: её видно
            по тому, что значение осталось прежним. Прежняя догадка по фокусу подводила:
            без фокуса нижняя граница молча падала до верхней. */
         if (a > b) { if (a !== lim.min) { b = a; sMax.value = String(b); } else { a = b; sMin.value = String(a); } }
-        lim.min = a; lim.max = b; lim.cnt = +sCnt.value;
+        lim.min = a; lim.max = b;
+        lim.how = sCnt.value;
+        const n = parseInt(sNum.value, 10);
+        /* Пустое или бессмысленное поле не превращаем в максимум: оставляем последнее
+           хорошее число, иначе опечатка тайком ставит 80 сцен. */
+        lim.n = isNaN(n) ? lim.n : Math.max(1, Math.min(SCENES_MAX, n));
+        sNum.value = String(lim.n);
+        showNum();
         try { localStorage.setItem('h3-scene-limits-' + cfg.mode, JSON.stringify(lim)); } catch (e) { }
       };
       [sMin, sMax, sCnt].forEach(s => s.addEventListener('change', readLim));
+      sNum.addEventListener('change', readLim);
       srCard.append(limRow);
       /* Написанный сценарий не должен пропадать: его снимаем с ленты при закрытии
          программы и кладем обратно при открытии - как у карточки «Промпт» в других разделах. */
@@ -3094,7 +3128,7 @@ export function makeRefMode(cfg) {
       // the base choice and its file button were placed in the settings card above
     }));
     $('#lmAdd', root).onclick = () => {
-      if ($$('.sc', root).length >= 80) { toast('Не больше 80 сцен: это больше часа расчёта - делайте ролик частями'); return; }
+      if ($$('.sc', root).length >= SCENES_MAX) { toast('Не больше ' + SCENES_MAX + ' сцен: это больше часа расчёта - делайте ролик частями'); return; }
       addScene('', 10);
       // the scene you asked for is the scene you want to write: it opens right away
       root._sel = $$('.sc', root).length - 1; root._target = root._sel;
