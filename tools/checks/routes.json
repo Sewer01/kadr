@@ -642,6 +642,26 @@
   ],
   [
    "get",
+   "/api/actors",
+   "state.h_actors_list"
+  ],
+  [
+   "post",
+   "/api/actors",
+   "state.h_actors_save"
+  ],
+  [
+   "delete",
+   "/api/actors/{id}",
+   "state.h_actors_delete"
+  ],
+  [
+   "get",
+   "/api/actors/{id}/file/{name}",
+   "state.h_actors_file"
+  ],
+  [
+   "get",
    "/api/events",
    "state.h_events"
   ],
@@ -653,6 +673,10 @@
  ],
  "handlers": [
   "h_action_info",
+  "h_actors_delete",
+  "h_actors_file",
+  "h_actors_list",
+  "h_actors_save",
   "h_agent_chat",
   "h_agent_ctx",
   "h_agent_install",

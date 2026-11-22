@@ -390,6 +390,37 @@
       </div>
     </section>
 
+    <!-- ============ ACTOR CARDS ============ -->
+    <section class="view" id="view-actors">
+      <div class="head">
+        <div>
+          <h1>Карточки актёров</h1>
+          <p>Лицо, голос и приметы, которые повторяются из ролика в ролик: собрали один раз, дальше зовёте карточку в тексте по имени</p>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-h"><h3>Новая карточка</h3></div>
+        <div class="ac-form">
+          <div class="ac-row">
+            <input type="text" id="acName" placeholder="Как звать карточку: Рыжий кот, Девушка в плаще">
+            <select id="acType"></select>
+          </div>
+          <textarea id="acText" rows="2" placeholder="Что это и что в нём сохранять: цвет глаз, одежда, манера говорить…"></textarea>
+          <div class="ac-row">
+            <label class="btn">Фото<input type="file" id="acImages" accept="image/*" multiple hidden></label>
+            <label class="btn">Образец голоса<input type="file" id="acVoice" accept="audio/*" hidden></label>
+            <span class="hint" id="acFiles">фото пока не выбраны</span>
+            <button class="btn pri" type="button" id="acAdd">Положить карточку</button>
+          </div>
+        </div>
+        <small class="hint">До девяти фото: каждое в карточке можно включить или выключить. Имя лучше короткое и без пробелов: им вы зовёте карточку в поле «Сценарий».</small>
+      </div>
+      <div class="card">
+        <div class="card-h"><h3>Мои карточки <small class="hint" id="acCnt"></small></h3></div>
+        <div id="acList" class="ac-list"></div>
+      </div>
+    </section>
+
     <!-- ============ OWN WORKFLOWS ============ -->
     <section class="view" id="view-custom">
       <div style="margin-bottom:10px"><button class="btn" id="cwBack" type="button">← Настройки</button></div>

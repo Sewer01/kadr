@@ -11,6 +11,7 @@ import './views/modes.js';
 import './ui/audio.js';
 import './views/setup.js';
 import './views/agent.js';
+import './views/actors.js';
 import './views/models.js';
 import './core/state.js';
 import './views/library.js';

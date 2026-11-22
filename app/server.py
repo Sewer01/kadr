@@ -27,6 +27,7 @@ from areas.cloud import CloudMixin
 from areas.agent import AgentMixin
 from areas.window import WindowMixin
 from areas.core import CoreMixin
+from areas.actors import ActorsMixin
 from aiohttp import web
 from applog import applog
 from pathlib import Path
@@ -55,7 +56,8 @@ class App(QueueMixin,
           CloudMixin,
           AgentMixin,
           WindowMixin,
-          CoreMixin):
+          CoreMixin,
+ActorsMixin):
     """Класс состояния собран из mixin-ов областей: поля и __init__ в areas/core.py,
     обработчики - по файлам app/areas/. Имя, поля и все вызовы self остались теми же,
     поэтому таблица маршрутов ниже обращается к state.h_* ровно как раньше."""
@@ -258,6 +260,10 @@ def build_app(comfy_override=None):
         web.get("/api/file/{id}", state.h_file),
         web.get("/api/refs/{group}/{name}", state.h_ref_file),
         web.get("/api/srcfile/{id}", state.h_srcfile),
+        web.get("/api/actors", state.h_actors_list),
+        web.post("/api/actors", state.h_actors_save),
+        web.delete("/api/actors/{id}", state.h_actors_delete),
+        web.get("/api/actors/{id}/file/{name}", state.h_actors_file),
         web.get("/api/events", state.h_events),
         web.static("/ui", UI_DIR),
     ])

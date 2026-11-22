@@ -1120,3 +1120,24 @@ body.dropping::after{content:'Отпустите — программа разл
     .ra-row>.token[data-j]{cursor:pointer}
 
     .sw-bench{margin-top:10px}
+
+/* Карточки актёров: лицо, голос и приметы, которые повторяются из ролика в ролик.
+   Ряд плашек .ac-actors живёт под полем «Сценарий» в каждом режиме: он принадлежит
+   карточкам, поэтому разделы его не перерисовывают и не трогают свои плашки тегов. */
+.ac-form{display:grid;gap:8px;margin-bottom:10px}
+.ac-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.ac-row input[type=text]{flex:1 1 280px;min-width:220px}
+.ac-form textarea{width:100%;resize:vertical}
+.ac-list{display:grid;gap:12px}
+.ac-card{border:1px solid var(--line);border-radius:14px;padding:12px 14px;background:var(--bg-2)}
+.ac-top{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
+.ac-top b{font-size:14.5px}
+.ac-thumbs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+.ac-thumb{padding:0;width:76px;height:76px;border:2px solid transparent;border-radius:10px;overflow:hidden;background:none;cursor:pointer;position:relative}
+.ac-thumb img{display:block;width:100%;height:100%;object-fit:cover}
+.ac-thumb.off{opacity:.34;border-color:var(--line)}
+.ac-thumb.off::after{content:"выкл";position:absolute;left:0;right:0;bottom:0;font-size:10px;text-align:center;color:#fff;background:rgba(0,0,0,.6)}
+.ac-voice{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px}
+.ac-note{font-size:12.5px;line-height:1.55;margin:0 0 8px}
+.ac-actors{margin-top:8px}
+.ac-empty{color:var(--dim);font-size:13px}
