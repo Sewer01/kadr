@@ -147,7 +147,7 @@ export function scenarioWindow(host, cfg = {}) {
   /* Окно сценария не ставим там, где карточка врезана в чужую (сцены студий) и в разделах
      картинок: там поле одно и человек пишет в него сам. */
   const sc = (cfg.prompt === false || cfg.card === false) ? null : scNode('textarea');
-  let mirroring = false, mirrored = true;
+  let mirroring = false, mirroring2 = false, mirrored = true;
   if (sc) {
     sc.className = 'sc-draft';
     sc.placeholder = cfg.scPlaceholder || 'Что должно произойти: своими словами, можно по-русски';
@@ -211,6 +211,9 @@ export function scenarioWindow(host, cfg = {}) {
   if (cfg.tail) root.insertAdjacentHTML('beforeend', cfg.tail);
   if (inline) host.append(root);
 
+  /* Кнопки работы с текстом живут в ряду окна сценария: человек пишет там, там и нажимает.
+         «Генерация промта» начинает новый разговор с моделью, «Исправить» продолжает тот же -
+         поэтому правку можно делать репликами, не теряя уже сказанного. */
   if (cfg.generate) {
     /* Кнопка окна та же, что висела над полем раньше: тот же текст, та же подсказка, тот же
        вызов agGenerate. Перевод текста окна («Показать по-русски») из окна убран: человек
@@ -225,7 +228,17 @@ export function scenarioWindow(host, cfg = {}) {
     g.onclick = () => views.agGenerate(g, sc
       ? Object.assign({}, cfg.generate, { text: () => (sc ? sc.value : ta.value) })
       : cfg.generate);
-    buttons.append(g);
+    const row = scButtons || buttons;
+    row.append(g);
+    if (sc) {
+      const fix = scNode('button');
+      fix.type = 'button'; fix.className = 'btn';
+      fix.style.cssText = 'padding:4px 12px;font-size:12px';
+      fix.textContent = 'Исправить';
+      fix.title = 'Попросить сценариста поправить промт в том же разговоре: он помнит, что уже писал. Новый текст ляжет в окно «Промт».';
+      fix.onclick = () => views.agGenerate(fix, Object.assign({}, cfg.generate, { text: () => sc.value, again: true }));
+      row.append(fix);
+    }
   }
   /* Ряд кнопок поля - общий: сюда раздел ставит свои кнопки после основной («Очистить текст»,
      «Вставить пример»). Кнопки раздела никогда не собираются внутри поля руками. */
@@ -294,7 +307,16 @@ export function scenarioWindow(host, cfg = {}) {
       ta.dispatchEvent(new Event('input', { bubbles: true }));
       mirroring = false;
     });
-    ta.addEventListener('input', () => { if (!mirroring) mirrored = false; });
+    ta.addEventListener('input', () => {
+      if (mirrored && !mirroring2) {
+        mirroring2 = true;
+        sc.value = ta.value;
+        sc.dispatchEvent(new Event('input', { bubbles: true }));
+        mirroring2 = false;
+        return;
+      }
+      if (!mirroring) mirrored = false;
+    });
   }
 
   const api = {

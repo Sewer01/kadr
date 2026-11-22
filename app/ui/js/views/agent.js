@@ -79,7 +79,8 @@ export async function agCarry(mode) {
   if (typeof window._agSync === 'function') { try { window._agSync(); } catch (e) { } }
   // the text button is not a file: the draft goes into the field below, not into the tray
   const btns = Array.prototype.slice.call(root.querySelectorAll('.agall-h'))
-    .filter(b => !/Текст к сценаристу|Все промты|Генерация/.test(b.textContent) && !b.disabled);
+    // «К сценаристу» сама уносит всё: кликать её внутри переноса нельзя - был бы круг
+    .filter(b => !b.classList.contains('ag-draft') && !/Все промты|Генерация/.test(b.textContent) && !b.disabled);
   if (!btns.length) return 0;
   let made = 0;
   window.__agQuiet = 1;   // these buttons would otherwise walk the person to the chat
@@ -99,6 +100,9 @@ export async function agGenerate(btn, gen) {
   const was = btn.textContent, chat = $('#agIn'), keep = chat ? chat.value : '';
   btn.disabled = true; btn.textContent = 'Переносим в чат…';
   try {
+    /* Генерация промта начинает новый разговор, «Исправить» - продолжает тот же: тогда правки
+       идут репликами и модель помнит, что уже написала. */
+    if (!gen.again) { try { newChat(); } catch (e) { } }
     agRefWarn(mode, 'До сценариста: не всё разложено по полочкам - ');   // files and tags must agree BEFORE the rewrite
     const carried = await agCarry(mode);
     btn.textContent = 'Сценарист пишет промпт…';
@@ -2076,7 +2080,7 @@ export function agGo() {
   goTo('agent');
   return true;
 }
-export function agDraftOut(text, target, what) {
+export function agDraftOut(text, target, what, carried) {
   const ta = $('#agIn');
   let t = ''; try { t = typeof target === 'function' ? target() : target; } catch (e) { t = ''; }
   const btn = t && ($('#agTarget [data-t="' + t + '"]') || ($('#agTarget2') && $('#agTarget2 [data-t="' + t + '"]')));
@@ -2094,18 +2098,24 @@ export function agDraftOut(text, target, what) {
   const where = btn ? btn.textContent.trim() : 'этот режим';
   toast(has
     ? ('Черновик передан сценаристу, цель «' + where + '»' + (replaced ? ' (текст в поле чата заменён)' : '')
-      + ' · правьте и жмите «Создать промт», ответ вернётся в раздел кнопкой «В ' + where + '»')
-    : 'Здесь ещё нет черновика: напишите ' + (what || 'текст') + ' в разделе, потом нажмите эту кнопку');
+      + ' · правьте и жмите «Создать промт», ответ вернётся в раздел кнопкой «В ' + where + '»'
+      + (carried ? ' · файлов унесено: ' + carried : ''))
+    : (carried
+      ? ('Файлы переданы сценаристу (' + carried + '), текста нет: пусть он и напишет сценарий по ним')
+      : 'Ни текста, ни файлов в этом режиме нет: сначала добавьте референсы или напишите ' + (what || 'текст')));
 }
 export function agPromptButton(host, what, get, target) {
   if (!host || typeof get !== 'function') return null;
   const b = document.createElement('button');
-  b.type = 'button'; b.className = 'btn mini agall-h';
-  b.textContent = '🤖 Текст к сценаристу';
-  b.title = 'Перенести ' + what + ' в чат сценариста целиком, с тегами, включить нужное «Промт для»; ответ вернётся в это же поле';
+  b.type = 'button'; b.className = 'btn mini agall-h ag-draft';
+  b.textContent = '🤖 К сценаристу';
+  b.title = 'Унести в Сценарист всё из этого режима: файлы, кадры, звук и текст, даже если текста нет. Ответ вернётся в этот режим.';
   b.addEventListener('click', e => e.stopPropagation());   // a press here must not fold the card
-  b.onclick = () => {
-    agDraftOut(get(), typeof target === 'function' ? target() : target, what);
+  b.onclick = async () => {
+    const t = typeof target === 'function' ? target() : target;
+    let carried = 0;
+    try { carried = await agCarry(t); } catch (e) { carried = 0; }
+    agDraftOut(get(), t, what, carried);
   };
   host.append(b);
   return b;
@@ -2151,9 +2161,14 @@ export function agWireOtherWindows() {
     if (!card) return;
     const go = document.createElement('button');
     go.type = 'button'; go.className = 'btn mini agall-h';
-    go.textContent = '🤖 Текст к сценаристу';
-    go.title = 'Перенести текст раздела «' + label + '» в чат сценариста целиком, с тегами; ответ вернётся в это же поле';
-    go.onclick = () => agDraftOut(get ? get() : '', target, 'черновик промпта');
+    go.textContent = '🤖 К сценаристу';
+    go.className = 'btn mini agall-h ag-draft';
+    go.title = 'Унести в Сценарист всё из этого режима: кадры, звук, видео и текст, даже если текста нет. Ответ вернётся в этот режим.';
+    go.onclick = async () => {
+      let carried = 0;
+      try { carried = await agCarry(target); } catch (e) { carried = 0; }
+      agDraftOut(get ? get() : '', target, 'черновик промпта', carried);
+    };
     card.querySelector('.card-h').append(go);
   };
   const say = (what, added, again, tail) => toast(added ? ('В чат сценариста добавлено ' + what + ': ' + added + (again ? ' · ' + again + ' уже лежало' : '') + (tail || ''))
