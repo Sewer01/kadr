@@ -158,6 +158,10 @@ class SetupMixin:
         modes = [m for m in (body.get("modes") or self.modes()) if m in catalog.MODE_ROLES] or ["video"]
         if body.get("add_mode"):
             modes = sorted(set(self.modes()) | {body["add_mode"]}, key=list(catalog.MODE_ROLES).index)
+        if self.config.configured:
+            # Прерванная установка (закрыли мастер, свет, сеть) без этой запаски оставляет
+            # программу «с незавершённой настройкой»: ядро не стартует, список моделей пуст.
+            self.config.update(setup_backup={k: self.config.get(k) for k in self.KEEP_ON_RESET})
         self.config.update(engine="managed", install_dir=install_dir, models_dir=models_dir,
                            choice=choice, profile=profile, modes=modes, setup_done=False)
         self.setup_log = []

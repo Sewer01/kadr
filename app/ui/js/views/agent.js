@@ -2187,6 +2187,18 @@ export function agPromptButton(host, what, get, target) {
 export function agScenesText(root) {
   const cards = (typeof $$ === 'function' ? $$('.sc', root) : []);
   const parts = [];
+  /* Метки сцен человек ставит руками, и Сценарист обязан их уважать: где поют, там слова
+     попадают в куплет или припев, где проигрыш - петь некому. Строку «SCENE N | секунды»
+     не трогаем: её читает программа, и ответ модели обязан вернуться в неё без прикрас,
+     поэтому метки стоят отдельной строкой перед списком. */
+  const TAG_WORD = { sing: 'поёт', dance: 'танцует', inst: 'инструментал' };
+  const marks = [];
+  cards.forEach((c, i) => {
+    const tg = [...(c._tags || [])].map(k => TAG_WORD[k]).filter(Boolean);
+    if (tg.length) marks.push('сцена ' + (i + 1) + ': ' + tg.join(' + '));
+  });
+  if (marks.length) parts.push('МЕТКИ СЦЕН (их поставил человек, менять нельзя): ' + marks.join('; ')
+    + '. Где персонаж поёт - слова должны попадать в куплет или припев этого куска трека и влезать в секунды сцены; где проигрыш - он не поёт и не говорит.');
   cards.forEach((c, i) => {
     const ta = c.querySelector('textarea:not(.sc-draft)') || c.querySelector('textarea');
     const rg = c.querySelector('input[type=range]');

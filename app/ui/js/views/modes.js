@@ -1286,6 +1286,34 @@ export function makeRefMode(cfg) {
   // (a long chain of continuations wears the picture out; a new shot is built from the references again, so the quality stays the same)
   const MAX_CHAIN = 3;
   const freshAt = () => { let run = 0; return $$('.sc', root).map((c, i) => { if (!i) { run = 0; return false; } const hand = !!$('.sc-fresh', c)?.checked; if (hand || run >= MAX_CHAIN) { run = 0; return true; } run++; return false; }); };
+  /* Метка сцены: что в ней происходит - поёт, танцует или играет только музыка. Её ставит
+     человек кнопками под текстом сцены; без метки сцена идёт ровно как описана. Метка
+     хранится в проекте, попадает в текст видеомодели и в лист Сценариста. */
+  const SC_TAGS = [{ id: 'sing', name: 'поёт', tip: 'Персонаж поёт под голос: губы попадают в слова' },
+    { id: 'dance', name: 'танцует', tip: 'Персонаж танцует под ритм музыки' },
+    { id: 'inst', name: 'инструментал', tip: 'Музыка без голоса: персонаж не поёт и не говорит' }];
+  /* Что метка дописывает к тексту сцены. Строки английские: видеомодель читает промпт
+     по-английски, русскими остаются только подписи кнопок для человека. */
+  const SC_TAG_TXT = {
+    sing: 'The character sings to the camera: clear lip-sync to the vocal, expressive face.',
+    dance: 'The character dances to the music with rhythmic movement of the whole body.',
+    inst: 'Instrumental part without vocals: the character does not sing and does not speak, mouth closed.',
+  };
+  const tagOn = (c, id) => !!(c._tags && c._tags.has(id));
+  /* Слова, которые сцена поёт: их слышит распознавание аудио сцены, человек может вписать
+     сам. Если их нет в тексте сцены, модель получает их отдельной строкой, иначе губы
+     попадают в неизвестно что. */
+  const singWords = c => ((c._audWords || []).map(x => String(x || '').trim()).filter(Boolean).join(' ')
+    || (c._auds || []).map((f, j) => f ? String(agWordsFor(c, j) || '').trim() : '').filter(Boolean).join(' '));
+  const tagTxt = (c, txt) => {
+    if (!txt || !c._tags || !c._tags.size) return txt;
+    const line = SC_TAGS.filter(t => tagOn(c, t.id)).map(t => SC_TAG_TXT[t.id]).join(' ');
+    if (!line) return txt;
+    const w = singWords(c);
+    const known = w && txt.toLowerCase().indexOf(w.slice(0, 24).toLowerCase()) >= 0;
+    return txt + ' ' + line + (tagOn(c, 'sing') && w && !known
+      ? ' The exact words she sings: "' + w + '". Her lips match these words.' : '');
+  };
   const sceneList = () => { const fr = freshAt(); return $$('.sc', root).map((c, i) => ({ prompt: $('textarea', c).value.trim(), sec: +$('input[type=range]', c).value, lng: !!c._longSec, fresh: fr[i] })); };
   if (cfg.scenes) {
     const card = scBox;                      // то же место в колонке, где у остальных режимов окно
@@ -1541,6 +1569,41 @@ export function makeRefMode(cfg) {
         else toast((why || 'Кадр взять не удалось') + ' Видео принято - сцена продолжит его, но кадр отдельной плиткой не встал: ваших мест тогда 9.');
       } catch (err) { toast(err.message); }
     };
+    /* Подгонка длин сцен, которые вернул Сценарист, к тому, что выбрал человек: каждая
+       сцена в границах min..max, сцен не больше cnt, а их общая длина равна длине куска
+       W, когда она известна (клип режут из трека, и хвост или пустое место в конце ни к
+       чему). Секунды перетекают между сценами: короткая растёт первой, длинная
+       укорачивается первой, поэтому порядок сцен и их тексты не меняются. Число сцен
+       функция умеет только сокращать - самая короткая отдаёт свои секунды соседней, - и
+       никогда не растит, так что предел ленты SCENES_MAX ей не страшен. Верхнюю границу
+       человек задал сам, и выше неё длины не поднимаются. */
+    const fitScenes = (sc, W, mn, mx, cnt) => {
+      mn = Math.min(mn, mx); mx = Math.max(mn, mx);
+      sc.forEach(x => { x.sec = Math.max(mn, Math.min(mx, Math.round(x.sec) || mn)); });
+      const sum = () => sc.reduce((q, x) => q + x.sec, 0);
+      while (cnt && sc.length > cnt && sc.length > 1) {   // сцен больше, чем просили: самая короткая уходит к соседней
+        let k = 0;
+        sc.forEach((x, i) => { if (x.sec < sc[k].sec) k = i; });
+        const gone = sc.splice(k, 1)[0], nb = sc[Math.max(0, k - 1)];
+        nb.sec = Math.min(mx, nb.sec + gone.sec);
+      }
+      if (!W) return sc;
+      W = Math.round(W);
+      while (sc.length > 1 && sum() - sc[sc.length - 1].sec >= W) sc.pop();   // сцены, начинающиеся за концом куска
+      let diff = W - sum();
+      for (let g = 0; g < 400 && diff !== 0; g++) {   // по секунде за разом
+        const order = sc.map((x, i) => i).sort((a, b) => diff > 0 ? sc[a].sec - sc[b].sec : sc[b].sec - sc[a].sec);
+        let moved = false;
+        for (const i of order) {
+          if (diff > 0 && sc[i].sec < mx) { sc[i].sec++; diff--; moved = true; }
+          else if (diff < 0 && sc[i].sec > mn) { sc[i].sec--; diff++; moved = true; }
+          if (!diff) break;
+        }
+        if (!moved) break;   // все сцены упёрлись в выбранные границы: двигать нечем
+      }
+      while (sc.length > 1 && sum() - sc[sc.length - 1].sec >= W) sc.pop();
+      return sc;
+    };
     root._setScenes = list => {   // from the agent: replace all scenes
       if (!list.length) return 0;
       /* Сценарист дописывал пустые сцены: всё, что в них уже было написано, должно
@@ -1572,6 +1635,18 @@ export function makeRefMode(cfg) {
         if (sl.cnt && list.length > sl.cnt) toast('Сценарист вернул ' + list.length + ' сцен, а вы просили не больше ' + sl.cnt + ': лишние убраны');
         list = list.slice(0, sl.cnt || list.length)
           .map(x => (x && Object.assign({}, x, { sec: Math.max(sl.min, Math.min(sl.max, Math.round(x.sec) || sl.min)) })) || x);
+      }
+      /* Клип-студия режет клип из куска трека, и ответ Сценариста обязан закрыть этот
+         кусок: иначе клип окажется короче музыки или длиннее её. Тут длины сцен
+         подтягиваются друг к другу до длины куска, а выбранные границы длин и число
+         сцен остаются нетронутыми: выше верхней границы ни одна сцена не растёт и новых
+         сцен не появляется. */
+      if (cfg.clipScenes && !root._fillOnly && list.length > 1) {
+        const W = Math.round(root._scSpan || root._scTrack || 0);
+        const clean = list.filter(x => x && typeof x.prompt === 'string');
+        if (W > 0 && clean.length > 1) {
+          list = fitScenes(clean.map(x => Object.assign({}, x)), W, sl ? sl.min : 3, sl ? sl.max : 15, sl ? sl.cnt : 0);
+        }
       }
       /* The usual round trip is the same scenes with better texts. Rebuilding the cards for it threw
          away what the person had put in them - a photo gone from a scene was the price of a cleaner
@@ -1605,7 +1680,7 @@ export function makeRefMode(cfg) {
       const keep = $$('.sc', root).map(c => ({
         files: (c._files || []).slice(), auds: (c._auds || []).slice(), src: (c._audSrc || []).slice(),
         sel: (c._audSel || []).slice(), dur: (c._audDur || []).slice(), fresh: !!$('.sc-fresh', c)?.checked,
-        base: c._baseFixed || 0, words: (c._audWords || []).slice(), prompt: ($('textarea', c) || {}).value || "",
+        base: c._baseFixed || 0, words: (c._audWords || []).slice(), tags: [...(c._tags || [])], prompt: ($('textarea', c) || {}).value || "",
       }));
       /* Файл сцены живёт под её номером места: у второй сцены десятки от 20. Когда ответов
        приходит больше или меньше, чем карточек, место съезжает и полка остаётся пустой, хотя
@@ -1637,6 +1712,12 @@ export function makeRefMode(cfg) {
       fresh.forEach((x, i) => { if (!baseFor[i]) baseFor[i] = alloc(); });
       fresh.forEach((x, i) => addScene(x.prompt, Math.min(25, Math.max(3, Math.round(x.sec) || 10)),
         x.fresh === undefined ? !!(keep[i] && keep[i].fresh) : !!x.fresh, baseFor[i]));
+      /* Метки человек ставил руками, Сценарист про них не знает: поэтому карточка,
+         вставшая на то же место, получает метки прежней сцены этого места. */
+      $$('.sc', root).forEach((c, i) => {
+        const tg = keep[i] && keep[i].tags;
+        if (tg && tg.length) { c._tags = new Set(tg); c._paintTags?.(); }
+      });
       let back = 0; const lostBack = [];
       /* Перенос в два прохода. Сначала каждая сцена забирает файлы того номера места, который
          назван в её новом тексте: так фото и песня едут вместе со своим тегом, даже если сцены
@@ -1878,7 +1959,7 @@ export function makeRefMode(cfg) {
         const proj = { run, t: Date.now(), sec: cfg.mode, mode: root._mode, qm: root._q, qBy: { ...(root._qBy || {}), [root._q]: S.q }, snd: root._snd, loop: root._loop !== false, start: $('.lm-start', root).value, vocals: $('.lm-vocals', root).checked,
           bed: $('.lm-beddb', root).value, bednorm: !!$('.lm-bednorm', root).checked,   // уровень музыки и выравнивание: их помним тоже
           aspect: S.aspect, q: S.q, cw: S.cw || 0, ch: S.ch || 0, src: root._src ? { id: root._src.id || '', name: root._src.name } : null,
-          scenes: $$('.sc', root).map(c => ({ prompt: $('textarea', c).value, sec: +$('input[type=range]', c).value, lng: !!c._longSec, fresh: !!$('.sc-fresh', c)?.checked, nimg: 9, var: c._var || 0, words: (c._audWords || []).slice(), base: c._baseFixed || 0,
+          scenes: $$('.sc', root).map(c => ({ prompt: $('textarea', c).value, sec: +$('input[type=range]', c).value, lng: !!c._longSec, fresh: !!$('.sc-fresh', c)?.checked, nimg: 9, var: c._var || 0, tags: [...(c._tags || [])], words: (c._audWords || []).slice(), base: c._baseFixed || 0,
             done: c._dn.final ? { sig: c._dn.final.sig, url: c._dn.final.url, id: c._dn.final.id, text: c._dn.final.text } : null,
             draftDone: c._dn.draft ? { sig: c._dn.draft.sig, url: c._dn.draft.url, id: c._dn.draft.id, text: c._dn.draft.text } : null })) };
         const all = loadAll(); all[run] = proj;
@@ -1928,7 +2009,9 @@ export function makeRefMode(cfg) {
       $$('.sc', root).forEach(c => c.remove());
       for (const x of p.scenes) addScene(x.prompt, Math.min(x.lng ? 25 : 15, x.sec), !!x.fresh, x.base || 0);
       renumber(); sceneReconcile(root);   // в проекте номер места не хранится: его надо поделить заново
-      $$('.sc', root).forEach((c, i) => { c._var = (p.scenes[i] || {}).var || 0; });
+      /* Метки сцены лежат в проекте рядом с её длиной: лента с «поёт» и «проигрыш»
+         возвращается такой, какой человек её оставил. */
+      $$('.sc', root).forEach((c, i) => { c._var = (p.scenes[i] || {}).var || 0; c._tags = new Set((p.scenes[i] || {}).tags || []); c._paintTags?.(); });
       root._sel = 0;
       const cards = $$('.sc', root);
       root._restoring = true;   // shelves fill in asynchronously: while they are empty, no check may call a true tag a lie
@@ -2237,7 +2320,7 @@ export function makeRefMode(cfg) {
             + '<button class="btn mini" type="button" data-again="en">переслушать по-английски</button>'
             + '<button class="btn mini" type="button" data-again="clear">стереть слова</button></div>';
           const ta0 = $('textarea', host);
-          ta0.oninput = () => { c._audWords = c._audWords || []; c._audWords[+ta0.dataset.w] = ta0.value; if (root._save) root._save(); };
+          ta0.oninput = () => { c._audWords = c._audWords || []; c._audWords[+ta0.dataset.w] = ta0.value; c._paintTags?.(); if (root._save) root._save(); };
           $$('button[data-again]', host).forEach(b => {
             b.onclick = async () => {
               const j = +host.dataset.slot, file = c._auds[j]; if (!file) return;
@@ -2293,6 +2376,33 @@ export function makeRefMode(cfg) {
       }
       if (!$('.sc-trimhost', c)) {
         $('.sc-auds', c).insertAdjacentHTML('afterend', '<div class="sc-trimhost" hidden style="margin-top:8px"></div>');
+      }
+      /* Метки этой сцены: поёт, танцует или инструментал. Ряд стоит сразу под окном
+         текста - там, где сцену описывают. Ничего не нажато - сцена идёт как описана. */
+      if (!$('.sc-tags', c)) {
+        $('.sc-auds', c).insertAdjacentHTML('beforebegin', '<div class="sc-tags"><span class="hint" style="font-size:12px">В этой сцене:</span>'
+          + SC_TAGS.map(t => `<button class="btn mini sc-tag" type="button" data-tag="${t.id}" title="${t.tip}">${t.name}</button>`).join('')
+          + '<span class="hint sc-tag-st" style="font-size:12px"></span></div>');
+        $('.sc-tags', c).onclick = e => {
+          const b = e.target.closest('.sc-tag'); if (!b) return;
+          const id = b.dataset.tag;
+          c._tags = c._tags || new Set();
+          if (c._tags.has(id)) c._tags.delete(id);
+          else { if (id === 'inst') c._tags.clear(); else c._tags.delete('inst'); c._tags.add(id); }   // проигрыш не соседствует с пением
+          c._paintTags?.();
+          if (root._save && !root._restoring) root._save();
+        };
+        /* Включённая метка «поёт» без слов означает, что модель будет петь без текста:
+           пусть человек увидит это сразу, а не в готовом клипе. */
+        c._paintTags = () => {
+          const tg = c._tags || new Set();
+          $$('.sc-tag', c).forEach(b => b.classList.toggle('on', tg.has(b.dataset.tag)));
+          const st = $('.sc-tag-st', c); if (!st) return;
+          const hasWords = !!singWords(c) || /<\s*d\s*>/i.test(($('textarea', c) || {}).value || '');
+          st.textContent = tg.has('sing') && !hasWords
+            ? 'слов не видно: добавьте аудио сцены или впишите слова, иначе модель будет петь без слов' : '';
+        };
+        c._paintTags();
       }
       $('.sc-auds', c).onclick = e => {
         const b = e.target.closest('[data-a]'); if (!b) return;
@@ -2378,7 +2488,7 @@ export function makeRefMode(cfg) {
         if (sigOk(c)) c._var = (c._var || 0) + 1;   // «Переделать»: another variant of this scene, not the same clip again
         root._chainPart = null; root._target = i; $('.go', $('.rm-preview', root)).click(); };
       $('.sc-undo', c).onclick = () => root._doUndo?.();
-      $('textarea', c).addEventListener('input', () => { refreshStates(); c._counter?.(); });   // first the rebuild, then the count and the lock
+      $('textarea', c).addEventListener('input', () => { refreshStates(); c._counter?.(); c._paintTags?.(); });   // first the rebuild, then the count and the lock
       $('textarea', c).addEventListener('focus', e => { root._ta = e.target; c._counter?.(); });   // the row of common chips follows the scene you picked up
       $('input[type=range]', c).oninput = recount;
       /* The cross in the header emptied the text, and the labelled button under the field did the
@@ -2802,6 +2912,7 @@ export function makeRefMode(cfg) {
             return 'Сценарий ролика из раздела «' + cfg.title + '». Разложи его на сцены так, чтобы из них можно было собрать ролик: от '
               + a + ' до ' + b + ' секунд на сцену'
               + root._scWords()
+              + root._scTagWords()
               + ', в одной сцене одно событие и одно движение камеры. Верни только список сцен, одним блоком кода, без пояснений до и после: каждая сцена начинается строкой «SCENE N | секунды», ниже идёт описание кадра на английском (60-110 слов) с тегами картинок и звука этого режима (<Picture N>, <Audio N>), а реплики - строкой <d>[Язык] текст</d> дословно. Если сценария почти нет, разрежь его на 2-3 сцены по смыслу, но новые имена и события не выдумывай.\n\n';
           },
         },
@@ -2831,6 +2942,22 @@ export function makeRefMode(cfg) {
           : lim.how === 'man' ? ', всего не больше ' + root._scLimits().cnt + ' сцен'
             : lim.how === 'off' ? ', количество сцен не ограничивай, режь по смыслу'
               : ', сколько сцен - реши сам по смыслу, но не меньше двух';
+      /* Что Сценарист должен знать о метках сцен. Сам он их не ставит, но обязан писать
+         так, чтобы они не врели: где поют - слова попадают в куплет или припев этого
+         куска трека, где проигрыш - пения и речи быть не должно. */
+      root._scTagWords = () => {
+        const sing = [], dance = [], inst = [];
+        $$('.sc', root).forEach((c, i) => {
+          if (tagOn(c, 'sing')) sing.push(i + 1);
+          if (tagOn(c, 'dance')) dance.push(i + 1);
+          if (tagOn(c, 'inst')) inst.push(i + 1);
+        });
+        const bits = [];
+        if (sing.length) bits.push('в сценах ' + sing.join(', ') + ' персонаж поёт: слова должны попадать в куплет или припев этого куска трека, на одну сцену - одна законченная строка или четверостишие, и по длине они влезают в секунды сцены');
+        if (dance.length) bits.push('в сценах ' + dance.join(', ') + ' персонаж танцует: движение под ритм, пения там нет');
+        if (inst.length) bits.push('в сценах ' + inst.join(', ') + ' проигрыш: никто не поёт и не говорит');
+        return bits.length ? '; ' + bits.join('; ') : '';
+      };
       const nums = [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
       const mkOpt = (v, t, on) => { const o = document.createElement('option'); o.value = v; o.textContent = t; o.selected = !!on; return o; };
       const limRow = document.createElement('div');
@@ -3241,7 +3368,7 @@ export function makeRefMode(cfg) {
       /* undo: what was cleared or deleted can be brought back (button «Отменить действие» or Ctrl+Z) */
       root._undo = []; root._redo = [];
       const refsFiles = () => $$('.ref', imgsEl).map(r => r._file || null);
-      const snapStep = () => ({ run: root._run, sel: root._sel, refs: refsFiles(), scenes: $$('.sc', root).map(c => ({ prompt: $('textarea', c).value, sec: +$('input[type=range]', c).value, fresh: !!$('.sc-fresh', c)?.checked, base: c._baseFixed || 0, files: [...c._files], dn: { ...c._dn }, old: c._old, tests: [...c._tests], var: c._var || 0 })) });
+      const snapStep = () => ({ run: root._run, sel: root._sel, refs: refsFiles(), scenes: $$('.sc', root).map(c => ({ prompt: $('textarea', c).value, sec: +$('input[type=range]', c).value, fresh: !!$('.sc-fresh', c)?.checked, tags: [...(c._tags || [])], base: c._baseFixed || 0, files: [...c._files], dn: { ...c._dn }, old: c._old, tests: [...c._tests], var: c._var || 0 })) });
       root._pushUndo = () => {
         root._undo.push(snapStep());
         if (root._undo.length > 15) root._undo.shift();
@@ -3250,7 +3377,7 @@ export function makeRefMode(cfg) {
       };
       const restore = async u => {
         $$('.sc', root).forEach(c => c.remove()); root._run = u.run;
-        u.scenes.forEach(x => { addScene(x.prompt, x.sec, x.fresh, x.base || 0); const c = $$('.sc', root).pop(); c._files = x.files; c._paint(); c._dn = x.dn; c._old = x.old; c._tests = x.tests; c._paintTests(); c._var = x.var; });
+        u.scenes.forEach(x => { addScene(x.prompt, x.sec, x.fresh, x.base || 0); const c = $$('.sc', root).pop(); c._files = x.files; c._paint(); c._dn = x.dn; c._old = x.old; c._tests = x.tests; c._paintTests(); c._var = x.var; c._tags = new Set(x.tags || []); c._paintTags?.(); });
         const names = a => JSON.stringify(a.map(f => f && f.name));
         if (names(refsFiles()) !== names(u.refs)) { $$('.ref .x', imgsEl).forEach(x => x.click()); for (let i = 0; i < u.refs.length; i++) if (u.refs[i]) await putInto($$('.ref input', imgsEl)[i], u.refs[i]); }
         root._sel = u.sel; renumber(); sceneReconcile(root); recount(); refreshStates(); paintStep();
@@ -3664,7 +3791,9 @@ export function makeRefMode(cfg) {
               }
             });
           } catch (e) { }
-          fd.append('scenes', JSON.stringify(sceneList().map((x, i) => Object.assign({}, x, { prompt: (sPlans[i] || {}).text || x.prompt }))));
+          /* Метку сцены модель читает здесь, а не в sceneList: в модель уходит текст
+             плана (с номерами мест и словами песни), а не то, что стоит на карточке. */
+          fd.append('scenes', JSON.stringify(sceneList().map((x, i) => Object.assign({}, x, { prompt: tagTxt(sCards[i], (sPlans[i] || {}).text || x.prompt) }))));
           sCards.forEach((c, i) => c._files.forEach((f, j) => { if (f) fd.append(`simg${i}_${j}`, f); }));
           sCards.forEach((c, i) => {
             const plan = sPlans[i];
