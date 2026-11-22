@@ -243,7 +243,8 @@
    "button#agNew2.btn.pri [＋ Новый чат]",
    "button#agOwnReset.btn [Вернуть встроенную Gemma] hidden",
    "button#agOwnUse.btn.pri [Подключить]",
-   "button#agSend.btn.pri [Создать промт]",
+   "button#agReturn.btn [Вернуть сценарий]",
+   "button#agSend.btn.pri [Написать сценарий]",
    "button#agWhReset.btn [Вернуть встроенный whisper] hidden",
    "button#agWhUse.btn.pri [Подключить]",
    "button#agWipe.btn [Очистить историю]",
@@ -261,7 +262,7 @@
    "select#agCtxSel",
    "select#agOwnPick",
    "textarea#agAudioText [Распознаём слова…] hidden",
-   "textarea#agIn [Опишите сцену, сценарий или вставьте реплики… (Enter — создать промт, Shift+Enter — новая строка)]"
+   "textarea#agIn [Опишите сцену, сценарий или вставьте реплики… (Enter — написать сценарий, Shift+Enter — новая строка)]"
   ],
   "view-custom": [
    "button#cwBack.btn [Настройки]",

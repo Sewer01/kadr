@@ -49,6 +49,17 @@ export function scenarioWindowOf(mode) {
 }
 /* Кладёт текст в окно режима. Привязку фото и звука окно не делает: для этого человек
    остаётся в режиме, куда текст лёг, - там свои плашки картинок и песен. */
+export function putScenarioDraft(mode, text) {
+  const win = scenarioWindowOf(mode);
+  if (!win) { toast('В этом режиме нет окна сценария: откройте его и попробуйте снова'); return false; }
+  goTo(mode);
+  const el = win.sc || win.ta;
+  el.value = text;
+  el.dispatchEvent(new Event('input', { bubbles: true }));
+  el.focus();
+  toast('Сценарий лег в окно «Сценарий»: правьте его здесь, промт — кнопкой «Генерация промта»');
+  return true;
+}
 export function putScenario(mode, text) {
   const win = scenarioWindowOf(mode);
   if (!win) { toast('В этом режиме нет окна сценария: откройте его и попробуйте снова'); return false; }

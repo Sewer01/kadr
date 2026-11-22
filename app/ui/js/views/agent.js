@@ -3,7 +3,7 @@ import { $, $$, GB, UI_Z, confirmBox, copyText, esc, fileKind, fileToDataURL, fm
 import { LIB, abuf, audioName, byId, openId, openItem, registerViews, setupModes, setupProfile } from '../core/state.js';
 import { goTo, onNav } from '../core/tabs.js';
 import { wavSlice } from '../ui/audio.js';
-import { putScenario, scenarioWindowOf, sendPrompt } from '../ui/scenario.js';
+import { putScenario, putScenarioDraft, scenarioWindowOf, sendPrompt } from '../ui/scenario.js';
 import { micToggle, transcribeWav } from '../ui/mic.js';
 import { dropBox } from '../ui/slots.js';
 import { openUpscale } from './library.js';
@@ -384,6 +384,7 @@ export const agTargetClick = e => {
   const b = e.target.closest('button[data-t]'); if (!b) return;
   // a new target means the draft has no way home; the highlight moves with the choice
   AG.target = b.dataset.t; if (AG.draft && AG.draft.to !== AG.target) AG.draft = null;
+  agReturnSync();
   $$('#agTarget button, #agTarget2 button').forEach(x => x.classList.toggle('on', x === b)); agCtx(); agFitVideos();
 };
 $('#agStoryF').onclick = e => { const b = e.target.closest('button[data-f]'); if (!b) return; AG.storyFrames = b.dataset.f === '1'; agCtx(); };
@@ -858,11 +859,42 @@ export async function agSend() {
       }
     }
   } catch (e) { if (e.name !== 'AbortError') reply.error = e.message; }
-  AG.busy = false; $('#agSend').textContent = 'Создать промт'; reply.status = null;
+  AG.busy = false; $('#agSend').textContent = 'Написать сценарий'; reply.status = null;
+  try { if ((reply.content || '').trim()) sessionStorage.setItem('h3-last-scenario', reply.content); } catch (e) { }
+  agReturnSync();
   if (!reply.content && !reply.error) reply.error = 'Остановлено';
   renderAssistant(el, reply); agStatus(); saveChat();
 }
 $('#agSend').onclick = agSend;
+
+/* Кнопка возврата сценария. Она живёт последним ответом сценариста:
+   если есть куда возвращать - она возвращает, если человек пишет с нуля
+   и окна режима не открыт - она просто копирует текст, чтобы вставить
+   его куда нужно. Ответа ещё нет - кнопка не нажимается. */
+export function agReturnText() {
+  try { return sessionStorage.getItem('h3-last-scenario') || ''; } catch (e) { return ''; }
+}
+export function agReturnTarget() {
+  const t = AG.target;
+  return t && scenarioWindowOf(t) ? t : null;
+}
+export function agReturnSync() {
+  const b = $('#agReturn'); if (!b) return;
+  const has = !!agReturnText().trim();
+  const to = agReturnTarget();
+  b.disabled = !has;
+  b.textContent = to ? 'Вернуть сценарий' : 'Скопировать сценарий';
+  b.title = !has ? 'Возвращать пока нечего: сначала напишите сценарий'
+    : to ? 'Последний ответ сценариста встанет в окно «Сценарий» - промт там же, кнопкой «Генерация промта»'
+      : 'Окно режима не открыто: текст просто скопируется, вставите его куда нужно';
+}
+$('#agReturn').onclick = () => {
+  const t = agReturnText().trim(); if (!t) return;
+  const to = agReturnTarget();
+  if (to) { putScenarioDraft(to, t); return; }
+  copyText(t, 'Сценарий скопирован');
+};
+agReturnSync();
 
 /* chat history */
 export async function saveChat() {
@@ -2098,7 +2130,7 @@ export function agDraftOut(text, target, what, carried) {
   const where = btn ? btn.textContent.trim() : 'этот режим';
   toast(has
     ? ('Черновик передан сценаристу, цель «' + where + '»' + (replaced ? ' (текст в поле чата заменён)' : '')
-      + ' · правьте и жмите «Создать промт», ответ вернётся в раздел кнопкой «В ' + where + '»'
+      + ' · правьте и жмите «Написать сценарий», ответ вернётся в раздел кнопкой «В ' + where + '»'
       + (carried ? ' · файлов унесено: ' + carried : ''))
     : (carried
       ? ('Файлы переданы сценаристу (' + carried + '), текста нет: пусть он и напишет сценарий по ним')
