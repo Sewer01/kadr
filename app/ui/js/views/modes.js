@@ -2943,16 +2943,7 @@ export function makeRefMode(cfg) {
           if (!(srWin.sc && srWin.sc.value.trim())) { toast('Сначала опишите в «Сценарии», что происходит в клипе'); return; }
           gen();
         };
-        bFill.onclick = () => {
-          const all = $$('.sc', root);
-          const empty = all.filter(c => !(((c._win && c._win.ta) || {}).value || '').trim());
-          if (!all.length) { toast('Сцен пока нет: сначала «Сцены по треку» или «+ сцена»'); return; }
-          if (!empty.length) { toast('Пустых сцен нет - Сценарист писал по всем'); return; }
-          root._fillKeep = all.map(c => ((c._win && c._win.ta) || {}).value || '');
-          root._fillOnly = empty.length;
-          toast('Сценарист дописывает ' + empty.length + ' сцен');
-          gen();
-        };
+        bFill.onclick = () => root._askFillEmpty();
         root.addEventListener('change', e => { if (e.target.closest('.lm-snd')) clipPaint(); });
       }
       /* Ряд тегов собирается заново: он всегда повторяет то, что стоит в студии сейчас. */
@@ -3166,6 +3157,29 @@ export function makeRefMode(cfg) {
       bUndo.onclick = () => root._doUndo(); bRedo.onclick = () => root._doRedo();
       const paintStep = () => { bUndo.disabled = !root._undo.length; bRedo.disabled = !root._redo.length; };
       (scCard.querySelector('.card-h') || scCard).append(bUndo, bRedo);
+      /* «Дописать пустые сцены» нужна не только клипу: в Киностудии и Экшн-студии люди
+         чинят ленту по одной сцене, а Сценарист умеет вернуть весь список сразу. Поэтому
+         функция одна, а кнопка стоит и в карточке «Клип», и в шапке карточки «Сцены». */
+      root._askFillEmpty = () => {
+        const all = $$('.sc', root);
+        const empty = all.filter(c => !(((c._win && c._win.ta) || {}).value || '').trim());
+        const g = $('.field-btns button', $('.rm-scenarist', root));
+        if (!all.length) { toast('Сцен пока нет: попросите Сценариста разложить сюжет или добавьте сцену'); return; }
+        if (!empty.length) { toast('Пустых сцен нет - Сценарист писал по всем'); return; }
+        if (!g) { toast('Окно Сценариста не найдено - обратитесь к карточке «Сценарий»'); return; }
+        root._fillKeep = all.map(c => ((c._win && c._win.ta) || {}).value || '');
+        root._fillOnly = empty.length;
+        toast('Сценарист дописывает ' + empty.length + ' сцен');
+        g.click();
+      };
+      if (!cfg.clipScenes) {
+        const bFill = document.createElement('button');
+        bFill.type = 'button'; bFill.className = 'btn mini sc-fill';
+        bFill.textContent = 'Дописать пустые сцены';
+        bFill.title = 'Сценарист пишет кадры только сценам без текста. Уже написанные он оставляет как есть.';
+        bFill.onclick = () => root._askFillEmpty();
+        (scCard.querySelector('.card-h') || scCard).append(bFill);
+      }
       paintStep();
       document.addEventListener('keydown', e => {
         if (!(e.ctrlKey || e.metaKey) || !root.classList.contains('active')) return;
