@@ -94,6 +94,18 @@ vUpd();
 /* Больше стольких сцен лента не держит: это уже больше часа расчёта и лента, которую человек не прочтёт. */
 export const SCENES_MAX = 80;
 
+/* Номера карточек идут по DOM-порядку; карточка без номера места не занимает.
+   Правило вынесено сюда: обход, навешанный на секцию, не всегда доходит до
+   карточки, которую добавили позже сборки страницы. */
+export const renumberCards = scope => {
+  let num = 0;
+  (scope || document).querySelectorAll('.card').forEach(c2 => {
+    const nn = c2.querySelector('.card-h .n'); if (!nn) return;
+    const want = String(++num);
+    if (nn.textContent !== want) nn.textContent = want;
+  });
+};
+
 export const L = { aspect: '9:16', q: '1080p', refSize: 'max', start: 0, end: 0, dur0: 0, refs: 0, len: () => Math.max(0, L.end - L.start) };
 export const MAX_LEN = 15, REC_LEN = 12;
 export const lPrev = previewPanel($('#lPreview'), L, {
@@ -2812,7 +2824,10 @@ export function makeRefMode(cfg) {
       });
       root._scWords = () => root._fillOnly
         ? ', верни список ровно из тех же сцен и в том же порядке: там, где описание уже есть, повтори его слово в слово, а пустые сцены допиши по музыке и общему смыслу клипа'
-        : root._scPlan ? ', всего ' + root._scPlan + ' сцен на трек длиной ' + root._scTrack + ' секунд - закрой трек целиком'
+        : root._scPlan ? (root._clSel && root._scSpan && root._scSpan !== root._scTrack
+            ? ', режь на сцены кусок трека с ' + root._clSel[0] + ' по ' + root._clSel[1] + ' секунд: всего '
+              + root._scPlan + ' сцен, закрой этот кусок целиком'
+            : ', всего ' + root._scPlan + ' сцен на трек длиной ' + root._scTrack + ' секунд - закрой трек целиком')
           : lim.how === 'man' ? ', всего не больше ' + root._scLimits().cnt + ' сцен'
             : lim.how === 'off' ? ', количество сцен не ограничивай, режь по смыслу'
               : ', сколько сцен - реши сам по смыслу, но не меньше двух';
@@ -2887,11 +2902,13 @@ export function makeRefMode(cfg) {
       /* Клип-студия: здесь герой - трек. Карточка «Клип» говорит, что программа видит в
          музыке, и даёт две кнопки Сценаристу: разложить трек на сцены и дописать те
          сцены, где текста ещё нет. Трек кладут в карточку «Музыка»: он один на клип. */
-      root._scPlan = 0; root._scTrack = 0; root._fillOnly = 0;
+      root._scPlan = 0; root._scTrack = 0; root._fillOnly = 0; root._scSpan = 0;
       if (cfg.clipScenes) {
         const clipCard = document.createElement('div');
         clipCard.className = 'card rm-clip';
-        clipCard.innerHTML = '<div class="card-h"><h3><span class="n">3</span>Клип</h3></div>';
+        /* Номер не пишем руками: его ставит обход по DOM-порядку - руками легко
+           попасть в повтор, когда карточка встала позже, чем обход проходил. */
+        clipCard.innerHTML = '<div class="card-h"><h3><span class="n"></span>Клип</h3></div>';
         const info = document.createElement('div'); info.className = 'hint'; info.style.marginBottom = '8px';
         const cRow = document.createElement('div'); cRow.className = 'row';
         const bPlan = document.createElement('button'), bFill = document.createElement('button');
@@ -2900,7 +2917,87 @@ export function makeRefMode(cfg) {
         bPlan.title = 'Число сцен считается от длины трека и ваших границ длительности, и Сценарист тут же пишет сцены.';
         bFill.title = 'Сценарист пишет кадры только сценам без текста. Уже написанные он оставляет как есть.';
         cRow.append(bPlan, bFill);
-        clipCard.append(info, cRow);
+        /* Волна рисуется здесь же, из файла: по ней видно, где трек густой и где пустой.
+           Кусок выделяется мышью - тогда Сценарист режет на сцены этот кусок, а не весь
+           трек; двойной щелчок снимает выделение. */
+        const cv = document.createElement('canvas');
+        cv.className = 'cl-wave'; cv.width = 720; cv.height = 56; cv.hidden = true;
+        const cvHint = document.createElement('div');
+        cvHint.className = 'hint cl-wave-hint';
+        clipCard.append(info, cv, cvHint, cRow);
+        root._clSel = null; root._clPeaks = null;
+        const fmt = s => Math.floor(s / 60) + ':' + String(Math.floor(s % 60)).padStart(2, '0');
+        const drawWave = () => {
+          const g = cv.getContext('2d'); if (!g) return;
+          const W = cv.width, H = cv.height, pk = root._clPeaks;
+          g.clearRect(0, 0, W, H);
+          if (!pk) return;
+          const css = getComputedStyle(document.documentElement);
+          g.fillStyle = (css.getPropertyValue('--muted') || '#8a8a8a').trim() || '#8a8a8a';
+          const step = W / pk.length;
+          for (let i = 0; i < pk.length; i++) {
+            const h = Math.max(1, Math.round(pk[i] * (H - 6)));
+            g.fillRect(Math.round(i * step), Math.round((H - h) / 2), Math.max(1, Math.ceil(step)), h);
+          }
+          const sel = root._clSel;
+          if (sel) {
+            const x0 = Math.round(W * sel[0] / (root._scTrack || 1)), x1 = Math.round(W * sel[1] / (root._scTrack || 1));
+            g.fillStyle = 'rgba(120,170,255,.28)';
+            g.fillRect(Math.min(x0, x1), 0, Math.abs(x1 - x0), H);
+          }
+        };
+        const waveHint = () => {
+          const sel = root._clSel;
+          cvHint.textContent = sel
+            ? 'Выделен кусок ' + fmt(sel[0]) + '–' + fmt(sel[1]) + ' (двойной щелчок - снять); сцены считаются по нему'
+            : 'Волна трека: тяните мышью, чтобы выделить кусок; двойной щелчок снимает выделение.';
+        };
+        let dragging = null;
+        const at = ev => {
+          const r = cv.getBoundingClientRect();
+          const x = Math.min(1, Math.max(0, (ev.clientX - r.left) / Math.max(1, r.width)));
+          return Math.round(x * (root._scTrack || 0));
+        };
+        cv.addEventListener('mousedown', ev => { if (!root._clPeaks) return; dragging = at(ev); root._clSel = [dragging, dragging]; drawWave(); });
+        cv.addEventListener('mousemove', ev => { if (dragging === null) return; root._clSel = [dragging, at(ev)]; drawWave(); waveHint(); });
+        cv.addEventListener('mouseup', ev => {
+          if (dragging === null) return;
+          const b = at(ev);
+          root._clSel = Math.abs(b - dragging) < 2 ? null : [Math.min(dragging, b), Math.max(dragging, b)];
+          dragging = null; drawWave(); waveHint();
+        });
+        cv.addEventListener('dblclick', () => { root._clSel = null; drawWave(); waveHint(); });
+        const loadWave = async () => {
+          const f = trackFile();
+          if (!f) { cv.hidden = true; root._clPeaks = null; drawWave(); return; }
+          if (f._h3pk) {
+            root._clPeaks = f._h3pk; root._scTrack = f._h3dur || root._scTrack;
+            cv.hidden = false; drawWave(); waveHint(); return;
+          }
+          cvHint.textContent = 'Читаем трек…';
+          try {
+            const AC = window.AudioContext || window.webkitAudioContext;
+            const ac = new AC();
+            const ab = await ac.decodeAudioData(await f.arrayBuffer());
+            if (ac.close) ac.close();
+            const ch = ab.getChannelData(0), N = 480, blk = Math.max(1, Math.floor(ch.length / N));
+            const pk = new Float32Array(N);
+            for (let i = 0; i < N; i++) {
+              let m = 0; const s = i * blk;
+              for (let k = 0; k < blk; k += 32) { const v = Math.abs(ch[s + k] || 0); if (v > m) m = v; }
+              pk[i] = Math.min(1, m * 1.6);
+            }
+            f._h3pk = pk; f._h3dur = Math.round(ab.duration);
+            root._clPeaks = pk; root._scTrack = f._h3dur;
+            cv.hidden = false; drawWave(); waveHint();
+          } catch (e) {
+            cv.hidden = true; root._clPeaks = null;
+            cvHint.textContent = 'Волну построить не вышло: формат аудио не читается. Сцены можно писать и без неё.';
+          }
+        };
+        /* Номер карточек переставляем, когда страница собрана: в момент вставки этой
+           карточки часть карточек ещё не стоит на своём месте. */
+        queueMicrotask(() => renumberCards((root.closest && root.closest('.view')) || root));
         srCard.after(clipCard);
         const trackFile = () => (root._filmFiles ? root._filmFiles() : [])[0] || null;
         const trackDur = async () => {
@@ -2925,6 +3022,11 @@ export function makeRefMode(cfg) {
         };
         const clipPaint = () => {
           const f = trackFile();
+          if (f && !f._h3pk && !root._clLoading) { root._clLoading = 1; loadWave().then(() => { root._clLoading = 0; }); }
+          if (!f) {
+            root._clSel = null; root._clPeaks = null; cv.hidden = true; drawWave();
+            cvHint.textContent = 'Волна появится, когда положите трек в карточку «Музыка».';
+          }
           info.textContent = f
             ? 'Трек: ' + f.name + (root._scTrack ? ' · ' + Math.floor(root._scTrack / 60) + ':' + String(root._scTrack % 60).padStart(2, '0') : ' · длина читается…')
               + ' · сцена ' + Math.min(lim.min, lim.max) + '-' + Math.max(lim.min, lim.max) + ' с'
@@ -2938,13 +3040,21 @@ export function makeRefMode(cfg) {
           const d = await trackDur();
           root._scTrack = d;
           if (!d) { toast('Длину трека прочитать не вышло - положите аудио заново'); clipPaint(); return; }
-          root._scPlan = Math.max(2, Math.min(SCENES_MAX, Math.round(d / Math.max(lim.min, lim.max))));
+          /* Выделенный кусок важнее всего трека: человек сам отметил, что его интересует. */
+          const sel = root._clSel;
+          const span = sel && sel[1] - sel[0] >= Math.max(lim.min, lim.max) ? sel[1] - sel[0] : d;
+          root._scSpan = span;
+          root._scPlan = Math.max(2, Math.min(SCENES_MAX, Math.round(span / Math.max(lim.min, lim.max))));
           clipPaint();
           if (!(srWin.sc && srWin.sc.value.trim())) { toast('Сначала опишите в «Сценарии», что происходит в клипе'); return; }
           gen();
         };
         bFill.onclick = () => root._askFillEmpty();
-        root.addEventListener('change', e => { if (e.target.closest('.lm-snd')) clipPaint(); });
+        /* Трек на весь ролик лежит в ряду карточки «Музыка»; аудио сцены - в другом ряду,
+           волне нужен именно ряд ролика. */
+        root.addEventListener('change', e => {
+          if (e.target && e.target.closest && e.target.closest('.mus-filmrow, .lm-snd')) clipPaint();
+        });
       }
       /* Ряд тегов собирается заново: он всегда повторяет то, что стоит в студии сейчас. */
       root._paintSrTags = () => {

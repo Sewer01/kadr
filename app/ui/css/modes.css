@@ -572,3 +572,7 @@
 .sr-cnt-n[hidden]{display:none}
 .sr-cnt-cap{font-size:12px}
 .sr-cnt-cap[hidden]{display:none}
+/* Волна трека в карточке «Клип»: рисуется из файла, по ней выделяется кусок. */
+.cl-wave{width:100%;height:56px;display:block;border-radius:8px;background:var(--surface-2);cursor:crosshair;margin:2px 0 6px}
+.cl-wave[hidden]{display:none}
+.cl-wave-hint{font-size:12px;margin-bottom:6px}
