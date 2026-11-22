@@ -14,7 +14,7 @@ export const SETUP_STEPS = [['comfy', 'ComfyUI'], ['nodes', 'Ноды'], ['start
 export function setStep(n) {
   $$('#setupSteps .step').forEach(s => {
     const k = +s.dataset.s; s.classList.toggle('done', k < n); s.classList.toggle('cur', k === n);
-    $('i', s).textContent = k < n ? '✓' : k;
+    $('i', s).textContent = k < n ? '' : k;
   });
 }
 export function showSetupPane(which) {
@@ -67,8 +67,8 @@ export async function openSetup() {
     ? ' «Клип» и «Видеостудия» используют одну и ту же основную модель — вместе они почти не добавляют места.' : '';
   $('#modeTotal').innerHTML = `<span>Скачается всего: <b>~${P[setupProfile].sizes.selected} ГБ</b> (из них ~19 ГБ — общая часть для любого режима: текстовый энкодер и VAE).${shared}</span>`;
   $('#profilePick').innerHTML = Object.entries(P).map(([k, p]) =>
-    `<button data-p="${k}" class="${k === setupProfile ? 'on' : ''}">${p.title}${k === setupInfo.recommended ? ' ★' : ''}<small>~${p.sizes[key]} ГБ</small></button>`).join('');
-  $('#profileAbout').textContent = P[setupProfile].about + (setupProfile === setupInfo.recommended ? ' · ★ рекомендуем для вашего компьютера' : '');
+    `<button data-p="${k}" class="${k === setupProfile ? 'on' : ''}">${p.title}${k === setupInfo.recommended ? ' ' : ''}<small>~${p.sizes[key]} ГБ</small></button>`).join('');
+  $('#profileAbout').textContent = P[setupProfile].about + (setupProfile === setupInfo.recommended ? ' · рекомендуем для вашего компьютера' : '');
   pickOpt(setupOpt);
 }
 $('#modePick').onclick = e => {
@@ -141,7 +141,7 @@ export function resetProgress() {
 export function renderPSteps() {
   $('#pSteps').innerHTML = SETUP_STEPS.map(([id, name], i) => {
     const cls = prog.done.has(id) ? 'done' : prog.cur === id ? 'cur' : '';
-    return `<div class="ps ${cls}"><i>${prog.done.has(id) ? '✓' : i + 1}</i>${name}</div>`;
+    return `<div class="ps ${cls}"><i>${prog.done.has(id) ? '' : i + 1}</i>${name}</div>`;
   }).join('');
 }
 export function onSetupEvent(ev) {

@@ -123,7 +123,7 @@ export function qRender() {
     const live = act.includes(j), v = live ? jobView(j) : null;
     const big = live ? `<div class="q-big ${v.lvl}"><i style="width:${Math.round(v.p * 100)}%"></i></div><div class="pbox-chip ${v.lvl}"><span class="pbox-dot"></span><span>${run ? Math.round(v.p * 100) + '% · ' : ''}${esc(v.txt)}</span></div>` : '';
     const cmpB = j.state === 'done' && j.mode === 'upscale' && j.itemId ? `<button class="btn pri" data-q="cmp" data-id="${j.itemId}">До и после</button>` : '';
-    return `<div class="q-row${cls}"><div class="q-n">${n || (j.state === 'done' ? '✓' : '·')}</div><div><div class="q-t">${esc(MODE_NAME[j.mode] || 'Видео')}: ${esc(j.prompt.slice(0, 120) || 'без промпта')}</div>`
+    return `<div class="q-row${cls}"><div class="q-n">${n || (j.state === 'done' ? '' : '·')}</div><div><div class="q-t">${esc(MODE_NAME[j.mode] || 'Видео')}: ${esc(j.prompt.slice(0, 120) || 'без промпта')}</div>`
       + `<div class="q-s">${esc(st)}</div>${big}</div>${cmpB || btn}</div>`;
   };
   box.innerHTML = QUEUE.length ? act.map((j, i) => row(j, i + 1)).join('') + fin.map(j => row(j, 0)).join('')

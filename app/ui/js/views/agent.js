@@ -1281,7 +1281,7 @@ export async function agStatus() {
     <div class="r"><span>Модель</span><b>${esc(curName || '—')}</b></div>
     <div class="r"><span>Исполнение</span><b>${light}</b></div>
     <div class="r"><span>Цензура</span><b>${cenz}</b></div>
-    <div class="t">${s.installing ? '⏳ Скачивается…' : s.installed ? '✓ Скачана' + (s.running ? ', работает сейчас' : ', запустится, когда понадобится') : '✗ Не скачана — нажмите «Скачать» ниже'}</div>`;
+    <div class="t">${s.installing ? '⏳ Скачивается…' : s.installed ? '. Скачана' + (s.running ? ', работает сейчас' : ', запустится, когда понадобится') : ' Не скачана — нажмите «Скачать» ниже'}</div>`;
   $('#agModel').innerHTML = s.custom
     ? `<b style="color:var(--text)">${esc(s.title)}</b> — ваша модель<br><span style="font-family:var(--mono);font-size:11px;word-break:break-all">${esc(s.custom.model)}</span><br>`
       + (s.vision ? 'Изображения видит (найден mmproj). ' : '<span class="warn-t">Файла mmproj нет — изображения сценарист не увидит.</span> ')
@@ -1290,11 +1290,11 @@ export async function agStatus() {
       + (s.installed ? 'Пока сценарист работает, генерация видео ждёт: обе модели вместе не помещаются в видеопамять — приложение переключает их само.' : `Нужно скачать один раз: ~${(s.size / 1e9).toFixed(1)} ГБ.`);
   const nReady = (s.variants || []).filter(o => o.have).length + (s.my_model ? 1 : 0);
   $('#agVarBox > summary').textContent = `Выбор моделей сценариста (скачано: ${nReady} из ${(s.variants || []).length + (s.my_model ? 1 : 0)})`;
-  $('#agVariants').innerHTML = (s.my_model ? `<button class="agv${s.my_model.current ? ' on' : ''}" type="button" data-my="1"><b>Моя модель: ${esc(s.my_model.title)}</b><span class="tg">ваша</span><span class="rd ok">✓ скачано${s.my_model.current ? ' · выбрана' : ''}</span></button>` : '')
+  $('#agVariants').innerHTML = (s.my_model ? `<button class="agv${s.my_model.current ? ' on' : ''}" type="button" data-my="1"><b>Моя модель: ${esc(s.my_model.title)}</b><span class="tg">ваша</span><span class="rd ok">, скачано${s.my_model.current ? ' · выбрана' : ''}</span></button>` : '')
     + (s.variants || []).map(o => `<button class="agv${o.current ? ' on' : ''}" type="button" data-v="${o.key}"><b>${esc(o.title)}</b>`
       + `<span class="tg${o.uncensored ? ' unc' : ''}">${o.uncensored ? 'без цензуры' : 'обычная'}</span>`
-      + `<span class="rd ${o.have ? 'ok' : 'no'}">${o.have ? '✓ скачано' : `Нужно скачать · ${(o.size / 1e9).toFixed(1)} ГБ`}${o.current ? ' · ВЫБРАНА' : ''}</span>`
-      + (o.min_vram && !o.fits ? `<small>⚠ нужно от ${o.min_vram} ГБ видеопамяти: у вас может быть медленно</small>` : '') + `</button>`).join('')
+      + `<span class="rd ${o.have ? 'ok' : 'no'}">${o.have ? ', скачано' : `Нужно скачать · ${(o.size / 1e9).toFixed(1)} ГБ`}${o.current ? ' · ВЫБРАНА' : ''}</span>`
+      + (o.min_vram && !o.fits ? `<small>Важно: нужно от ${o.min_vram} ГБ видеопамяти: у вас может быть медленно</small>` : '') + `</button>`).join('')
     + ((s.variants || []).some(o => o.current && o.uncensored) ? `<div class="hint" style="margin-top:8px">Эта модель не отказывается писать любые описания. Вы отвечаете за содержание: не используйте её для запрещённого и для людей без их согласия. Сам MiniMax H3 часть запросов всё равно может отклонить.</div>` : '');
   const cs = $('#agCtxSel');
   if (cs && s.ctx) {
@@ -1310,7 +1310,7 @@ export async function agStatus() {
   $('#agWhReset').hidden = !sp.custom;
   if (sp.custom && !$('#agWhDir').value) $('#agWhDir').value = sp.custom;
   $('#agWhInfo').innerHTML = sp.ready
-    ? `<span class="ok-t">✓ Программа и модель найдены${sp.model ? ': ' + esc(sp.model) : ''}</span>`
+    ? `<span class="ok-t">. Программа и модель найдены${sp.model ? ': ' + esc(sp.model) : ''}</span>`
     : sp.custom ? `<span class="warn-t">Не найдено: ${esc(sp.missing.join(', '))} — откройте строчку «Модель сценариста» выше и нажмите «Докачать», скачается только это.</span>` : '';
   /* Which recognition file is in use decides whether a song's words come out sense or nonsense:
      the little model mangles singing. The program always takes the best file it can see, so the
@@ -1347,7 +1347,7 @@ export async function agStatus() {
     } catch (e) { toast('Не вышло: ' + (e && e.message ? e.message : e)); bb.disabled = false; bb.textContent = 'Скачать точную модель распознавания'; }
   };
   $('#agModel').insertAdjacentHTML('beforeend', s.speech_ready
-    ? '<br><span class="ok-t">✓ Распознавание речи готово: можно приложить аудио и говорить в микрофон.</span>'
+    ? '<br><span class="ok-t">. Распознавание речи готово: можно приложить аудио и говорить в микрофон.</span>'
     : '<br><span class="warn-t">Распознавание речи не скачано: без него нельзя приложить аудио и говорить голосом.</span>');
   $('#agOwnReset').hidden = !s.custom;
   // own ComfyUI: the folder is always shown before a download, so it can be changed; an empty field keeps the current one
@@ -1361,7 +1361,7 @@ export async function agStatus() {
   const cands = s.candidates || [];
   $('#agOwnPickWrap').hidden = cands.length < 2;
   $('#agOwnPick').innerHTML = cands.map(c =>
-    `<option value="${esc(c.path)}" ${c.current ? 'selected' : ''}>${esc(c.name)} · ${c.gb} ГБ${c.fits ? '' : ' · ⚠ может не поместиться в видеопамять'}</option>`).join('');
+    `<option value="${esc(c.path)}" ${c.current ? 'selected' : ''}>${esc(c.name)} · ${c.gb} ГБ${c.fits ? '' : ' · Важно: может не поместиться в видеопамять'}</option>`).join('');
   if (s.custom && cands.some(c => c.current && !c.fits)) {
     $('#agModel').insertAdjacentHTML('beforeend', `<br><span class="warn-t">Эта модель крупная для вашей видеокарты (${s.vram} ГБ): она может работать медленно или не запуститься. Лучше Gemma 4 12B Q4 (~7 ГБ).</span>`);
   }
@@ -1699,7 +1699,7 @@ export const agQwenMode = () => { const b = $('.qw-eng button.on', $('#view-qwen
     B('Карточка с номером', 'сворачивается и разворачивается щелчком по её заголовку; свернуть всё разом - кнопка «Свернуть всё».'),
     B('Кнопка «Старт» внизу', 'запускает задание; во время работы она превращается в «Остановить».'),
     B('Очередь', 'все запущенные задания стоят там; можно дождаться, остановить или убрать из списка.'),
-    B('Библиотека', 'сюда попадают все готовые работы; нажмите на неё, чтобы открыть просмотр, «★» - пометить, «Удалить» - убрать файл в корзину.'),
+    B('Библиотека', 'сюда попадают все готовые работы; нажмите на неё, чтобы открыть просмотр, « » - пометить, «Удалить» - убрать файл в корзину.'),
     B('Панель «Библиотека» справа', 'открывается кнопкой у правого края: Фото, Видео и Аудио тремя группами. Файл можно перетащить из неё в любое место любого режима, а щелчок открывает просмотр.'),
     B('Звук', 'его не надо включать. Положите аудио - ролик строится под него. Не положили - звук сделает модель.'),
     B('Куда что попадает', 'готовые видео и фото - в Библиотеку и в папку data/outputs; кадры и звук, сохранённые кнопками, - в папку data/keeps.'),
@@ -1819,7 +1819,7 @@ export const agQwenMode = () => { const b = $('.qw-eng button.on', $('#view-qwen
     library: () => H('<b>Библиотека - всё, что программа сделала</b>') + UL([
       B('Полоса сверху', 'фильтр: все, только видео, только картинки, по режиму, избранное.'),
       B('Щелчок по карточке', 'открывает просмотр; галочки слева включают режим выбора, чтобы убрать несколько сразу.'),
-      B('«★»', 'помечает, чтобы не lostлось в общем списке.'),
+      B('« »', 'помечает, чтобы не lostлось в общем списке.'),
       B('"В монтаж"', 'кладёт клип в ленту монтажа.'),
       B('"Использовать в…"', 'переносит файл в нужный режим одним нажатием.'),
       B('«Удалить»', 'убирает запись и файл в корзину; «Сохранить копии старых файлов» держит второй экземпляр в папке программы.'),
@@ -1954,7 +1954,7 @@ export const agQwenMode = () => { const b = $('.qw-eng button.on', $('#view-qwen
     document.querySelectorAll('#libFilter .chip').forEach(b => {
       if (b.getAttribute('title')) return;
       const t = (b.textContent || '').trim();
-      if (t && !/^[on✓]+$/.test(t)) b.title = 'Показывать только: ' + t.toLowerCase();
+      if (t && !/^[on]+$/.test(t)) b.title = 'Показывать только: ' + t.toLowerCase();
     });
     document.querySelectorAll('button.go').forEach(b => {
       const txt = (b.textContent || '').replace(/\s+/g, ' ').trim();

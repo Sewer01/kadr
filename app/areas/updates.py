@@ -87,7 +87,7 @@ class UpdateMixin:
             except Exception:
                 pass
             await self.resolve_models()
-            applog(f"обновление ComfyUI: код {code} · было {before} → стало {after}")
+            applog(f"обновление ComfyUI: код {code} · было {before} -> стало {after}")
             return web.json_response({"ok": code == 0, "code": code, "before": before, "after": after,
                                       "log": out[-3000:].replace("\r", "")})
         finally:

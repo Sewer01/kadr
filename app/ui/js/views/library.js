@@ -45,7 +45,7 @@ export function renderLib() {
         ${it.kind === 'image' ? '' : `<div class="li-play"><i>${ICON.play}</i></div>`}
         ${it.fav ? `<span class="li-fav">${ICON.star}</span>` : ''}
         ${libTag(it)}
-        <span class="li-check">${selected.has(it.id) ? '✓' : ''}</span>
+        <span class="li-check">${selected.has(it.id) ? '' : ''}</span>
         <div class="li-act">
           <button data-act="use" title="Использовать в workflow">${ICON.use}</button>
           <button data-act="save" title="Сохранить на компьютер">${ICON.save}</button>
@@ -171,7 +171,7 @@ export function openViewer(id, fallback) {
     copyText(b.dataset.file, 'Имя файла скопировано');
   };
   $('#vwPrompt').textContent = it.prompt || 'без промпта';
-  $('#vwFav').textContent = it.fav ? '★ В избранном' : 'В избранное';
+  $('#vwFav').textContent = it.fav ? ' В избранном' : 'В избранное';
   $('#vwZoom').hidden = !(it.kind === 'image' && it.url);   // при открытом сравнении она не нужна
   $('#vwSeed').hidden = it.seed == null;
   $('#vwContinue').hidden = pic || !it.url || !!it.missing;
@@ -423,14 +423,14 @@ export async function openUpscale(it, file, into) {   // `file`: the person's ow
       const relayT = (w && h ? (w * 2) * (h * 2) / 1048576 / 4 : 0.9) * Math.round(secs * 24) * 0.7;   // seconds; an estimate for an RTX 4060 Ti (the author's 5090 is ~3.5x faster)
       const tooBig = w && h && w * h * secs > 10 * 1376 * 768;
       const why = 'Быстрый способ берёт всё видео целиком в память видеокарты, поэтому он рассчитан на клип примерно до 10 секунд при 1376×768.';
-      return `<div style="margin-top:14px;padding:12px;border:1.5px solid var(--line-2);border-radius:12px"><div style="font-weight:800;font-size:15px;margin-bottom:4px" title="${why}">⚡ Быстро — RelayVSR, в 2 раза${w ? ` · ${w * 2}×${h * 2}` : ''}</div>`
+      return `<div style="margin-top:14px;padding:12px;border:1.5px solid var(--line-2);border-radius:12px"><div style="font-weight:800;font-size:15px;margin-bottom:4px" title="${why}"> Быстро — RelayVSR, в 2 раза${w ? ` · ${w * 2}×${h * 2}` : ''}</div>`
         + `<div class="hint" style="margin-bottom:8px">Примерно ${fmtTime(relayT)} на RTX 4060 Ti (оценка). Видео не длиннее ~10 с при 1376×768: оно целиком грузится в память.${tooBig ? ' <b style="color:var(--pink)">Вашего видео это не касается - оно больше, поэтому кнопка ниже выключена. Увеличивайте вариантом «Качественнее».</b>' : ''}</div>`
         + (haveRelay ? `<label style="display:block;font-size:13px;margin-bottom:8px"><b>Детали: <span id="upDetailV">70</span>%</b> <span class="hint">меньше — мягче, без пересвета лиц; больше — чётче</span><input type="range" id="upDetail" min="0" max="100" step="5" value="70" style="width:100%"></label><button class="btn pri up-s" data-e="relay" data-k="2" type="button"${tooBig ? ' disabled title="' + why + ' Ваше видео длиннее или больше - быстрый способ для него недоступен."' : ' title="Быстрый способ: всё видео целиком в память карты, качество мягче, чем у «Качественнее», но в разы быстрее"'}>Увеличить быстро</button>`
           : `<div class="hint" style="margin-bottom:8px">${relayNodes
               ? `Нужна модель RelayVSR (около 5,3 ГБ).${st.engine === 'managed' ? '' : ' В своём ComfyUI положите relayvsr_x2_lightx2v_int8_convrot в diffusion_models и relayvsr_flash_vae_x2_fp32 в vae.'}`
               : 'Нужен более новый ComfyUI: в вашей версии узлов RelayVSR ещё нет. Обновите ComfyUI (раздел «Модели») — или увеличивайте вариантом «Качественнее», он работает сейчас.'}</div>`
             + (st.engine === 'managed' ? '<button class="btn pri" data-dl="relayvsr" type="button">Скачать модель</button>' : '')) + '</div>'
-        + `<div style="font-weight:800;font-size:15px;margin:14px 0 4px">✨ Качественнее — SeedVR2 (долго)</div>`;
+        + `<div style="font-weight:800;font-size:15px;margin:14px 0 4px"> Качественнее — SeedVR2 (долго)</div>`;
     })())
     + (have && it.kind === 'image' ? (() => { const k2 = w ? Math.max(1, 2048 / Math.max(w, h)) : 1.5; const tw = w ? Math.round(w * k2 / 2) * 2 : 0, th = w ? Math.round(h * k2 / 2) * 2 : 0;
         return `<div style="display:grid;gap:10px;margin-top:14px"><button class="btn pri up-s" data-k="2k" data-m="soft2k" type="button">До 2К, мягко${tw ? ` · ${tw}×${th}` : ''}<small style="display:block;opacity:.8">добавляет чёткость, но без «цифровой» резкости; быстро</small></button></div>`; })() : '')

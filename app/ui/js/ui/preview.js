@@ -63,7 +63,7 @@ export function previewPanel(el, st, opts) {
     </div>
     <button class="go"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.4 6.6L21 11l-6.6 2.4L12 20l-2.4-6.6L3 11l6.6-2.4z"/></svg>Сгенерировать</button>
     <button class="stop" hidden><i></i>Остановить генерацию</button>
-    <div class="cloud-line" hidden>☁ Генерация пойдёт в облако <b>RunningHub</b> (переключить — в разделе «Настройки»)</div>
+    <div class="cloud-line" hidden> Генерация пойдёт в облако <b>RunningHub</b> (переключить — в разделе «Настройки»)</div>
     <div class="status"></div>`;
   const frame = $('.frame', el), go = $('.go', el), stopB = $('.stop', el), status = $('.status', el);
   const live = $('.live', el), hud = $('.live-hud', el), bar = $('.bar', el);

@@ -400,7 +400,7 @@ class GenerateMixin:
                                               "или выберите «Обычное».")
             fast = self.model_names["sla_lora"]
         graph, stages = wf.video_graph(self.model_names, prompt, width, height, seconds, seed, first, last, self.custom_loras("video"), fast)
-        sub = "Зацикленное видео" if loop else "Кадр → кадр" if last else "Изображение → видео" if first else "Текст → видео"
+        sub = "Зацикленное видео" if loop else "Кадр -> кадр" if last else "Изображение -> видео" if first else "Текст -> видео"
         if fast:
             sub += " · быстрый черновик"
         return await self.queue(graph, stages, {

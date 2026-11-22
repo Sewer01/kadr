@@ -71,7 +71,7 @@ export function cwRenderInner() {
   r.notes.forEach(n => status += `<div class="note"><span>${esc(n)}</span></div>`);
   let html = '';
   if (status) html += `<div class="card cw-status"><div class="card-h"><h3>Что нашлось в «${esc(r.name)}»</h3></div>${status}</div>`;
-  else html += `<div class="cw-ok">✓ «${esc(r.name)}»: все ноды и файлы на месте</div>`;
+  else html += `<div class="cw-ok">, «${esc(r.name)}»: все ноды и файлы на месте</div>`;
 
   let main = '';
   if (prompts.length) main += `<div class="cw-prompts">${prompts.map(w => `<div class="cw-pp ${w.role === 'negative' ? 'neg' : 'pos'}"><div class="cw-pb">${w.role === 'negative' ? '✕ Негативный промпт' : '✓ Основной промпт'} <small>${esc(w.title)}</small></div>${cwField(w)}</div>`).join('')}</div>`;
@@ -118,7 +118,7 @@ $('#cwBody').addEventListener('change', e => {
   const inp = e.target, k = inp.dataset?.k; if (!k || !inp.closest('.cw-pair')) return;
   const v = parseInt(inp.value, 10); if (!(v > 0)) return;
   const r = Math.max(64, Math.round(v / 32) * 32);
-  if (r !== v) { inp.value = r; CW.vals[k] = String(r); try { localStorage.setItem('h3-cw-' + CW.id, JSON.stringify(CW.vals)); } catch {} toast(`Размер округлён: ${v} → ${r} (кратно 32)`); }
+  if (r !== v) { inp.value = r; CW.vals[k] = String(r); try { localStorage.setItem('h3-cw-' + CW.id, JSON.stringify(CW.vals)); } catch {} toast(`Размер округлён: ${v} -> ${r} (кратно 32)`); }
 });
 $('#cwBody').addEventListener('change', e => {
   const k = e.target.dataset?.f; if (!k) return;
@@ -394,11 +394,11 @@ if (API) {
 } else
 // demo items so the library isn't empty in the mockup
 [
-  ['video', 'Футболист бежит на камеру в замедленной съёмке, пасмурный день, мягкий свет', '16:9', '720p', 5, 'Изображение → видео', 2],
+  ['video', 'Футболист бежит на камеру в замедленной съёмке, пасмурный день, мягкий свет', '16:9', '720p', 5, 'Изображение -> видео', 2],
   ['lipsync', '<Picture 1> поёт у окна, за стеклом дождь, тёплый свет лампы', '9:16', '1080p', 9.4, '2 реф. · аудио 9.4 с', 1],
-  ['video', 'Бард играет на рояле в полутёмном зале, камера медленно облетает его', '16:9', 'HD+', 8, 'Текст → видео', 1],
+  ['video', 'Бард играет на рояле в полутёмном зале, камера медленно облетает его', '16:9', 'HD+', 8, 'Текст -> видео', 1],
   ['lipsync', '<Picture 1> читает рэп на крыше ночного города, неон', '9:16', '720p', 11.2, '3 реф. · аудио 11.2 с', 0],
-  ['video', 'Кошка прыгает на подоконник и смотрит на снег', '1:1', '720p', 4, 'Кадр → кадр', 0],
+  ['video', 'Кошка прыгает на подоконник и смотрит на снег', '1:1', '720p', 4, 'Кадр -> кадр', 0],
 ].forEach(([mode, prompt, aspect, q, len, sub, daysAgo], i) => {
   const [w, h] = resFor(aspect, q), d = new Date(Date.now() - daysAgo * 864e5 - i * 37e5);
   const c = document.createElement('canvas'); c.width = 320; c.height = 200; drawCover(c.getContext('2d'), makeScene(i / 7 + .05), 320, 200);

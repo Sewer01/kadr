@@ -188,7 +188,7 @@ class JsApi:
 
 def window_mode():
     """How the window opens. It used to always open maximized, which cannot be dragged to a second
-       monitor or made smaller without a fight; the choice is in Настройки → Интерфейс."""
+       monitor or made smaller without a fight; the choice is in Настройки -> Интерфейс."""
     try:
         import json
         v = json.loads((server.DATA_DIR / "config.json").read_text(encoding="utf-8")).get("window_mode")

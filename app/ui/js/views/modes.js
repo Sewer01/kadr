@@ -20,7 +20,7 @@ import { libToFile } from './workflows.js';
 export const V = { aspect: '16:9', q: '720p', dur: 5, first: false, last: false, len: () => V.dur };
 export const vPrev = previewPanel($('#vPreview'), V, {
   extraLabel: 'Режим',
-  extra: () => V.first && V.last ? 'Кадр → кадр' : V.first ? 'Изображение → видео' : 'Текст → видео',
+  extra: () => V.first && V.last ? 'Кадр -> кадр' : V.first ? 'Изображение -> видео' : 'Текст -> видео',
   validate: () => !$('#vPrompt').value.trim() ? 'Напишите промпт' : '',
   passes: () => [V.accel === 'sla' ? 4 : 8],
   target: () => $('#dFirst img'),
@@ -40,7 +40,7 @@ export const vPrev = previewPanel($('#vPreview'), V, {
       return fd;
     },
   },
-  meta: () => ({ mode: 'video', prompt: $('#vPrompt').value.trim(), sub: $('#vLoop').checked && V.first ? 'Зацикленное видео' : V.first && V.last ? 'Кадр → кадр' : V.first ? 'Изображение → видео' : 'Текст → видео' }),
+  meta: () => ({ mode: 'video', prompt: $('#vPrompt').value.trim(), sub: $('#vLoop').checked && V.first ? 'Зацикленное видео' : V.first && V.last ? 'Кадр -> кадр' : V.first ? 'Изображение -> видео' : 'Текст -> видео' }),
   onDone: item => addToLib(item),
 });
 $('#vLoop').onchange = () => { $('#dLast').style.opacity = $('#vLoop').checked ? .4 : ''; vPrev(); };
@@ -68,7 +68,7 @@ $('#vParams').addEventListener('click', e => {
 });
 vAccUpd(); vAccCheck();
 export function vMode() {
-  $('#vMode').textContent = 'Режим: ' + (V.first && V.last ? 'видео между двумя кадрами' : V.first ? 'изображение → видео' : 'видео по тексту');
+  $('#vMode').textContent = 'Режим: ' + (V.first && V.last ? 'видео между двумя кадрами' : V.first ? 'изображение -> видео' : 'видео по тексту');
   $('#dLast').classList.toggle('disabled', !V.first);
   $('#lastHint').textContent = V.first ? 'необязательно' : 'сначала загрузите первый';
 }
@@ -97,7 +97,7 @@ export const lPrev = previewPanel($('#lPreview'), L, {
   extraLabel: 'Проходы',
   extra: () => {
     const [w, h] = resFor(L.aspect, L.q), s = QUALITY_ALL.find(x => x.id === L.q).px >= 1824 * 1024 ? 2 : 1.5;
-    return `${r32(w / s)}×${r32(h / s)} → ×${s}`;
+    return `${r32(w / s)}×${r32(h / s)} -> ×${s}`;
   },
   passes: () => [8, 4],
   twoPass: true,
@@ -501,7 +501,7 @@ $('#vwSeed').onclick = () => {
   const st = it.mode === 'video' ? V : it.mode === 'lipsync' ? L : RM[it.mode]?.S; if (!st) return;
   closeViewer(); useSeed(st, it.seed, it.mode);
 };
-$('#vwFav').onclick = () => { const it = (byId(openId) || openItem); setFav(it, !it.fav); $('#vwFav').textContent = it.fav ? '★ В избранном' : 'В избранное'; renderLib(); };
+$('#vwFav').onclick = () => { const it = (byId(openId) || openItem); setFav(it, !it.fav); $('#vwFav').textContent = it.fav ? ' В избранном' : 'В избранное'; renderLib(); };
 $('#vwRepeat').onclick = async () => {
   const it = (byId(openId) || openItem); closeViewer();
   if (it.mode === 'custom') { toast('Для своих workflow настройки переносятся вручную: откройте раздел «Свои workflow»'); goTo('custom'); return; }
@@ -655,7 +655,7 @@ export function makeRefMode(cfg) {
         });
       input.onchange = () => {
         const f = input.files[0]; if (!f) return;
-        s._file = f; s.classList.add('filled'); $('span', s).textContent = accept.startsWith('video') ? '✓ Видео загружено' : f.name;
+        s._file = f; s.classList.add('filled'); $('span', s).textContent = accept.startsWith('video') ? '. Видео загружено' : f.name;
         const media = document.createElement(accept.startsWith('video') ? 'video' : 'audio');
         media.preload = 'auto'; media.muted = true; media.src = URL.createObjectURL(f);
         if (accept.startsWith('video')) {   // a frame of the video in the slot, like a picture: it is clear at a glance that the video is there
@@ -675,10 +675,10 @@ export function makeRefMode(cfg) {
             const ratio = Math.min(16 / 9, Math.max(9 / 16, media.videoWidth / media.videoHeight));
             s.style.aspectRatio = ratio.toFixed(4); s.classList.toggle('wide', ratio > 1.2);
           }
-          say(`✓ Загружено: ${f.name} · ${media.duration.toFixed(1)} с${isVid && media.videoWidth ? ` · ${media.videoWidth}×${media.videoHeight}` : ''} · ${(f.size / 1048576).toFixed(1)} МБ`, false); changed();
+          say(`. Загружено: ${f.name} · ${media.duration.toFixed(1)} с${isVid && media.videoWidth ? ` · ${media.videoWidth}×${media.videoHeight}` : ''} · ${(f.size / 1048576).toFixed(1)} МБ`, false); changed();
         };
         media.onerror = () => {
-          s._dur = 0; s.classList.add('bad'); $('small', s).textContent = 'не открылось'; if (isVid) $('span', s).textContent = '✗ Видео не открылось';
+          s._dur = 0; s.classList.add('bad'); $('small', s).textContent = 'не открылось'; if (isVid) $('span', s).textContent = ' Видео не открылось';
           say(`Не получилось открыть «${f.name}» в программе (возможно, необычный формат или кодек). Попробуйте сохранить файл как обычный MP4 (H.264) и загрузить снова.`, true);
           toast('Файл не открылся: ' + f.name);
         };
@@ -1259,7 +1259,7 @@ export function makeRefMode(cfg) {
     card.removeAttribute('data-scenarobox');
     card.innerHTML = `<div class="card-h"><h3><span class="n">4</span>Сцены</h3><span class="counter lm-total"></span></div>
       <div class="tl-player"><video class="tl-vid" controls playsinline loop hidden></video><div class="hint tl-empty">Здесь покажется готовая сцена. Выберите фрагмент на ленте ниже и нажмите «Сделать эту сцену».</div></div>
-      <div style="display:flex;gap:8px;margin-bottom:6px;flex-wrap:wrap"><button class="btn pri tl-all" type="button" title="Готовые сцены подряд, как один ролик: первая, вторая, третья...">▶ Смотреть готовые сцены подряд</button><button class="btn pri tl-join" type="button" title="Все готовые сцены по порядку отправляются в «Монтаж»: там остаётся нажать «Склеить», и весь ролик одним файлом появится в Библиотеке, откуда его можно сохранить">⇩ Собрать весь ролик и сохранить</button><span class="hint tl-note" style="align-self:center"></span></div>
+      <div style="display:flex;gap:8px;margin-bottom:6px;flex-wrap:wrap"><button class="btn pri tl-all" type="button" title="Готовые сцены подряд, как один ролик: первая, вторая, третья...">▶ Смотреть готовые сцены подряд</button><button class="btn pri tl-join" type="button" title="Все готовые сцены по порядку отправляются в «Монтаж»: там остаётся нажать «Склеить», и весь ролик одним файлом появится в Библиотеке, откуда его можно сохранить"> вниз Собрать весь ролик и сохранить</button><span class="hint tl-note" style="align-self:center"></span></div>
       <div class="tl" title="Фрагменты ролика по порядку. Тяните внутри фрагмента, чтобы задать его длину. Ручкой слева переставляйте сцены"></div>
       <div class="hint" style="margin:-6px 0 10px;font-size:12px">Нажмите на фрагмент, чтобы открыть его. Тяните внутри фрагмента - задаёте время сцены, за правый край - тоже, но с шагом. Ручка слева переставляет сцены местами, крестик убирает сцену целиком.</div>
       <div class="lm-scenes"></div>
@@ -1270,7 +1270,7 @@ export function makeRefMode(cfg) {
       <div class="seg lm-base" style="margin-bottom:6px"><button type="button" data-b="own" class="on" title="Новые сцены - считать всё с нуля по вашим описаниям">Новые сцены</button><button type="button" data-b="cont" title="Продолжить своё видео - берём конец вашего файла, и сцена идёт дальше от него">Продолжить видео</button></div>
       <div class="hint lm-base-hint" style="margin-bottom:10px"></div>
       <button class="btn pri lm-chain" type="button" style="margin-bottom:12px;width:100%;padding:12px" title="Сцены считаются одна за другой сами: следующая запускается, когда предыдущая готова. Можно оставить компьютер на ночь: каждая сцена сохраняется в Библиотеку отдельным клипом.">Сделать все сцены</button>
-      <button class="btn pri lm-final" type="button" hidden style="margin-bottom:12px;width:100%;padding:12px" title="Все сцены считаются заново с теми же текстами и тем же seed, но на 8 шагах: детали станут лучше. Один в один они не будут.">✨ Всё готово? Сделать всё в хорошем качестве</button>
+      <button class="btn pri lm-final" type="button" hidden style="margin-bottom:12px;width:100%;padding:12px" title="Все сцены считаются заново с теми же текстами и тем же seed, но на 8 шагах: детали станут лучше. Один в один они не будут."> Всё готово? Сделать всё в хорошем качестве</button>
       <div class="note lm-src" hidden style="margin-bottom:10px"><span><b>Продолжаем готовое видео:</b> <span class="lm-srcname"></span>. Первая сцена продолжит его конец, как будто это была прошлая сцена.</span> <button class="btn lm-srcx" type="button" style="padding:2px 9px;margin-left:8px">Убрать</button></div>
       <button class="btn" type="button" id="lmAdd" style="margin-top:10px">+ Добавить сцену</button>
       <div class="lm-srcpick" hidden>
@@ -1345,7 +1345,7 @@ export function makeRefMode(cfg) {
         $('.sc-act', c).hidden = !parts;
         const done = sigOk(c);
         const stale = c._done && !done;
-        $('.sc-state', c).textContent = done ? '✓ готова, клип в Библиотеке' + (c._done.text != null && c._done.text.trim() !== $('textarea', c).value.trim() ? ' · текст изменён после генерации, клип прежний' : '') : stale ? 'длина изменена: переделайте (следующие тоже)' : i > 0 && !root._canGo(i) ? `сцена ${i} ещё не готова: эта будет сделана как новый план` : '';
+        $('.sc-state', c).textContent = done ? ', готова, клип в Библиотеке' + (c._done.text != null && c._done.text.trim() !== $('textarea', c).value.trim() ? ' · текст изменён после генерации, клип прежний' : '') : stale ? 'длина изменена: переделайте (следующие тоже)' : i > 0 && !root._canGo(i) ? `сцена ${i} ещё не готова: эта будет сделана как новый план` : '';
         $('.sc-state', c).style.color = done ? 'var(--ok, #7bd88f)' : stale ? 'var(--pink)' : '';
         const b = $('.sc-do', c); b.disabled = false; b.style.opacity = ''; $('.sc-undo', c).hidden = !(root._undo && root._undo.length); b.textContent = done ? 'Переделать' : 'Сделать эту сцену';
         const rg = $('.sc-redogo', c); if (rg) rg.hidden = !(done && parts && i < $$('.sc', root).length - 1);
@@ -3297,7 +3297,7 @@ export function makeRefMode(cfg) {
       <div class="hint rm-acc-hint"></div></div>
     <div class="row"><div class="row-l">Шаги</div>
       <div class="seg rm-steps" style="grid-template-columns:repeat(3,1fr)">
-        <button data-s="4">4<small>быстро</small></button><button data-s="6">6 ★<small>баланс</small></button><button data-s="8">8<small>динамика</small></button>
+        <button data-s="4">4<small>быстро</small></button><button data-s="6">6 <small>баланс</small></button><button data-s="8">8<small>динамика</small></button>
       </div><div class="hint rm-steps-hint"></div></div>
     <div class="row"><div class="row-l">Точность переноса с изображений</div>
       <div class="seg rm-rs" style="grid-template-columns:minmax(0,1fr) minmax(0,1fr)"><button data-r="match">Быстро<small>изображения уменьшаются</small></button><button data-r="max">Максимум<small>лучшее сходство</small></button></div>
@@ -3372,7 +3372,7 @@ export function makeRefMode(cfg) {
         S.faithful = a.faithful; upd();
         // only the LoRAs this ComfyUI actually has can be switched and tuned
         mountLoras($('.rm-loras', root), S, [...(a.dmad ? ['dmad'] : []), ...(a.speed ? ['speed'] : [])]);
-        const row = (ok, t) => `<div class="${ok ? 'ok-t' : 'warn-t'}">${ok ? '✓' : '—'} ${t}</div>`;
+        const row = (ok, t) => `<div class="${ok ? 'ok-t' : 'warn-t'}">${ok ? '' : '—'} ${t}</div>`;
         box.innerHTML = (a.faithful ? '<b class="ok-t">Точная копия вашего workflow</b> <span class="hint">· со второй сцены продолжение идёт обычной схемой: нода точного режима не умеет принимать маску продолжения</span>' : '<b class="warn-t">Упрощённая схема (то же 8 + 4 шага)</b>')
           + row(a.selflift, 'SelfLift сэмплер (8 шагов в низком разрешении + 4 в высоком)')
           + row(a.refiner, 'H3 Sigma Refiner (+1 финальный шаг)')

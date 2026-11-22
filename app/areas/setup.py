@@ -244,7 +244,7 @@ class SetupMixin:
         return await self.h_window_gpu_get(req)
 
     async def h_window_mode(self, req):
-        """How the window should open next time (the choice lives in Настройки → Интерфейс)."""
+        """How the window should open next time (the choice lives in Настройки -> Интерфейс)."""
         try:
             body = await req.json()
         except Exception:

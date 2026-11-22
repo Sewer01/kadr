@@ -22,12 +22,12 @@ def is_link(v):
 
 def validate_api(graph):
     if isinstance(graph, dict) and isinstance(graph.get("nodes"), list):
-        raise ValueError("Это обычный файл workflow. Нужен формат API: в ComfyUI меню «Workflow» → «Export (API)».")
+        raise ValueError("Это обычный файл workflow. Нужен формат API: в ComfyUI меню «Workflow» -> «Export (API)».")
     if not isinstance(graph, dict) or not graph:
         raise ValueError("Файл не похож на workflow ComfyUI.")
     for node in graph.values():
         if not isinstance(node, dict) or not isinstance(node.get("class_type"), str) or not isinstance(node.get("inputs"), dict):
-            raise ValueError("Файл не похож на workflow в формате API (меню «Workflow» → «Export (API)»).")
+            raise ValueError("Файл не похож на workflow в формате API (меню «Workflow» -> «Export (API)»).")
 
 
 def spec(info, name):

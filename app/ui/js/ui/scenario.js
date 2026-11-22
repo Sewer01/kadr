@@ -398,7 +398,7 @@ export function audioTokens(c, bs, film) {
     return '<button class="token" type="button" data-ins="&lt;Audio ' + x.tag + '&gt;" data-audio="1"' + (off ? ' disabled' : '') +
       ' title="' + (here ? 'Этот тег уже в тексте сцены' : off ? 'В сцене уже три аудио - модель слушает не больше трёх'
         : 'Вставить в текст тег <Audio ' + x.tag + '> - ' + (x.own ? 'аудио этой сцены' : 'общее аудио ролика') + ': ' + x.name) + '">&lt;Audio ' +
-      x.tag + (here ? ' ✓' : '') + '</button>';
+      x.tag + (here ? ' · есть' : '') + '</button>';
   });
 }
 
@@ -572,7 +572,7 @@ export async function sendPrompt(blk, to) {
         if (j < 0) { home.gone.push('<Picture ' + n + '> - в сцене нет свободного места'); continue; }
         if (c._setOwn) c._setOwn(j, a.file); else { c._files[j] = a.file; c._paint?.(); }
         home.pics++;
-        home.where.push('<Picture ' + n + '> → сцена ' + Math.floor(n / 10) + ', место ' + (dec + j) + ' · ' + a.file.name);
+        home.where.push('<Picture ' + n + '> -> сцена ' + Math.floor(n / 10) + ', место ' + (dec + j) + ' · ' + a.file.name);
         files = files.filter(f => !sameFile(f, a.file));        // тот же файл не встанет ещё и на общую полку
       }
       for (const a of (AG.audios || [])) {
@@ -591,7 +591,7 @@ export async function sendPrompt(blk, to) {
         // слова уже услышаны в сценаристе: переносим их в карточку сцены, а не слушаем заново
         if ((a.text || '').trim() && !(c._audWords[j] || '').trim()) c._audWords[j] = String(a.text).trim();
         c._paintAuds?.(); c._paintWords?.(); c._paint?.(); home.auds++;
-        home.where.push('<Audio ' + n + '> → сцена ' + Math.floor(n / 10) + ' · ' + a.file.name);
+        home.where.push('<Audio ' + n + '> -> сцена ' + Math.floor(n / 10) + ' · ' + a.file.name);
       }
       const now = home.pics + home.auds;
       if (now > home.said) {

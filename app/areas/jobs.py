@@ -354,7 +354,7 @@ class QueueMixin:
 
     async def queue_cloud(self, rh, graph, stages, meta):
         if not self.config.get("rh_workflow_id"):
-            return web.json_response({"error": "Укажите ID любого вашего workflow на RunningHub (раздел «Настройки» → «Облако»)"},
+            return web.json_response({"error": "Укажите ID любого вашего workflow на RunningHub (раздел «Настройки» -> «Облако»)"},
                                      status=400)
         if getattr(self, "rh_models", None) is None:
             try:
@@ -398,7 +398,7 @@ class QueueMixin:
                                 date=datetime.now().isoformat(timespec="seconds"), fav=False,
                                 file={"type": "local", "path": str(dest), "filename": dest.name})
                     if video.get("consumeCoins"):
-                        item["sub"] = f'{item.get("sub", "")} · ☁ {video["consumeCoins"]} RH'.strip(" ·")
+                        item["sub"] = f'{item.get("sub", "")} · {video["consumeCoins"]} RH'.strip(" ·")
                     self.library.add(item)
                     await self.stamp(dict(item, local=str(dest)))
                     self.remember(job)
