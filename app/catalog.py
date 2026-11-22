@@ -58,7 +58,7 @@ NODE_CHECKS = [
      "modes": ["lipsync"], "optional": True, "why": "кнопка «Отделить голос» в редакторе аудио"},
     {"pack": "ComfyUI-VideoHelperSuite", "classes": ["VHS_LoadVideo"], "modes": ["refs", "swap"],
      "optional": False, "why": "видео, в котором меняем персонажа"},
-    {"pack": "ComfyUI-KJNodes", "classes": ["MiniMaxChunkFeedForward", "MiniMaxLowVRAMAttention", "ImageNoiseAugmentation"], "modes": ["long"],
+    {"pack": "ComfyUI-KJNodes", "classes": ["MiniMaxChunkFeedForward", "MiniMaxLowVRAMAttention", "ImageNoiseAugmentation"], "modes": ["long", "clipsc"],
      "optional": False, "why": "экономия видеопамяти в длинном видео и зерно плёнки в монтаже"},
     # without these two the exact action mode simply is not offered: the picture stays the same, just less clean
     {"pack": "ComfyUI-LTXVideo", "classes": ["LTXVSetVideoLatentNoiseMasks"], "modes": ["action", "actionsc"],
@@ -456,7 +456,7 @@ LORA_FAMILY = (
 )
 
 MODE_FAMILY = {"video": "video", "lipsync": "video", "refs": "video", "actor": "video", "swap": "video",
-               "action": "video", "actionsc": "video", "long": "video",
+               "action": "video", "actionsc": "video", "long": "video", "clipsc": "video",
                "krea": "krea", "kreareal": "krea", "qwen": "qwen", "flux": "flux", "h3img": "h3img",
                "upscale": "upscale", "relayvsr": "upscale"}
 
@@ -536,7 +536,8 @@ ROLE_TITLES = {
 MODE_TITLES = {"video": "Видео", "lipsync": "Клип", "refs": "Видеостудия", "actor": "Актёр", "swap": "Замена", "action": "Экшн-видео",
                "krea": "Изображение по тексту", "kreareal": "Изображение по тексту: реализм", "qwen": "Изменение изображения", "flux": "Изменение изображения: FLUX klein", "h3img": "Изображения MiniMax H3 Image (по тексту и по референсам)",
                "upscale": "Апскейлинг видео и изображений", "relayvsr": "Апскейлинг видео быстро (RelayVSR)", "long": "Киностудия",
-    "actionsc": "Экшн-студия (сцены подряд)"}
+    "actionsc": "Экшн-студия (сцены подряд)",
+ "clipsc": "Клип-студия (клип по треку)"}
 
 # Which roles each mode needs.
 MODE_ROLES = {
@@ -552,6 +553,8 @@ MODE_ROLES = {
     "swap": ["lipsync_unet", "text_encoder", "video_vae", "audio_vae", "ref2v_turbo_lora", "swap_lora"],
     # long video / clips: scenes that continue each other (Singularity Ref2V + Pika LoRA, same files as References)
     "long": ["lipsync_unet", "text_encoder", "video_vae", "audio_vae", "pika_lora"],
+ # клип-студия: та же дорога по сценам и та же модель, что у Киностудии
+ "clipsc": ["lipsync_unet", "text_encoder", "video_vae", "audio_vae", "pika_lora"],
     "krea": ["krea_unet", "krea_clip", "krea_vae"],
     "kreareal": ["kreareal_unet", "kreareal_lora", "krea_clip", "krea_vae"],
     "qwen": ["qwen_unet", "qwen_clip", "qwen_vae"],
@@ -569,6 +572,7 @@ MODE_OPTIONAL = {
     "swap": ["pika_lora", "realism_lora", "motion_repair_lora"],
     "action": ["speed_slider_lora", "action_upscaler"],
     "long": ["vocal_model", "dmad_lora"],
+ "clipsc": ["vocal_model", "dmad_lora"],
     # точная экшн-схема берёт свою LoRA DMAD по имени файла (ACTION_DMAD_FILES), а роль dmad_lora -
     # это файл ускорения ЧЕРНОВИКА Видеостудии; черновика в Экшн-студии нет, и предлагать здесь файл,
     # который эта студия никогда не читает, значит врать человеку
@@ -665,7 +669,7 @@ def choose_models(hw, profile=None):
 
 
 MAIN_ROLE = {"video": "fast_unet", "lipsync": "lipsync_unet", "refs": "lipsync_unet", "actor": "lipsync_unet", "swap": "lipsync_unet",
-             "long": "lipsync_unet", "action": "action_unet", "actionsc": "action_unet", "krea": "krea_unet", "qwen": "qwen_unet", "flux": "flux_unet", "h3img": "h3img_unet",
+             "long": "lipsync_unet", "clipsc": "lipsync_unet", "action": "action_unet", "actionsc": "action_unet", "krea": "krea_unet", "qwen": "qwen_unet", "flux": "flux_unet", "h3img": "h3img_unet",
              "upscale": "seedvr_unet", "kreareal": "kreareal_unet", "relayvsr": "relayvsr_unet", "flux": "flux_unet",
               "h3img": "h3img_unet"}
 ROLE_FAMILY = {"lipsync_unet": "ref2", "fast_unet": "fast", "action_unet": "hybrid",
@@ -718,4 +722,4 @@ def model_entry(role, variant):
 
 
 # modes that appeared after the first release: the app offers them once after an update
-OFFER_MODES = ["flux", "long", "h3img"]
+OFFER_MODES = ["flux", "long", "h3img", "clipsc"]

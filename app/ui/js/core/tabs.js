@@ -17,12 +17,13 @@ export const TABS = [
   {order: 9, section: "Создать", key: "long", caption: "Киностудия", sub: true, active: false, hidden: false},
   {order: 10, section: "Создать", key: "action", caption: "Экшн-видео", sub: true, active: false, hidden: false, group: "refs"},
   {order: 11, section: "Создать", key: "actionsc", caption: "Экшн-студия", sub: true, active: false, hidden: false, group: "long"},
-  {order: 12, section: "Создать", key: "krea", caption: "Изображение по тексту", sub: true, active: false, hidden: false},
-  {order: 13, section: "Создать", key: "qwen", caption: "Изменение изображения", sub: true, active: false, hidden: false},
-  {order: 14, section: "Создать", key: "custom", caption: "Свои workflow", sub: false, active: false, hidden: true},
-  {order: 15, section: "Студия", key: "queue", caption: "Очередь", sub: false, active: false, hidden: false},
-  {order: 16, section: "Студия", key: "library", caption: "Библиотека", sub: false, active: false, hidden: false},
-  {order: 17, section: "Студия", key: "montage", caption: "Монтаж", sub: false, active: false, hidden: false},
+  {order: 12, section: "Создать", key: "clipsc", caption: "Клип-студия", sub: true, active: false, hidden: false, group: "long"},
+  {order: 13, section: "Создать", key: "krea", caption: "Изображение по тексту", sub: true, active: false, hidden: false},
+  {order: 14, section: "Создать", key: "qwen", caption: "Изменение изображения", sub: true, active: false, hidden: false},
+  {order: 15, section: "Создать", key: "custom", caption: "Свои workflow", sub: false, active: false, hidden: true},
+  {order: 16, section: "Студия", key: "queue", caption: "Очередь", sub: false, active: false, hidden: false},
+  {order: 17, section: "Студия", key: "library", caption: "Библиотека", sub: false, active: false, hidden: false},
+  {order: 18, section: "Студия", key: "montage", caption: "Монтаж", sub: false, active: false, hidden: false},
   {order: 18, section: "Студия", key: "upfile", caption: "Апскейлинг", sub: true, active: false, hidden: false},
   {order: 19, section: "Система", key: "models", caption: "Настройки", sub: false, active: false, hidden: false},
   {order: 20, section: "Система", key: "about", caption: "О программе", sub: false, active: false, hidden: false},
@@ -33,11 +34,11 @@ export const TABS = [
    расчёт - меню просто перестаёт их плодить. Кнопкой группы открывается тот режим,
    на котором человек останавливался. */
 export const NAV_GROUPS = [
-  { nav: "long", store: "h3-grp-film", parts: ["long", "actionsc"] },
+  { nav: "long", store: "h3-grp-film", parts: ["long", "actionsc", "clipsc"] },
   { nav: "refs", store: "h3-grp-video", parts: ["refs", "action"] },
 ];
 export const NAV_GROUP_TITLES = {
-  long: "Киностудия", actionsc: "Экшн-студия",
+  long: "Киностудия", actionsc: "Экшн-студия", clipsc: "Клип-студия",
   refs: "Видеостудия", action: "Экшн-видео",
 };
 export const groupOf = key => NAV_GROUPS.find(g => g.parts.includes(key)) || null;

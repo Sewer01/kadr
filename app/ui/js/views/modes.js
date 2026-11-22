@@ -908,7 +908,7 @@ export function makeRefMode(cfg) {
     card.addEventListener('dragover', e => { if (e.dataTransfer.types.includes('text/h3lib')) { e.preventDefault(); card.style.outline = '2px dashed var(--accent)'; } });
     card.addEventListener('dragleave', () => { card.style.outline = ''; });
     card.addEventListener('drop', () => { card.style.outline = ''; });
-    const MODE_NAME = { refs: 'Видеостудия', actor: 'Актёр', action: 'Экшн-видео', long: 'Киностудия', actionsc: 'Экшн-студия' }[cfg.mode] || cfg.mode;
+    const MODE_NAME = { refs: 'Видеостудия', actor: 'Актёр', action: 'Экшн-видео', long: 'Киностудия', actionsc: 'Экшн-студия', clipsc: 'Клип-студия' }[cfg.mode] || cfg.mode;
     let turls = [];
     const paintThumbs = () => {
       turls.forEach(u2 => { try { URL.revokeObjectURL(u2); } catch (e) { } }); turls = [];
@@ -1139,7 +1139,7 @@ export function makeRefMode(cfg) {
         return;
       }
       host.hidden = false;
-      const MODE_NAME = { refs: 'Видеостудия', actor: 'Актёр', action: 'Экшн-видео', long: 'Киностудия', actionsc: 'Экшн-студия' }[cfg.mode] || cfg.mode;
+      const MODE_NAME = { refs: 'Видеостудия', actor: 'Актёр', action: 'Экшн-видео', long: 'Киностудия', actionsc: 'Экшн-студия', clipsc: 'Клип-студия' }[cfg.mode] || cfg.mode;
       if (!tr) tr = root._raTrim = new AudioTrimmer({ mount: host, limit: 15, agentTarget: cfg.mode, onFile,
         whereLabel: q => 'раздел «' + MODE_NAME + '», аудио ' + (q._slot + 1) + ', тег <Audio ' + (q._slot + 1) + '>, ' + slots.length + ' места в разделе' });
       const src = s._src || s._file;
@@ -1531,6 +1531,24 @@ export function makeRefMode(cfg) {
     };
     root._setScenes = list => {   // from the agent: replace all scenes
       if (!list.length) return 0;
+      /* Сценарист дописывал пустые сцены: всё, что в них уже было написано, должно
+         вернуться нетронутым - вставка отвечает всем списком сразу. */
+      if (root._fillOnly) {
+        const keepTxt = root._fillKeep || [];
+        queueMicrotask(() => {
+          const n = root._fillOnly;
+          root._fillOnly = 0; root._fillKeep = null;
+          let fixed = 0;
+          $$('.sc', root).forEach((c, i) => {
+            const ta = c._win && c._win.ta, old = keepTxt[i];
+            if (ta && old && old.trim() && ta.value !== old) {
+              ta.value = old; ta.dispatchEvent(new Event('input', { bubbles: true })); fixed++;
+            }
+          });
+          root.renumber?.(); if (root._save) root._save();
+          toast('Сценарист дописал пустые сцены' + (fixed ? ', ' + fixed + ' уже написанных не тронуты' : ''));
+        });
+      }
       /* Границы сцен человек задаёт в карточке «Сценарий». Сюда приходит ответ
          Сценариста, и он обязан уложиться: иначе «не больше 4 сцен по 8 секунд»
          значит «сколько модель посчитала». Других путей сюда нет - загрузка
@@ -2792,9 +2810,12 @@ export function makeRefMode(cfg) {
         min: Math.min(lim.min, lim.max), max: Math.max(lim.min, lim.max),
         cnt: lim.how === 'man' ? Math.max(1, Math.min(SCENES_MAX, lim.n | 0)) : 0,
       });
-      root._scWords = () => lim.how === 'man' ? ', всего не больше ' + root._scLimits().cnt + ' сцен'
-        : lim.how === 'off' ? ', количество сцен не ограничивай, режь по смыслу'
-          : ', сколько сцен - реши сам по смыслу, но не меньше двух';
+      root._scWords = () => root._fillOnly
+        ? ', верни список ровно из тех же сцен и в том же порядке: там, где описание уже есть, повтори его слово в слово, а пустые сцены допиши по музыке и общему смыслу клипа'
+        : root._scPlan ? ', всего ' + root._scPlan + ' сцен на трек длиной ' + root._scTrack + ' секунд - закрой трек целиком'
+          : lim.how === 'man' ? ', всего не больше ' + root._scLimits().cnt + ' сцен'
+            : lim.how === 'off' ? ', количество сцен не ограничивай, режь по смыслу'
+              : ', сколько сцен - реши сам по смыслу, но не меньше двух';
       const nums = [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
       const mkOpt = (v, t, on) => { const o = document.createElement('option'); o.value = v; o.textContent = t; o.selected = !!on; return o; };
       const limRow = document.createElement('div');
@@ -2863,6 +2884,77 @@ export function makeRefMode(cfg) {
         field.dispatchEvent(new Event('input', { bubbles: true }));
         root._paintSrTags?.();
       };
+      /* Клип-студия: здесь герой - трек. Карточка «Клип» говорит, что программа видит в
+         музыке, и даёт две кнопки Сценаристу: разложить трек на сцены и дописать те
+         сцены, где текста ещё нет. Трек кладут в карточку «Музыка»: он один на клип. */
+      root._scPlan = 0; root._scTrack = 0; root._fillOnly = 0;
+      if (cfg.clipScenes) {
+        const clipCard = document.createElement('div');
+        clipCard.className = 'card rm-clip';
+        clipCard.innerHTML = '<div class="card-h"><h3><span class="n">3</span>Клип</h3></div>';
+        const info = document.createElement('div'); info.className = 'hint'; info.style.marginBottom = '8px';
+        const cRow = document.createElement('div'); cRow.className = 'row';
+        const bPlan = document.createElement('button'), bFill = document.createElement('button');
+        [bPlan, bFill].forEach(b => { b.className = 'btn mini'; b.type = 'button'; });
+        bPlan.textContent = 'Сцены по треку'; bFill.textContent = 'Дописать пустые сцены';
+        bPlan.title = 'Число сцен считается от длины трека и ваших границ длительности, и Сценарист тут же пишет сцены.';
+        bFill.title = 'Сценарист пишет кадры только сценам без текста. Уже написанные он оставляет как есть.';
+        cRow.append(bPlan, bFill);
+        clipCard.append(info, cRow);
+        srCard.after(clipCard);
+        const trackFile = () => (root._filmFiles ? root._filmFiles() : [])[0] || null;
+        const trackDur = async () => {
+          const f = trackFile();
+          if (!f) return 0;
+          if (f._h3dur) return f._h3dur;
+          let u = '';
+          try { u = URL.createObjectURL(f); } catch (e) { return 0; }   // не файл - не читаем
+          let done = false;
+          try {
+            const d = await new Promise(res => {
+              const a = new Audio();
+              const fin = v => { if (!done) { done = true; res(v); } };
+              a.preload = 'metadata';
+              a.onloadedmetadata = () => fin(isFinite(a.duration) && a.duration > 0 ? Math.round(a.duration) : 0);
+              a.onerror = () => fin(0);
+              setTimeout(() => fin(0), 8000);
+              a.src = u;
+            });
+            f._h3dur = d; return d;
+          } finally { if (u) URL.revokeObjectURL(u); }
+        };
+        const clipPaint = () => {
+          const f = trackFile();
+          info.textContent = f
+            ? 'Трек: ' + f.name + (root._scTrack ? ' · ' + Math.floor(root._scTrack / 60) + ':' + String(root._scTrack % 60).padStart(2, '0') : ' · длина читается…')
+              + ' · сцена ' + Math.min(lim.min, lim.max) + '-' + Math.max(lim.min, lim.max) + ' с'
+              + (root._scPlan ? ' · на трек ' + root._scPlan + ' сцен' : '')
+            : 'Трека ещё нет: положите аудио в карточку «Музыка» - оно одно на весь клип, и от него считаются сцены.';
+          bPlan.disabled = !f;
+        };
+        root._clipPaint = clipPaint; clipPaint();
+        const gen = () => { const g = $('.field-btns button', srCard); if (g) g.click(); };
+        bPlan.onclick = async () => {
+          const d = await trackDur();
+          root._scTrack = d;
+          if (!d) { toast('Длину трека прочитать не вышло - положите аудио заново'); clipPaint(); return; }
+          root._scPlan = Math.max(2, Math.min(SCENES_MAX, Math.round(d / Math.max(lim.min, lim.max))));
+          clipPaint();
+          if (!(srWin.sc && srWin.sc.value.trim())) { toast('Сначала опишите в «Сценарии», что происходит в клипе'); return; }
+          gen();
+        };
+        bFill.onclick = () => {
+          const all = $$('.sc', root);
+          const empty = all.filter(c => !(((c._win && c._win.ta) || {}).value || '').trim());
+          if (!all.length) { toast('Сцен пока нет: сначала «Сцены по треку» или «+ сцена»'); return; }
+          if (!empty.length) { toast('Пустых сцен нет - Сценарист писал по всем'); return; }
+          root._fillKeep = all.map(c => ((c._win && c._win.ta) || {}).value || '');
+          root._fillOnly = empty.length;
+          toast('Сценарист дописывает ' + empty.length + ' сцен');
+          gen();
+        };
+        root.addEventListener('change', e => { if (e.target.closest('.lm-snd')) clipPaint(); });
+      }
       /* Ряд тегов собирается заново: он всегда повторяет то, что стоит в студии сейчас. */
       root._paintSrTags = () => {
         const row = srWin.tokens;
@@ -3788,6 +3880,13 @@ export const RM = {
     baseVideo: false, partsOnly: true,   // готового видео не продолжает; режим «весь ролик» не нужен
     sub: 'Длинный экшн по сценам: каждая следующая продолжает прошлую, готовые клипы склеиваются в один ролик',
     refHint: 'До 5 изображений: персонажи, локация, предмет. В тексте сцены ссылайтесь на них &lt;Picture 1&gt;, &lt;Picture 2&gt; - программа сама поставит номера по местам. Звук модель делает сама, но им можно управлять: в карточке «Аудио» кладут фон на весь ролик (один файл) и до трёх аудио на каждую сцену — их номера идут десятками, и промпт решает, где какой слушать.',
+    placeholder: '',
+  }),
+  clipsc: makeRefMode({
+    mode: 'clipsc', title: 'Клип-студия', pill: 'Клип по треку · Pika', dur: 10, maxImages: 5, videos: false,
+    scenes: true, graph: 'pika', clipScenes: true,   // сцены по треку; считает та же модель, что Киностудия
+    sub: 'Клип по вашей музыке: сцены рождаются из трека, готовые клипы склеиваются в один ролик',
+    refHint: 'До 5 изображений: герой, место, предмет, стиль - они подаются в каждую сцену, поэтому лицо и место не «плывут». В тексте сцены ссылайтесь на них как &lt;Picture 1&gt;, &lt;Picture 2&gt;… В карточке «Аудио» кладите трек на весь ролик: от его длины зависят количество и длительность сцен.',
     placeholder: '',
   }),
 };

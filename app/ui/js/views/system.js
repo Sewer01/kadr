@@ -90,7 +90,7 @@ export function setEngine(on) {
     krea: 'Изображение по тексту', qwen: 'Изменение изображения', upfile: 'Апскейлинг' };
   // the order a person works in: the picture, then the references, then the studios, then the clip
   // and the actor; pictures and the retouching stay in their own groups, the separators as they were
-  const GROUPS = [['video', 'refs', 'long', 'action', 'actionsc', 'lipsync', 'actor', 'swap'],
+  const GROUPS = [['video', 'refs', 'long', 'action', 'actionsc', 'clipsc', 'lipsync', 'actor', 'swap'],
                   ['krea', 'qwen'], ['upfile']];
   function paint() {
     const cur = ($('.view.active')?.id || '').replace('view-', '');

@@ -598,7 +598,7 @@ export function audioTagFor(name, dur) {
     } else {
       // both studios share this card: the picture studio and the action one
       const roots = [];
-      ['long', 'actionsc'].forEach(k => {
+      ['long', 'actionsc', 'clipsc'].forEach(k => {
         const r = (typeof RM !== 'undefined' && RM[k] && RM[k].root) || null;
         if (r && roots.indexOf(r) < 0) roots.push(r);
       });

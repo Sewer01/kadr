@@ -82,7 +82,7 @@ IMAGE_SKILLS = {"plist": "krea-2", "krea": "krea-2", "fluxt": "flux2-klein", "h3
                   "h3e": "minimax-h3-image", "qwent": "qwen-image-2-1-director-prompt",
                 "qwen": "qwen-image-2-1-director-prompt", "sheet": "karta-personazha", "sheet6": "karta-personazha",
                 "story": "storyboard"}
-AGENT_TARGETS = ("video", "lipsync", "refs", "actor", "swap", "action", "actionsc", "long") + tuple(IMAGE_SKILLS)
+AGENT_TARGETS = ("video", "lipsync", "refs", "actor", "swap", "action", "actionsc", "long", "clipsc") + tuple(IMAGE_SKILLS)
 # long extra reference files that would not fit next to the rest into the model's context
 SKIP_REFS = {"platform-adapters.md"}   # про облачные Seedance/Kling: в локальной версии их нет
 
@@ -420,6 +420,14 @@ def system_prompt(skills_text, target, ctx, editing=True):
             "- Если к чату приложена картинка персонажа, опираясь на неё, опиши его внешность (DNA) подробно: лист рисуется "
             "с нуля по тексту. Если лист нужен именно по готовой картинке, одной строкой подскажи раздел «Правка картинки» -> "
             "«Лист персонажа» -> 6 панелей: там это делается по самой картинке и точнее.")
+    elif target == "clipsc":
+        mode_rules = (
+            "СЕЙЧАС КЛИП-СТУДИЯ: клип по вашей музыке, лента сцен на модели Киностудии. Каждая следующая\n"
+            "сцена продолжает прошлую, готовые клипы программа склеивает в один ролик под трек.\n"
+            "- Отвечайте тем же списком сцен, что и студия: строка «SCENE N | секунды», ниже - описание кадра.\n"
+            "- Держитесь длины трека: сцен столько, сколько нужно, чтобы закрыть его целиком, и не режьте кадр\n"
+            "на две сцены там, где музыка не менялась. Там, где куплет или припев начинается, ставьте «| new».\n"
+            "- Описывайте движение под музыку (ритм, смена кадра на сильную долю), а не события без звука.\n")
     elif target == "actionsc":
         mode_rules = (
             "СЕЙЧАС ЭКШН-ВИДЕОСТУДИЯ: длинный экшн по сценам (Hybrid FL2VA/Ref2VA, 8 шагов в низком разрешении + 4 в высоком, "

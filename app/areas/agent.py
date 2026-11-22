@@ -337,7 +337,7 @@ class AgentMixin:
             if target == "actor" and not any(s["id"] == "akterskaya-igra" for s in active):
                 # this mode is acting-first: its skill is always on here
                 active += [s for s in self.skills.list() if s["id"] == "akterskaya-igra" and s["mode"] != "off"]
-            if target in ("long", "action", "actionsc") and not any(s["id"] == "sceny-studii" for s in active):
+            if target in ("long", "action", "actionsc", "clipsc") and not any(s["id"] == "sceny-studii" for s in active):
                 # these studios work scene by scene: whatever the person wrote, the answer
                 # has to come back as a scene sheet, or the studio cannot build the scenes
                 active += [s for s in self.skills.list() if s["id"] == "sceny-studii" and s["mode"] != "off"]
