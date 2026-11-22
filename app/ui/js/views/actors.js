@@ -7,7 +7,7 @@
 import { $, confirmBox, esc, toast } from '../core/util.js';
 import { onNav } from '../core/tabs.js';
 import { registerViews } from '../core/state.js';
-import { scenarioWindowOf } from '../ui/scenario.js';
+import { insertAtCursor, scenarioWindowOf } from '../ui/scenario.js';
 
 const TYPES = [['character', 'Персонаж'], ['vehicle', 'Транспорт'], ['object', 'Предмет'], ['location', 'Локация']];
 const MAX_IMAGES = 9;
@@ -91,19 +91,6 @@ export function acChips() {
   });
 }
 
-/* Имя карточки в текст: значок @ и токен, курсор встаёт после вставки. */
-function callByName(ta, token) {
-  const at = ta.selectionStart == null ? ta.value.length : ta.selectionStart;
-  const end = ta.selectionEnd == null ? at : ta.selectionEnd;
-  const head = ta.value.slice(0, at), tail = ta.value.slice(end);
-  const pad = !head || /[\s(]$/.test(head) ? '' : ' ';
-  ta.value = head + pad + '@' + token + ' ' + tail.replace(/^\s+/, ' ');
-  const pos = at + pad.length + token.length + 2;
-  ta.focus();
-  try { ta.setSelectionRange(pos, pos); } catch (e) { }
-  ta.dispatchEvent(new Event('input', { bubbles: true }));
-}
-
 function formOf(card, extra) {
   const fd = new FormData();
   fd.append('id', card.id); fd.append('name', card.name);
@@ -164,7 +151,7 @@ $('#acList').onclick = async e => {
     const mode = ($('select[data-mode]', row) || {}).value || SCENARIO_TABS[0];
     const win = scenarioWindowOf(mode);
     if (!win) { toast('В режиме «' + (TITLES[mode] || mode) + '» нет поля сценария'); return; }
-    callByName(win.ta, card.token);
+    insertAtCursor(win.ta, '@' + card.token);
     toast('Позвали «' + card.name + '» в «' + (TITLES[mode] || mode) + '»: её фото положите в слоты режима и поставьте тег плашкой');
   }
 };
@@ -176,7 +163,7 @@ document.addEventListener('click', e => {
   const root = chip.closest('[data-scenario]'); if (!root) return;
   const ta = root.querySelector('textarea'); if (!ta) return;
   e.stopPropagation(); e.preventDefault();
-  callByName(ta, chip.dataset.ac);
+  insertAtCursor(ta, '@' + chip.dataset.ac);
 }, true);
 
 SCENARIO_TABS.forEach(k => onNav(k, acChips));

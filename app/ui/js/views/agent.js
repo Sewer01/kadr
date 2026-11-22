@@ -4,6 +4,7 @@ import { LIB, abuf, audioName, byId, openId, openItem, registerViews, setupModes
 import { goTo, onNav } from '../core/tabs.js';
 import { wavSlice } from '../ui/audio.js';
 import { putScenario, scenarioWindowOf, sendPrompt } from '../ui/scenario.js';
+import { micToggle, transcribeWav } from '../ui/mic.js';
 import { dropBox } from '../ui/slots.js';
 import { openUpscale } from './library.js';
 import { MD_ENGINE, mdStart } from './models.js';
@@ -476,12 +477,8 @@ export function renderMsgs() {
   $('#agMsgs').scrollTop = 1e9;
 }
 /* audio in the chat: words from a clip (for lipsync prompts) and voice input */
-export async function transcribeWav(blob, lang = 'auto') {
-  const fd = new FormData(); fd.append('file', blob, 'a.wav'); fd.append('lang', lang);
-  const r = await fetch('/api/speech/transcribe', { method: 'POST', body: fd });
-  const j = await r.json(); if (!r.ok) throw new Error(j.error || 'Не удалось распознать');
-  return j;
-}
+/* распознавание речи уехало в ui/mic.js: та же кнопка нужна полям «Сценарий» в режимах,
+   а раздел не должен быть тем, от кого все зависят */
 /* The person may press the button before the page ever asked the server what is installed: an
    answer that was never fetched is not a missing model, so the status is fetched on the spot. */
 export async function speechReady() {
@@ -699,32 +696,14 @@ $('#agAttX').onclick = e => { e.preventDefault();   // the same cross as on the 
 $('#agAudioX').onclick = e => { e.preventDefault();        // the cross stands on the heading: without this it would also open the fold
   AG.audios = []; AG.audio = null; showAudioBox(); };   // and it clears the whole list, not one line
 
-export let micRec = null, micTimer = null;
-$('#agMic').onclick = async () => {
-  if (micRec) { micRec.stop(); return; }
-  if (needSpeech()) return;
-  let stream;
-  try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); }
-  catch { toast('Нет доступа к микрофону. Разрешите его в окне Windows или подключите микрофон.'); return; }
-  const chunks = [], mr = new MediaRecorder(stream), t0 = Date.now(), btn = $('#agMic');
-  micRec = mr; btn.classList.add('rec');
-  const tick = () => { btn.title = `Идёт запись ${Math.round((Date.now() - t0) / 1000)} с — нажмите, чтобы закончить`; };
-  tick(); micTimer = setInterval(tick, 500);
-  mr.ondataavailable = e => chunks.push(e.data);
-  mr.onstop = async () => {
-    clearInterval(micTimer); stream.getTracks().forEach(t => t.stop()); micRec = null; btn.classList.remove('rec');
-    btn.title = 'Голосовой ввод: нажмите, говорите, нажмите ещё раз';
-    const ta = $('#agIn'), before = ta.placeholder; ta.placeholder = 'Распознаём речь…';
-    try {
-      const buf = await sharedAudioCtx().decodeAudioData(await new Blob(chunks).arrayBuffer());
-      if (buf.duration < 0.4) throw new Error('Запись слишком короткая');
-      const j = await transcribeWav(wavSlice(buf, 0, buf.duration));
-      if (!j.text) toast('Речь не распознана — скажите ещё раз'); else { ta.value = (ta.value.trim() ? ta.value.trim() + ' ' : '') + j.text; ta.focus(); }
-    } catch (e) { toast(e.message); }
-    ta.placeholder = before;
-  };
-  mr.start();
-};
+/* Голосовой ввод чата: запись, распознавание, вставка в поле чата. Сама запись живёт в
+   ui/mic.js - такая же кнопка стоит под полями «Сценарий» в режимах. */
+$('#agMic').onclick = () => micToggle($('#agMic'), {
+  guard: () => speechReady(),
+  hint: 'Голосовой ввод: нажмите, говорите, нажмите ещё раз',
+  busy: text => { const ta = $('#agIn'), was = ta.placeholder; ta.placeholder = text; return () => { ta.placeholder = was; }; },
+  onText: text => { const ta = $('#agIn'); ta.value = (ta.value.trim() ? ta.value.trim() + ' ' : '') + text; ta.focus(); }
+});
 
 /* The words whisper heard live in the chat's list together with the place they came from; a scene's
    song is found there by its name and length, so the same words can be put back into its prompt. */
@@ -2269,4 +2248,4 @@ export function agWireOtherWindows() {
    // a second pass for a window built later
 /* Общий хаб не импортирует разделы: сообщаем ему о своих значениях сами (core/state.js).
    Через них ui/audio.js дотягивается до сценариста, не импортируя этот раздел. */
-registerViews({ AG, agGenerate, agGo, agStatus, setChatAudio });
+registerViews({ AG, agGenerate, agGo, agStatus, needSpeech, setChatAudio, speechReady });

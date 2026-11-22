@@ -2,6 +2,24 @@ import { $, $$, toast } from '../core/util.js';
 import { goTo } from '../core/tabs.js';
 import { earlyEvents, views } from '../core/state.js';
 import { setDropFile } from './slots.js';
+import { micToggle } from './mic.js';
+
+/* Вставить текст в поле туда, где курсор (или в конец, если курсора нет), и сказать полю, что
+   текст изменился - иначе автосохранение его не увидит. Один способ на весь интерфейс: им
+   пользуется и кнопка голоса, и плашки карточек актёров. */
+export function insertAtCursor(ta, text) {
+  if (!ta || !text) return false;
+  const s = typeof ta.selectionStart === 'number' ? ta.selectionStart : ta.value.length;
+  const e = typeof ta.selectionEnd === 'number' ? ta.selectionEnd : s;
+  const head = ta.value.slice(0, s), tail = ta.value.slice(e);
+  const pad = !head || /[\s(]$/.test(head) ? '' : ' ';
+  ta.value = head + pad + text + ' ' + tail.replace(/^\s+/, ' ');
+  const at = s + pad.length + text.length + 1;
+  ta.focus();
+  try { ta.setSelectionRange(at, at); } catch (err) { }
+  ta.dispatchEvent(new Event('input', { bubbles: true }));
+  return true;
+}
 
 /* Этот модуль НЕ импортирует разделы: разделы сами объявляют себя в реестре. Прямой импорт
    раздела отсюда замыкал круг, и тело этого модуля не успевало исполниться раньше раздела -
@@ -163,6 +181,22 @@ export function scenarioWindow(host, cfg = {}) {
      «Вставить пример»). Кнопки раздела никогда не собираются внутри поля руками. */
   const addButton = node => { if (node) { if (!buttons) { buttons = scNode('div'); buttons.className = 'field-btns'; into.append(buttons); } buttons.append(node); } return node; };
   (cfg.extra || []).forEach(addButton);
+  /* Голос под полем: диктует прямо в это поле, в то место, где стоит курсор. Кнопка одна и та же
+     машина, что и в чате сценариста; про скачанную модель спрашиваем раздел через реестр. */
+  if (cfg.mic !== false) addButton((() => {
+    const m = scNode('button');
+    m.type = 'button'; m.className = 'btn';
+    m.style.cssText = 'padding:4px 12px;font-size:12px';
+    m.textContent = 'Голос';
+    m.title = 'Продиктовать текст в это поле: нажмите, говорите, нажмите ещё раз. Распознавание идёт на вашей машине.';
+    m.onclick = () => micToggle(m, {
+      guard: () => (views.speechReady ? views.speechReady() : false),
+      hint: m.title,
+      busy: text => { const was = ta.placeholder; ta.placeholder = text; return () => { ta.placeholder = was; }; },
+      onText: text => insertAtCursor(ta, text)
+    });
+    return m;
+  })());
 
   const api = {
     el: root, ta, foot, tokens, buttons, counter, addButton,

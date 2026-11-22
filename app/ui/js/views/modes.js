@@ -8,7 +8,8 @@ import { ASPECTS, QUALITY, QUALITY_ALL, loraForm, mountLoras, paramsCard, r32, r
 import { previewPanel } from '../ui/preview.js';
 import { audioTokens, scenarioResolvers, scenarioTagRow, scenarioWindow, sceneAudioPlan } from '../ui/scenario.js';
 import { fitAspect, fitSlot, repeatRefs, resetSlot, wireDrop, wireSlotSwap } from '../ui/slots.js';
-import { AG, agAttachFile, agCtx, agDraftOut, agGenerate, agGo, agMakeBtn, agPickTarget, agRefWarn, agScenesText, agStatus, agWords, agWordsFor, hGrip, hGripAfter, setChatAudio, showAudioBox, speechReady, transcribeWav, wordsIntoPrompt } from './agent.js';
+import { AG, agAttachFile, agCtx, agDraftOut, agGenerate, agGo, agMakeBtn, agPickTarget, agRefWarn, agScenesText, agStatus, agWords, agWordsFor, hGrip, hGripAfter, setChatAudio, showAudioBox, speechReady, wordsIntoPrompt } from './agent.js';
+import { transcribeWav } from '../ui/mic.js';
 import { addToLib, closeViewer, openUpscale, openViewer, renderLib, setFav } from './library.js';
 import { mdStart } from './models.js';
 import { PR, presetsHave, presetsPaint } from './presets.js';
