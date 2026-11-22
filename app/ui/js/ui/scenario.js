@@ -133,7 +133,7 @@ function scHint(html) { const s = scNode('span'); s.className = 'hint'; s.innerH
 export function scenarioTagRow(tokensCls, tokensId) {
   const row = scNode('div'); row.className = 'ta-foot';
   const chips = scNode('div');
-  chips.className = 'tokens' + (tokensCls ? ' ' + tokensCls : '');
+  chips.className = 'tokens sc-src' + (tokensCls ? ' ' + tokensCls : '');
   if (tokensId) chips.id = tokensId;
   row.append(chips);
   return { row, chips };
@@ -153,13 +153,11 @@ export function scenarioWindow(host, cfg = {}) {
   ta.setAttribute('spellcheck', 'true');          // промпт - текст, а не путь: опечатка стоит целого расчёта
 
   /* Выше поля промта стоит поле сценария: то, что пишет человек своими словами. Поле промта -
-     то, что уходит в модель. Пока промт никто не генерировал, он повторяет сценарий, иначе
-     запрос ушёл бы пустым; «Генерация промта» или правка промта рукой повтор гасят, и правки
-     сценария готовый промт больше не перезаписывают. */
+     то, что уходит в модель. Поля не повторяют друг друга: в них разный текст, ответ
+     Сценариста кладётся в «Промт». */
   /* Окно сценария не ставим там, где карточка врезана в чужую (сцены студий) и в разделах
      картинок: там поле одно и человек пишет в него сам. */
   const sc = (cfg.prompt === false || cfg.card === false) ? null : scNode('textarea');
-  let mirroring = false, mirroring2 = false, mirrored = true;
   if (sc) {
     sc.className = 'sc-draft';
     sc.placeholder = cfg.scPlaceholder || 'Что должно произойти: своими словами, можно по-русски';
@@ -170,7 +168,6 @@ export function scenarioWindow(host, cfg = {}) {
     /* Раздел мог вернуть в поле промта сохранённый черновик: тогда сценарий пустой, и наши
        слова живут в промте. Перекладываем их в сценарий, чтобы «Генерация промта» читала их. */
     if (!sc.value.trim() && String(ta.value || '').trim()) { sc.value = ta.value; }
-    mirrored = true;
   }
 
   /* Заголовок окна всегда один и тот же: в карточке - шапка с цифрой, во врезке - короткая строка. */
@@ -196,7 +193,7 @@ export function scenarioWindow(host, cfg = {}) {
     caption.append(counter);
   }
 
-  let foot = null, tokens = null, buttons = null;
+  let foot = null, tokens = null, buttons = null, promptCap = null;
   let scButtons = null;                            // ряд под полем сценария: диктовка стоит там
   if (sc && cfg.mic !== false) { scButtons = scNode('div'); scButtons.className = 'field-btns'; }
   const tagRow = cfg.chips ? scenarioTagRow(cfg.chipsCls) : null;
@@ -212,7 +209,11 @@ export function scenarioWindow(host, cfg = {}) {
   if (wrap) root.append(wrap);
   if (cfg.head) into.insertAdjacentHTML('beforeend', cfg.head);
   if (tagRow && cfg.chips === 'above') { tagRow.row.style.margin = '0 0 8px'; into.append(tagRow.row); }
-  if (sc) { into.append(sc); if (scButtons) into.append(scButtons); into.append(scPromptCaption()); }
+  if (sc) {
+    into.append(sc);
+    if (scButtons) into.append(scButtons);
+    promptCap = scPromptCaption(); into.append(promptCap);
+  }
   into.append(ta);
   if (tagRow && cfg.chips !== 'above') into.append(tagRow.row);
   if (buttons) into.append(buttons);
@@ -233,7 +234,8 @@ export function scenarioWindow(host, cfg = {}) {
     const g = scNode('button');
     g.type = 'button'; g.className = 'btn gen-b';
     g.style.cssText = 'padding:4px 12px;font-size:12px';
-    g.textContent = '🤖 Генерация промта';
+    g.textContent = cfg.generate.caption || '🤖 Генерация промта';
+    if (cfg.generate.captionTitle) g.title = cfg.generate.captionTitle;
     g.title = 'Сценарист сделает из этого текста готовый промпт своего режима и заменит им текст в поле. Файлы раздела и черновик уйдут в чат сценариста, ответ останется в его истории.';
     /* Текст для сценариста берётся из поля сценария: из него делают промт, а не из готового
        промта. Раздел своё значение не перечёркивает, если окна сценария у него нет. */
@@ -309,30 +311,23 @@ export function scenarioWindow(host, cfg = {}) {
     into.append(ruOut);                            // блок перевода - сразу под рядом кнопок промта
   }
 
-  /* Пока промт не генерировали, он повторяет сценарий: человек видит в окне промта ровно то,
-     что уйдёт в модель. Правка промта рукой зеркало гасит. */
-  if (sc) {
-    sc.addEventListener('input', () => {
-      if (!mirrored) return;
-      mirroring = true;
-      ta.value = sc.value;
-      ta.dispatchEvent(new Event('input', { bubbles: true }));
-      mirroring = false;
-    });
-    ta.addEventListener('input', () => {
-      if (mirrored && !mirroring2) {
-        mirroring2 = true;
-        sc.value = ta.value;
-        sc.dispatchEvent(new Event('input', { bubbles: true }));
-        mirroring2 = false;
-        return;
-      }
-      if (!mirroring) mirrored = false;
-    });
+  /* Зеркала между полями больше нет: человек писал в «Сценарий» - слова появлялись и в
+     «Промте», и одно было копией другого. Теперь поля живут отдельно: «Сценарий» - наши
+     слова, «Промт» - то, что уходит в модель; ответ Сценариста кладёт текст в «Промт». */
+
+  /* Окно без поля промта: в студии промты пишутся в сценах, здесь человек ведёт только
+     сценарий. Поле промта остаётся в дереве - на него смотрят раздел и сохранение, - но
+     оно скрыто: просить человека писать в два поля в студии незачем. */
+  if (cfg.promptless) {
+    root.classList.add('sc-promptless');
+    ta.hidden = true;
+    if (promptCap) promptCap.hidden = true;
+    if (buttons) buttons.hidden = true;
+    if (ruOut) ruOut.hidden = true;
   }
 
   const api = {
-    el: root, ta, sc, foot, tokens, buttons, counter, addButton,
+    el: root, ta, sc, scButtons, foot, tokens, buttons, counter, addButton,
     value: () => ta.value,
     draft: () => (sc ? sc.value : ta.value),
     setDraft: text => {
@@ -340,10 +335,9 @@ export function scenarioWindow(host, cfg = {}) {
       field.value = text == null ? '' : String(text);
       field.dispatchEvent(new Event('input', { bubbles: true }));
     },
-    /* Ответ сценариста - это промт: он ложится в поле промта, и с этой минуты зеркало гаснет. */
+    /* Ответ сценариста - это промт: он ложится в поле промта. */
     setValue: text => {
       ta.value = text == null ? '' : String(text);
-      mirrored = false;
       ta.dispatchEvent(new Event('input', { bubbles: true }));
     },
     onInput: fn => { ta.addEventListener('input', fn); return fn; },
@@ -366,6 +360,10 @@ export function scenarioWindow(host, cfg = {}) {
       });
     },
   };
+  /* Окно находится по режиму: Сценарист, Библиотека и ряд тегов ищут его одинаково во
+     всех разделах. Раздел называет свой режим сам: у студий режимов несколько на один
+     вид, и угадать их по признаку окна нельзя. */
+  if (!inline && cfg.register) scenarioResolvers.set(cfg.register, () => api);
   return api;
 }
 

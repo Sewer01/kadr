@@ -555,3 +555,9 @@
 .sc-prompt-cap b{font-weight:700}
 .sc-mic{display:inline-flex;align-items:center;justify-content:center;padding:4px 9px!important;line-height:0;font-size:12px}
 .sc-mic.rec{border-color:var(--accent);color:var(--accent)}
+
+/* Карточка «Сценарий» в студиях: одно окно текста, поле промта скрыто модулем,
+   а ряд тегов показывает теги со всех сцен - писать их руками незачем. */
+.rm-scenarist .tokens.sc-src{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:10px}
+.rm-scenarist .sg-cap{width:100%;font-size:11.5px;color:var(--dim);margin:6px 0 0}
+.rm-scenarist textarea.sc-draft{min-height:170px}

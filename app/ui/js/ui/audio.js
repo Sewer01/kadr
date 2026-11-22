@@ -69,7 +69,7 @@ export class VideoTrimmer {
       '<div class="vt-acts"><button class="btn pri vt-keep" type="button" disabled>Оставить выбранное</button>' +
       '<button class="btn vt-shot" type="button" disabled title="Сохранить кадр, на котором стоит маркер, как фотографию">&#128247; Сделать кадр</button>' +
       '<button class="btn vt-und" type="button" disabled>Отменить</button>' +
-      '<button class="btn vt-ag" type="button" disabled title="Сценарист посмотрит на клип как на кадры">🤖 К сценаристу</button></div>' +
+      '<button class="btn vt-ag" type="button" disabled title="Всё к сценаристу: клип целиком уйдёт туда, он посмотрит на него как на кадры">🤖 Всё к сценаристу</button></div>' +
       '</div>';
     this._wire();
     if (o.mount) this.mount(o.mount);
@@ -605,7 +605,7 @@ export class AudioTrimmer {
       '<button class="btn at-voc" type="button" disabled>Отделить голос</button>' +
       '<button class="btn at-und" type="button" disabled title="Вернуть аудио ровно таким, каким оно было загружено: все спуски, разрезы и чистки пауз отменятся">Откат</button>' +
       '<button class="btn at-back" type="button" disabled title="Вернуть последнее изменение аудио - один шаг, а не всё сразу">Шаг назад</button>' +
-      '<button class="btn at-ag" type="button" disabled title="Выделенный кусок уйдёт в Сценарист: он послушает слова и ответит с учётом них">🤖 К сценаристу</button></div>' +
+      '<button class="btn at-ag" type="button" disabled title="Всё к сценаристу: всё, что вы выделили в этом аудио, уйдёт туда; он послушает слова и ответит с учётом них">🤖 Всё к сценаристу</button></div>' +
       '<div class="at-pz" hidden><span>Паузы длиннее</span><input type="number" class="at-pm" value="0,6" step="0.1" min="0.2" max="5">' +
       '<span>с сократить до</span><input type="number" class="at-pk" value="0,25" step="0.05" min="0.05" max="2"><span>с</span>' +
       '<b class="at-pzi"></b><button class="btn mini pri at-pgo" type="button" disabled>Убрать</button></div>' +

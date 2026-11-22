@@ -8,7 +8,7 @@ import { ASPECTS, QUALITY, QUALITY_ALL, loraForm, mountLoras, paramsCard, r32, r
 import { previewPanel } from '../ui/preview.js';
 import { audioTokens, ownWords, scenarioResolvers, scenarioTagRow, scenarioWindow, sceneAudioPlan } from '../ui/scenario.js';
 import { fitAspect, fitSlot, repeatRefs, resetSlot, wireDrop, wireSlotSwap } from '../ui/slots.js';
-import { AG, agAttachFile, agCtx, agDraftOut, agGenerate, agGo, agMakeBtn, agPickTarget, agRefWarn, agScenesText, agStatus, agWords, agWordsFor, hGrip, hGripAfter, setChatAudio, showAudioBox, speechReady, wordsIntoPrompt } from './agent.js';
+import { AG, agAttachFile, agCarry, agCtx, agDraftOut, agGenerate, agGo, agMakeBtn, agPickTarget, agRefWarn, agScenesText, agStatus, agWords, agWordsFor, hGrip, hGripAfter, setChatAudio, showAudioBox, speechReady, wordsIntoPrompt } from './agent.js';
 import { transcribeWav } from '../ui/mic.js';
 import { addToLib, closeViewer, openUpscale, openViewer, renderLib, setFav } from './library.js';
 import { mdStart } from './models.js';
@@ -1323,6 +1323,7 @@ export function makeRefMode(cfg) {
     const recount = () => {
       const all = $$('.sc', root), a = accs(), own = root._snd === 'own';
       all.forEach(x => x._counter?.());   // a tag inserted by a chip does not fire "input": count on every recount
+      root._paintSrTags?.();   // у окна «Сценарий» теги собраны со всех сцен, их тоже надо обновить
       root._lockBase?.();   // a fresh scene must inherit what the continuation forbids
       const st = Math.max(0, parseFloat($('.lm-start', root)?.value) || 0);
       all.forEach((c, i) => {
@@ -2614,7 +2615,7 @@ export function makeRefMode(cfg) {
     queueMicrotask(() => queueMicrotask(() => {   /* the order of the page: main settings, pictures, scenes; the rare things are folded */
       const col = $('.col', root), top = $('.rm-params', root), refsCard = $('.rm-imgs', root).closest('.card'), musCard = $('.lm-snd', root).closest('.card'), scCard = $('.lm-scenes', root).parentElement;
       const hdr = $('.card-h', top), mk = (cls, html) => { const d = document.createElement('div'); d.className = cls; d.innerHTML = html; return d; };
-      $('h3', hdr).innerHTML = '<span class="n">4</span>Параметры';
+      $('h3', hdr).innerHTML = '<span class="n">5</span>Параметры';
       $('.lm-qnote', root)?.remove();
       const how = $('details.agvar', top); if (how) how.open = false;
       // mode first, then format, quality, sound
@@ -2726,6 +2727,67 @@ export function makeRefMode(cfg) {
       // pictures right after the settings, then the scenes
       $('h3', refsCard).innerHTML = '<span class="n">1</span>Изображения героя и места';
       $('h3', musCard).innerHTML = '<span class="n">2</span>Аудио';
+      /* Карточка «3 Сценарий»: одно окно текста. Поля промта здесь нет - промты живут
+         в сценах, - зато рядом лежат все теги: общие теги героев и песни студии и теги
+         каждой сцены, помеченные номером сцены. Нажатие на тег вставляет его туда, где
+         стоит курсор. */
+      const srCard = document.createElement('div');
+      srCard.className = 'card rm-scenarist';
+      srCard.innerHTML = '<div data-scenarobox="scenarist"></div>';
+      musCard.after(srCard);
+      const srWin = scenarioWindow($('[data-scenarobox="scenarist"]', srCard), {
+        promptless: true,
+        kind: 'scenarist', num: 3, hint: 'одним текстом: Сценарист разложит его по сценам',
+        scPlaceholder: 'Что происходит в ролике: кто, где, что меняется, чем кончается. Можно репликами и по-русски - теги под окном.',
+        scRows: 8, scMin: '170px',
+        chips: 'below', chipsCls: 'sr-tokens',
+        generate: {
+          mode: cfg.mode,
+          text: () => (srWin.sc || {}).value,
+          caption: '🤖 Сценарист пишет сцены',
+          captionTitle: 'Сценарист прочитает сценарий и вернёт список сцен: каждая строка «SCENE N | секунды» станет отдельной сценой в карточке «Сцены». Картинки героев и песни студии уйдут в чат сами, ответ вернётся в сцены.',
+          instruction: 'Сценарий ролика из раздела «' + cfg.title + '». Разложи его на сцены так, чтобы из них можно было собрать ролик: по 5-10 секунд на сцену, в одной сцене одно событие и одно движение камеры. Верни только список сцен, одним блоком кода, без пояснений до и после: каждая сцена начинается строкой «SCENE N | секунды», ниже идёт описание кадра на английском (60-110 слов) с тегами картинок и звука этого режима (<Picture N>, <Audio N>), а реплики - строкой <d>[Язык] текст</d> дословно. Если сценария почти нет, разрежь его на 2-3 сцены по смыслу, но новые имена и события не выдумывай.\n\n',
+        },
+      });
+      root._srWin = srWin;
+      /* Вставка тега в текст сценария - в то место, где стоит курсор. */
+      const srInsert = tag => {
+        const field = srWin.sc, t = String(tag || '').trim();
+        if (!field || !t) return;
+        const p = typeof field.selectionStart === 'number' ? field.selectionStart : field.value.length;
+        const glue = (p > 0 && !/[\s>]/.test(field.value[p - 1]) ? ' ' : '') + t + ' ';
+        field.value = field.value.slice(0, p) + glue + field.value.slice(field.selectionEnd || p);
+        field.focus(); field.selectionStart = field.selectionEnd = p + glue.length;
+        field.dispatchEvent(new Event('input', { bubbles: true }));
+        root._paintSrTags?.();
+      };
+      /* Ряд тегов собирается заново: он всегда повторяет то, что стоит в студии сейчас. */
+      root._paintSrTags = () => {
+        const row = srWin.tokens;
+        if (!row) return;
+        row.innerHTML = '';
+        const put = (b, note) => {
+          const c = document.createElement('button');
+          c.type = 'button';
+          c.className = 'token' + (b.classList.contains('tok-aud') ? ' tok-aud' : b.classList.contains('tok-vid') ? ' tok-vid' : '');
+          c.textContent = b.textContent;
+          c.disabled = !!b.disabled;
+          c.title = (b.title || '') + (note ? ' · ' + note : '') + (b.disabled ? '' : ' - нажмите, чтобы вставить в текст сценария');
+          if (!b.disabled) c.onclick = () => srInsert(c.textContent);
+          row.append(c);
+        };
+        $$('.rm-tokens button', root).forEach(b => { if (!b.hidden) put(b, 'студия'); });
+        $$('.sc', root).forEach((card, i) => {
+          const list = $$('.sc-tokens button', card).filter(b => !b.hidden);
+          if (!list.length) return;
+          const cap = document.createElement('small');
+          cap.className = 'sg-cap'; cap.textContent = 'Сцена ' + (i + 1);
+          row.append(cap);
+          list.forEach(b => put(b, 'сцена ' + (i + 1)));
+        });
+        row.hidden = !row.querySelector('button');
+      };
+      root._paintSrTags();
       if (!$('.mus-film', musCard)) {   // three files for the whole film, on the same terms as a scene's
         const fw = document.createElement('div');
         fw.className = 'mus-film';
@@ -2830,7 +2892,7 @@ export function makeRefMode(cfg) {
       // "let the model invent the sound", so nothing about the card itself has to be hidden
       const syncMus = () => { musCard.hidden = false; };   // the action studio has a soundtrack of its own now
       new MutationObserver(syncMus).observe($('.lm-own', root), { attributes: true, attributeFilter: ['hidden'] }); syncMus();
-      $('h3', scCard).innerHTML = '<span class="n">3</span>Сцены';
+      $('h3', scCard).innerHTML = '<span class="n">4</span>Сцены';
       // under the open scene: the big buttons, the tags; the rest is folded
       const sceneBox = $('.lm-scenes', root), chain = $('.lm-chain', root), fin = $('.lm-final', root), src = $('.lm-src', root), foot = $('.ta-foot', scCard);
       // the prompt of the open scene comes first, then the ribbon of fragments, then the player
@@ -2878,7 +2940,7 @@ export function makeRefMode(cfg) {
       }
       // the order of the section, the same as everywhere else: media, text, settings
       col.prepend(refsCard);
-      refsCard.after(musCard); musCard.after(scCard);   // pictures, audio, scenes - audio used to fall under the scenes
+      refsCard.after(musCard); musCard.after(srCard, scCard);   // картинки, аудио, сценарий, сцены   // pictures, audio, scenes - audio used to fall under the scenes
       col.append(top);
       if (root._baseHost) col.prepend(root._baseHost);   // the switch, the file and the button, above card one
       /* undo: what was cleared or deleted can be brought back (button «Отменить действие» or Ctrl+Z) */
@@ -3106,6 +3168,7 @@ export function makeRefMode(cfg) {
         ? `<button class="token tok-vid" type="button" data-video="${i + 1}" title="&lt;Video ${i + 1}&gt; - ссылка на это видео: модель возьмёт из него движение">&lt;Video ${i + 1}&gt;</button>`
         : '').join('');
     $$('.sc', root).forEach(x => x._counter?.());   // after the row was rebuilt, or the lock it puts on the chips is wiped
+    root._paintSrTags?.();   // тот же ряд тегов живёт и у окна «Сценарий»
     if (cfg.swap) { const w2 = $('.rm-who[data-i="1"]', root); if (w2) w2.hidden = imgs.length < 2; }
     if (cfg.swap && S.autoLen !== false) { const v = files('.rm-vids .slot')[0]; if (v && v._dur) { S.dur = Math.min(15, Math.max(3, Math.round(v._dur))); root._upd?.(); } }
     const tooLong = !cfg.scenes && [...files('.rm-vids .slot'), ...files('.rm-auds .slot')].some(s => s._dur > 15);
@@ -3515,34 +3578,38 @@ export function makeRefMode(cfg) {
     const pe = $('.rm-prompt', root) || $('.lm-scenes', root) || (cfg.scenes ? $('.sc textarea', root) : null);
     const pcard = pe && pe.closest('.card');
     if (pcard) {
+      /* Кнопка переноса одна на окно и называется одинаково во всех окнах. Она забирает
+         всё: тексты (сценарий и промт, если они разные) и все файлы режима. Помечена
+         ag-draft, чтобы перенос не кликал сам себя, и ag-keep, чтобы не пряталась за
+         кнопками групп файлов. */
       const go = document.createElement('button');
-      go.type = 'button'; go.className = 'btn mini agall-h';
-      // the draft leaves the mode whole, tags and all, and the finished text is expected back here
+      go.type = 'button'; go.className = 'btn mini agall-h ag-draft ag-keep';
       if (cfg.scenes) {
-    // the same one-click round trip the single field has, but for the whole sheet at once
-    const gg = document.createElement('button');
-    gg.className = 'btn mini agall-h';
-    gg.textContent = '🤖 Сценарист перепишет сцены';
-    gg.title = 'Отправить все сцены сценаристу одним сообщением: он перепишет их, и каждая вернётся в свою карточку. Фото и песни сцен остаются на местах.';
-    gg.onclick = () => agGenerate(gg, { mode: cfg.mode, scenes: true, text: () => agScenesText(root) });
-    pcard.querySelector('.card-h').append(gg);
-    gg._agCount = () => $$('.sc', root).filter(c => ($('textarea', c) || {}).value.trim()).length;
-    /* After a run ComfyUI keeps its models in the card's memory - that is a cache, not a leak, but
-       the agent's model needs the same gigabytes and answers «Остановлено» while they are held. */
-    const fz = document.createElement('button');
-    fz.type = 'button'; fz.className = 'btn mini';
-    fz.textContent = 'Освободить память';
-    fz.title = 'Остановить модель сценариста и сбросить кэш ComfyUI: пока память занята, вторая сторона не загружается и отвечает «Остановлено»';
-    fz.onclick = () => window.kadrFreeMem(fz);
-    pcard.querySelector('.card-h').append(fz);
-  }
-  go.textContent = cfg.scenes ? '🤖 Все тексты к сценаристу' : '🤖 Текст к сценаристу';
+        // the same one-click round trip the single field has, but for the whole sheet at once
+        const gg = document.createElement('button');
+        gg.className = 'btn mini agall-h ag-draft ag-keep';
+        gg.textContent = '🤖 Сценарист перепишет сцены';
+        gg.title = 'Отправить все сцены сценаристу одним сообщением: он перепишет их, и каждая вернётся в свою карточку. Фото и песни сцен остаются на местах.';
+        gg.onclick = () => agGenerate(gg, { mode: cfg.mode, scenes: true, text: () => agScenesText(root) });
+        pcard.querySelector('.card-h').append(gg);
+        gg._agCount = () => $$('.sc', root).filter(c => ($('textarea', c) || {}).value.trim()).length;
+      }
+      go.textContent = '🤖 Всё к сценаристу';
       go.title = cfg.scenes
-        ? 'Перенести тексты всех сцен по порядку в чат сценариста сценарист пишет для «' + cfg.title + '»; ответ вернётся в те же сцены'
-        : 'Перенести текст раздела в чат сценариста целиком, с тегами, сценарист пишет для «' + cfg.title + '»; ответ вернётся в это же поле';
+        ? 'Унести Сценаристу всё из этого режима: тексты всех сцен по порядку, картинки, видео и песни. Сценарист пишет для «' + cfg.title + '»; ответ вернётся в те же сцены.'
+        : 'Унести Сценаристу всё из этого режима: текст сценария и промта, картинки, видео и звук. Сценарист пишет для «' + cfg.title + '»; ответ вернётся в это же поле.';
       $('.card-h', pcard).append(go);
-      go.onclick = () => agDraftOut(cfg.scenes ? agScenesText(root) : (pe ? pe.value : ''), cfg.mode,
-        cfg.scenes ? 'тексты сцен' : 'черновик промпта');
+      go.onclick = async () => {
+        let carried = 0;
+        try { carried = await agCarry(cfg.mode); } catch (e) { carried = 0; }
+        const scf = pcard.querySelector('.sc-draft') || (root._srWin ? root._srWin.sc : null);
+        const own = scf ? String(scf.value || '').trim() : '';
+        const pr = pe ? String(pe.value || '').trim() : '';
+        const sheet = agScenesText(root);
+        const body = cfg.scenes ? (own ? 'Сценарий:\n' + own + '\n\nСцены:\n' + sheet : sheet)
+          : (own && pr && own !== pr ? 'Сценарий:\n' + own + '\n\nПромт:\n' + pr : (pr || own));
+        agDraftOut(body, cfg.mode, cfg.scenes ? 'тексты сцен' : 'текст окна', carried);
+      };
     }
   }
   /* Раздел говорит сценаристу, где его окно сценария. В режиме с одним полем это оно, а в

@@ -12,6 +12,13 @@ import { PR, presetsHave, presetsPaint } from './presets.js';
 import { qAdd } from './queue.js';
 import { extKind, lowMemoryAsk } from './setup.js';
 
+/* Кнопка «Всё к сценаристу» уносит из окна всё: если «Сценарий» и «Промт» различаются,
+   уходят оба, с подписями - так Сценарист видит и наши слова, и готовый текст. */
+const windowText = win => {
+  const s = String(win.sc ? win.sc.value : '').trim(), p = String(win.value() || '').trim();
+  return s && p && s !== p ? 'Сценарий:\n' + s + '\n\nПромт:\n' + p : (p || s);
+};
+
 /* «Ручку» размера сетки вешает views/agent.js (window.gridResize), а он исполняется
    позже нас: у окна картинок ручки ещё нет, поэтому пробуем сейчас и повторяем на
    следующем шаге цикла событий, когда раздел сценариста уже объявился. */
@@ -241,9 +248,8 @@ export const imgSeedForm = (S, fd) => { if (S.seedFixed && S.seed) fd.append('se
      на все разделы. Переключатель «Один промпт / Список промптов» и блок списка остаются
      разметкой раздела: они встают до поля и сразу под кнопками, селекторы (.kr-bm, .kr-batch,
      .kr-same, .kr-bl) не меняются. */
-  scenarioWindow($('[data-scenarobox="krea"]', root), {
-    prompt: false,
-    kind: 'krea', num: 1, cls: 'kr-prompt',
+  const krWin = scenarioWindow($('[data-scenarobox="krea"]', root), {
+    kind: 'krea', register: 'krea', num: 1, cls: 'kr-prompt',
     counter: { cls: 'counter kr-count', text: '0 символов' },
     head: '<div class="seg kr-bm" style="grid-template-columns:minmax(0,1fr) minmax(0,1fr);margin-bottom:8px">'
       + '<button type="button" data-b="0" class="on">Один промпт</button>'
@@ -260,6 +266,10 @@ export const imgSeedForm = (S, fd) => { if (S.seedFixed && S.seed) fd.append('se
     footNote: 'Лучше писать подробно, одним абзацем. Помощник в разделе «Сценарист» умеет писать такие промпты',
     generate: { mode: () => agKreaMode(), text: () => ($('.kr-prompt', root) || {}).value },
   });
+  /* В модель уходит «Промт»; если человек написал только «Сценарий», берём его - иначе
+     кнопка генерации ушла бы с пустым текстом, как это было, когда поле было одно. */
+  const krText = () => String(krWin.value() || '').trim()
+    || String(krWin.sc ? krWin.sc.value : '').trim();
   gridHandle(root);
   $('.kr-asp', root).innerHTML = IMG_ASPECTS.map(([id, name, w, h]) => { const k = 18 / Math.max(w, h);
     return `<button class="chip" data-a="${id}"><i class="ar" style="width:${w * k}px;height:${h * k}px"></i>${name}${name !== id ? ` <small>${id}</small>` : ''}</button>`; }).join('');
@@ -269,9 +279,9 @@ export const imgSeedForm = (S, fd) => { if (S.seedFixed && S.seed) fd.append('se
   const P = imgPanel($('.kr-prev', root), {
     // the list of prompts starts from the same button the single prompt uses
     intercept: () => (window._krBatch ? window._krBatch() : false),
-    mode: 'krea', url: '/api/generate/krea', promptText: () => $('.kr-prompt', root).value.trim(),
-    validate: () => $('.kr-prompt', root).value.trim() ? '' : 'Напишите промпт',
-    form: () => { const fd = new FormData(); fd.append('prompt', $('.kr-prompt', root).value.trim()); fd.append('aspect', S.aspect); fd.append('style', S.engine === 'krea' ? S.style : 'plain'); fd.append('scale', S.scale); fd.append('engine', S.engine); if (S.engine === 'h3img') fd.append('mp', S.mp); if (S.cw && S.ch) { fd.append('width', S.cw); fd.append('height', S.ch); } if (S.engine === 'qwen') fd.append('negative', $('.kr-negtxt', root).value.trim()); imgSeedForm(S, fd); return fd; },
+    mode: 'krea', url: '/api/generate/krea', promptText: () => krText(),
+    validate: () => krText() ? '' : 'Напишите сценарий или готовый промпт',
+    form: () => { const fd = new FormData(); fd.append('prompt', krText()); fd.append('aspect', S.aspect); fd.append('style', S.engine === 'krea' ? S.style : 'plain'); fd.append('scale', S.scale); fd.append('engine', S.engine); if (S.engine === 'h3img') fd.append('mp', S.mp); if (S.cw && S.ch) { fd.append('width', S.cw); fd.append('height', S.ch); } if (S.engine === 'qwen') fd.append('negative', $('.kr-negtxt', root).value.trim()); imgSeedForm(S, fd); return fd; },
     two: () => S.engine === 'krea' && S.style === 'real',
   });
   const upd = () => {
@@ -326,7 +336,9 @@ export const imgSeedForm = (S, fd) => { if (S.seedFixed && S.seed) fd.append('se
   });
   $('.kr-asp', root).onclick = e => { const c = e.target.closest('.chip'); if (c) { S.aspect = c.dataset.a; S.cw = S.ch = 0; $('.sz-w', root).value = $('.sz-h', root).value = ''; $('.sz-reset', root).hidden = true; upd(); } };
   szWire(root, S, () => upd(), () => IMG_SIZES[S.aspect]);
-  $('.kr-prompt', root).oninput = e => $('.kr-count', root).textContent = e.target.value.length + ' символов';
+  const krCount = e => $('.kr-count', root).textContent = e.target.value.length + ' символов';
+  $('.kr-prompt', root).oninput = krCount;
+  if (krWin.sc) krWin.sc.oninput = krCount;   // счётчик считает и то, что пишут в сценарии
   /* --- list of prompts: a series of pictures, one queue job per prompt --- */
   const K = { batch: false, items: [], removed: new Set() };
   const splitList = text => {
@@ -337,7 +349,7 @@ export const imgSeedForm = (S, fd) => { if (S.seedFixed && S.seed) fd.append('se
   };
   const BATCH_MAX = 50;
   const kbRender = () => {
-    const all = splitList($('.kr-prompt', root).value);
+    const all = splitList(krText());
     K.items = all.filter(x => !K.removed.has(x));
     const over = K.items.length > BATCH_MAX;
     $('.kr-bl', root).innerHTML = K.items.map((x, i) => `<div class="kr-bi" style="display:flex;gap:8px;align-items:flex-start;padding:5px 0;border-bottom:1px solid var(--line)"><b style="min-width:26px">${i + 1}</b><span style="flex:1;font-size:12.5px">${esc(x.length > 120 ? x.slice(0, 120) + '…' : x)}</span><button class="btn" type="button" data-rm="${i}" title="Убрать из списка" style="padding:1px 8px">✕</button></div>`).join('')
@@ -383,7 +395,7 @@ export const imgSeedForm = (S, fd) => { if (S.seedFixed && S.seed) fd.append('se
   const fillList = text => { kbMode(true); $('.kr-prompt', root).value = text; $('.kr-prompt', root).oninput({ target: $('.kr-prompt', root) }); K.removed.clear(); kbRender(); };
   imgSeedWire(root, S); upd();
   // the text written here can be handed to the Agent without retyping it; the target follows the engine
-  agPromptButton($('.card-h', $('.kr-prompt', root).closest('.card')), 'промпт', () => $('.kr-prompt', root).value,
+  agPromptButton($('.card-h', $('.kr-prompt', root).closest('.card')), 'текст окна', () => windowText(krWin),
     () => ({ kreareal: 'krea', flux: 'fluxt', h3img: 'h3t', qwen: 'qwent' }[S.engine] || 'krea'));
   IMG.krea = { fillList, fill: it => { if (it.engine) S.engine = it.engine; else if (/^(Картинка|Изображение) \(FLUX/.test(it.sub || '')) S.engine = 'flux'; else if (/^(Картинка|Изображение) \(Qwen/.test(it.sub || '')) S.engine = 'qwen'; else S.engine = 'krea'; $('.kr-prompt', root).value = it.prompt || ''; $('.kr-prompt', root).oninput({ target: $('.kr-prompt', root) }); if (IMG_SIZES[it.aspect]) S.aspect = it.aspect; upd(); } };
   IMG.krea.S = S; IMG.krea.upd = upd; IMG.krea.ta = () => $('.kr-prompt', root);
@@ -433,13 +445,14 @@ export const imgSeedForm = (S, fd) => { if (S.seedFixed && S.seed) fd.append('se
   /* Окно «Сценарий» правки картинки - тот же общий модуль: ряд плашек над полем, обёртка
      .qw-edit сохранена (на неё смотрит лист персонажа, который прячет поле целиком), классы
      поля и плашек прежние, так что код раскадровки и меток их находит как находил. */
-  scenarioWindow($('[data-scenarobox="qwen"]', root), {
-    prompt: false,
-    kind: 'qwen', num: 2, hint: 'можно написать в разделе «Сценарист»',
+  const qwWin = scenarioWindow($('[data-scenarobox="qwen"]', root), {
+    kind: 'qwen', register: 'qwen', num: 2, hint: 'можно написать в разделе «Сценарист»',
     wrap: 'qw-edit', cls: 'qw-prompt', chips: 'above', chipsCls: 'qw-tokens',
     placeholder: 'Что изменить и что оставить. Например: Этот человек сидит в кафе у окна и пьёт кофе. Лицо, причёска и одежда как на изображении.',
     generate: { mode: () => agQwenMode(), text: () => ($('.qw-prompt', root) || {}).value },
   });
+  const qwText = () => String(qwWin.value() || '').trim()
+    || String(qwWin.sc ? qwWin.sc.value : '').trim();
   gridHandle(root);
   const drop = $('#qwDrop');
   wireDrop(drop, () => {});
@@ -464,8 +477,8 @@ export const imgSeedForm = (S, fd) => { if (S.seedFixed && S.seed) fd.append('se
   $('.qw-slots', root).addEventListener('click', () => setTimeout(upd, 0), true);
   const P = imgPanel($('.qw-prev', root), {
     mode: 'qwen', url: '/api/generate/qwen',
-    promptText: () => S.kind === 'sheet' ? 'Лист персонажа' : $('.qw-prompt', root).value.trim(),
-    validate: () => !drop._file && !(S.kind === 'story' && S.frames) ? 'Загрузите изображение' : S.kind === 'edit' && !$('.qw-prompt', root).value.trim() ? 'Напишите, что изменить на изображении' : S.kind === 'story' && !$('.qw-prompt', root).value.trim() ? 'Опишите историю по кадрам' : '',
+    promptText: () => S.kind === 'sheet' ? 'Лист персонажа' : qwText(),
+    validate: () => !drop._file && !(S.kind === 'story' && S.frames) ? 'Загрузите изображение' : S.kind === 'edit' && !qwText() ? 'Напишите, что изменить на изображении' : S.kind === 'story' && !$('.qw-prompt', root).value.trim() ? 'Опишите историю по кадрам' : '',
     form: () => {
       const fd = new FormData(); if (drop._file) fd.append('image', drop._file); fd.append('kind', S.kind);
       if (S.kind === 'story') { fd.append('frames', S.frames ? '1' : '0'); fd.append('line', S.line); }
@@ -474,7 +487,7 @@ export const imgSeedForm = (S, fd) => { if (S.seedFixed && S.seed) fd.append('se
       if (S.kind !== 'sheet') { if (drop2._file) fd.append('image2', drop2._file); if (drop3._file) fd.append('image3', drop3._file);
         if (S.engine === 'h3img') { if (drop4._file) fd.append('image4', drop4._file); if (drop5._file) fd.append('image5', drop5._file); } }
       if (S.kind === 'sheet') { fd.append('panels', S.panels); fd.append('headless', S.headless ? '1' : '0'); fd.append('background', S.bg); fd.append('marks', $('.qw-marks', root).value.trim()); }
-      else { fd.append('prompt', $('.qw-prompt', root).value.trim()); fd.append('size', S.engine === 'h3img' ? S.h3s : S.size); fd.append('aspect', S.aspect); }
+      else { fd.append('prompt', qwText()); fd.append('size', S.engine === 'h3img' ? S.h3s : S.size); fd.append('aspect', S.aspect); }
       imgSeedForm(S, fd); return fd;
     },
   });
@@ -584,7 +597,7 @@ export const imgSeedForm = (S, fd) => { if (S.seedFixed && S.seed) fd.append('se
     ta.focus(); ta.selectionStart = ta.selectionEnd = p + txt.length;
     ta.dispatchEvent(new Event('input'));
   };
-  agPromptButton($('.card-h', $('.qw-prompt', root).closest('.card')), 'текст правки', () => $('.qw-prompt', root).value,
+  agPromptButton($('.card-h', $('.qw-prompt', root).closest('.card')), 'текст правки', () => windowText(qwWin),
     () => ({ h3img: 'h3e' }[S.engine] || 'qwen'));
   IMG.qwen = { fill: it => { if (it.engine) S.engine = it.engine; if (it.frames !== undefined) S.frames = !!it.frames; if (String(it.sub || '').startsWith('Раскадровка по кадрам')) S.frames = true; else if (String(it.sub || '').startsWith('Раскадровка')) S.frames = false; if (it.kind === 'story' || String(it.sub || '').startsWith('Раскадровка')) { S.kind = 'story'; $('.qw-prompt', root).value = it.prompt || ''; } else if (it.sub === 'Лист персонажа') S.kind = 'sheet'; else { S.kind = 'edit'; $('.qw-prompt', root).value = it.prompt || ''; } upd(); } };
   IMG.qwen.S = S; IMG.qwen.upd = upd; IMG.qwen.ta = () => $('.qw-prompt', root);

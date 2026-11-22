@@ -272,11 +272,12 @@
             <textarea id="agAudioText" rows="1" hidden placeholder="Распознаём слова…"></textarea>
             <div class="ag-fold-body" id="agAudioList"></div>
           </details>
-          <div class="ag-edit" id="agEdit" role="group" aria-label="Как понимать следующее сообщение">
-            <button type="button" data-edit="1" class="on">Правка</button><button type="button" data-edit="0">Продолжить сюжет</button>
-            <small id="agEditHint">Вернёт весь промпт с заменой; «Picture 1, 2…» — картинки этого сообщения</small>
-          </div>
+          <!-- Выбора «правка или новый промт» здесь больше нет: «Написать сценарий»
+               и есть правка, а с нуля начинают «Новым чатом». Осталась строчка о том,
+               как вернётся ответ - она зависит от режима. -->
+          <div class="ag-edit"><small id="agEditHint"></small></div>
           <div class="ag-comp">
+            <div class="tokens ag-tags" id="agTags" hidden></div>
             <label class="btn ag-clip" title="Приложить картинки; если выбрать видео, из него возьмутся кадры"><input type="file" accept="image/*,video/*" multiple hidden id="agFile">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m21 12-8.5 8.5a5 5 0 0 1-7-7L14 5a3.5 3.5 0 0 1 5 5l-8.5 8.5a2 2 0 0 1-3-3L15 8"/></svg>
             </label>
@@ -295,11 +296,10 @@
             <button class="btn ag-clip" type="button" id="agMic" title="Голосовой ввод: нажмите, говорите, нажмите ещё раз">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="3" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
             </button>
-            <button class="btn" type="button" id="agClear" title="Убрать текст из поля ввода; история переписки останется">Очистить текст</button>
             <label class="ag-ctx" title="Сколько текста модель держит в памяти разом. Больше - влезают длинная переписка и много сцен, но растёт расход памяти; при переполнении.Agent сам просит увеличить">Контекст
               <select id="agCtxSel"></select>
             </label>
-            <button class="btn" type="button" id="agFreeMem" title="Выгрузить модель сценариста и кэш ComfyUI: освободить видеопамять для генерации">Освободить память</button>
+            <button class="btn" type="button" id="agClear" title="Убрать текст из поля ввода; история переписки останется">Очистить текст</button>
             <textarea id="agIn" rows="2" placeholder="Опишите сцену, сценарий или вставьте реплики… (Enter — написать сценарий, Shift+Enter — новая строка)"></textarea>
             <button class="btn pri" id="agSend" title="Сценарист напишет текст по вашему описанию и приложенным кадрам; в режим он уйдёт кнопкой «Отправить» под ответом">Написать сценарий</button>
             <button class="btn" id="agReturn" type="button" disabled title="Возвращать пока нечего: сначала напишите сценарий">Вернуть сценарий</button>

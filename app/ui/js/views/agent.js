@@ -110,11 +110,15 @@ export async function agGenerate(btn, gen) {
     const t = $('#agTarget [data-t="' + mode + '"]') || $('#agTarget2 [data-t="' + mode + '"]');
     if (t && !t.classList.contains('on')) t.click();   // the Agent writes for this mode
     AG.draft = { to: mode, at: Date.now() };           // and the answer has to come back to this field
-    if (chat) chat.value = (gen.scenes
-      // a scene sheet is one document: the answer has to come back with the same headings, or the
-      // texts would not know which card they belong to
-      ? 'Сцены из раздела ' + name + '. Перепиши каждую сцену как готовый промпт этого режима. Верни ровно те же заголовки SCENE N с той же длительностью, не объединяй и не теряй сцены, сохрани все теги (<Picture N>, <Video N>, <Audio N>) и их номера, от себя ничего не добавляй.\n\n'
-      : 'Черновик промпта из раздела ' + name + '. Сделай из него готовый промпт этого режима: сохрани все теги (<Picture N>, <Video N>, <Audio N>) и их номера, не добавляй того, чего в черновике нет, и верни ВЕСЬ промпт одним блоком.\n\n') + draft;
+    if (chat) chat.value = (gen.instruction
+      // раздел сам знает, о чём просить: карточка «Сценарий» в студиях просит разложить
+      // написанный текст на сцены, а не переделать его в один промт
+      ? gen.instruction
+      : gen.scenes
+        // a scene sheet is one document: the answer has to come back with the same headings, or the
+        // texts would not know which card they belong to
+        ? 'Сцены из раздела ' + name + '. Перепиши каждую сцену как готовый промпт этого режима. Верни ровно те же заголовки SCENE N с той же длительностью, не объединяй и не теряй сцены, сохрани все теги (<Picture N>, <Video N>, <Audio N>) и их номера, от себя ничего не добавляй.\n\n'
+        : 'Черновик промпта из раздела ' + name + '. Сделай из него готовый промпт этого режима: сохрани все теги (<Picture N>, <Video N>, <Audio N>) и их номера, не добавляй того, чего в черновике нет, и верни ВЕСЬ промпт одним блоком.\n\n') + draft;
     const before = AG.msgs.length;   // our own reply lands right after our own message, not at the tail
     await agSend();
     if (AG.msgs.length < before + 2) {
@@ -404,7 +408,7 @@ export function agVidNote() {
   const max = agVideoMax();
   return max > 1 ? ` В раздел уйдёт до ${max} видео: ${names.join(', ')}.` : ` В раздел уйдёт видео «${names[0]}».`;
 }
-export const AG_IN_HINT = 'Опишите сцену, сценарий или вставьте реплики… (Enter — создать промт, Shift+Enter — новая строка)';
+export const AG_IN_HINT = 'Опишите сцену, сценарий или вставьте реплики… (Enter — написать сценарий, Shift+Enter — новая строка)';
 export function agPlaceholder() {
   /* When the studio is going to continue a video, the person should read that in the field they are
      about to type into - not only in a line above, which the eye skips. */
@@ -417,8 +421,35 @@ export function agPlaceholder() {
     ? `${MODE_NAME[AG.target] || 'Студия'} продолжит «${nm.length > 28 ? nm.slice(0, 28) + '…' : nm}» с его последнего кадра. Напишите, что происходит дальше: одно движение, один ход камеры. (Enter — написать сценарий)`
     : AG_IN_HINT;
 }
+/* Теги файлов нужны там, где мы пишем, - поэтому ряд живёт в окне Сценариста. Сам ряд
+   режима остаётся на месте и скрыт стилем: по нему режим считает номера картинок, и
+   перенумерация при удалении файла приходит сюда же, при следующем открытии вкладки. */
+export function agTags() {
+  const box = document.getElementById('agTags');
+  if (!box) return;
+  box.innerHTML = '';
+  let src = null;
+  try {
+    const host = (typeof RM !== 'undefined' && RM[AG.target] && RM[AG.target].root) || null;
+    src = host && host.querySelector('.sr-tokens');   // карточка «Сценарий»: все теги студии в одном месте
+    if (!src) { const w = scenarioWindowOf(AG.target); src = w && w.tokens; }
+  } catch (e) { src = null; }
+  const list = src ? $$('button', src).filter(b => !b.hidden && !b.disabled) : [];
+  list.forEach(b => {
+    const tag = String(b.textContent || '').trim();
+    if (!tag) return;
+    const c = document.createElement('button');
+    c.type = 'button';
+    c.textContent = tag;
+    c.title = 'Вставить ' + tag + ' в текст сообщения: Сценарист увидит этот файл под тем же номером';
+    c.onclick = () => agInsertTag(tag);
+    box.append(c);
+  });
+  box.hidden = !list.length;
+}
 export function agCtx() {
-  agEditLabels(); agPlaceholder();   // названия переключателя зависят от того, добавляет ли режим что-то к готовому
+  agEditLabels(); agPlaceholder();   // строка над полем ввода зависит от режима
+  agTags();                          // теги файлов того режима, для которого сейчас пишем
   const n = (AG.edit ? 0 : agImgCount()) + AG.att.filter(a => !a.frame).length;   // a fix counts only the pictures of this message
   $('#agStoryF').hidden = AG.target !== 'story';
   $('#agStoryM').hidden = AG.target !== 'story';
@@ -983,26 +1014,20 @@ export async function openChat(id) {
   if (AG.att.length || AG.audios.length) toast('В чат вернулись его файлы: картинок ' + AG.att.length + ', аудио ' + AG.audios.length);
   else if ((AG.msgs || []).length && !(c.att || []).length && !(c.auds || []).length) toast('В этом чате файлы не сохранялись: они лежат только в тексте');
 }
-/* "Правка" or "Продолжить сюжет": a fix replaces what was written, a continuation remembers the whole chat */
-/* в режимах со списком «продолжить» реально что-то добавляет, и переключатель называется по-месту */
-export const EDIT_LABELS = {
-  long: { btn: ['Правка сцен', 'Добавить сцены'], on: 'Перепишет весь список сцен, заменив нужное; готовые не тронет', off: 'Оставит готовые сцены и допишет новые после них' },
-  plist: { btn: ['Правка списка', 'Добавить пункты'], on: 'Вернёт весь список с исправленным пунктом', off: 'Оставит готовые пункты и допишет новые' },
-  story: { btn: ['Правка', 'Добавить кадры'], on: 'Вернёт все строки с правкой', off: 'Оставит прежние кадры и добавит новые' },
+/* Ответ всегда правит то, что уже написано: переключатель «правка или новый промт»
+   убран - «Написать сценарий» и есть правка, а с нуля начинают «Новым чатом».
+   Осталась строка о том, как вернётся ответ: в режимах со списком она своя. */
+export const EDIT_HINT = {
+  long: 'Перепишет весь список сцен, заменив нужное; готовые не тронет',
+  plist: 'Вернёт весь список с исправленным пунктом',
+  story: 'Вернёт все строки с правкой',
 };
-export const EDIT_DEFAULT = { btn: ['Правка', 'Новый промпт'], on: 'Вернёт весь промпт с заменой; «Picture 1, 2…» — картинки этого сообщения', off: 'Напишет новый промпт, помня персонажей, свет и стиль из чата' };
+export const EDIT_HINT_DEFAULT = 'Вернёт весь промпт с заменой; «Picture 1, 2…» — картинки этого сообщения';
 export function agEditLabels() {
-  const l = (AG.target === 'story' && !AG.storyFrames) ? EDIT_DEFAULT : (EDIT_LABELS[AG.target] || EDIT_DEFAULT);
-  $$('#agEdit button').forEach((b, i) => { b.textContent = l.btn[i]; });
-  $('#agEditHint').textContent = AG.edit ? l.on : l.off;
+  const el = document.getElementById('agEditHint');
+  if (!el) return;
+  el.textContent = (AG.target === 'story' && !AG.storyFrames) ? EDIT_HINT_DEFAULT : (EDIT_HINT[AG.target] || EDIT_HINT_DEFAULT);
 }
-$('#agEdit').onclick = e => {
-  const b = e.target.closest('button[data-edit]'); if (!b) return;
-  AG.edit = b.dataset.edit === '1';
-  $$('#agEdit button').forEach(x => x.classList.toggle('on', x === b));
-  agEditLabels();
-  agCtx();
-};
 $('#agHist').addEventListener('click', e => {
   const row = e.target.closest('.ag-h'); if (!row) return;
   if (e.target.closest('button')) {
@@ -1224,7 +1249,7 @@ $('#agClear').onclick = () => { const ta = $('#agIn'); ta.value = ''; ta.dispatc
     btn.disabled = false; btn.textContent = was;
     try { if (typeof agStatus === 'function') agStatus(); } catch (e) { }
   };
-  [['#freeMemBtn', 'fm'], ['#agFreeMem', 'fmA']].forEach(pair => {
+  [['#freeMemBtn', 'fm']].forEach(pair => {
     const btn = $(pair[0]);
     if (btn && !btn._wired) { btn._wired = 1; btn.onclick = () => window.kadrFreeMem(btn); }
   });
@@ -2017,12 +2042,8 @@ export const agQwenMode = () => { const b = $('.qw-eng button.on', $('#view-qwen
     });
     document.querySelectorAll('[data-pick]').forEach(b => { if (!b.getAttribute('title')) b.title = 'Показать окна с папками на компьютере и выбрать нужную'; });
     // switches whose meaning is a pair: the word on the button is not enough
-    document.querySelectorAll('#view-agent [data-edit]').forEach(b => {
-      if (b.getAttribute('title')) return;
-      b.title = b.dataset.edit === '1'
-        ? 'Правка: сценарист меняет ваш готовый промпт - добавляет детали, убирает лишнее'
-        : 'Продолжить сюжет: сценарист пишет следующую сцену по тому, что уже есть';
-    });
+    /* переключателя «правка / продолжить сюжет» в окне больше нет - парных
+       подсказок вешать не нужно; смысл объясняет строка над полем ввода. */
     document.querySelectorAll('#view-agent [data-k]').forEach(b => {
       if (b.getAttribute('title')) return;
       b.title = b.dataset.k === 'deep'
@@ -2149,7 +2170,7 @@ export function agPromptButton(host, what, get, target) {
   if (!host || typeof get !== 'function') return null;
   const b = document.createElement('button');
   b.type = 'button'; b.className = 'btn mini agall-h ag-draft';
-  b.textContent = '🤖 К сценаристу';
+  b.textContent = '🤖 Всё к сценаристу';
   b.title = 'Унести в Сценарист всё из этого режима: файлы, кадры, звук и текст, даже если текста нет. Ответ вернётся в этот режим.';
   b.addEventListener('click', e => e.stopPropagation());   // a press here must not fold the card
   b.onclick = async () => {
@@ -2201,9 +2222,8 @@ export function agWireOtherWindows() {
   const goBtn = (card, target, label, get) => {
     if (!card) return;
     const go = document.createElement('button');
-    go.type = 'button'; go.className = 'btn mini agall-h';
-    go.textContent = '🤖 К сценаристу';
-    go.className = 'btn mini agall-h ag-draft';
+    go.type = 'button'; go.className = 'btn mini agall-h ag-draft ag-keep';
+    go.textContent = '🤖 Всё к сценаристу';
     go.title = 'Унести в Сценарист всё из этого режима: кадры, звук, видео и текст, даже если текста нет. Ответ вернётся в этот режим.';
     go.onclick = async () => {
       let carried = 0;
