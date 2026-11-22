@@ -137,3 +137,83 @@ of null») была видна только живой пробе в брауз�
 разбор `id` и `class` из `innerHTML`), и отдавать элемент только если его
 правда создали. До этого момента порядок создания полей в теле модуля
 проверяется только пробой.
+
+## Пресеты движения из её reflab.py (выписаны разбором файла, 22.11)
+
+Ролик длится 8.0 секунд: каждый кадр берётся в свою долю длительности, у кадра есть
+короткое имя и английская фраза про камеру. Ниже - как у неё, без перевода на глаз.
+
+**location / coverage - Со всех сторон.** общий · с обратной стороны · слева · справа · деталь (8 с)
+- `общий` на 0%: wide establishing shot of the whole place, eye level, the camera is still
+- `обратно` на 30%: the camera has turned around and now looks at the place from the opposite side, reverse shot
+- `слева` на 55%: the camera is moving along the left side of the place, left side view
+- `справа` на 80%: the camera is moving along the right side of the place, right side view
+- `деталь` на 100%: slow push in to a close-up of one characteristic detail of the place
+
+**location / pan360 - Осмотр на месте 360°.** камера стоит и поворачивается вокруг (8 с)
+- `0°` на 0%: the camera stands still and looks straight ahead
+- `90°` на 25%: the camera has turned in place a quarter of a full turn to the right
+- `180°` на 50%: the camera has turned half a turn and looks at the opposite side
+- `270°` на 75%: the camera has turned three quarters of a full turn
+- `360°` на 100%: the camera has finished the full turn and looks straight ahead again
+
+**location / walk - Пройтись по месту.** камера идёт вперёд по месту (8 с)
+- `вход` на 0%: wide shot at the entrance of the place, the camera starts to walk forward
+- `вперёд` на 35%: the camera keeps walking forward at walking speed, the place opens up around
+- `середина` на 70%: the camera is in the middle of the place and slowly looks around
+- `вглубь` на 100%: the camera has reached the far side of the place and looks back
+
+**location / time - Время суток.** то же место утром, днём, вечером, ночью (8 с)
+- `рассвет` на 0%: the same view at dawn, soft pink light, long shadows
+- `день` на 30%: the same view at noon, bright sun, short shadows
+- `закат` на 60%: the same view at golden hour, warm low light
+- `ночь` на 100%: the same view at night, artificial lights and moonlight
+
+**location / empty - Пустая сцена.** место без людей, спокойный облёт (6 с)
+- `начало` на 0%: empty place without any people, the camera is still
+- `сдвиг` на 50%: the camera drifts slowly to the right, still no people
+- `конец` на 100%: the camera ends on the opposite corner of the empty place
+
+**location / single - Один дубль.** один кадр места (5 с)
+- `кадр` на 50%: one steady wide shot of the place
+
+**location / custom - Свой.** свои ракурсы (8 с)
+- `ракурс 1` на 0%: wide shot of the place
+
+**character / face - Поворот лица.** левый профиль · анфас · правый профиль (6 с)
+- `слева` на 0%: head and shoulders close-up, the face turned fully to the left in profile
+- `анфас` на 50%: the head slowly turns to look straight into the camera, front view
+- `справа` на 100%: the head keeps turning and ends fully to the right in profile
+
+**character / orbit360 - Поворот 360°.** камера облетает героя в полный рост · 5 кадров: спереди, 3/4, бок, сзади, другой бок (12 с)
+- `спереди` на 0%: full body front view, the person stands completely still in a relaxed neutral pose, the camera starts one slow smooth orbit around them
+- `3/4` на 12%: the camera has orbited 45 degrees around the standing person, three-quarter view, full body from head to feet in the frame
+- `бок` на 25%: the camera has orbited 90 degrees around the standing person, side profile view, full body from head to feet in the frame
+- `сзади` на 50%: the camera has orbited 180 degrees around the standing person, back view, full body from head to feet in the frame
+- `другой бок` на 75%: the camera has orbited 270 degrees around the standing person, side profile view from the other side, full body from head to feet in the frame
+
+**character / single - Один дубль.** один кадр героя (5 с)
+- `кадр` на 50%: one steady full body shot of the person facing the camera
+
+**character / custom - Свой.** свои ракурсы (8 с)
+- `ракурс 1` на 0%: full body front view
+
+**object / table - Поворот на столе.** предмет медленно крутится на месте (8 с)
+- `спереди` на 0%: the object stands on a plain surface seen from the front
+- `бок` на 25%: the object has turned a quarter turn, side view
+- `сзади` на 50%: the object has turned half a turn, seen from behind
+- `другой бок` на 75%: the object has turned three quarters, the other side view
+- `сверху` на 100%: the camera rises and looks at the object from above
+
+**object / detail - Детали.** общий вид и крупные планы (8 с)
+- `общий` на 0%: the whole object in the frame, still camera
+- `деталь 1` на 40%: slow push in to a close-up of the most characteristic detail of the object
+- `деталь 2` на 75%: the camera moves along the object to another detail, close-up
+- `фактура` на 100%: extreme close-up of the surface and the material of the object
+
+**object / single - Один дубль.** один кадр предмета (5 с)
+- `кадр` на 50%: one steady shot of the object
+
+**object / custom - Свой.** свои ракурсы (8 с)
+- `ракурс 1` на 0%: the whole object seen from the front
+
