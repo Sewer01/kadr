@@ -452,7 +452,7 @@ class QueueMixin:
                 "low_memory": True,
                 "error": (f"Свободно {stop['have']:g} ГБ видеопамяти, а этот режим уже прерывался на нехватке памяти, "
                           f"когда свободно было {stop['need']:g} ГБ. Закройте программы, которые держат память "
-                          "(браузер с видео, Adobe, игры), или освободите память в разделе «Агент» и начните снова."),
+                          "(браузер с видео, Adobe, игры), или освободите память в разделе «Сценарист» и начните снова."),
                 "have": stop["have"], "need": stop["need"]}, status=409)
         eta = forecast.estimate(TIMINGS, mode_key, quality=str(m.get("q") or ""),
                                 sec=m.get("len") or 0, res=str(m.get("res") or ""))

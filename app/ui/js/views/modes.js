@@ -6,7 +6,7 @@ import { goTo, onNav } from '../core/tabs.js';
 import { AudioRow, AudioTrimmer, VideoTrimmer, actx, wavSlice, setActx } from '../ui/audio.js';
 import { ASPECTS, QUALITY, QUALITY_ALL, loraForm, mountLoras, paramsCard, r32, resFor, seedForm, sizeForm, useSeed } from '../ui/params.js';
 import { previewPanel } from '../ui/preview.js';
-import { audioTokens, scenarioTagRow, scenarioWindow, sceneAudioPlan } from '../ui/scenario.js';
+import { audioTokens, scenarioResolvers, scenarioTagRow, scenarioWindow, sceneAudioPlan } from '../ui/scenario.js';
 import { fitAspect, fitSlot, repeatRefs, resetSlot, wireDrop, wireSlotSwap } from '../ui/slots.js';
 import { AG, agAttachFile, agCtx, agDraftOut, agGenerate, agGo, agMakeBtn, agPickTarget, agRefWarn, agScenesText, agStatus, agWords, agWordsFor, hGrip, hGripAfter, setChatAudio, showAudioBox, speechReady, transcribeWav, wordsIntoPrompt } from './agent.js';
 import { addToLib, closeViewer, openUpscale, openViewer, renderLib, setFav } from './library.js';
@@ -210,7 +210,7 @@ export function refsChanged() {
     : CL_HEARD.text
       ? '<button class="token" type="button" data-ins="' + clEsc('<d>[' + (CL_HEARD.lang || 'язык аудио') + '] ' + CL_HEARD.text + '</d>') + '" title="' + clEsc(CL_HEARD.text) + '">вставить слова песни</button>'
       : '';
-  const song = L.dur0 ? '<span class="hint" style="font-size:11.5px;flex:1 1 160px">песня в этом режиме - движущий звук: её не называют тегом' + (CL_HEARD.text ? ', а слова вставляются кнопкой' : CL_HEARD.busy ? ', слова слушаю' : ', слов не слышно - проверьте распознавание речи в разделе «Агент»') + '</span>' : '';
+  const song = L.dur0 ? '<span class="hint" style="font-size:11.5px;flex:1 1 160px">песня в этом режиме - движущий звук: её не называют тегом' + (CL_HEARD.text ? ', а слова вставляются кнопкой' : CL_HEARD.busy ? ', слова слушаю' : ', слов не слышно - проверьте распознавание речи в разделе «Сценарист»') + '</span>' : '';
   $('#tokens').innerHTML = filled.map(n => `<button class="token" type="button">&lt;Picture ${n}&gt;</button>`).join('') + words + song
     || '<span class="hint">добавьте референсы — появятся метки</span>';
 }
@@ -222,7 +222,7 @@ $('#tokens').onclick = e => {
 };
 refsChanged();
 
-// abuf, peaks и audioName (звук «Клипа») лежат в core/state.js: их читают ещё «Агент» и «Workflow»
+// abuf, peaks и audioName (звук «Клипа») лежат в core/state.js: их читают ещё «Сценарист» и «Workflow»
 export const aFile = $('#aFile');
 // one click: audio, pictures and the prompt of this section
 $('#lClear').onclick = () => {
@@ -564,7 +564,7 @@ export function makeRefMode(cfg) {
   let scWin = null;
   if (!cfg.scenes && !cfg.swap) {
     scWin = scenarioWindow(scBox, {
-      kind: 'mode', num: 2, hint: 'можно написать в разделе «Агент»',
+      kind: 'mode', num: 2, hint: 'можно написать в разделе «Сценарист»',
       placeholder: cfg.placeholder, cls: 'rm-prompt', chips: 'below', chipsCls: 'rm-tokens',
       generate: { mode: cfg.mode, text: () => ($('.rm-prompt', root) || {}).value },
     });
@@ -859,7 +859,7 @@ export function makeRefMode(cfg) {
     card.append(host);
     // the button stands on this card, not on the old caption row: the row is storage only and hidden
     {
-      const vb = agMakeBtn($('.card-h', card), '🎞', 'видео-пример - Агент получит его кадрами');
+      const vb = agMakeBtn($('.card-h', card), '🎞', 'видео-пример - Сценарист получит его кадрами');
       if (vb) {
         vb._agCount = () => slots.filter(s => s._src || s._file).length;
         vb.onclick = async () => {
@@ -873,9 +873,9 @@ export function makeRefMode(cfg) {
               if (await agAttachFile(f)) added++; else again++;
             }
             agGo();
-            toast(added ? ('В чат агента добавлено видео (кадрами): ' + added + (again ? ' · ' + again + ' уже лежало' : '') + moved)
-                        : 'Это видео уже лежит в чате агента');
-          } catch (err) { toast('Не удалось передать видео агенту: ' + (err && err.message ? err.message : '')); }
+            toast(added ? ('В чат сценариста добавлено видео (кадрами): ' + added + (again ? ' · ' + again + ' уже лежало' : '') + moved)
+                        : 'Это видео уже лежит в чате сценариста');
+          } catch (err) { toast('Не удалось передать видео сценаристу: ' + (err && err.message ? err.message : '')); }
         };
       }
     }
@@ -1050,7 +1050,7 @@ export function makeRefMode(cfg) {
     card.append(host);
     // same here: this card is what the person sees, the old row is hidden storage
     {
-      const ab = agMakeBtn($('.card-h', card), '🎧', 'весь референс-аудио: Агент распознает слова и вставит их в промпт');
+      const ab = agMakeBtn($('.card-h', card), '🎧', 'весь референс-аудио: Сценарист распознает слова и вставит их в промпт');
       if (ab) {
         ab._agCount = () => slots.filter(s => s._file).length;
         ab.onclick = async () => {
@@ -1071,8 +1071,8 @@ export function makeRefMode(cfg) {
           }
           const moved = agPickTarget(cfg.mode);   // цель включается до перехода: тост должен о ней сказать
           agGo();
-          toast(added ? ('В чат агента добавлено аудио: ' + added + (again ? ' · ' + again + ' уже лежало' : '') + moved)
-                      : 'Всё это аудио уже лежит в чате агента' + moved);
+          toast(added ? ('В чат сценариста добавлено аудио: ' + added + (again ? ' · ' + again + ' уже лежало' : '') + moved)
+                      : 'Всё это аудио уже лежит в чате сценариста' + moved);
         };
       }
     }
@@ -1216,7 +1216,7 @@ export function makeRefMode(cfg) {
   const promptEl = () => $('.rm-prompt', root) || (cfg.scenes ? ($$('.sc textarea', root).find(t => t.value.trim()) || $('.sc textarea', root)) : (root._ta || $('.sc textarea', root)));   // video studio: the first scene that has a text (the focused field may be a stale one)
   if (cfg.swap) {   // beginner form: who to replace instead of a prompt; the program writes the prompt itself
     scWin = scenarioWindow(scBox, {
-      kind: 'swap', num: 2, hint: 'можно написать в разделе «Агент»',
+      kind: 'swap', num: 2, hint: 'можно написать в разделе «Сценарист»',
       placeholder: 'Напишите обычным промптом, кого на кого заменить. Например: Replace the man in the white shirt in <Video 1> with the character from <Picture 1>. Keep the background, camera and movements of the video.',
       cls: 'rm-prompt', chips: 'below', chipsCls: 'rm-tokens',
       generate: { mode: cfg.mode, text: () => ($('.rm-prompt', root) || {}).value },
@@ -1280,7 +1280,7 @@ export function makeRefMode(cfg) {
         </div>
       </div>
       <div data-tagrow></div>
-      <div class="note" style="margin-top:12px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 8h0M11 12h1v5h1"/></svg><span>Изображения героя необязательны: без них ролик строится только по тексту (например, про Древний Рим). Сцены идут одна за другой, каждая продолжает прошлую: герой, место и звук переходят дальше. Но при каждом продолжении изображение немного портится, поэтому при смене плана или места ставьте у сцены галочку «Новый план»: она строится заново по вашим изображениям, и качество остаётся как в первой сцене. В каждой сцене опишите героя, что он делает и как движется камера. Длину сцены задаёт ползунок. Текст сцены можно составить в разделе «Агент».</span></div>`;
+      <div class="note" style="margin-top:12px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 8h0M11 12h1v5h1"/></svg><span>Изображения героя необязательны: без них ролик строится только по тексту (например, про Древний Рим). Сцены идут одна за другой, каждая продолжает прошлую: герой, место и звук переходят дальше. Но при каждом продолжении изображение немного портится, поэтому при смене плана или места ставьте у сцены галочку «Новый план»: она строится заново по вашим изображениям, и качество остаётся как в первой сцене. В каждой сцене опишите героя, что он делает и как движется камера. Длину сцены задаёт ползунок. Текст сцены можно составить в разделе «Сценарист».</span></div>`;
     /* Общий ряд картинок студий сцен даёт тот же модуль окна, что и поля: ряд собирается
        одним кодом, а ряды отдельных сцен помечены иначе, чтобы их не перепутать. */
     const sharedRow = scenarioTagRow('rm-tokens');
@@ -2049,7 +2049,7 @@ export function makeRefMode(cfg) {
           + audioTokens(c, bs, root._fauds || []).join('');
         c._base = bs; c._counter?.();
         const n = c._files.filter(Boolean).length;
-        $('.sc-rhint', c).textContent = n ? `Своих фото в этой сцене: ${n} (мест до девяти). Номера идут десятками по сценам: в первой <Picture 10>, <Picture 11>, во второй <Picture 20>, <Picture 21> - поэтому в Агенте число сразу говорит, о какой сцене речь. Аудио этой сцены зовётся так же: <Audio 10>, <Audio 20>... Общие изображения остаются <Picture 1…5>, фон всего ролика - <Audio 1>.` : 'Своих фото нет: сцена возьмёт общие. У своих мест номера не меняются, даже если убрать другое фото.';
+        $('.sc-rhint', c).textContent = n ? `Своих фото в этой сцене: ${n} (мест до девяти). Номера идут десятками по сценам: в первой <Picture 10>, <Picture 11>, во второй <Picture 20>, <Picture 21> - поэтому в Сценаристе число сразу говорит, о какой сцене речь. Аудио этой сцены зовётся так же: <Audio 10>, <Audio 20>... Общие изображения остаются <Picture 1…5>, фон всего ролика - <Audio 1>.` : 'Своих фото нет: сцена возьмёт общие. У своих мест номера не меняются, даже если убрать другое фото.';
       };
       // (the places take pictures themselves: click a tile or drop a photo into it)
       paintRefs();
@@ -2180,7 +2180,7 @@ export function makeRefMode(cfg) {
               const put = v => { c._audWords[j] = v; const t2 = $('textarea', host); if (t2) t2.value = v; };
               if (b.dataset.again === 'clear') { put(''); if (root._save) root._save(); toast('Слова стёрты: модель будет петь на свой слух'); return; }
               if (!AG.status || !AG.status.speech_ready) { try { await agStatus(); } catch (e) { } }
-              if (!AG.status || !AG.status.speech_ready) { toast('Распознавание речи не готово: раздел «Агент», строчка «Модель агента»'); return; }
+              if (!AG.status || !AG.status.speech_ready) { toast('Распознавание речи не готово: раздел «Сценарист», строчка «Модель сценариста»'); return; }
               const was = b.textContent; b.disabled = true; b.textContent = 'слушаю…';
               try {
                 const j2 = await transcribeWav(file, b.dataset.again);
@@ -2678,8 +2678,8 @@ export function makeRefMode(cfg) {
             () => '<div class="hint" style="font-size:12.5px;line-height:1.55"><b>Аудио отдельной сцены.</b> Под текстом сцены есть кнопка «Загрузить аудио сцены» - до трёх файлов. У каждой сцены свои номера десятками: во второй сцене это &lt;Audio 20&gt;, &lt;Audio 21&gt;, &lt;Audio 22&gt;, в третьей - от 30; первый номер &lt;Audio 1&gt; оставлен фону всего ролика. Модель получает их как ссылки, а применяет там, где вы упомянули файл тегом в тексте сцены: не упомянули - звук в сцене делает модель. Кнопка «Обрезать» открывает тот же прибор, что и в карточке «Аудио», но с правилом 15 секунд - сцена длиннее всё равно не будет. Файлы хранятся вместе с проектом.</div>',
             ,
             () => '<div class="hint" style="font-size:12.5px;line-height:1.55"><b>Аудио в Референсах, Актёре и Экшн-видео.</b> Здесь у звука своя карточка «Аудио». Файлы не выкладываются тремя пустыми плашками: нажимаете «Загрузить аудио» - и файл становится отдельной меткой с названием, длиной и тегом &lt;Audio 1&gt;, &lt;Audio 2&gt;, &lt;Audio 3&gt;. Нажатие на метку ставит тег в текст, «Обрезать» открывает тот же прибор, что и в Видеостудии: волна, перетаскивание, прослушивание, до 15 секунд. Второе нажатие закрывает окно и применяет выделенное, а открывается снова целый файл - резать можно сколько раз угодно, файл на диске при этом не портится. Больше трёх аудио нельзя: кнопка гаснет сама.</div>',
-            () => '<div class="hint" style="font-size:12.5px;line-height:1.55"><b>Референс-видео.</b> В Референсах у видео своя карточка, а в «Замене персонажа» под окном видео стоит тот же верстак. Файлы добавляются по одному, каждый подписан &lt;Video 1&gt;, &lt;Video 2&gt;, &lt;Video 3&gt; - нажатие на метку ставит тег в текст. <b>Дальше 25 секунд модель не смотрит</b>, поэтому лишнее стоит отрезать. «✂ Монтаж» открывает верстак: над лентой окно просмотра, на ленте - сами кадры, жёлтый маркер (в левом верхнем углу ленты всегда показаны его секунды), а прямо у маркера стрелки покадровой прокрутки (один кадр = 1/24 с) и ножницы: левые убирают всё до маркера, правые - всё после. Ползунок и кнопки «−» «+» меняют <b>ширину ленты</b> (сколько пикселей приходится на секунду), «По ширине» возвращает весь клип в окно. Клик по ленте слева от метки играет от начала куска до метки, справа - от метки до конца, а окно просмотра стоит на маркере и показывает его как стоп-кадр. Края выделенного участка тянутся мышью, двойной клик возвращает целый клип, убрать файл совсем можно крестиком на его метке в карточке, «Отменить» шагает назад. «Оставить выбранное» режет по-настоящему, настоящим декодером: в карточке останется кусок, а для новой резки всегда открывается целый файл. «🤖 В агент» отправляет клип Агенту - он посмотрит на него как на кадры.</div>',
-            () => '<div class="hint" style="font-size:12.5px;line-height:1.55"><b>«🤖 В агент».</b> Отправляет выделенный кусок в раздел «Агент»: он распознаёт слова и пишет промпт уже зная, что говорится. Перед отправкой Агент сам переключается на Видеостудию, чтобы не писать в чужой раздел. Если распознавание речи ещё не скачано, кнопка об этом скажет - строчка «Модель агента», кнопка «Докачать».</div>',
+            () => '<div class="hint" style="font-size:12.5px;line-height:1.55"><b>Референс-видео.</b> В Референсах у видео своя карточка, а в «Замене персонажа» под окном видео стоит тот же верстак. Файлы добавляются по одному, каждый подписан &lt;Video 1&gt;, &lt;Video 2&gt;, &lt;Video 3&gt; - нажатие на метку ставит тег в текст. <b>Дальше 25 секунд модель не смотрит</b>, поэтому лишнее стоит отрезать. кнопка «Монтаж» открывает верстак: над лентой окно просмотра, на ленте - сами кадры, жёлтый маркер (в левом верхнем углу ленты всегда показаны его секунды), а прямо у маркера стрелки покадровой прокрутки (один кадр = 1/24 с) и ножницы: левые убирают всё до маркера, правые - всё после. Ползунок и кнопки «−» «+» меняют <b>ширину ленты</b> (сколько пикселей приходится на секунду), «По ширине» возвращает весь клип в окно. Клик по ленте слева от метки играет от начала куска до метки, справа - от метки до конца, а окно просмотра стоит на маркере и показывает его как стоп-кадр. Края выделенного участка тянутся мышью, двойной клик возвращает целый клип, убрать файл совсем можно крестиком на его метке в карточке, «Отменить» шагает назад. «Оставить выбранное» режет по-настоящему, настоящим декодером: в карточке останется кусок, а для новой резки всегда открывается целый файл. «🤖 К сценаристу» отправляет клип сценаристу - он посмотрит на него как на кадры.</div>',
+            () => '<div class="hint" style="font-size:12.5px;line-height:1.55"><b>«🤖 К сценаристу».</b> Отправляет выделенный кусок в раздел «Сценарист»: он распознаёт слова и пишет промпт уже зная, что говорится. Перед отправкой Сценарист сам переключается на Видеостудию, чтобы не писать в чужой раздел. Если распознавание речи ещё не скачано, кнопка об этом скажет - строчка «Модель сценариста», кнопка «Докачать».</div>',
             () => {
               const mp = root.querySelector('.mdl-pick'); if (!mp) return '';
               const cur = ($('.mp-cur', mp) || {}).textContent || '—';
@@ -2714,7 +2714,7 @@ export function makeRefMode(cfg) {
           '<div class="mus-extra"></div>' +
           '<small class="hint" style="display:block;margin-top:6px"><b>Первый файл - звук ролика</b> (тег &lt;Audio 1&gt;): модель перекладывает его в видео,' +
           ' правило 15 секунд на него не действует. <b>Второй и третий - образцы</b> (теги &lt;Audio 2&gt; и &lt;Audio 3&gt;): голос, ритм, атмосфера,' +
-          ' которые можно сослать в тексте любой сцены. Обрезать и глушить лесенкой можно каждый. Кнопка «🎧 Все в агент» живёт в заголовке этой карточки - она видна, даже когда карточка свёрнута.</small>';
+          ' которые можно сослать в тексте любой сцены. Обрезать и глушить лесенкой можно каждый. Кнопка «🎧 Всё к сценаристу» живёт в заголовке этой карточки - она видна, даже когда карточка свёрнута.</small>';
         $('.card-h', musCard).insertAdjacentElement('afterend', fw);
         // the old tile stays in the tree - the calculation reads its field - but it is not shown:
         // the row above is what the person sees and uses
@@ -2772,8 +2772,8 @@ export function makeRefMode(cfg) {
         lp.innerHTML = '<input type="checkbox" class="lm-loop"><span>Пустой фон по кругу - если ваш трек короче ролика, остаток заполняется им же, без тишины</span>';
         const ab = document.createElement('button');
         ab.type = 'button'; ab.className = 'btn mini at-all agall-h';
-        ab.textContent = '🎧 Все в агент';
-        ab.title = 'Сложить в чат Агента всё аудио - фон ролика, его образцы и аудио всех сцен; он допишет к тому, что уже есть, и ничего не очистит';
+        ab.textContent = '🎧 Всё к сценаристу';
+        ab.title = 'Сложить в чат сценариста всё аудио - фон ролика, его образцы и аудио всех сцен; он допишет к тому, что уже есть, и ничего не очистит';
         // the button belongs to the card's heading, not to its body: the audio card is folded most
         // of the time, and a control hidden inside a fold is a control nobody finds
         const head = $('.card-h', musCard);
@@ -2987,7 +2987,7 @@ export function makeRefMode(cfg) {
             if (done) ok++;
           } catch (err) { toast('Не удалось передать «' + it.name + '»: ' + err.message); }
         }
-        toast(ok ? ('В Агент передано аудио: ' + ok + ' из ' + items.length) : 'Агент не принял аудио - проверьте распознавание речи');
+        toast(ok ? ('В Сценарист передано аудио: ' + ok + ' из ' + items.length) : 'Сценарист не принял аудио - проверьте распознавание речи');
       };
       /* The button is created by the block above, which runs later than this code: looking it up here
          found nothing, the press found no handler and stayed silent. The click is caught where it
@@ -3383,15 +3383,15 @@ export function makeRefMode(cfg) {
     onNav(cfg.mode, check);
     check();
   }
-  /* Every group of files this mode holds gets the same button in the heading above it: «Все в агент».
+  /* Every group of files this mode holds gets the same button in the heading above it: «Всё к сценаристу».
      One action everywhere - only the icon says what is being sent. The Agent is filled, never
      restarted: whatever a person has typed and whichever «Промт для» they chose stay as they are. */
   const agHeadBtn = (host, icon, what) => {
     if (!host) return null;
     const b = document.createElement('button');
     b.type = 'button'; b.className = 'btn mini agall-h';
-    b.textContent = icon + ' Все в агент';
-    b.title = 'Сложить в чат Агента ' + what + ' - он допишет к тому, что уже лежит, и ничего не очистит';
+    b.textContent = icon + ' Всё к сценаристу';
+    b.title = 'Сложить в чат сценариста ' + what + ' - он допишет к тому, что уже лежит, и ничего не очистит';
     b.addEventListener('click', e => e.stopPropagation());   // a press here must not fold the card
     host.append(b);
     return b;
@@ -3399,8 +3399,8 @@ export function makeRefMode(cfg) {
   // a button with nothing to take is a dead button: it lies grey until a file appears
   const agCount = (btn, fn) => { btn._agCount = fn; btn.dataset.agKind = '1'; return btn; };
   const agSay = (what, added, again, tail) => {
-    toast(added ? ('В чат агента добавлено ' + what + ': ' + added + (again ? ' · ' + again + ' уже лежало' : '') + (tail || ''))
-                : ('Всё это ' + what + ' уже лежит в чате агента' + (tail || '')));
+    toast(added ? ('В чат сценариста добавлено ' + what + ': ' + added + (again ? ' · ' + again + ' уже лежало' : '') + (tail || ''))
+                : ('Всё это ' + what + ' уже лежит в чате сценариста' + (tail || '')));
   };
 
   // ···· images: the common places, and in the studios also every scene's own places
@@ -3430,11 +3430,11 @@ export function makeRefMode(cfg) {
       }
       agGo();
       const common = added - own;
-      toast(added ? ('В чат агента добавлено изображений: ' + added
+      toast(added ? ('В чат сценариста добавлено изображений: ' + added
           + (common && own ? ' (общих ' + common + ', из сцен ' + own + ')' : own ? ' (все из сцен)' : '')
           + (again ? ' · ' + again + ' уже лежало' : '') + moved)
-          : 'Все эти изображения уже лежат в чате агента' + moved);
-    } catch { toast('Не удалось передать изображения агенту'); }
+          : 'Все эти изображения уже лежат в чате сценариста' + moved);
+    } catch { toast('Не удалось передать изображения сценаристу'); }
   };
 
   // ···· reference videos: the Agent receives them as frames, which is how a video reaches the model
@@ -3455,7 +3455,7 @@ export function makeRefMode(cfg) {
         }
         agGo();
         agSay('видео (кадрами)', added, again, moved);
-      } catch (err) { toast('Не удалось передать видео агенту: ' + (err && err.message ? err.message : '')); }
+      } catch (err) { toast('Не удалось передать видео сценаристу: ' + (err && err.message ? err.message : '')); }
     };
   }
 
@@ -3463,7 +3463,7 @@ export function makeRefMode(cfg) {
   if (!cfg.scenes) {
     const ab = $('.rm-auds', root);
     const audBtn = (ab && !ab.closest('.ra-tiles')) ? agHeadBtn($('.sub-l', ab.parentElement), '🎧',
-      'весь референс-аудио: Агент распознает слова и вставит их в промпт') : null;
+      'весь референс-аудио: Сценарист распознает слова и вставит их в промпт') : null;
     if (audBtn) agCount(audBtn, () => $$('.slot', audsEl).filter(s => s._file).length);
     if (audBtn) audBtn.onclick = async () => {
       const list = $$('.slot', ab).map(s => s._file).filter(Boolean);
@@ -3499,8 +3499,8 @@ export function makeRefMode(cfg) {
     // the same one-click round trip the single field has, but for the whole sheet at once
     const gg = document.createElement('button');
     gg.className = 'btn mini agall-h';
-    gg.textContent = '🤖 Генерация агентом сцен';
-    gg.title = 'Отправить все сцены Агенту одним сообщением: он перепишет их, и каждая вернётся в свою карточку. Фото и песни сцен остаются на местах.';
+    gg.textContent = '🤖 Сценарист перепишет сцены';
+    gg.title = 'Отправить все сцены сценаристу одним сообщением: он перепишет их, и каждая вернётся в свою карточку. Фото и песни сцен остаются на местах.';
     gg.onclick = () => agGenerate(gg, { mode: cfg.mode, scenes: true, text: () => agScenesText(root) });
     pcard.querySelector('.card-h').append(gg);
     gg._agCount = () => $$('.sc', root).filter(c => ($('textarea', c) || {}).value.trim()).length;
@@ -3509,19 +3509,30 @@ export function makeRefMode(cfg) {
     const fz = document.createElement('button');
     fz.type = 'button'; fz.className = 'btn mini';
     fz.textContent = 'Освободить память';
-    fz.title = 'Остановить модель Агента и сбросить кэш ComfyUI: пока память занята, вторая сторона не загружается и отвечает «Остановлено»';
+    fz.title = 'Остановить модель сценариста и сбросить кэш ComfyUI: пока память занята, вторая сторона не загружается и отвечает «Остановлено»';
     fz.onclick = () => window.kadrFreeMem(fz);
     pcard.querySelector('.card-h').append(fz);
   }
-  go.textContent = cfg.scenes ? '🤖 Все промты в агента' : '🤖 Промпт в агента';
+  go.textContent = cfg.scenes ? '🤖 Все тексты к сценаристу' : '🤖 Текст к сценаристу';
       go.title = cfg.scenes
-        ? 'Перенести тексты всех сцен по порядку в чат Агента и включить «Промт для: ' + cfg.title + '»; ответ вернётся в те же сцены'
-        : 'Перенести текст раздела в чат Агента целиком, с тегами, и включить «Промт для: ' + cfg.title + '»; ответ вернётся в это же поле';
+        ? 'Перенести тексты всех сцен по порядку в чат сценариста и включить «Промт для: ' + cfg.title + '»; ответ вернётся в те же сцены'
+        : 'Перенести текст раздела в чат сценариста целиком, с тегами, и включить «Промт для: ' + cfg.title + '»; ответ вернётся в это же поле';
       $('.card-h', pcard).append(go);
       go.onclick = () => agDraftOut(cfg.scenes ? agScenesText(root) : (pe ? pe.value : ''), cfg.mode,
         cfg.scenes ? 'тексты сцен' : 'черновик промпта');
     }
   }
+  /* Раздел говорит сценаристу, где его окно сценария. В режиме с одним полем это оно, а в
+     студии сцен - окно той сцены, на которой человек сейчас; если ни на какой - первой
+     пустой сцены, а если все заполнены, последней. Сам сценарист про это не знает. */
+  scenarioResolvers.set(cfg.mode, cfg.scenes
+    ? () => {
+      const list = $$('.sc', root).filter(c => c._win);
+      if (!list.length) return null;
+      if (root._sel != null && list[root._sel]) return list[root._sel]._win;
+      return (list.find(c => !c._win.value().trim()) || list[list.length - 1])._win;
+    }
+    : () => scWin);
   return { root, S, upd, voice: () => files('.rm-auds .slot').length, prompt: () => promptEl(), imgSlots: () => $$('.ref input', imgsEl) };
 }
 export const RM = {
@@ -3534,8 +3545,8 @@ export const RM = {
   actor: makeRefMode({
     mode: 'actor', title: 'Актёр', pill: 'Singularity Ref2V · 10 шагов', dur: 14, maxImages: 3, videos: false,
     sub: 'Диалоги и крупные планы: актёрская игра, эмоции и голос по образцу — лучше всего для реализма',
-    refHint: 'Первое изображение — стартовый кадр видео (его композиция сохранится). Аудио — образец голоса: из него берётся только тембр и манера, а слова произносятся новые, из вашего промпта. Нужны два голоса — запишите оба в одно аудио. Промпт удобно писать в разделе «Агент» (цель «Актёр»).',
-    placeholder: '@image1 - keyframe, first frame of the target video… Лучше всего писать в «Агенте»: он знает формат этого режима',
+    refHint: 'Первое изображение — стартовый кадр видео (его композиция сохранится). Аудио — образец голоса: из него берётся только тембр и манера, а слова произносятся новые, из вашего промпта. Нужны два голоса — запишите оба в одно аудио. Промпт удобно писать в разделе «Сценарист» (цель «Актёр»).',
+    placeholder: '@image1 - keyframe, first frame of the target video… Лучше всего писать в «Сценаристе»: он знает формат этого режима',
   }),
   swap: makeRefMode({
     mode: 'swap', title: 'Замена', pill: 'Готовый пресет · Ref2V + LoRA замены', dur: 6, maxImages: 2, videos: true, swap: true,

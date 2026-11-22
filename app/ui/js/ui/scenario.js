@@ -17,6 +17,29 @@ export function onPrompt(id, fn) {
 }
 export function offPrompt(id) { promptHandlers.delete(id); }
 
+/* Реестр окон по режиму. Сценаристу нужно положить готовый текст в окно нужного режима,
+   а как это окно собрано он знать не должен: раздел сам говорит, где его окно. В студии
+   сцен окно не одно, поэтому раздел отдаёт не окно, а способ его найти - тогда работает
+   и после того, как сцены добавили или удалили. */
+export const scenarioResolvers = new Map();
+export function scenarioWindowOf(mode) {
+  const find = scenarioResolvers.get(mode);
+  let win = null;
+  try { win = find ? find() : null; } catch (e) { win = null; }
+  return win && win.ta && win.ta.isConnected ? win : null;
+}
+/* Кладёт текст в окно режима. Привязку фото и звука окно не делает: для этого человек
+   остаётся в режиме, куда текст лёг, - там свои плашки картинок и песен. */
+export function putScenario(mode, text) {
+  const win = scenarioWindowOf(mode);
+  if (!win) { toast('В этом режиме нет окна сценария: откройте его и попробуйте снова'); return false; }
+  goTo(mode);
+  win.setValue(text);
+  win.ta.focus();
+  toast('Сценарий лёг в окно «Сценарий»: картинки и звук привязываете здесь же, потом «Генерация промта»');
+  return true;
+}
+
 /* ── Окно «Сценарий»: единственное поле, где человек пишет текст для модели ─────────────
    Раньше каждое окно собирали у себя в разделе руками: поле, ряд кнопок тегов, подписи -
    семь копий одной и той же разметки, и в каждой она понемногу расходилась. Теперь окно
@@ -37,7 +60,7 @@ export function offPrompt(id) { promptHandlers.delete(id); }
        cfg.wrap        - класс обёртки поля, если разделу нужно прятать поле целиком;
        cfg.buttons     - true - ряд кнопок поля, даже когда генерации в нём нет;
        cfg.generate    - { mode, text, scenes } - кнопка «Генерация промта» окна: тем же текстом
-               и тем же вызовом, что и раньше; ответ Агента возвращается в это же окно
+               и тем же вызовом, что и раньше; ответ сценариста возвращается в это же окно
                тем же путём sendPrompt.
      чем читается значение: api.value(); чем задаётся: api.setValue(text) - поле само
        сообщает об изменении; как вкладка узнаёт об изменении: api.onInput(fn);
@@ -132,7 +155,7 @@ export function scenarioWindow(host, cfg = {}) {
     g.type = 'button'; g.className = 'btn gen-b';
     g.style.cssText = 'padding:4px 12px;font-size:12px';
     g.textContent = '🤖 Генерация промта';
-    g.title = 'Агент сделает из этого текста готовый промпт своего режима и заменит им текст в поле. Файлы раздела и черновик уйдут в чат Агента, ответ останется в его истории.';
+    g.title = 'Сценарист сделает из этого текста готовый промпт своего режима и заменит им текст в поле. Файлы раздела и черновик уйдут в чат сценариста, ответ останется в его истории.';
     g.onclick = () => views.agGenerate(g, cfg.generate);
     buttons.append(g);
   }
@@ -182,7 +205,7 @@ export function scenarioWindow(host, cfg = {}) {
         + 'Имена героя тегами работают в «Видеостудии» и «Киностудии».',
       generate: { mode: 'video', text: () => ($('#vPrompt') || {}).value },
     });
-    if (w) { w.ta.id = 'vPrompt'; if (w.counter) w.counter.id = 'vCount'; }
+    if (w) { w.ta.id = 'vPrompt'; if (w.counter) w.counter.id = 'vCount'; scenarioResolvers.set('video', () => w); }
   }
   const lip = document.querySelector('[data-scenarobox="lipsync"]');
   if (lip) {
@@ -193,7 +216,7 @@ export function scenarioWindow(host, cfg = {}) {
       chips: 'below',
       generate: { mode: 'lipsync', text: () => ($('#lPrompt') || {}).value },
     });
-    if (w) { w.ta.id = 'lPrompt'; if (w.tokens) w.tokens.id = 'tokens'; }
+    if (w) { w.ta.id = 'lPrompt'; if (w.tokens) w.tokens.id = 'tokens'; scenarioResolvers.set('lipsync', () => w); }
   }
 })();
 
@@ -351,7 +374,7 @@ export async function sendPrompt(blk, to) {
       const by = {};
       scenesMade.forEach((s, i) => { (by[key(s)] = by[key(s)] || []).push(i + 1); });
       const twins = Object.keys(by).filter(k => by[k].length > 1 && k.length > 40).map(k => by[k].join(', '));
-      if (twins.length) toast('Агент повторил сцены ' + twins.join(' · ') + ' одинаковым текстом: поправьте текст или попросите его продолжить дальше');
+      if (twins.length) toast('Сценарист повторил сцены ' + twins.join(' · ') + ' одинаковым текстом: поправьте текст или попросите его продолжить дальше');
     }
     L2.root._setScenes(scenesMade);
     /* Своё фото и своя песня сцены живут под её номером места: у второй сцены это 20.
@@ -399,7 +422,7 @@ export async function sendPrompt(blk, to) {
         if (j < 0) { home.gone.push('<Audio ' + n + '> - в сцене нет свободного места для песни'); continue; }
         c._auds[j] = a.file; c._audSrc[j] = a.file; c._audSel[j] = null; if (!a.file.__key) window.audioKey(a.file);
         c._audWords = c._audWords || [];
-        // слова уже услышаны в агенте: переносим их в карточку сцены, а не слушаем заново
+        // слова уже услышаны в сценаристе: переносим их в карточку сцены, а не слушаем заново
         if ((a.text || '').trim() && !(c._audWords[j] || '').trim()) c._audWords[j] = String(a.text).trim();
         c._paintAuds?.(); c._paintWords?.(); c._paint?.(); home.auds++;
         home.where.push('<Audio ' + n + '> → сцена ' + Math.floor(n / 10) + ' · ' + a.file.name);

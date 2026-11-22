@@ -14,7 +14,7 @@ import { extKind, lowMemoryAsk } from './setup.js';
 
 /* «Ручку» размера сетки вешает views/agent.js (window.gridResize), а он исполняется
    позже нас: у окна картинок ручки ещё нет, поэтому пробуем сейчас и повторяем на
-   следующем шаге цикла событий, когда раздел агента уже объявился. */
+   следующем шаге цикла событий, когда раздел сценариста уже объявился. */
 const gridHandle = root => {
   const g = $('.grid', root);
   if (!g) return;
@@ -256,7 +256,7 @@ export const imgSeedForm = (S, fd) => { if (S.seedFixed && S.seed) fd.append('se
       <label style="display:flex;gap:8px;align-items:flex-start;margin:8px 0;cursor:pointer" title="Если нужна серия похожих кадров, включите. Для разных изображений оставьте выключенным: у каждой будет свой случайный seed."><input type="checkbox" class="kr-same" style="margin-top:3px"><span>Одинаковый seed для всей серии <span class="hint">(для серии кадров; для разных изображений не нужно). Если ниже задан фиксированный seed, возьмётся он.</span></span></label>
       <div class="status kr-bstatus" style="margin-top:6px"></div>
     </div>`,
-    footNote: 'Лучше писать подробно, одним абзацем. Помощник в разделе «Агент» умеет писать такие промпты',
+    footNote: 'Лучше писать подробно, одним абзацем. Помощник в разделе «Сценарист» умеет писать такие промпты',
     generate: { mode: () => agKreaMode(), text: () => ($('.kr-prompt', root) || {}).value },
   });
   gridHandle(root);
@@ -433,7 +433,7 @@ export const imgSeedForm = (S, fd) => { if (S.seedFixed && S.seed) fd.append('se
      .qw-edit сохранена (на неё смотрит лист персонажа, который прячет поле целиком), классы
      поля и плашек прежние, так что код раскадровки и меток их находит как находил. */
   scenarioWindow($('[data-scenarobox="qwen"]', root), {
-    kind: 'qwen', num: 2, hint: 'можно написать в разделе «Агент»',
+    kind: 'qwen', num: 2, hint: 'можно написать в разделе «Сценарист»',
     wrap: 'qw-edit', cls: 'qw-prompt', chips: 'above', chipsCls: 'qw-tokens',
     placeholder: 'Что изменить и что оставить. Например: Этот человек сидит в кафе у окна и пьёт кофе. Лицо, причёска и одежда как на изображении.',
     generate: { mode: () => agQwenMode(), text: () => ($('.qw-prompt', root) || {}).value },
@@ -535,7 +535,7 @@ export const imgSeedForm = (S, fd) => { if (S.seedFixed && S.seed) fd.append('se
     $$('.qw-fr button', root).forEach(b => b.classList.toggle('on', (b.dataset.fr === '1') === S.frames));
     $$('.qw-ln button', root).forEach(b => b.classList.toggle('on', b.dataset.ln === S.line));
     $$('.qw-editonly', root).forEach(r => r.hidden = S.kind === 'story' || (S.engine === 'flux' && r.contains($('.qw-asp', root))) || (h3 && r.classList.contains('qw-szrow')));   // у H3 Image свой размер в МП
-    $('.qw-prompt', root).placeholder = S.kind === 'story' && S.frames ? '1: первый кадр по-английски...\n2: второй кадр...\n(героя и место называйте image 1, image 2). Или попросите Агента (Раскадровка → По кадрам).' : S.kind === 'story' ? 'Расскажите историю по кадрам: первый кадр — …, второй кадр — …. Героя и место называйте <image1>, <image2>. Или попросите Агента (Раскадровка) написать промпт.' : 'Что изменить и что оставить. Например: Этот человек сидит в кафе у окна и пьёт кофе. Лицо, причёска и одежда как на изображении.';
+    $('.qw-prompt', root).placeholder = S.kind === 'story' && S.frames ? '1: первый кадр по-английски...\n2: второй кадр...\n(героя и место называйте image 1, image 2). Или попросите сценариста (Раскадровка, потом «По кадрам»).' : S.kind === 'story' ? 'Расскажите историю по кадрам: первый кадр — …, второй кадр — …. Героя и место называйте <image1>, <image2>. Или попросите сценариста (Раскадровка) написать промпт.' : 'Что изменить и что оставить. Например: Этот человек сидит в кафе у окна и пьёт кофе. Лицо, причёска и одежда как на изображении.';
     $$('.qw-size button', root).forEach(b => b.classList.toggle('on', b.dataset.s === S.size));
     $$('.qw-head button', root).forEach(b => b.classList.toggle('on', (b.dataset.h === '1') === S.headless));
     $$('.qw-bg button', root).forEach(b => b.classList.toggle('on', b.dataset.b === S.bg));
@@ -600,7 +600,7 @@ export function attachClearButtons(root) {
      The row is the one the field's buttons already use; where there are none, a row is made. */
   const list = Array.prototype.slice.call(scope.querySelectorAll ? scope.querySelectorAll('textarea') : (scope.tagName === 'TEXTAREA' ? [scope] : []));
   list.forEach(ta => {
-    // ряд аудио в лотке Агента: у каждой строки есть свой крестик, кнопка очистки только мешает
+    // ряд аудио в лотке сценариста: у каждой строки есть свой крестик, кнопка очистки только мешает
     if (ta.dataset.noClear === '1' || ta.id === 'agAudioText' || ta.closest('#agAudioBox') || ta.closest('.atrim') || ta.closest('.sp-menu') || ta.closest('.lm-scenes') || ta.closest('.sc') || ta.closest('.ag-comp') || ta.id === 'agIn') return;
     const card = ta.closest('.card') || ta.parentElement;
     if (!card || card.querySelector('.ta-clear')) return;

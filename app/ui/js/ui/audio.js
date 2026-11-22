@@ -4,7 +4,7 @@ import { paintRange, toast } from '../core/util.js';
    и страница падала на всего графе модулей. Что нужно от разделов - берём из общего
    хаба, где разделы сами о себе заявили (registerViews). */
 import { views } from '../core/state.js';
-const agentState = () => views.AG || {};             // состояние раздела «Агент»
+const agentState = () => views.AG || {};             // состояние раздела «Сценарист»
 const agentGo = () => views.agGo && views.agGo();
 const agentStatus = () => (views.agStatus ? views.agStatus() : Promise.resolve(null));
 const agentSetAudio = (...a) => (views.setChatAudio ? views.setChatAudio(...a) : Promise.resolve(null));
@@ -69,7 +69,7 @@ export class VideoTrimmer {
       '<div class="vt-acts"><button class="btn pri vt-keep" type="button" disabled>Оставить выбранное</button>' +
       '<button class="btn vt-shot" type="button" disabled title="Сохранить кадр, на котором стоит маркер, как фотографию">&#128247; Сделать кадр</button>' +
       '<button class="btn vt-und" type="button" disabled>Отменить</button>' +
-      '<button class="btn vt-ag" type="button" disabled title="Агент посмотрит на клип как на кадры">🤖 В агент</button></div>' +
+      '<button class="btn vt-ag" type="button" disabled title="Сценарист посмотрит на клип как на кадры">🤖 К сценаристу</button></div>' +
       '</div>';
     this._wire();
     if (o.mount) this.mount(o.mount);
@@ -355,13 +355,13 @@ export class VideoTrimmer {
     this.q('.vt-ag').onclick = async () => {
       // the agent can look at a video only as at frames, and that road already exists - the paperclip's
       const go = window.agFramesFromFile;
-      if (typeof go !== 'function') { this.say('Агент пока не умеет смотреть видео'); return; }
+      if (typeof go !== 'function') { this.say('Сценарист пока не умеет смотреть видео'); return; }
       const tg = document.querySelector('#agTarget [data-t="' + (this.o.agentTarget || 'long') + '"]');
       if (tg) tg.click();
       agentGo();
       try { if (!agentState().status || !agentState().status.speech_ready) await agentStatus(); } catch (e) {}
       const ok = await go(this.cut ? this.cutFile : this.file);
-      if (ok !== false) this.say('Клип отправлен Агенту: вырежем из него кадры');
+      if (ok !== false) this.say('Клип отправлен сценаристу: вырежем из него кадры');
     };
     window.addEventListener('resize', () => { if (this.dur0) this._sync(); });
   }
@@ -605,7 +605,7 @@ export class AudioTrimmer {
       '<button class="btn at-voc" type="button" disabled>Отделить голос</button>' +
       '<button class="btn at-und" type="button" disabled title="Вернуть аудио ровно таким, каким оно было загружено: все спуски, разрезы и чистки пауз отменятся">Откат</button>' +
       '<button class="btn at-back" type="button" disabled title="Вернуть последнее изменение аудио - один шаг, а не всё сразу">Шаг назад</button>' +
-      '<button class="btn at-ag" type="button" disabled title="Выделенный кусок уйдёт в Агент: он послушает слова и ответит с учётом них">🤖 В агент</button></div>' +
+      '<button class="btn at-ag" type="button" disabled title="Выделенный кусок уйдёт в Сценарист: он послушает слова и ответит с учётом них">🤖 К сценаристу</button></div>' +
       '<div class="at-pz" hidden><span>Паузы длиннее</span><input type="number" class="at-pm" value="0,6" step="0.1" min="0.2" max="5">' +
       '<span>с сократить до</span><input type="number" class="at-pk" value="0,25" step="0.05" min="0.05" max="2"><span>с</span>' +
       '<b class="at-pzi"></b><button class="btn mini pri at-pgo" type="button" disabled>Убрать</button></div>' +
@@ -1037,13 +1037,13 @@ export class AudioTrimmer {
       // the agent refuses audio while it does not know whether recognition is ready: on the first press
       // in a fresh session that status was not fetched yet, and the button looked dead
       try { if (!agentState().status || !agentState().status.speech_ready) await agentStatus(); } catch (e) {}
-      if (!agentState().status || !agentState().status.speech_ready) { this.say('Агент ещё не может слушать аудио: распознавание речи не готово - строчка «Модель агента», кнопка «Докачать»'); return; }
-      if (this.len() < 1) { this.say('Кусок короче секунды: Агент и модель всё равно его не разберут - выделите полторы-две секунды'); return; }
+      if (!agentState().status || !agentState().status.speech_ready) { this.say('Сценарист ещё не может слушать аудио: распознавание речи не готово - строчка «Модель сценариста», кнопка «Докачать»'); return; }
+      if (this.len() < 1) { this.say('Кусок короче секунды: Сценарист и модель всё равно его не разберут - выделите полторы-две секунды'); return; }
       try { await agentSetAudio(wavSlice(this.buf, this.start, this.end), (this.name || 'фрагмент').replace(/\.[^.]+$/, ''), this.len(),
                               this.whereLabel ? this.whereLabel(this) : ''); }
-      catch (e) { this.say((e && e.message) || 'Не удалось передать аудио в Агент'); }
+      catch (e) { this.say((e && e.message) || 'Не удалось передать аудио в Сценарист'); }
       const box = document.querySelector('#agAudioBox');
-      if (box && box.hidden) this.say('Аудио не принято: Агент не смог его взять'); else this.say('Фрагмент отправлен в Агент: ' + this.len().toFixed(1).replace('.', ',') + ' с');
+      if (box && box.hidden) this.say('Аудио не принято: Сценарист не смог его взять'); else this.say('Фрагмент отправлен в Сценарист: ' + this.len().toFixed(1).replace('.', ',') + ' с');
     };
     this.q('.at-und').onclick = () => {
       if (!this.buf0 || this.buf === this.buf0) { this.say('Аудио и так целое - откатывать нечего'); return; }

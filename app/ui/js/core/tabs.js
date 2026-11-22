@@ -7,7 +7,7 @@
 /* реестр вкладок: порядок, раздел, ключ, подпись, вложенность, состояние */
 export const TABS = [
   {order: 1, section: "Создать", key: "presets", caption: "Главная", sub: false, active: false, hidden: false},
-  {order: 2, section: "Создать", key: "agent", caption: "Агент", sub: false, active: false, hidden: false},
+  {order: 2, section: "Создать", key: "agent", caption: "Сценарист", sub: false, active: false, hidden: false},
   {order: 3, section: "Создать", key: "video", caption: "Видео", sub: true, active: true, hidden: false},
   {order: 4, section: "Создать", key: "lipsync", caption: "Клип", sub: true, active: false, hidden: false},
   {order: 5, section: "Создать", key: "refs", caption: "Видеостудия", sub: true, active: false, hidden: false},
@@ -53,7 +53,7 @@ const TAB_SVG = {
 };
 const TAB_TAIL = {
   presets: "\n      Главная\n    ",
-  agent: "\n      Агент\n    ",
+  agent: "\n      Сценарист\n    ",
   video: "\n      Видео\n    ",
   lipsync: "\n      Клип\n    ",
   refs: "\n      Видеостудия\n    ",
@@ -100,7 +100,7 @@ export function renderNavHtml() {
   return html + "\n";
 }
 
-/* кто просит реакцию на клик своей вкладки (режимы, агент, свои workflow):
+/* кто просит реакцию на клик своей вкладки (режимы, сценарист, свои workflow):
    регистрируется и до сборки - кнопка достанется обработчику, когда навигация собрана */
 const NAV_EXTRA = new Map();
 let navMounted = false;

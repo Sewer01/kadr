@@ -311,17 +311,17 @@ $('#vwSub').onclick = e => {
                               () => subAskLang(it, place, e.clientX, e.clientY)]));
 };
 // второе меню: оставлять распознанное как сказано или просить перевод. Перевод делает локальная
-// модель Агента, поэтому нужны её модель на диске и чтобы генерация видео в это время не шла
+// модель сценариста, поэтому нужны её модель на диске и чтобы генерация видео в это время не шла
 export function subAskLang(it, place, x, y) {
   subMenu(x, y, [
     ['Оставить как сказано', 'Слова лягут поверх видео такие, какие распознались: ничего не переводится',
       () => subMake(it, place, false)],
-    ['Перевести на русский', 'Перевод делает локальная модель Агента: нужна её модель на диске и чтобы генерация видео не шла. Метки времени останутся те же',
+    ['Перевести на русский', 'Перевод делает локальная модель сценариста: нужна её модель на диске и чтобы генерация видео не шла. Метки времени останутся те же',
       () => subMake(it, place, true)],
   ]);
 }
 // речь из клипа распознаётся на процессоре: десятки секунд на короткий ролик, поэтому запас большой;
-// перевод моделью Агента добавляет к ожиданию ещё минуты
+// перевод моделью сценариста добавляет к ожиданию ещё минуты
 export async function subMake(it, place, translate) {
   const b = $('#vwSub'); if (!b || b.disabled) return;
   const was = b.textContent;
@@ -524,7 +524,7 @@ export function zoomClose() { $('#zoomv').hidden = true; $('#zvImg').removeAttri
 })();
 
 /* ---------- Library -> workflow: "Use in…" button and the side tray to drag from ---------- */
-export const USE_TARGETS = [['video', 'Видео'], ['lipsync', 'Клип'], ['refs', 'Видеостудия'], ['actor', 'Актёр'], ['action', 'Экшн-видео'], ['actionsc', 'Экшн-студия'], ['long', 'Киностудия'], ['qwen', 'Изменение изображения'], ['agent', 'Агент (в чат)']];
+export const USE_TARGETS = [['video', 'Видео'], ['lipsync', 'Клип'], ['refs', 'Видеостудия'], ['actor', 'Актёр'], ['action', 'Экшн-видео'], ['actionsc', 'Экшн-студия'], ['long', 'Киностудия'], ['qwen', 'Изменение изображения'], ['agent', 'Сценарист (в чат)']];
 export function freeSlot(view) {
   const root = $('#view-' + view); if (!root) return null;
   // кадры начала и конца человек выбирает сам: само туда ничего не подставляем
@@ -534,7 +534,7 @@ export function freeSlot(view) {
 }
 export async function useInWorkflow(it, view) {
   if (view === 'agent') {  // not a slot: the picture goes into the chat
-    try { await agAttachFile(await libToFile(it)); agGo(); toast('Изображение добавлена в чат агента'); return true; }
+    try { await agAttachFile(await libToFile(it)); agGo(); toast('Изображение добавлена в чат сценариста'); return true; }
     catch { toast('Не удалось взять файл'); return false; }
   }
   const input = freeSlot(view);

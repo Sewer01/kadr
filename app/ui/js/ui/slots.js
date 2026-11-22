@@ -92,7 +92,7 @@ export async function handleDrop(e) {
 export async function routeFiles(files) {
   if (!files.length) return;
   const view = activeView();
-  if (!view || !dropBox(view)) { toast('Бросьте файлы в раздел генерации, в чат Агента или в окно увеличения'); return; }
+  if (!view || !dropBox(view)) { toast('Бросьте файлы в раздел генерации, в чат сценариста или в окно увеличения'); return; }
   const r = await spreadFiles(files, view);
   DROP_IN_SCENES = false;
   const text = dropNotes(r);

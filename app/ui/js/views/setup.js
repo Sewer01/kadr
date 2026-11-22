@@ -7,7 +7,7 @@ import { mountCloud } from './models.js';
 import { loadStatus } from './system.js';
 
 // start with one mode: a full set is ~100 GB, most people need one task to begin with
-export let setupInfo = null, setupOpt = 'new';   // setupProfile и setupModes лежат в core/state.js: их читает «Агент»
+export let setupInfo = null, setupOpt = 'new';   // setupProfile и setupModes лежат в core/state.js: их читает «Сценарист»
 export function setSetupInfo(v) { setupInfo = v; }   // пишут и чужие модули
 export const SETUP_STEPS = [['comfy', 'ComfyUI'], ['nodes', 'Ноды'], ['start', 'Запуск ComfyUI'], ['models', 'Модели']];
 

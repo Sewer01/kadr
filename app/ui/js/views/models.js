@@ -80,7 +80,7 @@ export function renderModels(s) {
     : `<span>Режим</span><b>ваш ComfyUI ${s.comfy_version || ''}</b><span>Видео</span><b>${esc(s.output_dir || 'папка output вашего ComfyUI')}</b>`;
   const P = s.paths || {};
   $('#mdEngine').insertAdjacentHTML('beforeend', (P.models ? `<span>Модели</span><b>${esc(P.models)}</b>` : '')
-    + (P.assistant ? `<span>Помощник (агент)</span><b>${esc(P.assistant)}</b>` : '')
+    + (P.assistant ? `<span>Помощник (сценарист)</span><b>${esc(P.assistant)}</b>` : '')
     + `<span>Настройки и список Библиотеки</span><b>${esc(P.data || '')}${diskNote()}</b>`);
 }
 $('#mdMirror').onchange = async e => {
@@ -174,17 +174,6 @@ $('#wzRestore').onclick = async () => {
     try { await postJSON('/api/window_mode', { mode: b.dataset.w }); paintWin(b.dataset.w); toast('При следующем запуске окно откроется так'); }
     catch (err) { toast(err.message); }
   };
-})();
-(function () {   // staying put when files go to the Agent: a habit, not a setting worth a server call
-  const nb = $('#uiNoJumpCb');
-  if (nb) {
-    try { nb.checked = localStorage.getItem('h3-ag-nojump') === '1'; } catch (e) { }
-    nb.onchange = () => {
-      try { localStorage.setItem('h3-ag-nojump', nb.checked ? '1' : '0'); } catch (e) { }
-      toast(nb.checked ? 'Кнопки «Все в агент» перестанут вас уводить: файлы уйдут в чат, а вы останетесь в разделе'
-                       : 'Кнопки «Все в агент» снова открывают чат Агента');
-    };
-  }
 })();
 (function () {   // the window without the video card + a way to restart and actually apply it
   const cb = $('#mdGpuUiCb'), rb = $('#mdRestart'); if (!cb) return;

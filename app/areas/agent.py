@@ -1,4 +1,4 @@
-"""Агент: локальная модель, навыки, чаты, правописание и
+"""Сценарист: локальная модель, навыки, чаты, правописание и
     распознавание речи. Методы перенесены из app/server.py без правок."""
 
 from aiohttp import web
@@ -87,7 +87,7 @@ class AgentMixin:
                 await ag.install(self.agent_installer, self.llm.root, variant,
                                  runtime_only=bool(self.config.get("llm_custom")),
                                  whisper_dir=self.config.get("whisper_dir"))
-                await emit({"step": "agent", "state": "done", "label": "Модель агента установлена"})
+                await emit({"step": "agent", "state": "done", "label": "Модель сценариста установлена"})
             except engine.Cancelled:
                 await emit({"step": "agent", "state": "cancelled", "label": "Скачивание остановлено"})
             except Exception as e:
@@ -163,7 +163,7 @@ class AgentMixin:
             return web.json_response({"error": "Сейчас идёт генерация видео - поправите после"}, status=409)
         variant = await self.llm_variant()
         if not self.llm.installed(variant):
-            return web.json_response({"error": "Модель агента ещё не скачана."}, status=400)
+            return web.json_response({"error": "Модель сценариста ещё не скачана."}, status=400)
         try:
             if not self.llm.alive():
                 self.llm.start(variant, ctx=self.agent_ctx())
@@ -227,7 +227,7 @@ class AgentMixin:
         """Words from an audio clip (WAV from the browser) - lyrics for lipsync prompts and voice input."""
         await self.llm_variant()  # keeps llm.root in sync with the install folder
         if not self.speech_status()["ready"]:
-            return web.json_response({"error": "Распознавание речи ещё не скачано (карточка «Модель» в разделе «Агент»)."},
+            return web.json_response({"error": "Распознавание речи ещё не скачано (карточка «Модель» в разделе «Сценарист»)."},
                                      status=400)
         wav, lang = None, "auto"
         async for field in await req.multipart():
@@ -305,12 +305,12 @@ class AgentMixin:
                 while self.jobs:
                     if req.transport is None or req.transport.is_closing():   # the person pressed «Стоп» or left
                         return resp
-                    await send({"type": "status", "text": f"Идёт генерация видео — агент запустится сам, когда она закончится… (ждём {waited // 60}:{waited % 60:02d})"})
+                    await send({"type": "status", "text": f"Идёт генерация видео — сценарист запустится сам, когда она закончится… (ждём {waited // 60}:{waited % 60:02d})"})
                     await asyncio.sleep(3)
                     waited += 3
             variant = await self.llm_variant()
             if not self.llm.installed(variant):
-                raise RuntimeError("Модель агента ещё не скачана.")
+                raise RuntimeError("Модель сценариста ещё не скачана.")
             if not self.llm.alive():
                 await send({"type": "status", "text": "Освобождаем видеопамять…"})
                 try:
@@ -362,7 +362,7 @@ class AgentMixin:
                         if "exceed_context" in why and attempt == 0:
                             continue   # lighter payload on the next pass
                         if "exceed_context" in why:
-                            why += (". Увеличьте длину контекста ползунком «Контекст» в разделе «Агент» "
+                            why += (". Увеличьте длину контекста ползунком «Контекст» в разделе «Сценарист» "
                                     "или начните новый чат - старый диалог занимает место")
                         raise RuntimeError(f"Модель ответила ошибкой {r.status}: {why}")
                     async for raw in r.content:
@@ -393,7 +393,7 @@ class AgentMixin:
             return web.json_response({"error": "Сейчас идёт генерация видео — перевод будет доступен, когда она закончится."}, status=409)
         variant = await self.llm_variant()
         if not self.llm.installed(variant):
-            return web.json_response({"error": "Модель агента ещё не скачана."}, status=400)
+            return web.json_response({"error": "Модель сценариста ещё не скачана."}, status=400)
         try:
             if not self.llm.alive():
                 try:
