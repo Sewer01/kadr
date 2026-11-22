@@ -254,6 +254,7 @@
           <button class="btn" id="agWipe" style="width:100%" title="Удалить все сохранённые переписки сценариста">Очистить историю</button>
         </div>
         <div class="card ag-chat">
+          <small class="hint" id="agWhere" style="display:block;margin:0 2px 6px"></small>
           <div class="ag-msgs" id="agMsgs">
             <div class="ag-empty" id="agEmpty">
               <b>С чего начать</b>
@@ -345,7 +346,9 @@
             <div class="seg" id="agThink" style="grid-template-columns:minmax(0,1fr) minmax(0,1fr);margin-bottom:6px"><button type="button" data-k="fast" title="Быстро — без долгих рассуждений">Быстро</button><button type="button" data-k="deep" title="Думать глубже — дольше, для сложных историй">Думать глубже</button></div>
             <div class="hint" id="agThinkHint" style="margin-bottom:14px"></div>
                       </details>
-          <details class="agfold" open>
+          <!-- Список целей теперь фон: цель назначает режим, из которого запустили
+               генерацию. Разметка нужна как хранитель состояния, поэтому она спрятана, а не удалена. -->
+          <details class="agfold" id="agTargetFold" hidden>
             <summary>Промпт для <span class="agnow" id="agNow"></span></summary>
             <div class="hint" style="margin-bottom:6px">Видео</div>
             <div class="seg" id="agTarget" style="grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-auto-rows:auto">

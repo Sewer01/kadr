@@ -1445,7 +1445,7 @@ export function renderSkills(list) {
   $('#skCnt').textContent = `(${list.length})`;
   $('#skList').innerHTML = list.map(s => `<div class="sk" data-id="${esc(s.id)}">
     <div class="sk-top"><b title="${esc(s.name)}">${esc(s.name)}</b><span class="sk-mode">
-      ${AG_SK_IMG[s.id] ? `<span class="hint" title="Подключается сама, когда выбрана кнопка «${AG_SK_IMG[s.id]}» в «Промпт для»">${AG_SK_IMG[s.id]}</span>` : `<select>${Object.entries(SK_MODES).map(([k, v]) => `<option value="${k}" ${k === s.mode ? 'selected' : ''}>${v}</option>`).join('')}</select>`}
+      ${AG_SK_IMG[s.id] ? `<span class="hint" title="Подключается сама, когда выбрана кнопка «${AG_SK_IMG[s.id]}» этого режима">${AG_SK_IMG[s.id]}</span>` : `<select>${Object.entries(SK_MODES).map(([k, v]) => `<option value="${k}" ${k === s.mode ? 'selected' : ''}>${v}</option>`).join('')}</select>`}
       ${s.builtin ? '' : '<button class="x" title="Удалить скилл">✕</button>'}</span></div>
     <p title="${esc(s.description)}">${esc(s.description)}</p>
     <div class="sk-foot">${s.mode === 'auto' && !AG_SK_IMG[s.id] ? `<input value="${esc(s.keywords.join(', '))}" placeholder="слова через запятую">` : ''}
@@ -1866,7 +1866,7 @@ export const agQwenMode = () => { const b = $('.qw-eng button.on', $('#view-qwen
     ]),
     presets: () => H('<b>Главная - с чего начать</b>') + UL([
       B('Карточка режима', 'открывает нужный режим; под названием написано, что ему нужно загрузить.'),
-      B('Отметить режимы', 'если включить несколько, в «Промпт для» и вверху останутся только они - так экран чище.'),
+      B('Отметить режимы', 'если включить несколько, сценарист будет писать только для отмеченных режимов - так проще не путаться.'),
       B('Первый запуск', 'достаточно настроить движок и выбрать один режим; остальное программа спросит сама.'),
     ]),
     queue: () => H('<b>Очередь - что сейчас делается</b>') + UL([
@@ -2053,15 +2053,19 @@ export const agQwenMode = () => { const b = $('.qw-eng button.on', $('#view-qwen
     .observe(document.body, { childList: true, subtree: true });
 })();
 
-/* A closed fold hides the only place where the choice is visible, so the chosen thing is repeated
-   in the heading of the fold itself. */
+/* Цель больше не выбирают руками: её назначает режим, из которого запустили
+   генерацию, либо перенос файлов из режима. Человек видит только
+   спокойную строку над чатом: для какого режима пишется промт. */
 (() => {
   const now = document.getElementById('agNow');
+  const where = document.getElementById('agWhere');
   if (!now) return;
   const paint = () => {
     const on = document.querySelector('#agTarget button.on, #agTarget2 button.on');
-    now.textContent = on ? on.textContent.trim() : '';
-    now.hidden = !now.textContent;
+    const t = on ? on.textContent.trim() : '';
+    now.textContent = t;
+    now.hidden = !t;
+    if (where) { where.textContent = t ? 'Промт готовится для: ' + t + ' - режима, из которого вы запустили генерацию' : ''; }
   };
   ['agTarget', 'agTarget2'].forEach(id => {
     const box = document.getElementById(id);
@@ -2087,7 +2091,7 @@ export function agPickTarget(mode) {
   const b = $('#agTarget [data-t="' + mode + '"]') || $('#agTarget2 [data-t="' + mode + '"]');
   if (!b || b.classList.contains('on')) return '';
   b.click();
-  return ' · «Промт для» переключено на «' + b.textContent.trim() + '»';
+  return ' · сценарист пишет для «' + b.textContent.trim() + '»';
 }
 export function agMakeBtn(host, icon, what) {
   if (!host) return null;
@@ -2099,7 +2103,7 @@ export function agMakeBtn(host, icon, what) {
   host.append(b);
   return b;
 }
-/* Carrying a text a person already wrote into the Agent: the field gets it, «Промт для» switches to
+/* Carrying a text a person already wrote into the Agent: the field gets it, the target follows
    the engine that is actually chosen in this window, and the cursor lands where the work continues. */
 /* Черновик, написанный в режиме, уходит сценаристу как есть: теги в нём указывают на файлы
    ИМЕННО этого режима, и они должны пережить перенос. Сценарист отвечает, и ответ ждётся
