@@ -307,12 +307,20 @@ def main():
             webview.settings["ALLOW_DOWNLOADS"] = True  # a plain <a download> also works as a fallback
         except Exception:
             pass
+        # Браузерные флаги окна. Два из них - про правую кнопку мыши в полях текста:
+        # TextAcceleration (Edge «выделил слово - иду искать в интернете») подвешивает меню на
+        # секунды и подсовывает поиск вместо проверки правописания, а msWebOOUI рисует
+        # всплывающую панель поверх текста. Оба - не проверки орфографии, а рекламные надстройки
+        # Edge; отключаем, остаётся обычная проверка правописания Windows, быстрая и местная.
+        _bargs = ["--disable-features=TextAcceleration,msWebOOUI"]
         try:   # "Рисовать окно программы без видеокарты" (Настройки): on computers where the window itself
                # eats gigabytes of video memory that the models then have to do without
             if json.loads((server.DATA_DIR / "config.json").read_text(encoding="utf-8")).get("software_ui"):
-                os.environ["WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS"] = "--disable-gpu --disable-gpu-compositing"
+                _bargs.append("--disable-gpu --disable-gpu-compositing")
         except Exception:
             pass
+        _old_bargs = os.environ.get("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS", "").strip()
+        os.environ["WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS"] = (_old_bargs + " " if _old_bargs else "") + " ".join(_bargs)
         api = JsApi(port)
         mode = window_mode()
         # "as at closing" opens the way you left it: the same state, not only the same size

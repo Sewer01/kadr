@@ -535,6 +535,14 @@ export async function sendPrompt(blk, to) {
     if (files[1]) await setDropFile($('#dLast input'), files[1]);
   } else if (studioCaps(to).scenes) {   // сценная лента общая: её собирает любой сценный режим
     const L2 = RM[to] || RM.long, list = []; let cur = null;   // the same sheet of scenes fits both studios
+    /* Лёгкая модель иногда прилепляет к ответу свою служебную шапку - имена движка и скиллов
+       одним куском («hailuo-h3…sceny-studii»): заголовок «SCENE 1 | 10» от этого сидит не с
+       начала строки, и студия перестает узнавать лист - тексты не возвращались вообще.
+       Всё, что стоит перед первым заголовком, текстом сцены быть не может: снимаем его.
+       Обычный случай (заголовок с начала строки, а сверху вступительная фраза) не трогается:
+       такая фраза и раньше не мешала, лист узнаётся по заголовку со своей строки. */
+    const junk = prompt.search(/SCENE\s*1\s*\|/i);
+    if (junk > 0 && !/^\s*SCENE\s*\d+\s*\|/im.test(prompt)) prompt = prompt.slice(junk);
     const hasHead = /^\s*SCENE\s*\d+\s*\|/im.test(prompt);   // text before "SCENE 1" (a stray roles line) is not a scene
     for (const line of prompt.split('\n')) {
       if (hasHead && !cur && !/^\s*SCENE\s*\d+\s*\|/i.test(line)) continue;
