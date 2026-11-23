@@ -188,14 +188,6 @@
 
 .ag-audio{margin:0 18px;padding:10px 12px;border-radius:12px;background:var(--bg-2);border:1px solid var(--line);display:grid;gap:6px}
 
-.ag-audio-h{display:flex;align-items:center;gap:10px}
-
-.ag-audio-h b{flex:1;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-
-.ag-audio-h small{font-family:var(--mono);color:var(--muted)}
-
-.ag-audio-h button{width:24px;height:24px;border-radius:7px;background:var(--surface-2);font-size:11px}
-
 /* a name or a tile that carries a tag says so: it brightens under the pointer */
 .ag-tagb{cursor:pointer;border-bottom:1px dotted var(--line-2)}
 

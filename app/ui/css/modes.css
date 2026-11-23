@@ -68,8 +68,6 @@
 
 .sc-act .sc-state{flex:1 1 auto;min-width:0;align-self:center}
 
-.sc-tools{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px}
-
 .sc-tools .ru-out{flex:1 1 100%;min-width:0}
 
 .tl-grip{flex:none;width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font-size:16px;font-weight:800;

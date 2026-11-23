@@ -30,15 +30,12 @@
 .vl-chk small{font-weight:400}
 .vl-adv{border-top:1px solid var(--line);margin-top:12px;padding-top:4px}
 .vl-adv summary{cursor:pointer;padding:8px 0;font-weight:700;font-size:13px}
-.vl-note{color:var(--muted);font-size:12.5px;line-height:1.5}
 .vl-empty{padding:26px 16px;text-align:center;color:var(--muted);line-height:1.6;border:1px dashed var(--line-2);border-radius:16px}
 .vl-dir{display:flex;gap:8px;align-items:center}
 .vl-dir input{flex:1;min-width:0}
 
 /* когда модуля ещё нет: то, что человек должен сделать, стоит на видном месте */
 .vl-warn{border:1px solid var(--line-2);border-radius:12px;padding:14px;line-height:1.6;display:grid;gap:10px}
-.vl-req{margin-top:10px;padding:10px 12px;border:1px solid var(--accent);border-radius:12px;background:var(--accent-soft)}
-
 /* окно образца голоса: волна, удержание куска, вырезание пауз */
 .vl-sm{display:grid;gap:8px;border:1px solid var(--line);border-radius:12px;padding:10px 12px;background:var(--surface)}
 .vl-sm.on{border-color:var(--accent)}
@@ -47,8 +44,6 @@
 .vl-smtools{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .vl-smtools .hint{flex:1;min-width:140px}
 .vl-smtools .bad{color:var(--accent-2)}
-.vl-tag{cursor:pointer}
-
 /* голоса диалога */
 .vl-sp{border:1px solid var(--line);border-radius:12px;padding:10px 12px;display:grid;gap:8px}
 

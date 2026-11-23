@@ -44,8 +44,6 @@ textarea.rl-in{resize:vertical;line-height:1.35}
 .rl-chip.on{border-color:var(--accent);background:var(--accent-soft);font-weight:700}
 .rl-chip i{font-style:normal;margin-left:6px;opacity:.6;cursor:pointer}
 .rl-chip i:hover{opacity:1;color:var(--accent)}
-.rl-note{font-size:12px;color:var(--muted);line-height:1.5}
-
 /* картинки-основа */
 .rl-pics{display:grid;gap:5px;border:1px dashed var(--line-2);border-radius:12px;padding:6px}
 .rl-pic{display:grid;grid-template-columns:48px 1fr auto;gap:8px;align-items:center;border:1px solid var(--line);border-radius:10px;padding:4px 6px}
