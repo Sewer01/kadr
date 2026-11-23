@@ -2234,6 +2234,9 @@ export function makeRefMode(cfg) {
         // своих фото и песен нет - ряда тегов у сцены тоже нет: пустых заготовок не показываем
         { const fRow = tk ? tk.closest('.ta-foot') : null; if (fRow) fRow.hidden = !tk.children.length; }
         c._base = bs; c._counter?.();
+        // копия ряда у окна «Сценарий» обязана жить вместе с рядом сцены: удалил аудио
+        // или фото - плашки исчезают сразу, а не до первой загрузки нового файла
+        root._paintSrTags?.();
         const n = c._files.filter(Boolean).length;
         $('.sc-rhint', c).textContent = n ? `Своих фото в этой сцене: ${n} (мест до девяти). Номера идут десятками по сценам: в первой <Picture 10>, <Picture 11>, во второй <Picture 20>, <Picture 21> - поэтому в Сценаристе число сразу говорит, о какой сцене речь. Аудио этой сцены зовётся так же: <Audio 10>, <Audio 20>... Общие изображения остаются <Picture 1…5>, фон всего ролика - <Audio 1>.` : 'Своих фото нет: сцена возьмёт общие. У своих мест номера не меняются, даже если убрать другое фото.';
       };
@@ -3229,11 +3232,14 @@ export function makeRefMode(cfg) {
         const put = (b, note) => {
           const c = document.createElement('button');
           c.type = 'button';
-          c.className = 'token' + (b.classList.contains('tok-aud') ? ' tok-aud' : b.classList.contains('tok-vid') ? ' tok-vid' : '');
+          c.className = 'token' + (b.classList.contains('tok-aud') ? ' tok-aud' : b.classList.contains('tok-vid') ? ' tok-vid' : '') + (b.classList.contains('tok-on') ? ' tok-on' : '');
           c.textContent = b.textContent;
           c.disabled = !!b.disabled;
           c.title = (b.title || '') + (note ? ' · ' + note : '') + (b.disabled ? '' : ' - нажмите, чтобы вставить в текст сценария');
-          if (!b.disabled) c.onclick = () => srInsert(c.textContent);
+          /* Вставляем ровно тег из data-ins, а не надпись плашки: на плашке могут
+             быть пометки («уже в тексте»), и раньше они вставлялись прямо в сценарий. */
+          const tag = b.dataset && b.dataset.ins ? b.dataset.ins : b.textContent;
+          if (!b.disabled) c.onclick = () => srInsert(tag);
           row.append(c);
         };
         $$('.rm-tokens button', root).forEach(b => { if (!b.hidden) put(b, 'студия'); });

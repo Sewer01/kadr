@@ -413,10 +413,13 @@ export function audioTokens(c, bs, film) {
   const full = used.size >= 3;
   return list.map(x => {
     const here = used.has(x.tag), off = !here && full;
-    return '<button class="token" type="button" data-ins="&lt;Audio ' + x.tag + '&gt;" data-audio="1"' + (off ? ' disabled' : '') +
-      ' title="' + (here ? 'Этот тег уже в тексте сцены' : off ? 'В сцене уже три аудио - модель слушает не больше трёх'
-        : 'Вставить в текст тег <Audio ' + x.tag + '> - ' + (x.own ? 'аудио этой сцены' : 'общее аудио ролика') + ': ' + x.name) + '">&lt;Audio ' +
-      x.tag + (here ? ' · есть' : '') + '</button>';
+    /* Текст плашки - ровно тег: «· есть» живёт в классе и подсказке. Раньше пометка
+       стояла внутри надписи, и копия ряда в окне «Сценарий» вставляла в текст
+       калечное «<Audio 10 · есть>» - модель получала мусор вместо ссылки на звук. */
+    return '<button class="token' + (here ? ' tok-on' : '') + '" type="button" data-ins="&lt;Audio ' + x.tag + '&gt;" data-audio="1"' + (off ? ' disabled' : '') +
+      ' title="&lt;Audio ' + x.tag + '&gt; - ' + (x.own ? 'аудио этой сцены' : 'общее аудио ролика') + ': ' + x.name +
+      (here ? ' (уже в тексте)' : off ? ' - в сцене уже три аудио, модель слушает не больше трёх' : ': нажмите, чтобы вставить тег') + '">&lt;Audio ' +
+      x.tag + '</button>';
   });
 }
 
