@@ -20,15 +20,16 @@ export const TABS = [
   {order: 12, section: "Создать", key: "clipsc", caption: "Клип-студия", sub: true, active: false, hidden: false, group: "long"},
   {order: 13, section: "Создать", key: "voicelab", caption: "Озвучка", sub: true, active: false, hidden: false},
   {order: 14, section: "Создать", key: "reflab", caption: "Студия референсов", sub: true, active: false, hidden: false},
-  {order: 15, section: "Создать", key: "krea", caption: "Изображение по тексту", sub: true, active: false, hidden: false},
-  {order: 16, section: "Создать", key: "qwen", caption: "Изменение изображения", sub: true, active: false, hidden: false},
-  {order: 17, section: "Создать", key: "custom", caption: "Свои workflow", sub: false, active: false, hidden: true},
-  {order: 18, section: "Студия", key: "queue", caption: "Очередь", sub: false, active: false, hidden: false},
-  {order: 19, section: "Студия", key: "library", caption: "Библиотека", sub: false, active: false, hidden: false},
-  {order: 20, section: "Студия", key: "montage", caption: "Монтаж", sub: false, active: false, hidden: false},
-  {order: 20, section: "Студия", key: "upfile", caption: "Апскейлинг", sub: true, active: false, hidden: false},
-  {order: 21, section: "Система", key: "models", caption: "Настройки", sub: false, active: false, hidden: false},
-  {order: 22, section: "Система", key: "about", caption: "О программе", sub: false, active: false, hidden: false},
+  {order: 15, section: "Создать", key: "imgedit", caption: "Редактирование изображений", sub: true, active: false, hidden: false},
+  {order: 16, section: "Создать", key: "krea", caption: "Изображение по тексту", sub: true, active: false, hidden: false},
+  {order: 17, section: "Создать", key: "qwen", caption: "Изменение изображения", sub: true, active: false, hidden: false},
+  {order: 18, section: "Создать", key: "custom", caption: "Свои workflow", sub: false, active: false, hidden: true},
+  {order: 19, section: "Студия", key: "queue", caption: "Очередь", sub: false, active: false, hidden: false},
+  {order: 20, section: "Студия", key: "library", caption: "Библиотека", sub: false, active: false, hidden: false},
+  {order: 21, section: "Студия", key: "montage", caption: "Монтаж", sub: false, active: false, hidden: false},
+  {order: 21, section: "Студия", key: "upfile", caption: "Апскейлинг", sub: true, active: false, hidden: false},
+  {order: 22, section: "Система", key: "models", caption: "Настройки", sub: false, active: false, hidden: false},
+  {order: 23, section: "Система", key: "about", caption: "О программе", sub: false, active: false, hidden: false},
 ];
 
 /* Группы режимов: в меню одна кнопка, а режимы внутри неё выбираются переключателем
@@ -70,6 +71,7 @@ const TAB_SVG = {
   actionsc: "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M9.6 2 4 11.4h4.3L7.6 16.6 13.4 7H8.9z\"/><path d=\"M16.4 7.4 11 16.8h4.3l-.7 5.2 5.8-9.6h-4.5z\"/></svg>",
   voicelab: "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M3 12v-2M7 12V7M11 12V4M15 12v-6M19 12v-3M3 16h18\"/></svg>",
   reflab: "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect x=\"3\" y=\"4\" width=\"18\" height=\"16\" rx=\"2\"/><path d=\"M3 9h18M12 9v11\"/></svg>",
+  imgedit: "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect x=\"3\" y=\"4\" width=\"18\" height=\"16\" rx=\"3\"/><circle cx=\"8.5\" cy=\"9.5\" r=\"1.5\"/><path d=\"m3 16 4.5-4.5L11 15\"/><path d=\"M21.5 8.5a1.9 1.9 0 0 1-2.7 2.7L13 17l-1 3.5 3.5-1z\"/></svg>",
   krea: "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect x=\"3\" y=\"4\" width=\"18\" height=\"16\" rx=\"3\"/><circle cx=\"9\" cy=\"10\" r=\"1.6\"/><path d=\"m21 16-5-5L6 20\"/></svg>",
   qwen: "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M12 20h9\"/><path d=\"M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z\"/></svg>",
   custom: "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect x=\"3\" y=\"3\" width=\"7\" height=\"7\" rx=\"1.5\"/><rect x=\"14\" y=\"14\" width=\"7\" height=\"7\" rx=\"1.5\"/><path d=\"M10 6.5h4a3 3 0 0 1 3 3V14\"/></svg>",
@@ -94,6 +96,7 @@ const TAB_TAIL = {
   actionsc: "\n      Экшн-студия\n    ",
   voicelab: "\n      Озвучка\n    ",
   reflab: "\n      Студия референсов\n    ",
+  imgedit: "\n      Редактирование изображений\n    ",
   krea: "\n      Изображение по тексту\n    ",
   qwen: "\n      Изменение изображения\n    ",
   custom: "\n      Свои workflow\n    ",
@@ -114,7 +117,7 @@ const TAB_ATTRS = {
 /*UISNAP:DATA-END*/
 
 /* точные разделители между элементами навигации - как лежали в разметке */
-const NAV_SEP = ["", "\n    ", "\n    ", "\n    ", "\n    ", "\n    ", "\n    ", "\n    ", "\n    ", "\n    ", "\n    ", "\n    ", "\n\n    ", "\n    ", "\n\n    ", "\n\n    ", "\n    ", "\n    ", "\n    ", "\n    ", "\n\n    ", "\n    ", "\n    "];
+const NAV_SEP = ["", "\n    ", "\n    ", "\n    ", "\n    ", "\n    ", "\n    ", "\n    ", "\n    ", "\n    ", "\n    ", "\n    ", "\n\n    ", "\n    ", "\n    ", "\n\n    ", "\n\n    ", "\n    ", "\n    ", "\n    ", "\n    ", "\n\n    ", "\n    ", "\n    "];
 
 export function renderNavHtml() {
   let html = "", sec = "", i = 0;
