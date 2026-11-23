@@ -306,8 +306,12 @@
 
 .token{font-family:var(--mono);font-size:11.5px;padding:4px 8px;border-radius:7px;background:var(--surface-2);border:1px solid var(--line-2);color:var(--text)}
 
+/* все аудиотеги - сплошная цветная заливка, чтобы отличаться от фото-тегов;
+   если тег уже стоит в тексте (tok-on), к заливке добавляется светлый ободок */
+.token.tok-aud{background:var(--accent);border-color:var(--accent);color:var(--bg)}
+
 /* тег уже стоит в тексте сцены - плашка подсвечена, но надпись остаётся ровным тегом */
-.token.tok-on{border-color:var(--accent);color:var(--accent)}
+.token.tok-on{box-shadow:0 0 0 2px var(--accent-2)}
 
 .token:hover{border-color:var(--accent)}
 

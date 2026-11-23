@@ -416,10 +416,10 @@ export function audioTokens(c, bs, film) {
     /* Текст плашки - ровно тег: «· есть» живёт в классе и подсказке. Раньше пометка
        стояла внутри надписи, и копия ряда в окне «Сценарий» вставляла в текст
        калечное «<Audio 10 · есть>» - модель получала мусор вместо ссылки на звук. */
-    return '<button class="token' + (here ? ' tok-on' : '') + '" type="button" data-ins="&lt;Audio ' + x.tag + '&gt;" data-audio="1"' + (off ? ' disabled' : '') +
+    return '<button class="token tok-aud' + (here ? ' tok-on' : '') + '" type="button" data-ins="&lt;Audio ' + x.tag + '&gt;" data-audio="1"' + (off ? ' disabled' : '') +
       ' title="&lt;Audio ' + x.tag + '&gt; - ' + (x.own ? 'аудио этой сцены' : 'общее аудио ролика') + ': ' + x.name +
       (here ? ' (уже в тексте)' : off ? ' - в сцене уже три аудио, модель слушает не больше трёх' : ': нажмите, чтобы вставить тег') + '">&lt;Audio ' +
-      x.tag + '</button>';
+      x.tag + '&gt;</button>';
   });
 }
 
