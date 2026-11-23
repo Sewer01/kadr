@@ -79,7 +79,15 @@ $('#prView').onclick = e => { const b = e.target.closest('button'); if (b) { PR.
 $('#view-presets .pr-grid').onclick = e => {
   const f = e.target.closest('[data-fav]');
   if (f) { const id = f.dataset.fav; PR.favs = PR.favs.includes(id) ? PR.favs.filter(x => x !== id) : [...PR.favs, id]; try { localStorage.setItem('h3-pfav', JSON.stringify(PR.favs)); } catch {} presetsPaint(); return; }
-  const c = e.target.closest('.pr-card'); if (c) goTo(c.dataset.p);
+  const c = e.target.closest('.pr-card'); if (!c) return;
+  const p = c.dataset.p;
+  if (p.indexOf('qwen:') === 0) {   // карточка режима: открыть «Изображения» и встать на нужный переключатель
+    goTo('qwen');
+    const b = $('.qw-kind button[data-k="' + p.slice(5) + '"]', $('#view-qwen'));
+    if (b) b.click();
+    return;
+  }
+  goTo(p);
 };
 // разметка «Пресетов» только что встала: красим её сейчас - presets.js исполнялся
 // раньше нас и свою первую покраску сделать не мог

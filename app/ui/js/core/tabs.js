@@ -10,9 +10,9 @@ export const TABS = [
   {order: 2, section: "Создать", key: "agent", caption: "Сценарист", sub: false, active: false, hidden: false},
   {order: 3, section: "Создать", key: "actors", caption: "Карточки", sub: false, active: false, hidden: false},
   {order: 4, section: "Создать", key: "video", caption: "Видео", sub: true, active: true, hidden: false},
-  {order: 5, section: "Создать", key: "lipsync", caption: "Клип", sub: true, active: false, hidden: false},
+  {order: 5, section: "Создать", key: "lipsync", caption: "Клип", sub: true, active: false, hidden: false, group: "refs"},
   {order: 6, section: "Создать", key: "refs", caption: "Видеостудия", sub: true, active: false, hidden: false},
-  {order: 7, section: "Создать", key: "actor", caption: "Актёр", sub: true, active: false, hidden: false},
+  {order: 7, section: "Создать", key: "actor", caption: "Актёр", sub: true, active: false, hidden: false, group: "refs"},
   {order: 8, section: "Создать", key: "swap", caption: "Замена", sub: true, active: false, hidden: false},
   {order: 9, section: "Создать", key: "long", caption: "Студия", sub: true, active: false, hidden: false},
   {order: 10, section: "Создать", key: "action", caption: "Экшн-видео", sub: true, active: false, hidden: false, group: "refs"},
@@ -37,11 +37,11 @@ export const TABS = [
    на котором человек останавливался. */
 export const NAV_GROUPS = [
   { nav: "long", store: "h3-grp-film", parts: ["long", "actionsc", "clipsc"] },
-  { nav: "refs", store: "h3-grp-video", parts: ["refs", "action"] },
+  { nav: "refs", store: "h3-grp-video", parts: ["refs", "action", "lipsync", "actor"] },
 ];
 export const NAV_GROUP_TITLES = {
   long: "Киностудия", actionsc: "Экшн-студия", clipsc: "Клип-студия",
-  refs: "Видеостудия", action: "Экшн-видео",
+  refs: "Видеостудия", action: "Экшн-видео", lipsync: "Музыкальный клип", actor: "Актерская игра",
 };
 export const groupOf = key => NAV_GROUPS.find(g => g.parts.includes(key)) || null;
 /* кнопка в меню есть только у головы группы; у остальных режимов группы кнопки нет */

@@ -6,7 +6,7 @@ export const PRESETS = [
     text: 'Оживить изображение или сделать видео из текста. Можно начальный и конечный кадр.' },
   { id: 'refs', kind: 'video', badge: ['Лучшее качество', 'q'], title: 'Видеостудия', need: 'изображения, по желанию видео и аудио',
     text: 'Видео по вашим изображениям: персонаж, одежда, локация. Видео задаёт движение, аудио — голос или атмосферу.' },
-  { id: 'long', kind: 'video', badge: ['Быстрый черновик', 'f'], title: 'Студия', need: 'изображения героев + сцены',
+  { id: 'long', kind: 'video', badge: ['Быстрый черновик', 'f'], title: 'Киностудия', need: 'изображения героев + сцены',
     text: 'Ролик из нескольких сцен, каждая продолжает прошлую: клипы, истории, музыка. Своё аудио — на весь ролик или на каждую сцену.' },
   { id: 'action', kind: 'video', title: 'Экшн-видео', need: 'изображения героев',
     text: 'Бой, погоня, бег: динамичные сцены с вашими персонажами. До трёх аудио задают голос, ритм и атмосферу.' },
@@ -22,10 +22,14 @@ export const PRESETS = [
     text: 'Диалоги и крупные планы: эмоции, речь и голос по образцу.' },
   { id: 'swap', kind: 'video', title: 'Замена', isNew: true, role: 'swap_lora', need: 'видео + изображение героя',
     text: 'Берёте любое видео и меняете в нём человека на своего персонажа. Движения, камера и фон остаются прежними.' },
-  { id: 'krea', kind: 'image', title: 'Изображение', need: 'только текст',
-    text: 'Красивые изображения по описанию: Krea 2, FLUX klein, MiniMax H3 Image, серии по списку промптов.' },
-  { id: 'qwen', kind: 'image', title: 'Правка', need: 'изображение + что изменить',
-    text: 'Меняете одежду, фон, детали; делаете карту персонажа и раскадровку. Своими словами или по референсам.' },
+  { id: 'krea', kind: 'image', title: 'Изображение по тексту', need: 'только текст',
+    text: 'Красивые изображения по описанию: Krea 2, MiniMax H3 Image до 16 МП, FLUX klein, Qwen 2.1; серии по списку промптов.' },
+  { id: 'qwen:edit', kind: 'image', icon: 'qwen', poster: 'qwen', title: 'Править изображение', need: 'изображение + что изменить',
+    text: 'Меняете на своём изображении одежду, фон, свет или детали словами. Лицо и характер персонажа остаются прежними.' },
+  { id: 'qwen:sheet', kind: 'image', icon: 'qwen', poster: 'qwen', title: 'Лист персонажа', need: 'изображение героя',
+    text: 'Из одной картинки - лист из 4 или 6 видов героя с разных сторон. Лист потом можно брать как референс в других разделах.' },
+  { id: 'qwen:story', kind: 'image', icon: 'qwen', poster: 'qwen', title: 'Раскадровка', need: 'изображения героя и места',
+    text: 'История в кадрах: от 2 до 9 кадров по вашим референсам - одним листом или отдельными картинками, которые программа склеит сама.' },
 ];
 export const PR = { tab: '', have: {}, q: '', f: 'all', view: 'grid' };
 try { PR.favs = JSON.parse(localStorage.getItem('h3-pfav') || '[]'); } catch { PR.favs = []; }
@@ -54,7 +58,7 @@ export function presetsPaint() {
   const g = $('#view-presets .pr-grid'); g.classList.toggle('list', PR.view === 'list');
   g.innerHTML = list.map(x => {
     const miss = !prHave(x), fav = PR.favs.includes(x.id);
-    return `<div class="pr-card" role="button" tabindex="0" data-p="${x.id}"><div class="pr-pic">${navIcon(x.id)}${prMedia(x)}
+    return `<div class="pr-card" role="button" tabindex="0" data-p="${x.id}"><div class="pr-pic">${navIcon(x.icon || x.id)}${prMedia(x)}
       <span class="pr-fav${fav ? ' on' : ''}" data-fav="${x.id}" title="В избранное"><svg viewBox="0 0 24 24" fill="${fav ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"/></svg></span>
       ${x.badge ? `<span class="pr-bdg ${x.badge[1]}">${x.badge[0]}</span>` : ''}${x.isNew ? '<span class="pr-new">Новое</span>' : miss ? '<span class="pr-new warn">Нужно скачать</span>' : ''}</div>
       <div class="pr-body"><b>${x.title}</b><p>${x.text}</p><div class="pr-tags"><span>${x.kind === 'video' ? 'Видео' : 'Изображение'}</span><span>нужно: ${x.need}</span>${miss ? '<span>докачаем 0,16 ГБ</span>' : ''}</div></div></div>`;
