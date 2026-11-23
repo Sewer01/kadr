@@ -282,9 +282,10 @@
 
 #skToggle{cursor:pointer}
 
-/* Ряд тегов переехал в окно Сценариста: в окнах режимов он остаётся узлом, по которому
-   режим считает номера файлов, но не показывается. */
-.tokens.sc-src{display:none}
+/* Ряд тегов живёт у окна «Сценарий» каждого режима и должен показываться везде:
+   раньше этот файл глобально гасил .tokens.sc-src, и плашки исчезали во всех окнах
+    разом. Числа файлов ряд считает так же, видимости это не мешает. */
+.tokens.sc-src{display:flex;flex-wrap:wrap;gap:6px}
 .ag-comp .ag-tags{display:flex;flex-wrap:wrap;gap:6px;order:-3;flex:1 1 100%;margin:0 0 4px}
 .ag-comp .ag-tags button{font-size:12px;padding:4px 9px;border-radius:999px;border:1px solid var(--line-2);background:var(--bg-2);color:var(--muted);cursor:pointer}
 .ag-comp .ag-tags button:hover{border-color:var(--accent);color:var(--text)}

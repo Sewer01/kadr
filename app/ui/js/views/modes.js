@@ -71,7 +71,23 @@ export function vMode() {
   $('#vMode').textContent = 'Режим: ' + (V.first && V.last ? 'видео между двумя кадрами' : V.first ? 'изображение -> видео' : 'видео по тексту');
   $('#dLast').classList.toggle('disabled', !V.first);
   $('#lastHint').textContent = V.first ? 'необязательно' : 'сначала загрузите первый';
+  /* Ряд тегов окна «Сценарий»: кадр-плашка оживает, когда кадр загружен, пустая стоит
+     серой - человек видит заранее, каким тегом назвать первый и последний кадр. */
+  { const tk = $('.v-tokens');
+    if (tk) tk.innerHTML = [['Первый кадр', !!$('#dFirst')._file], ['Последний кадр', !!$('#dLast')._file]].map((p, i) =>
+      `<button class="token" type="button" data-pic="${i + 1}"${p[1] ? '' : ' disabled'} title="&lt;Picture ${i + 1}&gt; - ${p[0]}: ${p[1] ? 'нажмите, чтобы вставить тег в текст сценария' : 'кадр ещё не загружен'}">&lt;Picture ${i + 1}&gt;</button>`).join(''); }
 }
+{ const vw = $('#view-video');
+  if (vw) vw.addEventListener('click', e => {
+    const b = e.target.closest && e.target.closest('.v-tokens button');
+    if (!b) return;
+    if (b.disabled) { toast('Кадр ещё не загружен'); return; }
+    const ta = $('#vPrompt'), tag = `<Picture ${b.dataset.pic}> `;
+    const p = ta.selectionStart == null ? ta.value.length : ta.selectionStart;
+    ta.value = ta.value.slice(0, p) + tag + ta.value.slice(ta.selectionEnd || p);
+    ta.focus(); ta.selectionStart = ta.selectionEnd = p + tag.length;
+    ta.dispatchEvent(new Event('input', { bubbles: true }));
+  }); }
 export const lastDrop = wireDrop($('#dLast'), on => { V.last = on; vUpd(); });
 // the first frame decides the composition, so the format always follows it
 wireDrop($('#dFirst'), (on, img) => { V.first = on; if (!on) lastDrop.clear(); vUpd(); if (on) fitAspect(V, img, vUpd, true); });
@@ -227,8 +243,10 @@ export function refsChanged() {
       ? '<button class="token" type="button" data-ins="' + clEsc('<d>[' + (CL_HEARD.lang || 'язык аудио') + '] ' + CL_HEARD.text + '</d>') + '" title="' + clEsc(CL_HEARD.text) + '">вставить слова песни</button>'
       : '';
   const song = L.dur0 ? '<span class="hint" style="font-size:11.5px;flex:1 1 160px">песня в этом режиме - движущий звук: её не называют тегом' + (CL_HEARD.text ? ', а слова вставляются кнопкой' : CL_HEARD.busy ? ', слова слушаю' : ', слов не слышно - проверьте распознавание речи в разделе «Сценарист»') + '</span>' : '';
-  $('#tokens').innerHTML = filled.map(n => `<button class="token" type="button">&lt;Picture ${n}&gt;</button>`).join('') + words + song
-    || '<span class="hint">добавьте референсы — появятся метки</span>';
+  $('#tokens').innerHTML = filled.map(n => `<button class="token" type="button">&lt;Picture ${n}&gt;</button>`).join('')
+    + `<button class="token" type="button" disabled title="следующий добавленный референс получит этот тег">&lt;Picture ${filled.length + 1}&gt;</button>`
+    + words + song;
+  if (!filled.length && !words && !song) { const hs = document.createElement('span'); hs.className = 'hint'; hs.textContent = 'добавьте референс — тег оживёт'; $('#tokens').append(hs); }
 }
 $('#tokens').onclick = e => {
   const t = e.target.closest('.token'); if (!t) return;

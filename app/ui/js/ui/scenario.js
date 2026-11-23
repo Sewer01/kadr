@@ -384,8 +384,9 @@ export function scenarioWindow(host, cfg = {}) {
       kind: 'video', num: 2,
       counter: { cls: 'hint', text: '0 символов' },
       placeholder: 'Опишите сцену: кто в кадре, что происходит, как движется камера, свет, звук…',
-      footNote: 'Картинки в этом режиме - первый и последний кадр: текст их не называет, теги не нужны. '
-        + 'Имена героя тегами работают в «Видеостудии» и «Студии».',
+      chips: 'below', chipsCls: 'v-tokens',
+      footNote: 'Первый кадр - тег &lt;Picture 1&gt;, последний - &lt;Picture 2&gt;: нажмите плашку, '
+        + 'и тег встанет в текст туда, где стоит курсор. Имена героя тегами работают в «Видеостудии» и «Студии».',
       generate: { mode: 'video', text: () => ($('#vPrompt') || {}).value },
     });
     if (w) { w.ta.id = 'vPrompt'; if (w.counter) w.counter.id = 'vCount'; scenarioResolvers.set('video', () => w); }
