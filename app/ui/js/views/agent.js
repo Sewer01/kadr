@@ -290,7 +290,7 @@ export function agVidBtn() {
   lb.style.pointerEvents = n ? '' : 'none';
   lb.title = n
     ? `Сценарист посмотрит на видео как на кадры - вырежем их сами (этот режим принимает видео: ${n}). При переносе промпта в раздел уйдёт сам файл`
-    : 'Это видео не примет режим, для которого пишется промпт: выберите «Видеостудию», «Замену» или «Киностудию»';
+    : 'Это видео не примет режим, для которого пишется промпт: выберите «Видеостудию», «Замену» или «Студию»';
 }
 export function agFitVideos() {
   // the mode changed under the tray: the extra videos leave, the first ones stay
@@ -326,7 +326,7 @@ export function agShareFrames() {
 }
 export async function agFramesFromFile(f) {   // the only way the agent can look at a video: pieces of it
   const max = agVideoMax();
-  if (!max) { toast('Видео не нужен режиму, для которого пишется промпт: выберите «Видеостудию», «Замену» или «Киностудию»'); return false; }
+  if (!max) { toast('Видео не нужен режиму, для которого пишется промпт: выберите «Видеостудию», «Замену» или «Студию»'); return false; }
   const again = AG.att.some(a => a.frame && a.vname === f.name);
   if (again) AG.att = AG.att.filter(a => !(a.frame && a.vname === f.name));   // the same video lays its frames out anew
   if (max === 1) AG.att = AG.att.filter(a => !a.frame);                       // one place: the new video takes it from the old
@@ -345,7 +345,7 @@ export async function agFramesFromFile(f) {   // the only way the agent can look
     const fr = AG.att.filter(a => a.frame);
     const nv = new Set(fr.map(a => a.vname)).size;
     toast(frames.length === 1
-      ? `Взят последний кадр видео (${frames[0].t.toFixed(1)} с) - ровно тот, с которого Киностудия продолжит ролик. Опишите, что происходит дальше`
+      ? `Взят последний кадр видео (${frames[0].t.toFixed(1)} с) - ровно тот, с которого Студия продолжит ролик. Опишите, что происходит дальше`
       : `Из видео взято ${frames.length} кадров` + (cut ? `, повторы убраны: ${cut}` : '')
         + (nv > 1 ? ` · всего ${fr.length} кадров с ${nv} видео` : '') + '. Теперь напишите, кого на что заменить');
   } catch (err) { toast(err.message); return false; }
@@ -375,7 +375,7 @@ $('#agFile').onchange = async e => {
 };
 $('#agEmpty').onclick = e => { const s = e.target.closest('span'); if (s) { $('#agIn').value = s.textContent.replace(/[«»]/g, '').replace(/ \+ фото героинь$/, ''); $('#agIn').focus(); } };
 $('#agIn').addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); $('#agSend').click(); } });
-export const AG_NAMES = { plist: '«Изображение по тексту» · список кадров', h3t: '«Изображение по тексту» · H3 Image', h3e: '«Изменение по референсам» · H3 Image', actionsc: '«Экшн-студия»', long: '«Киностудия»', video: '«Видео»', lipsync: '«Клип»', refs: '«Видеостудия»', actor: '«Актёр»', swap: '«Замена»', action: '«Экшн-видео»', krea: '«Изображение по тексту» · Krea 2', qwen: '«Изменение изображения»', sheet: '«Изменение изображения» · лист персонажа', sheet6: '«Изменение изображения» · лист ×6', fluxt: '«Изображение по тексту» · FLUX klein', qwent: '«Изображение по тексту» · Qwen 2.1', story: '«Изменение изображения» · раскадровка' };
+export const AG_NAMES = { plist: '«Изображение по тексту» · список кадров', h3t: '«Изображение по тексту» · H3 Image', h3e: '«Изменение по референсам» · H3 Image', actionsc: '«Экшн-студия»', long: '«Студия»', video: '«Видео»', lipsync: '«Клип»', refs: '«Видеостудия»', actor: '«Актёр»', swap: '«Замена»', action: '«Экшн-видео»', krea: '«Изображение по тексту» · Krea 2', qwen: '«Изменение изображения»', sheet: '«Изменение изображения» · лист персонажа', sheet6: '«Изменение изображения» · лист ×6', fluxt: '«Изображение по тексту» · FLUX klein', qwent: '«Изображение по тексту» · Qwen 2.1', story: '«Изменение изображения» · раскадровка' };
 export const AG_IMG = ['plist', 'krea', 'qwen', 'sheet', 'sheet6', 'fluxt', 'qwent', 'h3t', 'h3e', 'story'];
 AG.storyModel = 'krea'; AG.storyFrames = true;
 AG.think = (() => { try { return localStorage.getItem('h3-ag-think') === 'deep' ? 'deep' : 'fast'; } catch { return 'fast'; } })();
@@ -862,7 +862,7 @@ export async function agSend() {
   const ctx = { cont: studioCaps(AG.target).baseVideo && (AG.att.some(a => a.frame) || !!((RM[AG.target] || {}).root || {})._src) ? 1 : 0, model: AG.target === 'qwen' ? ((qwBtn && qwBtn.dataset.e) || 'qwen') : (AG.storyFrames && AG.storyModel === 'krea' ? 'flux' : AG.storyModel), frames: AG.target === 'story' && AG.storyFrames, duration: AG_IMG.includes(AG.target) ? null : AG.target === 'video' ? V.dur : AG.target === 'lipsync' ? (L.dur0 ? L.len() : null) : RM[AG.target].S.dur };
   if (AG.target === 'actor') ctx.voice = RM.actor.voice() ? 1 : 0;
   /* Состояние звука и длины сцен берутся из окна того режима, для которого пишут,
-     а не из окна Киностудии: иначе сценаристу про другую сценную студию рассказывали
+     а не из окна Студии: иначе сценаристу про другую сценную студию рассказывали
      чужие настройки. */
   if (studioCaps(AG.target).scenes) { const lr = RM[AG.target].root; ctx.long = { sound: lr._snd, secs: $$('.sc input[type=range]', lr).map(r => +r.value),
       music: lr._snd === 'own' ? { loop: lr._loop !== false, sec: Math.round((lr._adur || 0) * 10) / 10 } : null,
@@ -1804,7 +1804,7 @@ export const agQwenMode = () => { const b = $('.qw-eng button.on', $('#view-qwen
       B('Длительность', 'если аудио нет, длину задаёте вы.'),
       B('Промпт', 'что делают герои и куда смотрит камера; вставляйте теги вместо слов «он», «она», «это».'),
     ]),
-    long: () => H('<b>Киностудия - фильм по сценам</b>') + UL([
+    long: () => H('<b>Студия - фильм по сценам</b>') + UL([
       B('«Новые сцены»', 'вы пишете список сцен; каждая - отдельный клип до 15 секунд, следующая продолжает последнюю картинку предыдущей.'),
       B('«Продолжить видео»', 'берёт ваше готовое видео и дописывает сцены после него.'),
       B('Плюс под сценой', 'добавляет ещё одну сцену; номер карточки слева - это и есть её место.'),

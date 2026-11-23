@@ -248,7 +248,7 @@ export function scenarioWindow(host, cfg = {}) {
       const fix = scNode('button');
       fix.type = 'button'; fix.className = 'btn';
       fix.style.cssText = 'padding:4px 12px;font-size:12px';
-      fix.textContent = 'Исправить';
+      fix.textContent = cfg.kind === 'scenarist' ? 'Правка сценария' : 'Исправить';   // в окне «Сценарий» кнопка правит сценарий, в остальных - текст поля
       fix.title = 'Попросить сценариста поправить промт в том же разговоре: он помнит, что уже писал. Новый текст ляжет в окно «Промт».';
       fix.onclick = () => views.agGenerate(fix, Object.assign({}, cfg.generate, { text: () => sc.value, again: true }));
       row.append(fix);
@@ -326,6 +326,13 @@ export function scenarioWindow(host, cfg = {}) {
     if (ruOut) ruOut.hidden = true;
   }
 
+  /* Плашки файлов относятся к тексту, где человек пишет: в окне «Сценарий» (с полем «Промта»
+     или без него) ряд тегов встаёт сразу под кнопки поля, а не под полем промта, как раньше. */
+  if (sc && tagRow && cfg.chips !== 'above') {
+    const br = (scButtons && scButtons.children.length ? scButtons : buttons) || null;
+    if (br && br.parentElement) br.parentElement.insertBefore(tagRow.row, br.nextSibling);
+  }
+
   const api = {
     el: root, ta, sc, scButtons, foot, tokens, buttons, counter, addButton,
     value: () => ta.value,
@@ -378,7 +385,7 @@ export function scenarioWindow(host, cfg = {}) {
       counter: { cls: 'hint', text: '0 символов' },
       placeholder: 'Опишите сцену: кто в кадре, что происходит, как движется камера, свет, звук…',
       footNote: 'Картинки в этом режиме - первый и последний кадр: текст их не называет, теги не нужны. '
-        + 'Имена героя тегами работают в «Видеостудии» и «Киностудии».',
+        + 'Имена героя тегами работают в «Видеостудии» и «Студии».',
       generate: { mode: 'video', text: () => ($('#vPrompt') || {}).value },
     });
     if (w) { w.ta.id = 'vPrompt'; if (w.counter) w.counter.id = 'vCount'; scenarioResolvers.set('video', () => w); }
@@ -629,7 +636,7 @@ export async function sendPrompt(blk, to) {
     deliver();
     /* Карточки раздела перестраиваются не в тот же миг: доставка, сделанная один раз,
        попадала в карточки, которые потом заменялись новыми, и фото сцены исчезало.
-       Поэтому она повторяется, когда Киностудия уже на экране. Повтор ничего не
+       Поэтому она повторяется, когда Студия уже на экране. Повтор ничего не
        дублирует: лежащий в сцене файл узнаётся по имени и размеру. */
     setTimeout(deliver, 400);
     setTimeout(deliver, 1400);
@@ -669,7 +676,7 @@ export async function sendPrompt(blk, to) {
   if (to === 'lipsync' && au && !back) await setDropFile($('#aFile'), au);   // a returned draft keeps its own song
   if (to === 'swap' || to === 'refs') { const r = await handVids(RM[to].root); vUsed = r.used; vAll = r.all; }
   goTo(to);
-  const name = { video: '«Видео»', lipsync: '«Клип»', refs: '«Видеостудия»', actor: '«Актёр»', swap: '«Замена»', action: '«Экшн-видео»', actionsc: '«Экшн-студия»', long: '«Киностудия»', krea: '«Изображение по тексту»', qwen: '«Изменение изображения»' }[to];
+  const name = { video: '«Видео»', lipsync: '«Клип»', refs: '«Видеостудия»', actor: '«Актёр»', swap: '«Замена»', action: '«Экшн-видео»', actionsc: '«Экшн-студия»', long: '«Студия»', krea: '«Изображение по тексту»', qwen: '«Изменение изображения»' }[to];
   toast(`${back ? 'Черновик вернулся в' : 'Промпт перенесён в режим'} ${name}` + (back ? ', ваши файлы остались на местах' : '') + (files.length && to !== 'video' && to !== 'krea' ? ' вместе с изображениями' : '')
     + (vUsed ? ` и видео: ${vUsed}` : '') + (vidFiles.length > vUsed ? ` (видео в чате ${vidFiles.length}, раздел принимает ${vAll || 1}: лишние не перенесены)` : '') + (to === 'lipsync' && !back ? (au ? ' и аудио — выделите нужный фрагмент' : ' — добавьте аудио') : ''));
 }

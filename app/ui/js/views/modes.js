@@ -524,7 +524,7 @@ $('#vwRepeat').onclick = async () => {
   // scenes, settings AND the pictures - otherwise the texts would point at empty places
   if (studioCaps(it.mode).scenes && it.long && it.long.run) {
     /* сценные студии живут одной механикой: проект целиком (сцены, настройки,
-       картинки) переносится в ту студию, откуда ролик, а не только в Киностудию */
+       картинки) переносится в ту студию, откуда ролик, а не только в Студию */
     goTo(RM[it.mode] ? it.mode : 'long');
     try {
       if (await (RM[it.mode] || RM.long).root._openRun(it.long.run)) { toast('Перенесли проект целиком: сцены, настройки и все картинки'); return; }
@@ -920,7 +920,7 @@ export function makeRefMode(cfg) {
     card.addEventListener('dragover', e => { if (e.dataTransfer.types.includes('text/h3lib')) { e.preventDefault(); card.style.outline = '2px dashed var(--accent)'; } });
     card.addEventListener('dragleave', () => { card.style.outline = ''; });
     card.addEventListener('drop', () => { card.style.outline = ''; });
-    const MODE_NAME = { refs: 'Видеостудия', actor: 'Актёр', action: 'Экшн-видео', long: 'Киностудия', actionsc: 'Экшн-студия', clipsc: 'Клип-студия' }[cfg.mode] || cfg.mode;
+    const MODE_NAME = { refs: 'Видеостудия', actor: 'Актёр', action: 'Экшн-видео', long: 'Студия', actionsc: 'Экшн-студия', clipsc: 'Клип-студия' }[cfg.mode] || cfg.mode;
     let turls = [];
     const paintThumbs = () => {
       turls.forEach(u2 => { try { URL.revokeObjectURL(u2); } catch (e) { } }); turls = [];
@@ -1151,7 +1151,7 @@ export function makeRefMode(cfg) {
         return;
       }
       host.hidden = false;
-      const MODE_NAME = { refs: 'Видеостудия', actor: 'Актёр', action: 'Экшн-видео', long: 'Киностудия', actionsc: 'Экшн-студия', clipsc: 'Клип-студия' }[cfg.mode] || cfg.mode;
+      const MODE_NAME = { refs: 'Видеостудия', actor: 'Актёр', action: 'Экшн-видео', long: 'Студия', actionsc: 'Экшн-студия', clipsc: 'Клип-студия' }[cfg.mode] || cfg.mode;
       if (!tr) tr = root._raTrim = new AudioTrimmer({ mount: host, limit: 15, agentTarget: cfg.mode, onFile,
         whereLabel: q => 'раздел «' + MODE_NAME + '», аудио ' + (q._slot + 1) + ', тег <Audio ' + (q._slot + 1) + '>, ' + slots.length + ' места в разделе' });
       const src = s._src || s._file;
@@ -2139,6 +2139,22 @@ export function makeRefMode(cfg) {
         chips: 'below', chipsCls: 'sc-tokens', buttons: true,
       });
       c._win = scWin;
+      /* «Переписать сцену» встала под текстовое окно сцены: карточка просит сценариста
+         переписать только эту сцену. Лист возвращается целиком - так сцены не путаются
+         номерами, а остальные модель обязана вернуть слово в слово. */
+      const bRew = document.createElement('button');
+      bRew.type = 'button'; bRew.className = 'btn mini sc-rewrite';
+      bRew.textContent = 'Переписать сцену';
+      bRew.title = 'Сценарист перепишет текст только этой сцены - сделает его готовым промптом режима. Остальные сцены вернутся без изменений.';
+      bRew.onclick = () => {
+        const iR = $$('.sc', root).indexOf(c);
+        agGenerate(bRew, { mode: cfg.mode, scenes: true,
+          text: () => ((c._win && c._win.ta) || {}).value || '',
+          instruction: 'Перепиши сцену ' + (iR + 1) + ' как готовый промпт этого режима: сильный, точный кадр на её секунды. Верни ВЕСЬ лист: все заголовки SCENE N с той же длительностью, тексты остальных сцен - слово в слово, ничего от себя не добавляй, все теги (<Picture N>, <Video N>, <Audio N>) и их номера сохрани.\n\n' + agScenesText(root) });
+      };
+      { const hbR = scWin.buttons || $('.field-btns', scWin.el);
+        const clrR = hbR ? Array.prototype.slice.call(hbR.children).find(x => x.textContent.trim() === 'Очистить текст') : null;
+        if (hbR) hbR.insertBefore(bRew, clrR || null); else c.appendChild(bRew); }
       { const r0 = $('input[type=range]', c);
         if (r0 && sec > 15) { r0.max = '25'; r0.value = String(Math.min(25, sec)); window.sceneLongOn(c, true); } }
       // nine places of their own, made like the common ones: an empty place offers itself, a filled
@@ -2189,7 +2205,7 @@ export function makeRefMode(cfg) {
             lb.style.borderStyle = 'solid'; $('.x', lb).style.display = '';
           } else { plus.hidden = false; tag.hidden = true; lb.style.borderStyle = 'dashed'; $('.x', lb).style.display = 'none'; }
         });
-        const last = c._files.reduce((a, f, j) => (f ? j : a), -1), shown = Math.min(9, last + 2);
+        const last = c._files.reduce((a, f, j) => (f ? j : a), -1), shown = Math.min(9, Math.max(1, last + 2));   // ряд тегов под окном сцены не гаснет совсем: первый номер виден всегда
         (c._ownTiles || []).forEach((lb, j) => { lb.hidden = j >= shown; });   // лишние пустые места не светятся
         const tk = $('.sc-tokens', c);
         const bs = ownBase();
@@ -2901,7 +2917,7 @@ export function makeRefMode(cfg) {
         generate: {
           mode: cfg.mode,
           text: () => (srWin.sc || {}).value,
-          caption: '🤖 Сценарист пишет сцены',
+          caption: 'Новый сценарий',
           captionTitle: 'Сценарист прочитает сценарий и вернёт список сцен: каждая строка «SCENE N | секунды» станет отдельной сценой в карточке «Сцены». Картинки героев и песни студии уйдут в чат сами, ответ вернётся в сцены.',
           /* Границы сцен человек задаёт сам, но по умолчанию стоит «авто»: тогда
              Сценарист решает, сколько сцен нужно сюжету, держась только длительности.
@@ -3208,6 +3224,17 @@ export function makeRefMode(cfg) {
           list.forEach(b => put(b, 'сцена ' + (i + 1)));
         });
         row.hidden = !row.querySelector('button');
+        /* Заодно следим за «Отменить» и «Вернуть»: окно «Сценарий» перестраивается
+           при загрузке ленты, и кнопки должны стоять в ряду с «Очистить текст»,
+           прямо перед ней. Этот рядок перерисовывается после любой перестройки;
+           при самой первой отрисовке кнопок ещё нет - try бережёт от этого. */
+        try {
+          const u0 = $('.sc-undo', root), r0 = $('.sc-redo', root);
+          const clr0 = $$('.field-btns button', root).find(x => x.textContent.trim() === 'Очистить текст');
+          if (u0 && r0 && clr0 && clr0.parentElement !== u0.parentElement) {
+            clr0.parentElement.insertBefore(u0, clr0); clr0.parentElement.insertBefore(r0, clr0);
+          }
+        } catch (e) { }
       };
       root._paintSrTags();
       if (!$('.mus-film', musCard)) {   // three files for the whole film, on the same terms as a scene's
@@ -3393,8 +3420,10 @@ export function makeRefMode(cfg) {
       bRedo.title = 'Вернуть то, что вы только что отменили (Ctrl+Shift+Z)';
       bUndo.onclick = () => root._doUndo(); bRedo.onclick = () => root._doRedo();
       const paintStep = () => { bUndo.disabled = !root._undo.length; bRedo.disabled = !root._redo.length; };
-      (scCard.querySelector('.card-h') || scCard).append(bUndo, bRedo);
-      /* «Дописать пустые сцены» нужна не только клипу: в Киностудии и Экшн-студии люди
+      { const clr0 = $$('.field-btns button', srCard).find(x => x.textContent.trim() === 'Очистить текст');
+        const hb = clr0 ? clr0.parentElement : ((srWin && (srWin.buttons || $('.field-btns', srCard))) || null);
+        if (hb) { hb.insertBefore(bUndo, clr0 || null); hb.insertBefore(bRedo, clr0 || null); } else (scCard.querySelector('.card-h') || scCard).append(bUndo, bRedo); }
+      /* «Дописать пустые сцены» нужна не только клипу: в Студии и Экшн-студии люди
          чинят ленту по одной сцене, а Сценарист умеет вернуть весь список сразу. Поэтому
          функция одна, а кнопка стоит и в карточке «Клип», и в шапке карточки «Сцены». */
       root._askFillEmpty = () => {
@@ -3461,10 +3490,12 @@ export function makeRefMode(cfg) {
           const pv = $('.rm-preview', root); if (pv && pv._reset) pv._reset();   // и предпросмотр сцены пустеет
           toast('Сцены очищены: осталась одна пустая, общие фото на месте');
         });
-      const chips = $('.rm-tokens', root)?.closest('.ta-foot'), ta0 = $('.col textarea', root);
-      // the names you can insert belong where you write: put them under the card that holds the text
-      const host = ta0 && (ta0.closest('.sc') || ta0.closest('.card'));
-      if (chips && host && !host.contains(chips)) host.insertAdjacentElement('afterend', chips);
+      /* Общий ряд картинок студий сцен больше не стоит отдельной строкой под сценами:
+         он остаётся донором тегов, а видит человек один ряд - в окне «Сценарий», куда
+         его копает рядок окна (там же теги каждой сцены). Две одинаковые строки в
+         интерфейсе - только путаница. */
+      { const donorRow = $('.rm-tokens', root) ? $('.rm-tokens', root).closest('.ta-foot') : null;
+        if (donorRow) donorRow.hidden = true; }
       const tlRow = ($('.tl', root) || {}).nextElementSibling || $('.tl', root);
       if (tlRow) { tlRow.insertAdjacentElement('afterend', clrSc); clrSc.insertAdjacentElement('beforebegin', clrOne); } else fin.after(clrSc);   // right under the scene chips: first this scene, then all
       $('#lmAdd', root).hidden = true;   // the plus on the ribbon is the way to add a scene
@@ -4059,7 +4090,7 @@ export function makeRefMode(cfg) {
         gg.textContent = '🤖 Сценарист перепишет сцены';
         gg.title = 'Отправить все сцены сценаристу одним сообщением: он перепишет их, и каждая вернётся в свою карточку. Фото и песни сцен остаются на местах.';
         gg.onclick = () => agGenerate(gg, { mode: cfg.mode, scenes: true, text: () => agScenesText(root) });
-        pcard.querySelector('.card-h').append(gg);
+        /* кнопка «Сценарист перепишет сцены» из шапки ушла: вместо неё под каждым текстовым окном сцены стоит «Переписать сцену» */
         gg._agCount = () => $$('.sc', root).filter(c => ($('textarea', c) || {}).value.trim()).length;
       }
       go.textContent = '🤖 Всё к сценаристу';
@@ -4116,7 +4147,7 @@ export const RM = {
     placeholder: '',
   }),
   long: makeRefMode({
-    mode: 'long', title: 'Киностудия', pill: 'Сцены подряд · Pika', dur: 20, maxImages: 5, videos: false, scenes: true, graph: 'pika',
+    mode: 'long', title: 'Студия', pill: 'Сцены подряд · Pika', dur: 20, maxImages: 5, videos: false, scenes: true, graph: 'pika',
     sub: 'Клипы и ролики по сценам: каждая сцена до 15 секунд и продолжает прошлую. Музыка — общая на ролик или своя в каждой сцене',
     refHint: 'До 5 изображений-референсов: персонаж, локация, предмет, одежда, стиль — всё, что должно сохраняться. Они подаются в каждую сцену, поэтому лицо и место не «плывут». В тексте сцены ссылайтесь на них как &lt;Picture 1&gt;, &lt;Picture 2&gt;… Чем больше референсов, тем тяжелее и дольше считается сцена.',
     placeholder: '',
@@ -4137,7 +4168,7 @@ export const RM = {
   }),
   clipsc: makeRefMode({
     mode: 'clipsc', title: 'Клип-студия', pill: 'Клип по треку · Pika', dur: 10, maxImages: 5, videos: false,
-    scenes: true, graph: 'pika', clipScenes: true,   // сцены по треку; считает та же модель, что Киностудия
+    scenes: true, graph: 'pika', clipScenes: true,   // сцены по треку; считает та же модель, что Студия
     sub: 'Клип по вашей музыке: сцены рождаются из трека, готовые клипы склеиваются в один ролик',
     refHint: 'До 5 изображений: герой, место, предмет, стиль - они подаются в каждую сцену, поэтому лицо и место не «плывут». В тексте сцены ссылайтесь на них как &lt;Picture 1&gt;, &lt;Picture 2&gt;… В карточке «Аудио» кладите трек на весь ролик: от его длины зависят количество и длительность сцен.',
     placeholder: '',

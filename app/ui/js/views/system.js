@@ -82,7 +82,7 @@ export function setEngine(on) {
   // the names people read all day; the side menu keeps its own, longer ones for now
   const SHORT = { video: 'Видео', lipsync: 'Клип', refs: 'Видеостудия', actor: 'Актёр', swap: 'Замена', voicelab: 'Озвучка',
     reflab: 'Референсы', imgedit: 'Редактирование',
-    long: 'Киностудия', actionsc: 'Экшн-студия', action: 'Экшн-видео',
+    long: 'Студия', actionsc: 'Экшн-студия', action: 'Экшн-видео',
     krea: 'Изображение по тексту', qwen: 'Изменение изображения', upfile: 'Апскейлинг' };
   // what a button really opens, said in one line: the bar is short by design, the tooltip is not
   const TIP = { video: 'Видео из картинки', lipsync: 'Музыкальный клип', voicelab: 'Голос по описанию, клон по образцу, диалог', refs: 'Видео по референсам',
@@ -144,7 +144,7 @@ export function offerNewModes(s) {
   OFFER_SHOWN = true;
   const show = () => {
     if (!$('#confirm').hidden) return setTimeout(show, 3000);  // another question is open: wait
-    const name = { flux: 'Изменение изображения: FLUX klein (можно в коммерцию)', long: '«Киностудия» (клипы и ролики по сценам)' }[o.mode] || o.mode;
+    const name = { flux: 'Изменение изображения: FLUX klein (можно в коммерцию)', long: '«Студия» (клипы и ролики по сценам)' }[o.mode] || o.mode;
     const btn = $('#confirm [data-close]');
     const later = () => fetch('/api/mode/offered', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mode: o.mode }) });
     btn.addEventListener('click', later, { once: true });

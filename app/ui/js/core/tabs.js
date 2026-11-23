@@ -14,7 +14,7 @@ export const TABS = [
   {order: 6, section: "Создать", key: "refs", caption: "Видеостудия", sub: true, active: false, hidden: false},
   {order: 7, section: "Создать", key: "actor", caption: "Актёр", sub: true, active: false, hidden: false},
   {order: 8, section: "Создать", key: "swap", caption: "Замена", sub: true, active: false, hidden: false},
-  {order: 9, section: "Создать", key: "long", caption: "Киностудия", sub: true, active: false, hidden: false},
+  {order: 9, section: "Создать", key: "long", caption: "Студия", sub: true, active: false, hidden: false},
   {order: 10, section: "Создать", key: "action", caption: "Экшн-видео", sub: true, active: false, hidden: false, group: "refs"},
   {order: 11, section: "Создать", key: "actionsc", caption: "Экшн-студия", sub: true, active: false, hidden: false, group: "long"},
   {order: 12, section: "Создать", key: "clipsc", caption: "Клип-студия", sub: true, active: false, hidden: false, group: "long"},

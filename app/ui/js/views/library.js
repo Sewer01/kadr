@@ -525,7 +525,7 @@ export function zoomClose() { $('#zoomv').hidden = true; $('#zvImg').removeAttri
 })();
 
 /* ---------- Library -> workflow: "Use in…" button and the side tray to drag from ---------- */
-export const USE_TARGETS = [['video', 'Видео'], ['lipsync', 'Клип'], ['refs', 'Видеостудия'], ['actor', 'Актёр'], ['action', 'Экшн-видео'], ['actionsc', 'Экшн-студия'], ['long', 'Киностудия'], ['qwen', 'Изменение изображения'], ['agent', 'Сценарист (в чат)']];
+export const USE_TARGETS = [['video', 'Видео'], ['lipsync', 'Клип'], ['refs', 'Видеостудия'], ['actor', 'Актёр'], ['action', 'Экшн-видео'], ['actionsc', 'Экшн-студия'], ['long', 'Студия'], ['qwen', 'Изменение изображения'], ['agent', 'Сценарист (в чат)']];
 export function freeSlot(view) {
   const root = $('#view-' + view); if (!root) return null;
   // кадры начала и конца человек выбирает сам: само туда ничего не подставляем
