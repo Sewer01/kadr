@@ -158,8 +158,10 @@ def scene_prompt(prompt, images, own, frame=None, base=10, auds=()):
     return re.sub(r"<\s*Frame\s*>", "<Picture 1>" if frame else "the previous shot", out)
 
 
-def _refs(g, cond_node, images, videos=(), audios=(), base=100, vsize=None, abase=None):
-    """LoadImage / VHS_LoadVideo (24 fps) / LoadAudio nodes wired into MiniMaxH3ReferenceToVideo."""
+def _refs(g, cond_node, images, videos=(), audios=(), base=100, vsize=None, abase=None, atrim=None):
+    """LoadImage / VHS_LoadVideo (24 fps) / LoadAudio nodes wired into MiniMaxH3ReferenceToVideo.
+    atrim - seconds to cut the reference audio down to: a whole song does not fit the audio VAE
+    (encoding dies on the huge tensor), while the reference only needs its beginning."""
     inputs = g[cond_node]["inputs"]
     for i, name in enumerate([x for x in images[:9] if x]):
         nid = str(base + i)
@@ -176,7 +178,12 @@ def _refs(g, cond_node, images, videos=(), audios=(), base=100, vsize=None, abas
     for i, name in enumerate(audios[:3]):
         nid = str((abase if abase is not None else base + 20) + i)   # per-scene audio must not land on the next scene's nodes
         g[nid] = {"class_type": "LoadAudio", "inputs": {"audio": name}}
-        inputs[f"ref_audios.ref_audio_{i}"] = [nid, 0]
+        src = [nid, 0]
+        if atrim:
+            tid = str(9000 + int(nid) + i)   # a quiet range: trim nodes never meet the loaders' ids
+            g[tid] = {"class_type": "TrimAudioDuration", "inputs": {"audio": src, "start_index": 0.0, "duration": float(atrim)}}
+            src = [tid, 0]
+        inputs[f"ref_audios.ref_audio_{i}"] = src
     return [str(base + i) for i in range(len([x for x in images[:9] if x]))] \
         + [str(base + 10 + i) for i in range(len(videos[:3]))] \
         + [str(base + 20 + i) for i in range(len(audios[:3]))]
@@ -928,7 +935,7 @@ def long_graph(m, scenes, width, height, seed, images, audio=None, start=0.0, pi
         # files whose tag is absent from the text are still only references: the model applies a
         # reference where the prompt names it, and the numbering stays by place (2, 3, 4)
         own_a = [x for x in (scene_audios[i] if i < len(scene_audios) else ()) if x][:3]
-        _refs(g, ref, refs, audios=own_a, base=1000 + 10 * i, abase=5000 + 4 * i)
+        _refs(g, ref, refs, audios=own_a, base=1000 + 10 * i, abase=5000 + 4 * i, atrim=15)
         new = add("LTXVSeparateAVLatent", av_latent=[ref, 1])
         a_lat = [new, 1]   # звук сочиняет модель: латент чистый, как когда общего файла нет
         if held:   # кусок голоса из файла держится нулевой маской: общее прижатие `_held_audio_latent`
@@ -1025,7 +1032,7 @@ def long_part_graph(m, scenes, k, width, height, seed, images, audio=None, start
     ref = add("MiniMaxH3ReferenceToVideo", clip=["5", 0], vae=["6", 0], audio_vae=["7", 0],
               prompt=scene_prompt(sc[0], images, own, None, base=10 * (k + 1), auds=own_a),
               width=width, height=height, length=total, ref_image_size=ref_size)
-    _refs(g, ref, own or images, audios=own_a, base=100, abase=5000)
+    _refs(g, ref, own or images, audios=own_a, base=100, abase=5000, atrim=15)
     new = add("LTXVSeparateAVLatent", av_latent=[ref, 1])
     a_lat = [new, 1]   # звук сочиняет модель: латент чистый, как когда общего файла нет
     if held:   # прижатие звукового латента - общее со всеми студиями (`_held_audio_latent`)
@@ -1276,7 +1283,7 @@ def action_part_graph(m, scenes, k, width, height, seed, images, loras, preview=
               prompt=scene_prompt(sc[0], images, own, None, base=10 * (k + 1)),
               width=lw, height=lh, length=total, ref_image_size="max")
     own_a = [x for x in (scene_audios[k] if k < len(scene_audios) else ()) if x][:3]
-    _refs(g, ref, own or images, audios=own_a, base=100, abase=5000)
+    _refs(g, ref, own or images, audios=own_a, base=100, abase=5000, atrim=15)
     new = add("LTXVSeparateAVLatent", av_latent=[ref, 1])
     # что слушает модель, фон фильма и галочка «модель слушает только голос» - той же общей
     # сборкой, что в Видеостудии (`_heard_audio`); здесь эти ноды занимают 14/15/16/17.

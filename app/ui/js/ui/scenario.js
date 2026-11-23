@@ -426,20 +426,24 @@ export function audioTokens(c, bs, film) {
 /* What a scene really sends: the files whose tags stand in its text, in the order of those tags, never
    more than the three places the model has. A text that names no audio sends the scene's own files, as
    always. The copy handed to the model gets the tags renumbered to the places the files took - the
-   numbers on the screen stay the ones the person wrote. */
-export function sceneAudioPlan(c, film, bs) {
+   numbers on the screen stay the ones the person wrote.
+   A scene may also name a file that stands in ANOTHER scene (pool): tags never collide across the
+   strip, so such a file is copied into this scene's send row and its tag moves onto the place it
+   takes there. The card of the other scene keeps the file; nothing moves on the shelf. */
+export function sceneAudioPlan(c, film, bs, pool, room) {
   /* Numbers written on the cards belong to the SCENE, not to the place it happens to stand in:
      the person moved a scene and its text kept <Picture 30>, while the server waits for the decade
      of the new place and leaves a foreign number exactly as written - the model then invents what
      the missing picture should show, and a fox becomes a sack. Here every number of this scene's
-     own decade is moved onto the place the file really takes; a number with no file behind it in
-     THIS scene is taken out of the text and named in the report, because a tag with nothing behind
-     it is a lie to the model. */
+     own decade is moved onto the place the file really takes; a number whose file stands in another
+     scene copies that file into this scene; a number with no file behind it ANYWHERE is taken out
+     of the text and named in the report, because a tag with nothing behind it is a lie to the model. */
   const ta = c.querySelector('textarea:not(.sc-draft)') || c.querySelector('textarea'), raw = ta ? ta.value : '';
   const own = (c && c._baseFixed) || bs;      // the decade written on the cards of this scene
   const byTag = new Map();
   (film || []).forEach((f, j) => { if (f && j > 0) byTag.set(1 + j, f); });   // the background has its own road to the model
   (c._auds || []).forEach((f, j) => { if (f) byTag.set(own + j, f); });
+  (pool || []).forEach(p => (p.auds || []).forEach((f, j) => { if (f && !byTag.has(p.base + j)) byTag.set(p.base + j, f); }));
   const seen = (raw.match(/<Audio\s*\d+/g) || []).map(s => +s.replace(/\D+/g, ''));
   const picked = [];
   seen.forEach(t => { if (byTag.has(t) && picked.indexOf(t) < 0 && picked.length < 3) picked.push(t); });
@@ -448,23 +452,35 @@ export function sceneAudioPlan(c, film, bs) {
     const k = picked.indexOf(+t);
     if (k >= 0) return '<Audio ' + (bs + k) + '>';
     if (byTag.has(+t)) { left.push(+t); return ''; }   // the fourth and further: the quota is three, the tag goes
-    return whole;                              // a number of another scene or one typed by hand stays
+    return whole;                              // a number typed by hand with no file behind it stays
   });
   const slots = (c && c._files) || [];
   const lostP = [];
+  const borrow = {};                           // free slot of this scene -> file borrowed from another one
+  const borrowed = [];                         // for the report: { tag, n } - whose file came over
+  const ownFilled = slots.filter(Boolean).length;
+  const roomLeft = room == null ? 9 : room;    // how many pictures the model can take with the common ones
   text = text.replace(/<Picture\s*(\d+)>/g, (whole, t) => {
     t = +t;
     if (t < 10) return whole;                  // the common references count by their own places
     const j = t - own;
     if (j >= 0 && j < 9 && slots[j]) return '<Picture ' + (bs + j) + '>';
-    lostP.push(t); return '';                  // no such photo in this scene: the model must not guess one
+    const src = (pool || []).find(p => t >= p.base && t < p.base + 9 && p.files[t - p.base]);
+    if (src) {
+      if (ownFilled + Object.keys(borrow).length >= roomLeft) { lostP.push(t); return ''; }
+      let jf = 0; while (jf < 9 && (slots[jf] || borrow[jf])) jf++;
+      borrow[jf] = src.files[t - src.base];
+      borrowed.push({ tag: t, n: src.n });
+      return '<Picture ' + (bs + jf) + '>';
+    }
+    lostP.push(t); return '';                  // no such photo in the whole strip: the model must not guess one
   });
   const dropped = left.filter((v, i) => left.indexOf(v) === i);
   const lostPics = lostP.filter((v, i) => lostP.indexOf(v) === i);
   const tidy = s => s.replace(/ {2,}/g, ' ').replace(/\s+([,.;!?])/g, '$1').trim();
   const out = tidy(text);
-  if (!picked.length) return { files: (c._auds || []).slice(0, 3), text: out, rewritten: out !== raw.trim(), dropped: [], lostPics: lostPics };
-  return { files: picked.map(t => byTag.get(t)), text: out, rewritten: out !== raw.trim(), dropped: dropped, lostPics: lostPics };
+  if (!picked.length) return { files: (c._auds || []).slice(0, 3), text: out, rewritten: out !== raw.trim(), dropped: [], lostPics: lostPics, borrow: borrow, borrowed: borrowed };
+  return { files: picked.map(t => byTag.get(t)), text: out, rewritten: out !== raw.trim(), dropped: dropped, lostPics: lostPics, borrow: borrow, borrowed: borrowed };
 }
 
 export async function sendPrompt(blk, to) {

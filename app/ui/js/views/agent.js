@@ -40,10 +40,18 @@ export function agRefCheck(mode) {
   $$('.rm-auds .slot', root).filter(x => x._file).forEach((r, j) => { if (!fill.has('Audio ' + (j + 1))) fill.set('Audio ' + (j + 1), 'звук ' + (j + 1)); });
   const cards = (typeof $$ === 'function' ? $$('.sc', root) : []);
   const named = t => new Set(((t || '').match(/<\s*(?:Picture|Audio)\s*\d+\s*>/g) || []).map(s => s.replace(/[<>]/g, '').replace(/\s+/g, ' ')));
+  /* Полка одной сцены - общая для ленты: ссылка на фото или песню другой сцены законна,
+     при отправке файл копируется в сцену, которая его назвала. */
+  const elsewhere = new Map();
+  cards.forEach((c, i) => {
+    const bs = c._baseFixed || c._base || 10 * (i + 1);
+    (c._files || []).forEach((f, j) => { if (f) elsewhere.set('Picture ' + (bs + j), 'фото сцены ' + (i + 1)); });
+    (c._auds || []).forEach((f, j) => { if (f) elsewhere.set('Audio ' + (bs + j), 'песня сцены ' + (i + 1)); });
+  });
   const bad = [];
   const one = (text, label, own) => {
     (own || []).forEach(x => { if (!named(text).has(x.tag)) bad.push(label + ': ' + x.where + ' - тег <' + x.tag + '> в тексте не назван'); });
-    named(text).forEach(tag => { if (!fill.has(tag) && !(own || []).some(x => x.tag === tag)) bad.push(label + ': в тексте есть <' + tag + '>, а такого файла в разделе нет'); });
+    named(text).forEach(tag => { if (!fill.has(tag) && !(own || []).some(x => x.tag === tag) && !elsewhere.has(tag)) bad.push(label + ': в тексте есть <' + tag + '>, а такого файла нет ни в этой, ни в других сценах'); });
   };
   cards.forEach((c, i) => {
     const bs = c._baseFixed || c._base || 10 * (i + 1);
@@ -872,6 +880,13 @@ export async function agSend() {
         const bs = c._baseFixed || 10 * (i + 1);
         const items = (c._auds || []).map((f, j) => { const words = agWordsFor(c, j); if (!f || !words) return null; const base = agWords(f, i + 1) || {}; return Object.assign({ tag: '<Audio ' + (bs + j) + '>', name: f.name, sec: Math.round(base.sec || 0), lang: base.lang || '' }, { words }); }).filter(Boolean);
         return items.length ? { scene: i + 1, audios: items } : null;
+      }).filter(Boolean),
+      // какие фото и песни реально лежат на карточках: сценарист ссылается только на эти теги
+      scene_media: $$('.sc', lr).map((c, i) => {
+        const bs = c._baseFixed || 10 * (i + 1);
+        const pics = (c._files || []).map((f, j) => f ? '<Picture ' + (bs + j) + '>' : null).filter(Boolean);
+        const auds = (c._auds || []).map((f, j) => f ? '<Audio ' + (bs + j) + '>' : null).filter(Boolean);
+        return (pics.length || auds.length) ? { scene: i + 1, pictures: pics, audios: auds } : null;
       }).filter(Boolean) }; }
   try {
     const r = await fetch('/api/agent/chat', {

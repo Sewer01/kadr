@@ -2238,7 +2238,7 @@ export function makeRefMode(cfg) {
         // или фото - плашки исчезают сразу, а не до первой загрузки нового файла
         root._paintSrTags?.();
         const n = c._files.filter(Boolean).length;
-        $('.sc-rhint', c).textContent = n ? `Своих фото в этой сцене: ${n} (мест до девяти). Номера идут десятками по сценам: в первой <Picture 10>, <Picture 11>, во второй <Picture 20>, <Picture 21> - поэтому в Сценаристе число сразу говорит, о какой сцене речь. Аудио этой сцены зовётся так же: <Audio 10>, <Audio 20>... Общие изображения остаются <Picture 1…5>, фон всего ролика - <Audio 1>.` : 'Своих фото нет: сцена возьмёт общие. У своих мест номера не меняются, даже если убрать другое фото.';
+        $('.sc-rhint', c).textContent = n ? `Своих фото в этой сцене: ${n} (мест до девяти). Номера идут десятками по сценам: в первой <Picture 10>, <Picture 11>, во второй <Picture 20>, <Picture 21> - поэтому в Сценаристе число сразу говорит, о какой сцене речь. Аудио этой сцены зовётся так же: <Audio 10>, <Audio 20>... Общие изображения остаются <Picture 1…5>, фон всего ролика - <Audio 1>. Ссылаться можно и на файл другой сцены: назовите его тег в тексте, и файл поедет в эту сцену, не сдвигаясь с чужой полки.` : 'Своих фото нет: сцена возьмёт общие. У своих мест номера не меняются, даже если убрать другое фото.';
       };
       // (the places take pictures themselves: click a tile or drop a photo into it)
       paintRefs();
@@ -3825,7 +3825,12 @@ export function makeRefMode(cfg) {
              not what stands on the card: the cards keep the scene's own numbers, the text gets the
              numbers of the places. The person sees his numbers, the model gets the right files. */
           const sCards = $$('.sc', root);
-          const sPlans = sCards.map((c, i) => sceneAudioPlan(c, root._fauds || [], 10 * (i + 1)));
+          /* Полка одной сцены - общая для ленты: текст сцены может назвать фото или песню другой
+             сцены, и тогда файл копируется в отправку этой сцены (на полке он не двигается). */
+          const commonFilled = $$('.ref', imgsEl).filter(r => r._file).length + (root._srcFrameFile ? 1 : 0);
+          const sPlans = sCards.map((c, i) => sceneAudioPlan(c, root._fauds || [], 10 * (i + 1),
+            sCards.map((cc, j) => ({ base: 10 * (j + 1), files: cc._files || [], auds: cc._auds || [], n: j + 1 })).filter((p, j) => j !== i),
+            Math.max(0, 9 - commonFilled)));
           /* The song's words only reach the model if they stand in the scene's text: the reference
              audio carries a voice, not a lyric. If the Agent dropped them, the program puts the heard
              words into the line it sends and says so out loud - a person must never guess that his
@@ -3859,11 +3864,14 @@ export function makeRefMode(cfg) {
           fd.append('scenes', JSON.stringify(sceneList().map((x, i) => Object.assign({}, x, { prompt: tagTxt(sCards[i], (sPlans[i] || {}).text || x.prompt) }))));
           sCards.forEach((c, i) => c._files.forEach((f, j) => { if (f) fd.append(`simg${i}_${j}`, f); }));
           sCards.forEach((c, i) => {
-            const plan = sPlans[i];
+            const pl = sPlans[i];
+            if (pl && pl.borrow) Object.keys(pl.borrow).forEach(j => fd.append(`simg${i}_${j}`, pl.borrow[j]));   // чужое фото едет в эту сцену
+            const plan = pl;
             plan.files.forEach((f, j) => { if (f) fd.append(`saudio${i}_${j}`, f); });
             if (plan.rewritten && root._sentText) root._sentText[i] = plan.text;   // the model gets the numbers of the places
+            if (plan.borrowed && plan.borrowed.length) toast('Сцена ' + (i + 1) + ': ' + plan.borrowed.map(b => '<Picture ' + b.tag + '> - фото сцены ' + b.n).join(', ') + ' - поедет в эту сцену, на полке оно не двигается');
             if (plan.lostPics && plan.lostPics.length) toast('Сцена ' + (i + 1) + ': под тегами ' + plan.lostPics.map(t => '<Picture ' + t + '>').join(', ')
-              + ' в этой сцене нет фото - они убраны из текста, чтобы модель не рисовала наугад');
+              + ' нет фото ни в этой, ни в других сценах - они убраны из текста, чтобы модель не рисовала наугад');
             if (plan.dropped && plan.dropped.length) toast('Сцена ' + (i + 1) + ': модель слушает три аудио, поэтому ' + plan.dropped.map(t => '<Audio ' + t + '>').join(', ') + ' в этот раз не пойдёт - уберите лишний тег или замените его');
           }); fd.append('start', $('.lm-start', root).value || '0'); if (root._loop !== false) fd.append('music_loop', '1'); if (root._adur) fd.append('audio_dur', String(Math.round(root._adur * 1000) / 1000)); fd.append('vocals', root._snd === 'own' && $('.lm-vocals', root).checked ? '1' : '0'); fd.append('bed_db', $('.lm-beddb', root).value); fd.append('bed_norm', $('.lm-bednorm', root).checked ? '1' : '0'); if (cfg.mode === 'actionsc') loraForm(S, fd); }
         else loraForm(S, fd);

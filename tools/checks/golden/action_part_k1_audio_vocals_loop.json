@@ -43,6 +43,17 @@
     "audio": "h3studio/song.mp3"
    }
   },
+  "14000": {
+   "class_type": "TrimAudioDuration",
+   "inputs": {
+    "audio": [
+     "5000",
+     0
+    ],
+    "duration": 15.0,
+    "start_index": 0.0
+   }
+  },
   "15": {
    "class_type": "MelBandRoFormerModelLoader",
    "inputs": {
@@ -93,7 +104,7 @@
     "length": 175,
     "prompt": "прыжок: своя картинка <Picture 4>, пустое место <Picture 21>, <Picture 5> и свой звук <Audio 20>",
     "ref_audios.ref_audio_0": [
-     "5000",
+     "14000",
      0
     ],
     "ref_image_size": "max",

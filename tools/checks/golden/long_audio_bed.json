@@ -91,6 +91,17 @@
     "audio": "h3studio/song.mp3"
    }
   },
+  "14004": {
+   "class_type": "TrimAudioDuration",
+   "inputs": {
+    "audio": [
+     "5004",
+     0
+    ],
+    "duration": 15.0,
+    "start_index": 0.0
+   }
+  },
   "15": {
    "class_type": "LoadAudio",
    "inputs": {
@@ -248,7 +259,7 @@
     "length": 175,
     "prompt": "прыжок: своя картинка <Picture 4>, пустое место <Picture 21>, <Picture 5> и свой звук <Audio 1>",
     "ref_audios.ref_audio_0": [
-     "5004",
+     "14004",
      0
     ],
     "ref_image_size": "match",
