@@ -83,14 +83,14 @@ export function setEngine(on) {
   const SHORT = { video: 'Видео', lipsync: 'Клип', refs: 'Видеостудия', actor: 'Актёр', swap: 'Замена', voicelab: 'Озвучка',
     reflab: 'Референсы', imgedit: 'Редактирование',
     long: 'Студия', actionsc: 'Экшн-студия', action: 'Экшн-видео',
-    krea: 'Изображение по тексту', qwen: 'Изменение изображения', upfile: 'Апскейлинг' };
+    krea: 'Изображение по тексту', qwen: 'Изображения', upfile: 'Апскейлинг' };
   // what a button really opens, said in one line: the bar is short by design, the tooltip is not
   const TIP = { video: 'Видео из картинки', lipsync: 'Музыкальный клип', voicelab: 'Голос по описанию, клон по образцу, диалог', refs: 'Видео по референсам',
     reflab: 'Листы референсов персонажа, предмета и места из одного ролика',
     imgedit: 'Выбор варианта правки готового изображения: по описанию, лист персонажа, раскадровка',
     actor: 'Актёрская игра', swap: 'Замена персонажа', long: 'Фильм по сценам',
     actionsc: 'Динамичное видео по сценам', action: 'Динамичное видео',
-    krea: 'Изображение по тексту', qwen: 'Изменение изображения', upfile: 'Апскейлинг' };
+    krea: 'Изображение по тексту', qwen: 'Изображения', upfile: 'Апскейлинг' };
   // the order a person works in: the picture, then the references, then the studios, then the clip
   // and the actor; pictures and the retouching stay in their own groups, the separators as they were
   const GROUPS = [['video', 'refs', 'long', 'action', 'actionsc', 'clipsc', 'lipsync', 'actor', 'swap'],

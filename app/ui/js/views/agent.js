@@ -383,7 +383,7 @@ $('#agFile').onchange = async e => {
 };
 $('#agEmpty').onclick = e => { const s = e.target.closest('span'); if (s) { $('#agIn').value = s.textContent.replace(/[«»]/g, '').replace(/ \+ фото героинь$/, ''); $('#agIn').focus(); } };
 $('#agIn').addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); $('#agSend').click(); } });
-export const AG_NAMES = { plist: '«Изображение по тексту» · список кадров', h3t: '«Изображение по тексту» · H3 Image', h3e: '«Изменение по референсам» · H3 Image', actionsc: '«Экшн-студия»', long: '«Студия»', video: '«Видео»', lipsync: '«Клип»', refs: '«Видеостудия»', actor: '«Актёр»', swap: '«Замена»', action: '«Экшн-видео»', krea: '«Изображение по тексту» · Krea 2', qwen: '«Изменение изображения»', sheet: '«Изменение изображения» · лист персонажа', sheet6: '«Изменение изображения» · лист ×6', fluxt: '«Изображение по тексту» · FLUX klein', qwent: '«Изображение по тексту» · Qwen 2.1', story: '«Изменение изображения» · раскадровка' };
+export const AG_NAMES = { plist: '«Изображение по тексту» · список кадров', h3t: '«Изображение по тексту» · H3 Image', h3e: '«Изменение по референсам» · H3 Image', actionsc: '«Экшн-студия»', long: '«Студия»', video: '«Видео»', lipsync: '«Клип»', refs: '«Видеостудия»', actor: '«Актёр»', swap: '«Замена»', action: '«Экшн-видео»', krea: '«Изображение по тексту» · Krea 2', qwen: '«Изображения»', sheet: '«Изображения» · лист персонажа', sheet6: '«Изображения» · лист ×6', fluxt: '«Изображение по тексту» · FLUX klein', qwent: '«Изображение по тексту» · Qwen 2.1', story: '«Изображения» · раскадровка' };
 export const AG_IMG = ['plist', 'krea', 'qwen', 'sheet', 'sheet6', 'fluxt', 'qwent', 'h3t', 'h3e', 'story'];
 AG.storyModel = 'krea'; AG.storyFrames = true;
 AG.think = (() => { try { return localStorage.getItem('h3-ag-think') === 'deep' ? 'deep' : 'fast'; } catch { return 'fast'; } })();
@@ -2115,7 +2115,7 @@ export const agQwenMode = () => { const b = $('.qw-eng button.on', $('#view-qwen
   paint();
 })();
 
-/* ── «Всё к сценаристу» там, где окно собрано не общей схемой: «Клип», «Видео», «Изменение изображения».
+/* ── «Всё к сценаристу» там, где окно собрано не общей схемой: «Клип», «Видео», «Изображения».
    Одно правило на всю программу: каждая карточка, в которой лежат файлы, предлагает их сценаристу -
    сколько бы файлов там ни было, хоть одно видео. Иконка говорит, что за вид; кнопка спит, пока
    брать нечего, и просыпается, как только файл появился. */
@@ -2310,7 +2310,7 @@ export function agWireOtherWindows() {
     }
   }
 
-  // ···· «Изменение изображения»: картинка, которую правят, и референсы к ней
+  // ···· «Изображения»: картинка, которую правят, и референсы к ней
   {
     const qv = $('#view-qwen');
     if (qv) {

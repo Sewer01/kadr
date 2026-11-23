@@ -221,9 +221,10 @@ export const imgSeedForm = (S, fd) => { if (S.seedFixed && S.seed) fd.append('se
 (() => {
   const root = $('#view-krea'), S = { aspect: '16:9', style: 'plain', scale: '2k', engine: 'krea', mp: '4' };
   root.innerHTML = `
-    <div class="head"><div><h1>Изображение по тексту</h1><p>Опишите изображение словами — модель Krea 2 нарисует его. Загрузить своё изображение здесь нельзя: для этого страница «Правка»</p></div>
+    <div class="head"><div><h1>Изображение по тексту</h1><p>Опишите изображение словами — модель нарисует его. Загрузить своё изображение здесь нельзя: для этого переключитесь на «Править изображение»</p></div>
       <div class="mode-pill"><i></i><span>Krea 2 · 1 МП</span></div></div>
     <div class="grid"><div class="col">
+      <div class="row qw-top"><div class="seg qw-kind kr-kind"><button data-k="edit" type="button" title="Изменить ваше изображение по описанию">Править изображение</button><button data-k="sheet" type="button" title="Собрать лист персонажа: 4 или 6 видов с разных сторон">Лист персонажа</button><button data-k="story" type="button" title="История по кадрам из изображений героя и места">Раскадровка</button><button data-k="totext" type="button" class="on">Изображение по тексту</button></div></div>
       <div class="card" data-scenarobox="krea"></div>
       <div class="card"><div class="card-h"><h3><span class="n">2</span>Параметры</h3></div>
         <div class="row"><div class="row-l">Модель</div>
@@ -316,6 +317,13 @@ export const imgSeedForm = (S, fd) => { if (S.seedFixed && S.seed) fd.append('se
     } catch {}
   }
   root.addEventListener('click', async e => {
+    const kd = e.target.closest('.kr-kind button');
+    if (kd && kd.dataset.k !== 'totext') {           // та же вкладка: уходим на страницу правки с её режимом
+      goTo('qwen');
+      const b = $('.qw-kind button[data-k="' + kd.dataset.k + '"]', $('#view-qwen'));
+      if (b) b.click();
+      return;
+    }
     const en = e.target.closest('.kr-eng button'); if (en) { S.engine = en.dataset.e; upd(); krEngCheck(); return; }
     const mp = e.target.closest('[data-mp]'); if (mp) { S.mp = mp.dataset.mp; upd(); return; }
     const sc = e.target.closest('[data-sc]'); if (sc) { S.scale = sc.dataset.sc; upd(); return; }
@@ -405,10 +413,10 @@ export const imgSeedForm = (S, fd) => { if (S.seedFixed && S.seed) fd.append('se
 (() => {
   const root = $('#view-qwen'), S = { kind: 'edit', size: '1', h3s: '4', aspect: '', headless: true, bg: 'grey', panels: 4, engine: 'qwen', frames: true, line: 'white' };
   root.innerHTML = `
-    <div class="head"><div><h1>Изменение изображения</h1><p>Загрузите изображение и напишите, что изменить: поменять место, одежду, свет, поставить персонажа в новую сцену. Или соберите лист персонажа</p></div>
+    <div class="head"><div><h1>Изображения</h1><p>Правьте ваше изображение словами, собирайте лист персонажа или раскадровку - или рисуйте новое изображение по описанию</p></div>
       <div class="mode-pill"><i></i><span>Qwen Image 2.1</span></div></div>
     <div class="grid"><div class="col">
-      <div class="row qw-top"><div class="seg qw-kind"><button data-k="edit" type="button" title="Изменить ваше изображение по описанию">Править изображение</button><button data-k="sheet" type="button" title="Собрать лист персонажа: 4 или 6 видов с разных сторон">Лист персонажа</button><button data-k="story" type="button" title="История по кадрам из изображений героя и места">Раскадровка</button></div><button class="btn mini qw-clear" type="button" title="Убрать всё в этом разделе: картинки, текст правки и особые приметы">Очистить всё</button></div>
+      <div class="row qw-top"><div class="seg qw-kind"><button data-k="edit" type="button" title="Изменить ваше изображение по описанию">Править изображение</button><button data-k="sheet" type="button" title="Собрать лист персонажа: 4 или 6 видов с разных сторон">Лист персонажа</button><button data-k="story" type="button" title="История по кадрам из изображений героя и места">Раскадровка</button><button data-k="totext" type="button" title="Нарисовать изображение по описанию: Krea 2, H3 Image, FLUX, Qwen">Изображение по тексту</button></div><button class="btn mini qw-clear" type="button" title="Убрать всё в этом разделе: картинки, текст правки и особые приметы">Очистить всё</button></div>
       <div class="card"><div class="card-h"><h3><span class="n">1</span>Картинка</h3></div>
         <div class="qw-slots">
           <label class="drop" id="qwDrop"><input type="file" accept="image/*"><i class="cnt">1/3</i><div class="ph"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="9" cy="9" r="1.6"/><path d="m21 15-5-5L5 21"/></svg><b>Ваша картинка</b><span>перетащите или нажмите</span></div><span class="tag" hidden>Исходная</span><button class="x" type="button">✕</button></label>
@@ -460,7 +468,7 @@ export const imgSeedForm = (S, fd) => { if (S.seedFixed && S.seed) fd.append('se
   $('.qw-clear', root).onclick = () => {
     const pics = [drop, drop2, drop3, drop4, drop5].filter(d => d.classList.contains('filled')), ta = $('.qw-prompt', root), mk = $('.qw-marks', root);
     if (!pics.length && !ta.value.trim() && !(mk && mk.value.trim())) { toast('Здесь и так пусто'); return; }
-    confirmBox('Очистить «Изменение изображения»?',
+    confirmBox('Очистить «Изображения»?',
       `Уберём${pics.length ? ' картинки (' + pics.length + ' шт.),' : ''} текст правки${mk && mk.value.trim() ? ' и особые приметы' : ''}. Картинки в Библиотеке останутся.`, 'Очистить всё', () => {
         pics.forEach(d => $('.x', d)?.click());
         ta.value = ''; ta.dispatchEvent(new Event('input', { bubbles: true }));
@@ -567,6 +575,7 @@ export const imgSeedForm = (S, fd) => { if (S.seedFixed && S.seed) fd.append('se
     if (ln) { S.line = ln.dataset.ln; upd(); return; }
     const qa = e.target.closest('.qw-asp .chip'); if (qa) { S.aspect = qa.dataset.qa; upd(); return; }
     const k = e.target.closest('.qw-kind button'), h3s = e.target.closest('[data-h3s]'), s = e.target.closest('.qw-size button'), h = e.target.closest('.qw-head button'), b = e.target.closest('.qw-bg button'), pn = e.target.closest('.qw-pn button'), en = e.target.closest('.qw-eng button');
+    if (k && k.dataset.k === 'totext') { goTo('krea'); return; }   // рисование по тексту - соседняя страница той же вкладки
     if (en) { S.engine = en.dataset.e; upd(); qwFluxCheck(); return; }
     if (h3s) { S.h3s = h3s.dataset.h3s; upd(); return; }
     if (pn) S.panels = +pn.dataset.p; else if (k) S.kind = k.dataset.k; else if (s) S.size = s.dataset.s; else if (h) S.headless = h.dataset.h === '1'; else if (b) S.bg = b.dataset.b; else return;

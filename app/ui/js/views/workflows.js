@@ -386,6 +386,7 @@ if (API) {
     if (!s.configured) { setNavLocked(true); goTo('models'); return; }
     setTimeout(() => {   // back to the page where the user was last time
       let v = ''; try { v = localStorage.getItem('h3-last-view') || ''; } catch {}
+      if (v === 'krea') v = 'qwen';   // «по тексту» - режим вкладки «Изображения»: утром человек ждёт её, а не подстраницу
       const n = v && $(`.nav[data-view="${v}"]`);
       if (n && !n.hidden && !n.disabled && v !== 'models') goTo(v); else if (!v) goTo('presets');   // a first start opens the start page
     }, 700);

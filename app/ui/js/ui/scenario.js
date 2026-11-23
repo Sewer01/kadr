@@ -696,7 +696,7 @@ export async function sendPrompt(blk, to) {
   if (to === 'lipsync' && au && !back) await setDropFile($('#aFile'), au);   // a returned draft keeps its own song
   if (to === 'swap' || to === 'refs') { const r = await handVids(RM[to].root); vUsed = r.used; vAll = r.all; }
   goTo(to);
-  const name = { video: '«Видео»', lipsync: '«Клип»', refs: '«Видеостудия»', actor: '«Актёр»', swap: '«Замена»', action: '«Экшн-видео»', actionsc: '«Экшн-студия»', long: '«Студия»', krea: '«Изображение по тексту»', qwen: '«Изменение изображения»' }[to];
+  const name = { video: '«Видео»', lipsync: '«Клип»', refs: '«Видеостудия»', actor: '«Актёр»', swap: '«Замена»', action: '«Экшн-видео»', actionsc: '«Экшн-студия»', long: '«Студия»', krea: '«Изображение по тексту»', qwen: '«Изображения»' }[to];
   toast(`${back ? 'Черновик вернулся в' : 'Промпт перенесён в режим'} ${name}` + (back ? ', ваши файлы остались на местах' : '') + (files.length && to !== 'video' && to !== 'krea' ? ' вместе с изображениями' : '')
     + (vUsed ? ` и видео: ${vUsed}` : '') + (vidFiles.length > vUsed ? ` (видео в чате ${vidFiles.length}, раздел принимает ${vAll || 1}: лишние не перенесены)` : '') + (to === 'lipsync' && !back ? (au ? ' и аудио — выделите нужный фрагмент' : ' — добавьте аудио') : ''));
 }

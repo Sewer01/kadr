@@ -538,10 +538,10 @@ ROLE_TITLES = {
     "krea_vae": "VAE для Krea 2",
     "kreareal_unet": "Основная модель — Изображение: реализм (RedCraft, Krea 2)",
     "kreareal_lora": "LoRA Realism Engine для Krea 2 (реализм)",
-    "qwen_unet": "Основная модель — «Изменение изображения» (Qwen Image 2.1)",
+    "qwen_unet": "Основная модель — «Изображения» (Qwen Image 2.1)",
     "qwen_clip": "Текстовый энкодер Qwen (Qwen3-VL 8B)",
     "qwen_vae": "VAE для Qwen Image 2.1",
-    "flux_unet": "Основная модель — «Изменение изображения» (FLUX klein)",
+    "flux_unet": "Основная модель — «Изображения» (FLUX klein)",
     "flux_clip": "Текстовый энкодер этой модели (Qwen3 4B)",
     "flux_vae": "VAE этого семейства",
 }

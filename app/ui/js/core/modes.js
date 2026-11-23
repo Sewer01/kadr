@@ -10,7 +10,7 @@ export const MODE_NAME = {
     // one silently won - that is how an old name kept surviving every rename
     montage: 'Монтаж', about: 'О программе', custom: 'Свой workflow', video: 'Видео', lipsync: 'Клип', refs: 'Видеостудия',
     actor: 'Актёр', swap: 'Замена', action: 'Экшн-видео', actionsc: 'Экшн-студия', long: 'Киностудия',
-    krea: 'Изображение по тексту', fluxt: 'Изображение по тексту', qwent: 'Изображение по тексту', qwen: 'Изменение изображения', upfile: 'Апскейлинг',
+    krea: 'Изображение по тексту', fluxt: 'Изображение по тексту', qwent: 'Изображение по тексту', qwen: 'Изображения', upfile: 'Апскейлинг',
     upscale: 'Апскейлинг', relayvsr: 'Апскейлинг · быстро', plist: 'Список кадров', story: 'Раскадровка', sheet: 'Лист персонажа',
   };
 
