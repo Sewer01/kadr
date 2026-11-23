@@ -306,14 +306,18 @@
 
 .token{font-family:var(--mono);font-size:11.5px;padding:4px 8px;border-radius:7px;background:var(--surface-2);border:1px solid var(--line-2);color:var(--text)}
 
-/* все аудиотеги - сплошная цветная заливка, чтобы отличаться от фото-тегов;
-   если тег уже стоит в тексте (tok-on), к заливке добавляется светлый ободок */
-.token.tok-aud{background:var(--accent);border-color:var(--accent);color:var(--bg)}
+/* все аудиотеги - зелёные чернила в надписи: рамка, фон и активация обычные,
+   как у фото-тегов, отличие только цветом надписи */
+.token.tok-aud{color:var(--accent)}
 
-/* тег уже стоит в тексте сцены - плашка подсвечена, но надпись остаётся ровным тегом */
-.token.tok-on{box-shadow:0 0 0 2px var(--accent-2)}
+/* тег уже стоит в тексте сцены - надпись жирнее, рамка остаётся стандартной */
+.token.tok-on{font-weight:700}
 
 .token:hover{border-color:var(--accent)}
+
+/* кнопки в ряду звука - той же высоты, что в окне «Сценарий», и не тянутся на всю
+   строку: рядом с ними теперь стоит «Сцены по треку» из Клип-студии */
+.lm-own .btn{padding:4px 12px;font-size:12px;align-self:center}
 
     /* the audio row of a scene: one box for every element in it, and the loading button is filled,
        so it reads as the action it is and not as one more label */

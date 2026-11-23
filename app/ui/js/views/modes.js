@@ -3072,19 +3072,14 @@ export function makeRefMode(cfg) {
          сцены, где текста ещё нет. Трек кладут в карточку «Музыка»: он один на клип. */
       root._scPlan = 0; root._scTrack = 0; root._fillOnly = 0; root._scSpan = 0;
       if (cfg.clipScenes) {
-        const clipCard = document.createElement('div');
-        clipCard.className = 'card rm-clip';
-        /* Номер не пишем руками: его ставит обход по DOM-порядку - руками легко
-           попасть в повтор, когда карточка встала позже, чем обход проходил. */
-        clipCard.innerHTML = '<div class="card-h"><h3><span class="n"></span>Клип</h3></div>';
+        /* Отдельной карточки «Клип» больше нет: кнопка «Сцены по треку» встаёт рядом
+           с «Отделить голос от музыки» в карточке аудио, там же волна трека, а
+           «Дописать пустые сцены» - в шапке карточки «Сцены», как в Студии. */
         const info = document.createElement('div'); info.className = 'hint'; info.style.marginBottom = '8px';
-        const cRow = document.createElement('div'); cRow.className = 'row';
-        const bPlan = document.createElement('button'), bFill = document.createElement('button');
-        [bPlan, bFill].forEach(b => { b.className = 'btn mini'; b.type = 'button'; });
-        bPlan.textContent = 'Сцены по треку'; bFill.textContent = 'Дописать пустые сцены';
+        const bPlan = document.createElement('button');
+        bPlan.className = 'btn mini'; bPlan.type = 'button';
+        bPlan.textContent = 'Сцены по треку';
         bPlan.title = 'Число сцен считается от длины трека и ваших границ длительности, и Сценарист тут же пишет сцены.';
-        bFill.title = 'Сценарист пишет кадры только сценам без текста. Уже написанные он оставляет как есть.';
-        cRow.append(bPlan, bFill);
         /* Волна рисуется здесь же, из файла: по ней видно, где трек густой и где пустой.
            Кусок выделяется мышью - тогда Сценарист режет на сцены этот кусок, а не весь
            трек; двойной щелчок снимает выделение. */
@@ -3092,7 +3087,6 @@ export function makeRefMode(cfg) {
         cv.className = 'cl-wave'; cv.width = 720; cv.height = 56; cv.hidden = true;
         const cvHint = document.createElement('div');
         cvHint.className = 'hint cl-wave-hint';
-        clipCard.append(info, cv, cvHint, cRow);
         root._clSel = null; root._clPeaks = null;
         const fmt = s => Math.floor(s / 60) + ':' + String(Math.floor(s % 60)).padStart(2, '0');
         const drawWave = () => {
@@ -3163,10 +3157,9 @@ export function makeRefMode(cfg) {
             cvHint.textContent = 'Волну построить не вышло: формат аудио не читается. Сцены можно писать и без неё.';
           }
         };
-        /* Номер карточек переставляем, когда страница собрана: в момент вставки этой
-           карточки часть карточек ещё не стоит на своём месте. */
+        /* Номер карточек переставляем, когда страница собрана: кнопки ещё переезжают
+           на свои места, и порядок карточек к этому моменту не окончательный. */
         queueMicrotask(() => renumberCards((root.closest && root.closest('.view')) || root));
-        srCard.after(clipCard);
         const trackFile = () => (root._filmFiles ? root._filmFiles() : [])[0] || null;
         const trackDur = async () => {
           const f = trackFile();
@@ -3193,13 +3186,13 @@ export function makeRefMode(cfg) {
           if (f && !f._h3pk && !root._clLoading) { root._clLoading = 1; loadWave().then(() => { root._clLoading = 0; }); }
           if (!f) {
             root._clSel = null; root._clPeaks = null; cv.hidden = true; drawWave();
-            cvHint.textContent = 'Волна появится, когда положите трек в карточку «Музыка».';
+            cvHint.textContent = 'Волна появится, когда положите трек в карточку «Аудио».';
           }
           info.textContent = f
             ? 'Трек: ' + f.name + (root._scTrack ? ' · ' + Math.floor(root._scTrack / 60) + ':' + String(root._scTrack % 60).padStart(2, '0') : ' · длина читается…')
               + ' · сцена ' + Math.min(lim.min, lim.max) + '-' + Math.max(lim.min, lim.max) + ' с'
               + (root._scPlan ? ' · на трек ' + root._scPlan + ' сцен' : '')
-            : 'Трека ещё нет: положите аудио в карточку «Музыка» - оно одно на весь клип, и от него считаются сцены.';
+            : 'Трека ещё нет: положите аудио в карточку «Аудио» - оно одно на весь клип, и от него считаются сцены.';
           bPlan.disabled = !f;
         };
         root._clipPaint = clipPaint; clipPaint();
@@ -3217,12 +3210,19 @@ export function makeRefMode(cfg) {
           if (!(srWin.sc && srWin.sc.value.trim())) { toast('Сначала опишите в «Сценарии», что происходит в клипе'); return; }
           gen();
         };
-        bFill.onclick = () => root._askFillEmpty();
-        /* Трек на весь ролик лежит в ряду карточки «Музыка»; аудио сцены - в другом ряду,
+        /* Трек на весь ролик лежит в ряду карточки «Аудио»; аудио сцены - в другом ряду,
            волне нужен именно ряд ролика. */
         root.addEventListener('change', e => {
           if (e.target && e.target.closest && e.target.closest('.mus-filmrow, .lm-snd')) clipPaint();
         });
+        /* Карточка «Аудио» к этому моменту уже собрана: сюда мы попадаем из отложенной
+           сборки страницы. Кнопка встаёт рядом с «Отделить голос от музыки», трек и
+           волна - тем же рядом под ним. */
+        const lv = $('#lmVoice', root);
+        if (lv) {
+          lv.after(bPlan);
+          (lv.closest('.lm-own') || root).append(info, cv, cvHint);
+        }
       }
       /* Ряд тегов собирается заново: он всегда повторяет то, что стоит в студии сейчас. */
       root._paintSrTags = () => {
@@ -3451,9 +3451,9 @@ export function makeRefMode(cfg) {
       { const clr0 = $$('.field-btns button', srCard).find(x => x.textContent.trim() === 'Очистить текст');
         const hb = clr0 ? clr0.parentElement : ((srWin && (srWin.buttons || $('.field-btns', srCard))) || null);
         if (hb) { hb.insertBefore(bUndo, clr0 || null); hb.insertBefore(bRedo, clr0 || null); } else (scCard.querySelector('.card-h') || scCard).append(bUndo, bRedo); }
-      /* «Дописать пустые сцены» нужна не только клипу: в Студии и Экшн-студии люди
-         чинят ленту по одной сцене, а Сценарист умеет вернуть весь список сразу. Поэтому
-         функция одна, а кнопка стоит и в карточке «Клип», и в шапке карточки «Сцены». */
+      /* «Дописать пустые сцены» стоит в шапке карточки «Сцены» во всех студиях,
+         включая Клип-студию: ленту чинят по одной сцене, а Сценарист умеет вернуть
+         весь список сразу. */
       root._askFillEmpty = () => {
         const all = $$('.sc', root);
         const empty = all.filter(c => !(((c._win && c._win.ta) || {}).value || '').trim());
@@ -3466,7 +3466,7 @@ export function makeRefMode(cfg) {
         toast('Сценарист дописывает ' + empty.length + ' сцен');
         g.click();
       };
-      if (!cfg.clipScenes) {
+      {
         const bFill = document.createElement('button');
         bFill.type = 'button'; bFill.className = 'btn mini sc-fill';
         bFill.textContent = 'Дописать пустые сцены';
