@@ -71,11 +71,14 @@ export function vMode() {
   $('#vMode').textContent = 'Режим: ' + (V.first && V.last ? 'видео между двумя кадрами' : V.first ? 'изображение -> видео' : 'видео по тексту');
   $('#dLast').classList.toggle('disabled', !V.first);
   $('#lastHint').textContent = V.first ? 'необязательно' : 'сначала загрузите первый';
-  /* Ряд тегов окна «Сценарий»: кадр-плашка оживает, когда кадр загружен, пустая стоит
-     серой - человек видит заранее, каким тегом назвать первый и последний кадр. */
+  /* Ряд тегов окна «Сценарий»: плашки только для загруженных кадров. Кадров нет -
+     ряда нет вовсе, серых заготовок человек просил не показывать. */
   { const tk = $('.v-tokens');
-    if (tk) tk.innerHTML = [['Первый кадр', !!$('#dFirst')._file], ['Последний кадр', !!$('#dLast')._file]].map((p, i) =>
-      `<button class="token" type="button" data-pic="${i + 1}"${p[1] ? '' : ' disabled'} title="&lt;Picture ${i + 1}&gt; - ${p[0]}: ${p[1] ? 'нажмите, чтобы вставить тег в текст сценария' : 'кадр ещё не загружен'}">&lt;Picture ${i + 1}&gt;</button>`).join(''); }
+    if (tk) {
+      tk.innerHTML = [['Первый кадр', !!$('#dFirst')._file, 1], ['Последний кадр', !!$('#dLast')._file, 2]]
+        .filter(p => p[1]).map(p => `<button class="token" type="button" data-pic="${p[2]}" title="&lt;Picture ${p[2]}&gt; - ${p[0]}: нажмите, чтобы вставить тег в текст сценария">&lt;Picture ${p[2]}&gt;</button>`).join('');
+      const f = tk.closest('.ta-foot'); if (f) f.hidden = !tk.children.length;
+    } }
 }
 { const vw = $('#view-video');
   if (vw) vw.addEventListener('click', e => {
@@ -243,10 +246,9 @@ export function refsChanged() {
       ? '<button class="token" type="button" data-ins="' + clEsc('<d>[' + (CL_HEARD.lang || 'язык аудио') + '] ' + CL_HEARD.text + '</d>') + '" title="' + clEsc(CL_HEARD.text) + '">вставить слова песни</button>'
       : '';
   const song = L.dur0 ? '<span class="hint" style="font-size:11.5px;flex:1 1 160px">песня в этом режиме - движущий звук: её не называют тегом' + (CL_HEARD.text ? ', а слова вставляются кнопкой' : CL_HEARD.busy ? ', слова слушаю' : ', слов не слышно - проверьте распознавание речи в разделе «Сценарист»') + '</span>' : '';
-  $('#tokens').innerHTML = filled.map(n => `<button class="token" type="button">&lt;Picture ${n}&gt;</button>`).join('')
-    + `<button class="token" type="button" disabled title="следующий добавленный референс получит этот тег">&lt;Picture ${filled.length + 1}&gt;</button>`
-    + words + song;
-  if (!filled.length && !words && !song) { const hs = document.createElement('span'); hs.className = 'hint'; hs.textContent = 'добавьте референс — тег оживёт'; $('#tokens').append(hs); }
+  $('#tokens').innerHTML = filled.map(n => `<button class="token" type="button">&lt;Picture ${n}&gt;</button>`).join('') + words + song;
+  // референсов нет - ряда тегов нет: пустых заготовок человек просил не показывать
+  { const f = $('#tokens').closest('.ta-foot'); if (f) f.hidden = !$('#tokens').children.length; }
 }
 $('#tokens').onclick = e => {
   const t = e.target.closest('.token'); if (!t) return;
@@ -2227,8 +2229,10 @@ export function makeRefMode(cfg) {
         (c._ownTiles || []).forEach((lb, j) => { lb.hidden = j >= shown; });   // лишние пустые места не светятся
         const tk = $('.sc-tokens', c);
         const bs = ownBase();
-        if (tk) tk.innerHTML = c._files.slice(0, shown).map((f, j) => `<button class="token" type="button" data-ins="&lt;Picture ${bs + j}&gt;"${f ? '' : ' disabled'} title="${f ? 'Вставить в текст тег <Picture ' + (bs + j) + '> - ваше фото номер ' + (j + 1) + ' этой сцены' : 'Место ' + (j + 1) + ' свободно - номер ' + (bs + j) + ' оживёт, когда туда что-нибудь положат'}">&lt;Pic ${bs + j}&gt;</button>`).join('')
+        if (tk) tk.innerHTML = c._files.map((f, j) => f ? `<button class="token" type="button" data-ins="&lt;Picture ${bs + j}&gt;" title="Вставить в текст тег <Picture ${bs + j}> - ваше фото номер ${j + 1} этой сцены">&lt;Pic ${bs + j}&gt;</button>` : '').join('')
           + audioTokens(c, bs, root._fauds || []).join('');
+        // своих фото и песен нет - ряда тегов у сцены тоже нет: пустых заготовок не показываем
+        { const fRow = tk ? tk.closest('.ta-foot') : null; if (fRow) fRow.hidden = !tk.children.length; }
         c._base = bs; c._counter?.();
         const n = c._files.filter(Boolean).length;
         $('.sc-rhint', c).textContent = n ? `Своих фото в этой сцене: ${n} (мест до девяти). Номера идут десятками по сценам: в первой <Picture 10>, <Picture 11>, во второй <Picture 20>, <Picture 21> - поэтому в Сценаристе число сразу говорит, о какой сцене речь. Аудио этой сцены зовётся так же: <Audio 10>, <Audio 20>... Общие изображения остаются <Picture 1…5>, фон всего ролика - <Audio 1>.` : 'Своих фото нет: сцена возьмёт общие. У своих мест номера не меняются, даже если убрать другое фото.';
@@ -3671,8 +3675,8 @@ export function makeRefMode(cfg) {
     $('.rm-count', root).textContent = `${total} / 12`;
     if (cfg.scenes && root._save && !root._restoring) root._save();
     $('.rm-count', root).style.color = total > 12 ? 'var(--pink)' : '';
-    // all places are listed from the start; a chip wakes up when its place gets a photo
-    $('.rm-tokens', root).innerHTML = slots.map((r, i) => `<button class="token" type="button" data-slot="${i}"${r._file ? '' : ' disabled'} title="${r._file ? 'Вставить в текст сцены' : 'В это место ещё не загружено фото - плашка оживёт, когда оно появится'}">&lt;Picture ${i + 1}&gt;</button>`).join('')
+    // плашки только для загруженных файлов: фото нет - ряда тегов нет вовсе
+    $('.rm-tokens', root).innerHTML = slots.filter(r => r._file).map(r => `<button class="token" type="button" data-slot="${slots.indexOf(r)}" title="Вставить в текст сцены">&lt;Picture ${slots.indexOf(r) + 1}&gt;</button>`).join('')
       // the audio chips belong to the same row. They used to stand AFTER the semicolon, which made the
       // second line a separate statement that threw its result away - so the audio chip never appeared
       // anywhere, in any mode, and no syntax check could see anything wrong with it.
@@ -3682,6 +3686,10 @@ export function makeRefMode(cfg) {
       + $$('.rm-vids .slot', root).map((s, i) => s._file
         ? `<button class="token tok-vid" type="button" data-video="${i + 1}" title="&lt;Video ${i + 1}&gt; - ссылка на это видео: модель возьмёт из него движение">&lt;Video ${i + 1}&gt;</button>`
         : '').join('');
+    /* В студиях сцен общий ряд - только донор тегов для окна «Сценарий», он спрятан
+       один раз и навсегда; здесь управляем видимостью ряда только в остальных режимах,
+       иначе эта строка ожилала каждый раз, когда в донор падала новая плашка. */
+    { const ft = $('.rm-tokens', root).closest('.ta-foot'); if (ft && !cfg.scenes) ft.hidden = !$('.rm-tokens', root).children.length; }
     $$('.sc', root).forEach(x => x._counter?.());   // after the row was rebuilt, or the lock it puts on the chips is wiped
     root._paintSrTags?.();   // тот же ряд тегов живёт и у окна «Сценарий»
     if (cfg.swap) { const w2 = $('.rm-who[data-i="1"]', root); if (w2) w2.hidden = imgs.length < 2; }
