@@ -469,6 +469,7 @@ export class AudioRow {
     this.onChange = o.onChange || (() => {}); this.whereLabel = o.whereLabel || (j => 'аудио ' + (j + 1));
     this.onHeard = o.onHeard || null;   // «Сохранить» в приборе: хозяин ряда сам решает, чьи слова слушать
     this.noAdd = !!o.noAdd;   // ряд сам решает, какими кнопками кладут файлы (фон и образцы - разными)
+    this.second = o.secondMount || null;   // второе место: чипы образцов стоят под своей кнопкой, а не вперемешку с фоном
     this.files = [null, null, null]; this.src = [null, null, null]; this.sel = [null, null, null]; this.dur = [null, null, null];
     this.pick = -1; this._slot = -1;
     this.el = document.createElement('div');
@@ -489,7 +490,7 @@ export class AudioRow {
       this.set(j, f);
       toast('Аудио <Audio ' + (this.base + j) + '>: ' + f.name + (this.limit ? ' - при желании обрежьте (до ' + this.limit + ' с)' : ' - при желании обрежьте, длина не ограничена'));
     };
-    this.el.onclick = e => {
+    const rowClick = e => {
       const b = e.target.closest('[data-a]'); if (!b) return;
       const j = +b.dataset.j;
       if (b.dataset.a === 'add') {
@@ -501,6 +502,8 @@ export class AudioRow {
         if (this._tr && this._tr._slot === j) { this._tr.clear(); this._tr._slot = -1; this.trim.hidden = true; }
       } else if (b.dataset.a === 'trim') this.openTrim(j);
     };
+    this.el.onclick = rowClick;
+    if (this.second) this.second.onclick = rowClick;   // кнопки на чипах образцов работают на обоих местах
     // a file may also be dragged onto the row, as the old single loader accepted it
     this.el.addEventListener('dragover', e => { e.preventDefault(); this.el.style.outline = '1px dashed var(--accent)'; });
     this.el.addEventListener('dragleave', () => { this.el.style.outline = ''; });
@@ -564,15 +567,18 @@ export class AudioRow {
   paint() {
     const e2 = s => String(s).replace(/[<>&]/g, ch => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[ch]));
     const full = this.used() >= 3;
+    const chip = (f, j) => f ? '<span class="token" style="display:inline-flex;gap:6px;align-items:center">&lt;Audio ' +
+      (this.base + j) + '&gt; ' + e2(f.name.slice(0, 18)) +
+      (this.sel[j] && this.sel[j].start != null && this.sel[j].end != null ? ' <small style="opacity:.75">с ' + (+this.sel[j].start).toFixed(1).replace('.', ',') + ' по ' + (+this.sel[j].end).toFixed(1).replace('.', ',') + ' с</small>' : '') +
+      ' <button class="btn mini" type="button" data-a="trim" data-j="' + j + '" title="Послушать и обрезать: прибор под строкой">Обрезать</button>' +
+      '<button class="btn mini" type="button" data-a="del" data-j="' + j + '" title="Убрать это аудио">×</button></span>' : '';
     this.el.innerHTML = (this.noAdd ? '' : '<button class="btn mini" type="button" data-a="add"' + (full ? ' disabled' : '') +
-      ' title="До трёх файлов. Модель получает их как образцы и применяет там, где вы упомянули файл тегом в тексте">+ Загрузить аудио</button>') +
-      '<span class="counter" title="Аудио здесь: не больше трёх">' + this.used() + ' / 3</span>' +
-      this.files.map((f, j) => f ? '<span class="token" style="display:inline-flex;gap:6px;align-items:center">&lt;Audio ' +
-        (this.base + j) + '&gt; ' + e2(f.name.slice(0, 18)) +
-        (this.sel[j] && this.sel[j].start != null && this.sel[j].end != null ? ' <small style="opacity:.75">с ' + (+this.sel[j].start).toFixed(1).replace('.', ',') + ' по ' + (+this.sel[j].end).toFixed(1).replace('.', ',') + ' с</small>' : '') +
-        ' <button class="btn mini" type="button" data-a="trim" data-j="' + j + '" title="Послушать и обрезать: прибор под строкой">Обрезать</button>' +
-        '<button class="btn mini" type="button" data-a="del" data-j="' + j + '" title="Убрать это аудио">×</button></span>' : '').join('') +
-      (full ? '<span class="hint" style="font-size:12px">три аудио - максимум</span>' : '');
+      ' title="До трёх файлов. Модель получает их как образцы и применяет там, где вы упомянули файл тегом в тексте">+ Загрузить аудио</button>' +
+      '<span class="counter" title="Аудио здесь: не больше трёх">' + this.used() + ' / 3</span>') +
+      this.files.map((f, j) => (this.second && j > 0) ? '' : chip(f, j)).join('') +
+      (full && !this.second ? '<span class="hint" style="font-size:12px">три аудио - максимум</span>' : '');
+    if (this.second) this.second.innerHTML = this.files.map((f, j) => j > 0 ? chip(f, j) : '').join('') ||
+      '<span class="hint" style="font-size:12px">образцов пока нет: положите до двух - на них ссылаются тегом в тексте сцены</span>';
   }
 }
 

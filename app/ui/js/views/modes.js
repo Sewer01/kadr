@@ -1474,6 +1474,10 @@ export function makeRefMode(cfg) {
     root._chainNext = chainNext;
     $('.lm-chain', root).onclick = () => {
       if (root._mode !== 'parts') return;
+      /* вторая тычка по той же кнопке не должна заводить второй заказ той же сцены */
+      if (root._chainPart != null && QUEUE.some(j => j.mode === cfg.mode && (j.state === 'queued' || j.state === 'running'))) {
+        toast('Сцены уже делаются подряд: жду сцену ' + (root._chainPart + 1)); return;
+      }
       root._chainEnd = null;
       if (readyUpTo() >= $$('.sc', root).length) { toast('Все сцены уже сделаны. Чтобы переделать одну, нажмите «Переделать» в её карточке.'); return; }
       chainNext();
@@ -2606,7 +2610,8 @@ export function makeRefMode(cfg) {
           toast(`Сцена ${i + 1} сделается как новый план: сцена ${i} ещё не готова, продолжать нечего.`);
         }
         if (sigOk(c)) c._var = (c._var || 0) + 1;   // «Переделать»: another variant of this scene, not the same clip again
-        root._chainPart = null; root._target = i; $('.go', $('.rm-preview', root)).click(); };
+        if (root._chainPart !== i) root._chainPart = null;   // повторная кнопка той же сцены, которую цепочка и так ждёт, цепочку не убивает
+        root._target = i; $('.go', $('.rm-preview', root)).click(); };
       $('.sc-undo', c).onclick = () => root._doUndo?.();
       $('textarea', c).addEventListener('input', () => { refreshStates(); c._counter?.(); c._paintTags?.(); });   // first the rebuild, then the count and the lock
       $('textarea', c).addEventListener('focus', e => { root._ta = e.target; c._counter?.(); });   // the row of common chips follows the scene you picked up
@@ -3371,8 +3376,13 @@ export function makeRefMode(cfg) {
         const media = $('.rm-media', musCard);
         if (media) { const cp = $('.sub-l', media), hn = $('.media-hint', media); if (cp) cp.hidden = true; if (hn) hn.hidden = true; }
         const audsRow = $('.rm-auds', root); if (audsRow) audsRow.hidden = true;
+        /* Чипы образцов живут под своей кнопкой, а не в одной строке с фоном. */
+        const srow = document.createElement('div');
+        srow.className = 'mus-samplerow';
+        srow.style.cssText = 'display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:6px';
+        $('.mus-extra', fw).after(srow);
         const frow = new AudioRow({
-          mount: $('.mus-filmrow', fw), base: 1, limit: 0, noAdd: true,
+          mount: $('.mus-filmrow', fw), base: 1, limit: 0, noAdd: true, secondMount: srow,
           whereLabel: j => (j === 0 ? 'фон всего ролика' : 'образец ролика номер ' + j) + ', аудио ' + (j + 1) + ', тег <Audio ' + (1 + j) + '>',
           onChange: j => { syncFilm(j); if (root._save) root._save(); $$('.sc', root).forEach(cc => { try { cc._paintRefs && cc._paintRefs(); } catch (e) { } });
             try { root._paintFaudWords && root._paintFaudWords(); } catch (e) { } },
@@ -3395,7 +3405,8 @@ export function makeRefMode(cfg) {
         bSmp.style.margin = '8px 0 0';
         bSmp.title = 'Образец - на него ссылаются тегом в тексте сцены; флаги про фон его не касаются. До двух образцов. Их слова дослушиваются в приборе по «Сохранить»';
         $('.sub-l', fw).after(bBg);
-        $('.mus-extra', fw).after(bSmp);
+        $('.mus-extra', fw).after(bSmp);   // сразу под флагами, а чипы образцов - под кнопкой
+        bSmp.after(srow);
         bBg.onclick = () => frow.pickSlot(0);
         bSmp.onclick = () => frow.pickSlot(1);
         /* Слова общих образцов (<Audio 2>, <Audio 3>): слушаем один раз здесь,
@@ -3995,7 +4006,11 @@ export function makeRefMode(cfg) {
         }
         if (cfg.scenes && root._mode === 'parts') {
           const all = $$('.sc', root);
-          if (root._target == null) root._chainPart = null;   // the big button alone makes one scene, never a chain
+          /* Большая кнопка сама по себе делает одну сцену, цепочку не заводит. Но повтор
+             этого же запуска (после окна с предупреждениями) судить не пересуживает:
+             на повторе цель уже израсходована, и цепочка гибла молча - сборка вставала
+             после первой сцены со словами «цепочка не совпала». */
+          if (root._target == null && !force) root._chainPart = null;
           let k = root._target; root._target = null;
           const tst = root._test; root._test = null;
           if (k == null) k = root._ready();

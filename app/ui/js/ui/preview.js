@@ -174,7 +174,7 @@ export function previewPanel(el, st, opts) {
       const txt = await r.text();
       try { res = JSON.parse(txt); } catch { res = { error: txt }; }
       if (!r.ok) {
-        if (r.status === 409 && res.low_memory) { go.disabled = false; return lowMemoryAsk(res.error, () => realStart()); }
+        if (r.status === 409 && res.low_memory) { go.disabled = false; return lowMemoryAsk(res.error, () => realStart(true)); }
         if (r.status === 409 && res.gaps) { go.disabled = false; return gapsAsk(res.gaps, () => realStart(true)); }
         throw new Error(res.error || r.statusText);
       }
