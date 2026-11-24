@@ -98,6 +98,16 @@ export async function agCarry(mode) {
   } finally { window.__agQuiet = 0; }
   return made;
 }
+/* «Правка» после перезапуска программы: разговор про этот сценарий лежит в истории
+   чатов, и человек ждёт, что сценарист продолжит именно его - там он помнит, что
+   писал. Поднимаем последний сохранённый разговор этого режима. */
+export async function agResumeFor(mode) {
+  try {
+    const list = await (await fetch('/api/agent/chats')).json();
+    const mine = (list || []).find(c => c && c.id && c.target === mode && c.count);
+    return mine ? mine.id : null;
+  } catch (e) { return null; }
+}
 export async function agGenerate(btn, gen) {
   const draft = String((typeof gen.text === 'function' ? gen.text() : '') || '').trim();
   if (!draft) { toast('Сначала напишите текст в этом поле'); return; }
@@ -115,9 +125,15 @@ export async function agGenerate(btn, gen) {
        правка пометок ушла бы в чужую историю. */
     if (!gen.again) { try { newChat(); } catch (e) { } }
     else if (!AG.msgs.length) {
-      toast('Сценарист не помнит этот сценарий: чат открылся заново (программу перезапускали или чат сменили). '
-        + 'Нажмите «Генерация промта» - правка продолжит новый разговор.');
-      try { newChat(); } catch (e) { }
+      /* раньше здесь всегда начинался новый чат, и «Правка сценария» после перезапуска
+         программы обрывала старый разговор, хотя он лежал в истории целым */
+      const rid = await agResumeFor(mode);
+      if (rid) { await openChat(rid); toast('Сценарист продолжил ваш прежний разговор об этом сценарии'); }
+      else {
+        toast('Сценарист не помнит этот сценарий: разговора про него в истории нет - начинаю новый. '
+          + 'Дальше правки пойдут репликами в него.');
+        try { newChat(); } catch (e) { }
+      }
     }
     agRefWarn(mode, 'До сценариста: не всё разложено по полочкам - ');   // files and tags must agree BEFORE the rewrite
     const carried = await agCarry(mode);
