@@ -31,13 +31,17 @@ export const agViewOf = m => (/^(krea|kreareal|fluxt|h3t|qwent)$/.test(m) ? '#vi
    the person gets a stranger on the screen instead of his reference. */
 export function agRefCheck(mode) {
   const root = (typeof RM !== 'undefined' && RM[mode] && RM[mode].root) || document.querySelector(agViewOf(mode));
-  if (!root) return [];
+  if (!root) return { bad: [], idle: [] };
   const fill = new Map();
   // кадры ролика - не места референсов, их в тексте нет под номерами (<Picture N>)
   $$('label.ref:not(.frame)', root).forEach((r, j) => { if (r._file) fill.set('Picture ' + (j + 1), 'общее место ' + (j + 1)); });
   // the single-text modes keep their media in numbered slots, not in label.ref shelves
   $$('.rm-imgs .slot', root).filter(x => x._file).forEach((r, j) => { if (!fill.has('Picture ' + (j + 1))) fill.set('Picture ' + (j + 1), 'фото ' + (j + 1)); });
   $$('.rm-auds .slot', root).filter(x => x._file).forEach((r, j) => { if (!fill.has('Audio ' + (j + 1))) fill.set('Audio ' + (j + 1), 'звук ' + (j + 1)); });
+  /* Ряд аудио ролика (фон и образцы) живёт не в .rm-auds: без него фон <Audio 1> и
+     образцы <Audio 2..3> казались пропавшими, хотя лежали на месте. */
+  const fr = root._faudRow;
+  if (fr && fr.files) [0, 1, 2].forEach(j => { const f = fr.files[j]; if (f && !fill.has('Audio ' + (1 + j))) fill.set('Audio ' + (1 + j), j === 0 ? 'фон ролика' : 'общий образец'); });
   const cards = (typeof $$ === 'function' ? $$('.sc', root) : []);
   const named = t => new Set(((t || '').match(/<\s*(?:Picture|Audio)\s*\d+\s*>/g) || []).map(s => s.replace(/[<>]/g, '').replace(/\s+/g, ' ')));
   /* Полка одной сцены - общая для ленты: ссылка на фото или песню другой сцены законна,
@@ -48,9 +52,9 @@ export function agRefCheck(mode) {
     (c._files || []).forEach((f, j) => { if (f) elsewhere.set('Picture ' + (bs + j), 'фото сцены ' + (i + 1)); });
     (c._auds || []).forEach((f, j) => { if (f) elsewhere.set('Audio ' + (bs + j), 'песня сцены ' + (i + 1)); });
   });
-  const bad = [];
+  const bad = [], idle = [];
   const one = (text, label, own) => {
-    (own || []).forEach(x => { if (!named(text).has(x.tag)) bad.push(label + ': ' + x.where + ' - тег <' + x.tag + '> в тексте не назван'); });
+    (own || []).forEach(x => { if (!named(text).has(x.tag)) idle.push(label + ': ' + x.where + ' - тег <' + x.tag + '> в тексте не назван'); });
     named(text).forEach(tag => { if (!fill.has(tag) && !(own || []).some(x => x.tag === tag) && !elsewhere.has(tag)) bad.push(label + ': в тексте есть <' + tag + '>, а такого файла нет ни в этой, ни в других сценах'); });
   };
   cards.forEach((c, i) => {
@@ -64,19 +68,18 @@ export function agRefCheck(mode) {
     const ta = root.querySelector('textarea.rm-prompt') || root.querySelector('textarea:not(.sc-draft)');
     if (ta) one(ta.value, 'текст', []);
   }
-  const out = [];
-  fill.forEach((where, tag) => {
-    const anywhere = cards.length ? cards.some(c => (($('textarea', c) || {}).value || '').indexOf('<' + tag + '>') >= 0)
-      : ((root.querySelector('textarea.rm-prompt') || root.querySelector('textarea:not(.sc-draft)') || {}).value || '').indexOf('<' + tag + '>') >= 0;
-    if (!anywhere) out.push(where + ' - <' + tag + '> ни в одном тексте не назван');
-  });
-  return out.concat(bad.filter((x, i) => bad.indexOf(x) === i));
+  /* «файл лежит, а текст его не зовёт» - не поломка: общие места и сценные файлы
+     имеют право ждать своего запуска. Раньше это попадало в окно «Перед запуском»
+     и человек видел «4 предупреждения» там, где всё на месте. Скажем это только
+     тихим тостом, а окну оставим настоящие дыры: тег без файла. */
+  return { bad: bad.filter((x, i) => bad.indexOf(x) === i), idle };
 }
 export function agRefWarn(mode, head) {
   try {
     const r = (typeof RM !== 'undefined' && RM[mode] && RM[mode].root);
     if (r && r._restoring) return 0;   // the shelves are still filling from memory: nothing is missing yet
-    const bad = agRefCheck(mode);
+    const { bad, idle } = agRefCheck(mode);
+    if (idle && idle.length) toast('Лежит на полке и не вызвано текстом: ' + idle.slice(0, 2).join(' · ') + (idle.length > 2 ? ' · и ещё ' + (idle.length - 2) : '') + ' - модель применит его по-своему');
     if (!bad.length) return 0;
     warn(head + bad.length + ': ' + bad.slice(0, 3).join(' · ') + (bad.length > 3 ? ' · и ещё ' + (bad.length - 3) : ''));
     return bad.length;
@@ -662,11 +665,12 @@ export function audioTagFor(name, dur) {
   } catch (e) {}
   return '';
 }
-export async function setChatAudio(wavBlob, name, dur, where) {
+export async function setChatAudio(wavBlob, name, dur, where, words) {
   // a missing status is asked for, not guessed at: the songs of the scenes used to be dropped here
   if (!(AG.status && AG.status.speech_ready)) { try { await agStatus(); } catch (e) { } }
   if (needSpeech()) return false;
   where = where || audioTagFor(name, dur);
+  const pre = String(words || '').trim();   // слова уже услышаны в редакторе: переносим их, а не слушаем заново
   AG.audios = AG.audios || [];
   const file = new File([wavBlob], name.replace(/\.[^.]+$/, '') + '.wav', { type: 'audio/wav' });
   file._dur = dur;
@@ -688,12 +692,12 @@ export async function setChatAudio(wavBlob, name, dur, where) {
      каждое новое распознавание может вернуть другую строку, и человек видел, как
      та же песня поёт по-разному. Заново слушаем только действительно другой звук. */
   const prev = at >= 0 ? AG.audios[at] : null;
-  const sameAudio = !!(prev && prev.key === key && (prev.text || '').trim());
-  const a = { name, dur, where: where || '', text: sameAudio ? String(prev.text).trim() : '', busy: !sameAudio,
-    lang: sameAudio ? (prev.lang || '') : '', langName: sameAudio ? (prev.langName || '') : '', file, key };
+  const reuse = pre || (prev && prev.key === key && (prev.text || '').trim() ? String(prev.text).trim() : '');
+  const a = { name, dur, where: where || '', text: reuse, busy: !reuse,
+    lang: reuse && !pre ? (prev.lang || '') : '', langName: reuse && !pre ? (prev.langName || '') : '', file, key };
   if (at >= 0) AG.audios.splice(at, 1, a); else AG.audios.push(a);
   showAudioBox();
-  if (sameAudio) return true;
+  if (reuse) return true;
   try { const j = await transcribeWav(wavBlob); a.text = j.text; a.lang = j.lang; a.langName = j.lang_name; }
   catch (e) { toast(e.message); }
   a.busy = false; showAudioBox();

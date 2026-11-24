@@ -194,6 +194,19 @@ $('#wzRestore').onclick = async () => {
     catch (err) { toast(err.message); rb.disabled = false; }
   };
 })();
+(() => {   // «Замечать работу программы»: мигающая метка и сигнал по окончании (queue.js спрашивает notifyOn)
+  const cb = $('#mdNotifyCb'); if (!cb) return;
+  let on = true; try { on = localStorage.getItem('kadr-notify') !== 'off'; } catch {}
+  cb.checked = on;
+  document.body.classList.toggle('no-notify', !on);
+  window.notifyOn = () => on;
+  cb.onchange = () => {
+    on = cb.checked;
+    try { localStorage.setItem('kadr-notify', on ? 'on' : 'off'); } catch {}
+    document.body.classList.toggle('no-notify', !on);
+    toast(on ? 'Замечаем: метка пульсирует во время расчёта, в конце - сигнал' : 'Тихо: метка не пульсирует и сигнала не будет');
+  };
+})();
 (() => {   // «Держать модели в памяти»: общий флаг (jobs.queue его читает, как и озвучка)
   const cb = $('#mdKeepCb'); if (!cb) return;
   window.paintKeep = on => { cb.checked = !!on; };

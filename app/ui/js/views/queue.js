@@ -5,6 +5,7 @@ import { goTo } from '../core/tabs.js';
 import { addToLib, openViewer } from './library.js';
 import { RM, upFinished, upProgress } from './modes.js';
 import { ENGINE_ON, gpuNote } from './system.js';
+import { setActx } from '../ui/audio.js';
 
 export const QSTAGE = { queued: 'ждёт своей очереди', load: 'загрузка моделей', encode: 'кодирование', sample: 'генерация', sample2: 'проход 2', upscale: 'апскейл',
   decode: 'сборка видео', save: 'сохранение', cloud_queued: 'в очереди RunningHub', cloud_run: 'считается в облаке' };
@@ -138,5 +139,35 @@ $('#qList').addEventListener('click', e => {
   fetch('/api/interrupt', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt_id: b.dataset.id }) });
 });
 $('#qClear').onclick = () => { for (let i = QUEUE.length - 1; i >= 0; i--) if (!['queued', 'running'].includes(QUEUE[i].state)) QUEUE.splice(i, 1); qRender(); };
-setInterval(() => { if (QUEUE.some(j => j.state === 'running' || j.state === 'queued')) qRender(); else dockRender(); }, 1000);
+/* Метка программы отвечает за расчёт: пульсирует, пока в очереди что-то есть,
+   и в конце одна вспышка плюс короткий сигнал - человек уходит в другое окно и
+   возвращается по звуку. Всё это гасится переключателем в «Настройках». */
+let NOTIFY_BUSY = false;
+function notifyDone() {
+  const mark = document.querySelector('.brand-mark');
+  if (mark) { mark.classList.remove('work-done'); void mark.offsetWidth; mark.classList.add('work-done'); }
+  try {
+    const ac = setActx();
+    if (ac.state === 'suspended') ac.resume();
+    const t = ac.currentTime + 0.02;
+    [[660, 0], [880, 0.16]].forEach(([f, d]) => {
+      const o = ac.createOscillator(), g = ac.createGain();
+      o.type = 'sine'; o.frequency.value = f;
+      g.gain.setValueAtTime(0.0001, t + d);
+      g.gain.exponentialRampToValueAtTime(0.16, t + d + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + d + 0.17);
+      o.connect(g); g.connect(ac.destination); o.start(t + d); o.stop(t + d + 0.2);
+    });
+  } catch (e) { }
+}
+setInterval(() => {
+  const busy = QUEUE.some(j => j.state === 'running' || j.state === 'queued');
+  if (busy !== NOTIFY_BUSY) {
+    NOTIFY_BUSY = busy;
+    const mark = document.querySelector('.brand-mark');
+    if (mark) mark.classList.toggle('work', busy);
+    if (!busy && window.notifyOn && window.notifyOn()) notifyDone();
+  }
+  if (QUEUE.some(j => j.state === 'running' || j.state === 'queued')) qRender(); else dockRender();
+}, 1000);
 qRender();

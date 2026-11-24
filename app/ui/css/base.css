@@ -502,6 +502,13 @@ body.sys-folded .sys-body{display:none}
 
 @media (prefers-reduced-motion:reduce){.brand-mark.eng-wait{animation:none}}
 
+/* «Замечать работу программы» (Настройки): метка пульсирует, пока идёт расчёт,
+   и коротко вспыхивает, когда всё готово; человек может это выключить. */
+.brand-mark.work{animation:kadrbreathe 1.05s ease-in-out infinite}
+.brand-mark.work-done{animation:kadrflash .9s ease-out 2}
+@keyframes kadrflash{0%,100%{filter:none}40%{filter:drop-shadow(0 0 10px rgba(var(--accent-rgb),.9))}}
+body.no-notify .brand-mark{animation:none!important}
+
 .audio-empty:hover,.audio-empty.over{border-color:var(--accent);background:rgba(var(--accent-rgb),.06)}
 
 .audio-empty svg{width:24px;height:24px;color:var(--accent)}

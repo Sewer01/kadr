@@ -2452,6 +2452,7 @@ export function makeRefMode(cfg) {
           toast('Слова песни услышаны и встанут в текст сцены: ' + words.slice(0, 60));
         } catch (e) { }
       };
+      c._autoHeard = autoHeard;   // «Всё к сценаристу» слушает кусок здесь, а не заново в чате
       ainp.onchange = () => {
         const f = ainp.files && ainp.files[0];
         let j = apick; apick = -1;
@@ -3298,9 +3299,19 @@ export function makeRefMode(cfg) {
           row.append(c);
         };
         $$('.rm-tokens button', root).forEach(b => { if (!b.hidden) put(b, 'студия'); });
+        /* Общие места - один раз в начале ряда: <Audio 2> не принадлежит сцене,
+           а повторённый под каждой сценой он выглядел как своё аудио сцены. */
+        const shared = new Map(), per = [];
         $$('.sc', root).forEach((card, i) => {
-          const list = $$('.sc-tokens button', card).filter(b => !b.hidden);
-          if (!list.length) return;
+          const list = $$('.sc-tokens button', card).filter(b => !b.hidden).filter(b => {
+            const m = /<\s*(?:Picture|Audio)\s*(\d+)\s*>/i.exec((b.dataset && b.dataset.ins) || b.textContent || '');
+            if (m && +m[2] < 10) { if (!shared.has(m[2])) shared.set(m[2], b); return false; }
+            return true;
+          });
+          if (list.length) per.push([i, list]);
+        });
+        shared.forEach(b => put(b, 'общее место'));
+        per.forEach(([i, list]) => {
           const cap = document.createElement('small');
           cap.className = 'sg-cap'; cap.textContent = 'Сцена ' + (i + 1);
           row.append(cap);
@@ -3339,9 +3350,54 @@ export function makeRefMode(cfg) {
         const frow = new AudioRow({
           mount: $('.mus-filmrow', fw), base: 1, limit: 0,
           whereLabel: j => (j === 0 ? 'фон всего ролика' : 'образец ролика номер ' + j) + ', аудио ' + (j + 1) + ', тег <Audio ' + (1 + j) + '>',
-          onChange: j => { syncFilm(j); if (root._save) root._save(); $$('.sc', root).forEach(cc => { try { cc._paintRefs && cc._paintRefs(); } catch (e) { } }); },
+          onChange: j => { syncFilm(j); if (root._save) root._save(); $$('.sc', root).forEach(cc => { try { cc._paintRefs && cc._paintRefs(); } catch (e) { } });
+            try { root._paintFaudWords && root._paintFaudWords(); } catch (e) { }
+            try { if (j > 0 && frow.files[j] && !(root._faudWords || [])[j]) root._faudHeard && root._faudHeard(j); } catch (e) { } },
         });
         root._faudRow = frow;
+        /* Слова общих образцов (<Audio 2>, <Audio 3>): слушаем один раз здесь,
+           человек правит руками, сценарист берёт именно эти слова. */
+        root._faudWords = root._faudWords || ['', '', ''];
+        const wbox = document.createElement('div');
+        wbox.className = 'mus-words';
+        fw.append(wbox);
+        const escW = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;');
+        root._paintFaudWords = () => {
+          wbox.innerHTML = '';
+          [1, 2].forEach(j => {
+            if (!frow.files[j]) { root._faudWords[j] = ''; return; }
+            const line = document.createElement('div');
+            line.style.cssText = 'display:flex;gap:8px;align-items:flex-start;margin-top:6px';
+            line.innerHTML = '<small class="hint" style="min-width:104px;padding-top:5px">&lt;Audio ' + (1 + j) + '&gt; слова:</small>'
+              + '<textarea class="lm-faudw" data-j="' + j + '" rows="2" style="flex:1" placeholder="Слова образца: послушайте или напишите сами">' + escW(root._faudWords[j] || '') + '</textarea>'
+              + '<div style="display:flex;flex-direction:column;gap:4px">'
+              + '<button class="btn mini" type="button" data-fw="ru" data-j="' + j + '">по-русски</button>'
+              + '<button class="btn mini" type="button" data-fw="en" data-j="' + j + '">по-английски</button>'
+              + '<button class="btn mini" type="button" data-fw="clear" data-j="' + j + '">стереть</button></div>';
+            wbox.append(line);
+          });
+          $$('.lm-faudw', wbox).forEach(t => { t.oninput = () => { root._faudWords[+t.dataset.j] = t.value; }; });
+          wbox.onclick = e => {
+            const b = e.target.closest && e.target.closest('button[data-fw]');
+            if (!b) return;
+            const j = +b.dataset.j;
+            if (b.dataset.fw === 'clear') { root._faudWords[j] = ''; const t = $('.lm-faudw[data-j="' + j + '"]', wbox); if (t) t.value = ''; return; }
+            root._faudHeard(j, b.dataset.fw);
+          };
+        };
+        root._faudHeard = async (j, lang) => {
+          const f = frow.files[j];
+          if (!f) return;
+          try {
+            const j2 = await transcribeWav(f, lang || 'auto');
+            const words = String(j2.text || '').trim();
+            if (!words) { toast('Образец не разобрался: слов не слышно'); return; }
+            root._faudWords[j] = words;
+            root._paintFaudWords();
+            toast('Слова образца <Audio ' + (1 + j) + '> услышаны: ' + words.slice(0, 60));
+          } catch (e) { toast('Не вышло распознать образец: ' + (e && e.message ? e.message : e)); }
+        };
+        root._paintFaudWords();
         // the calculation still reads the old field: the first file of the row is written into it,
         // so every flag above the row (start, voice, music, loop) keeps working off the same file
         const slotInp = () => { const s = $('.rm-auds .slot', root); return s && $('input', s); };
@@ -3644,8 +3700,8 @@ export function makeRefMode(cfg) {
         const f0 = (root._filmFiles ? root._filmFiles() : [])[0];
         if (f0) items.push({ file: f0, name: f0.name, where: 'фон всего ролика, тег <Audio 1>' });
         const ff = root._fauds || [];
-        ff.forEach((f, j) => { if (f && j > 0) items.push({ file: f, name: f.name, where: 'образец ролика, тег <Audio ' + (1 + j) + '>' }); });
-        $$('.sc', root).forEach((cc, i) => (cc._auds || []).forEach((f, j) => { if (f) items.push({ file: f, name: f.name, where: 'сцена ' + (i + 1) + ', тег <Audio ' + ((cc._baseFixed || cc._base || 10 * (i + 1)) + j) + '>' }); }));
+        ff.forEach((f, j) => { if (f && j > 0) items.push({ file: f, name: f.name, where: 'образец ролика, тег <Audio ' + (1 + j) + '>', smp: j }); });
+        $$('.sc', root).forEach((cc, i) => (cc._auds || []).forEach((f, j) => { if (f) items.push({ file: f, name: f.name, where: 'сцена ' + (i + 1) + ', тег <Audio ' + ((cc._baseFixed || cc._base || 10 * (i + 1)) + j) + '>', cc, j }); }));
         if (!items.length) { toast('Готового аудио нет: сначала загрузите файл'); return; }
         if (!AG.status || !AG.status.speech_ready) { try { await agStatus(); } catch (e) {} }
         agGo();
@@ -3654,6 +3710,15 @@ export function makeRefMode(cfg) {
         let ok = 0;
         for (const it of items) {
           try {
+            /* Слова берём из редактора, где человек их уже поправил: новое распознавание
+               в чате могло вернуть другую строку, и одна песня начинала петься по-разному.
+               Пусто в редакторе - слушаем один раз там же, потом переносим. */
+            if (it.words === undefined) {
+              it.words = it.cc ? String((it.cc._audWords || [])[it.j] || '').trim()
+                : it.smp ? String((root._faudWords || [])[it.smp] || '').trim() : '';
+              if (!it.words && it.cc && it.cc._autoHeard) { await it.cc._autoHeard(it.j, it.file, true); it.words = String((it.cc._audWords || [])[it.j] || '').trim(); }
+              if (!it.words && it.smp && root._faudHeard) { await root._faudHeard(it.smp); it.words = String((root._faudWords || [])[it.smp] || '').trim(); }
+            }
             let buf = it.buf, s = it.s || 0, e = it.e;
             if (!buf) {
               const ac = setActx();
@@ -3662,7 +3727,7 @@ export function makeRefMode(cfg) {
               if (buf.duration > 15) it.where += ' (обрезку не делали - берём первые 15 с)';
             }
             const piece = wavSlice(buf, s, Math.min(e, buf.duration));
-            const done = await setChatAudio(piece, it.name, Math.min(e, buf.duration) - s, it.where);
+            const done = await setChatAudio(piece, it.name, Math.min(e, buf.duration) - s, it.where, it.words);
             if (done) ok++;
           } catch (err) { toast('Не удалось передать «' + it.name + '»: ' + err.message); }
         }
