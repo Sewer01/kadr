@@ -211,6 +211,16 @@
    "state.h_window_gpu_set"
   ],
   [
+   "get",
+   "/api/keep_models",
+   "state.h_keep_models_get"
+  ],
+  [
+   "post",
+   "/api/keep_models",
+   "state.h_keep_models_set"
+  ],
+  [
    "post",
    "/api/generate/video",
    "state.h_generate_video"
@@ -868,6 +878,8 @@
   "h_grain",
   "h_index",
   "h_interrupt",
+  "h_keep_models_get",
+  "h_keep_models_set",
   "h_library",
   "h_library_add",
   "h_library_delete",

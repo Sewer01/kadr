@@ -168,8 +168,7 @@ import { AC, acLoad } from './actors.js';
         ${sf('vlModel', 'Модель', 'по умолчанию выбирает программа', [['', 'Выбрать само'], ...m.map(x => [x, x])])}
         ${sf('vlDev', 'Где считать', 'auto - на видеокарте, если есть', [['auto', 'auto (само)'], ['cuda', 'Видеокарта NVIDIA'], ['cpu', 'Процессор (медленно)']])}
         ${sf('vlDt', 'Точность чисел', 'auto подходит почти всегда', [['auto', 'auto (само)'], ['bf16', 'bf16'], ['fp16', 'fp16'], ['fp32', 'fp32 (тяжелее)']])}
-        ${sf('vlAtt', 'Способ внимания', 'sage_attention быстрее, нужен спец. модуль', [['auto', 'auto (само)'], ['eager', 'eager'], ['sage_attention', 'sage_attention']])}
-        ${cf('vlKeep', 'Держать модель в памяти', 'следующая озвучка стартует быстрее, но память занята', false)}</div></details></div>`;
+        ${sf('vlAtt', 'Способ внимания', 'sage_attention быстрее, нужен спец. модуль', [['auto', 'auto (само)'], ['eager', 'eager'], ['sage_attention', 'sage_attention']])}</div></details></div>`;
   }
 
   function textCard(ph, hint) {
@@ -591,7 +590,7 @@ import { AC, acLoad } from './actors.js';
   function baseParams() {
     return { steps: num('vlSteps', 32), speed: num('vlSp', 1), guidance: num('vlGu', 2), t_shift: num('vlTs', 0.1), duration: num('vlDu', 0),
       position_temperature: num('vlPt', 5), class_temperature: num('vlCt', 0), layer_penalty_factor: num('vlLp', 5),
-      denoise: chk('vlDen'), postprocess_output: chk('vlPost'), keep_model_loaded: chk('vlKeep'), preprocess_prompt: chk('vlPre'),
+      denoise: chk('vlDen'), postprocess_output: chk('vlPost'), preprocess_prompt: chk('vlPre'),
       device: val('vlDev', 'auto'), dtype: val('vlDt', 'auto'), attention: val('vlAtt', 'auto'), mp3: val('vlMp3', 'V0'),
       model: val('vlModel', ''), instruct: val('vlInstr', ''), words_per_chunk: num('vlWpc', 100) };
   }
@@ -903,7 +902,7 @@ import { AC, acLoad } from './actors.js';
       put('vlPause', p.pause); put('vlInstr', p.instruct); put('vlModel', p.model); put('vlDev', p.device); put('vlDt', p.dtype); put('vlAtt', p.attention);
       put('vlMp3', p.mp3); put('vlSteps', p.steps);
       const setChk = (id, v) => { const el = $('#' + id, root); if (el && v != null) el.checked = !!v; };
-      setChk('vlDen', p.denoise); setChk('vlPost', p.postprocess_output); setChk('vlKeep', p.keep_model_loaded); setChk('vlPre', p.preprocess_prompt);
+      setChk('vlDen', p.denoise); setChk('vlPost', p.postprocess_output); setChk('vlPre', p.preprocess_prompt);
       const ta = $('#vlText', root); if (ta && t.text) ta.value = t.text;
       bindForm();
       toast('Настройки варианта поставлены в форму');

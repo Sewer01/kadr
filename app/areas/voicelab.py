@@ -83,8 +83,8 @@ def settings(p):
             "class_temperature": round(_num(p.get("class_temperature"), 0.0, 5.0, 0.0), 2),
             "layer_penalty_factor": round(_num(p.get("layer_penalty_factor"), 0.0, 20.0, 5.0), 1),
             "denoise": _flag(p.get("denoise"), True), "postprocess_output": _flag(p.get("postprocess_output"), True),
-            # голосовую модель держим выгруженной: иначе она занимает память режимов, которые человек
-            # откроет сразу после озвучки
+            # «Держать модель в памяти» - общий флаг в Настройках: озвучка подставляет его сама
+            # (h_voice_generate), своей галочки в её окне больше нет
             "keep_model_loaded": _flag(p.get("keep_model_loaded"), False)}
 
 
@@ -472,6 +472,9 @@ class VoicelabMixin:
                     files[field.name] = (Path(field.filename).suffix.lower(), raw)
         except (ValueError, UnicodeDecodeError):
             return _err("Не удалось прочитать данные")
+        # «Держать модель в памяти» человек включает один раз в Настройках - в окне озвучки
+        # своей галочки больше нет
+        p["keep_model_loaded"] = bool(self.config.get("keep_models"))
         mode = p.get("mode")
         text = str(p.get("text") or "").strip()
         if not text and mode != "vc":

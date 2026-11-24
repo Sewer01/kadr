@@ -561,6 +561,8 @@ def system_prompt(skills_text, target, ctx, editing=True):
             "Дальше один абзац обычного английского текста. "
             "В конце сцены двумя отдельными строками напиши `overall_soundscape: ...` - что слышно в сцене, и "
             "`non_diegetic_music: ...` - музыка за кадром, либо `N/A`, если тишина: приложение поднимет эти строки в поля промпта. "
+            "Имена этих двух полей пиши ровно так, с подчёркиванием, без дефисов - движок понимает только написание с "
+            "подчёркиванием. "
             "Полей `integrated_multimodal_description`, `[Shot 1]` и таймкодов НЕ пиши - обёртку добавит приложение. После "
             "последней сцены в блоке ничего не пиши. Пример:\n"
             "SCENE 1 | 10\n<Picture 1> is the character reference (keep this face exactly). <Picture 2> is the location reference. "

@@ -424,7 +424,9 @@ class QueueMixin:
         self.last_mode = mode_key
         # nothing is running or waiting: drop the previous job's models and cache so each job starts clean.
         # Not between pictures of the same mode: the same big models would just be loaded from disk again.
-        if not self.jobs and not same:
+        # Not at all with «Держать модели в памяти» (Настройки): the person chose speed over free VRAM,
+        # and unloads by hand with «Освободить память».
+        if not self.jobs and not same and not self.config.get("keep_models"):
             try:
                 await self.comfy_json("POST", "/free", json={"unload_models": True, "free_memory": True})
                 await asyncio.sleep(1.5)

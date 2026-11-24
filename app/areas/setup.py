@@ -247,6 +247,17 @@ class SetupMixin:
         self.config.update(software_ui=bool(body.get("software")))   # main.py reads it at the next start
         return await self.h_window_gpu_get(req)
 
+    async def h_keep_models_get(self, _req):
+        return web.json_response({"keep": bool(self.config.get("keep_models"))})
+
+    async def h_keep_models_set(self, req):
+        """«Держать модели в памяти между заданиями»: jobs.queue перестает выгружать модели
+        перед новым заданием, а озвучка держит свою голосовую модель. Следующее задание стартует
+        быстрее; выгрузить человек может сам - кнопкой «Освободить память»."""
+        body = await req.json()
+        self.config.update(keep_models=bool(body.get("keep")))
+        return await self.h_keep_models_get(req)
+
     async def h_window_mode(self, req):
         """How the window should open next time (the choice lives in Настройки -> Интерфейс)."""
         try:

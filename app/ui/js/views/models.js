@@ -194,6 +194,18 @@ $('#wzRestore').onclick = async () => {
     catch (err) { toast(err.message); rb.disabled = false; }
   };
 })();
+(() => {   // «Держать модели в памяти»: общий флаг (jobs.queue его читает, как и озвучка)
+  const cb = $('#mdKeepCb'); if (!cb) return;
+  window.paintKeep = on => { cb.checked = !!on; };
+  cb.onchange = async () => {
+    try {
+      const r = await postJSON('/api/keep_models', { keep: cb.checked });
+      paintKeep(r.keep);
+      toast(r.keep ? 'Держим модели в памяти: следующая генерация стартует быстрее. Память выгружается кнопкой «Освободить память»'
+                   : 'Выгружаем модели между заданиями: память освобождается сама');
+    } catch (err) { toast(err.message); cb.checked = !cb.checked; }
+  };
+})();
 setTimeout(fitTopBar, 700);   // the pills are built a moment after the page opens
 (() => {   // a manual update check: the same two server calls as the banner, from the settings card
   const b = $('#mdUpd'), st = $('#mdUpdState'); if (!b) return;

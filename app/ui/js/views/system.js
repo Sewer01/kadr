@@ -192,6 +192,7 @@ export async function loadStatus() {
     paintProbe(s);
     if (window.paintWin) paintWin(s.window_mode);
     if (window.paintSoftUi) paintSoftUi(!!s.software_ui);
+    if (window.paintKeep) paintKeep(!!s.keep_models);
     renderModels(s);            // also when the core is silent: the card has to say why it is empty
     if (!s.online) { waitCore(); return; }
     askSavedQueue();

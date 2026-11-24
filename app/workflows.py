@@ -158,6 +158,34 @@ def scene_prompt(prompt, images, own, frame=None, base=10, auds=()):
     return re.sub(r"<\s*Frame\s*>", "<Picture 1>" if frame else "the previous shot", out)
 
 
+def scene_gaps(prompt, images, own, base=10, auds=(), track=False):
+    """Номера из текста сцены, под которые не едет ни одного файла: пустое место, чужой
+    десяток или <Audio 1> без фонового трека. Движок читает такой номер в описании, не
+    находит под ним картинки и рисует своё - так в сценах заводятся разные герои.
+    Возвращает список найденных меток (без повторов), чтобы предупредить человека."""
+    images, own, auds = list(images or []), list(own or []), list(auds or [])
+    miss = []
+    for m in re.finditer(r"<\s*(Picture|Audio)\s*(\d+)\s*>", prompt or ""):
+        kind, k = m.group(1), int(m.group(2))
+        if kind == "Picture":
+            if 0 < k < 10:
+                ok = bool(images[k - 1]) if k - 1 < len(images) else False
+            elif base <= k < base + 10:
+                ok = bool(own[k - base]) if k - base < len(own) else False
+            else:
+                ok = False
+        elif k == 1:
+            ok = bool(track)
+        elif base <= k < base + 10:
+            ok = bool(auds[k - base]) if k - base < len(auds) else False
+        else:
+            ok = False
+        tag = f"<{kind} {k}>"
+        if not ok and tag not in miss:
+            miss.append(tag)
+    return miss
+
+
 def _refs(g, cond_node, images, videos=(), audios=(), base=100, vsize=None, abase=None, atrim=None):
     """LoadImage / VHS_LoadVideo (24 fps) / LoadAudio nodes wired into MiniMaxH3ReferenceToVideo.
     atrim - seconds to cut the reference audio down to: a whole song does not fit the audio VAE
@@ -1428,21 +1456,28 @@ def lipsync_prompt(text, n_refs, n_videos=0, ref_tags=None):
         refs += f" {vids} {'is' if n_videos == 1 else 'are'} referenced for motion, camera and setting only."
         if tags:
             refs += " The faces and identities must match the reference pictures exactly."
-    low = text.lower()
-    fields = []
+    # Сценарист иногда пишет поля звука через дефис ("non-diegetic_music"). Движок понимает
+    # только подчёркивание, и прежний поиск такую строку не находил: она оставалась внутри
+    # описания, а сверху добавлялась вторая, пустая - сцена уходила с двумя противоречивыми
+    # строками. Теперь находятся оба написания, убираются из текста и ставятся на место в
+    # эталонном порядке: описание, overall_soundscape, non_diegetic_music.
+    fields = {}
     for name in ("overall_soundscape", "non_diegetic_music"):
-        m = re.search(rf"(?im)^[ \t]*{name}[ \t]*:[ \t]*(.+?)[ \t]*$", text)
+        pat = name.replace("_", "[-_]")
+        m = re.search(rf"(?im)^[ \t]*{pat}[ \t]*:[ \t]*(.+?)[ \t]*$", text)
         if m and m.group(1).strip():
-            fields.append(f"{name}: {m.group(1).strip()}")
-            text = re.sub(rf"(?im)^[ \t]*{name}[ \t]*:.*$\n?", "", text).strip()
+            fields[name] = m.group(1).strip()
+        text = re.sub(rf"(?im)^[ \t]*{pat}[ \t]*:.*$\n?", "", text).strip()
+    low = text.lower()
     parts = [] if "for the target video" in low else [
         f"For the target video, at 0.00 seconds into the target video, {refs}"]
     parts.append(f"integrated_multimodal_description: [Shot 1] {text}")
-    if "overall_soundscape" not in low:
-        parts.append("overall_soundscape: N/A")
-    if "non_diegetic_music" not in low:
-        parts.append("non_diegetic_music: N/A")
-    return "\n\n".join(parts + fields)
+    for name in ("overall_soundscape", "non_diegetic_music"):
+        if name in fields:
+            parts.append(f"{name}: {fields[name]}")
+        elif not re.search(name.replace("_", "[-_]"), low):
+            parts.append(f"{name}: N/A")
+    return "\n\n".join(parts)
 
 
 def lipsync_graph(m, prompt, width, height, seconds, seed, audio, ref_images, scale, ref_size="max", extra_loras=()):

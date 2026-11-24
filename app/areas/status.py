@@ -106,7 +106,8 @@ class StatusMixin:
 
     async def h_status(self, _req):
         base = {"configured": bool(self.config.configured or self.comfy_override),
-                "engine": self.config.get("engine"), "installing": bool(self.installer)}
+                "engine": self.config.get("engine"), "installing": bool(self.installer),
+                "keep_models": bool(self.config.get("keep_models"))}
         deadline = time.monotonic() + self.STATUS_BUDGET
         try:
             stats = await asyncio.wait_for(self.system_stats(), timeout=self.STATUS_BUDGET)

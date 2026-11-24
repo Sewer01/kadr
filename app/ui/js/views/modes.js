@@ -2418,10 +2418,11 @@ export function makeRefMode(cfg) {
       if (!$('.sc-trimhost', c)) {
         $('.sc-auds', c).insertAdjacentHTML('afterend', '<div class="sc-trimhost" hidden style="margin-top:8px"></div>');
       }
-      /* Метки этой сцены: поёт, танцует или инструментал. Ряд стоит сразу под окном
-         текста - там, где сцену описывают. Ничего не нажато - сцена идёт как описана. */
+      /* Метки этой сцены: поёт, танцует или инструментал. Ряд стоит сразу за полками
+         аудио - сначала загружают файлы, потом отмечают, что в сцене происходит.
+         Ничего не нажато - сцена идёт как описана. */
       if (!$('.sc-tags', c)) {
-        $('.sc-auds', c).insertAdjacentHTML('beforebegin', '<div class="sc-tags"><span class="hint" style="font-size:12px">В этой сцене:</span>'
+        $('.sc-auds', c).insertAdjacentHTML('afterend', '<div class="sc-tags"><span class="hint" style="font-size:12px">В этой сцене:</span>'
           + SC_TAGS.map(t => `<button class="btn mini sc-tag" type="button" data-tag="${t.id}" title="${t.tip}">${t.name}</button>`).join('')
           + '<span class="hint sc-tag-st" style="font-size:12px"></span></div>');
         $('.sc-tags', c).onclick = e => {

@@ -180,6 +180,8 @@ def build_app(comfy_override=None):
     web.post("/api/window_mode", state.h_window_mode),
     web.get("/api/window-gpu", state.h_window_gpu_get),
     web.post("/api/window-gpu", state.h_window_gpu_set),
+    web.get("/api/keep_models", state.h_keep_models_get),
+    web.post("/api/keep_models", state.h_keep_models_set),
         web.post("/api/generate/video", state.h_generate_video),
         web.post("/api/generate/krea", state.h_generate_krea),
         web.post("/api/upscale", state.h_upscale),
