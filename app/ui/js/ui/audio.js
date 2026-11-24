@@ -467,6 +467,7 @@ export class AudioRow {
   constructor(o) {
     this.mount = o.mount; this.base = o.base || 1; this.limit = o.limit === 0 ? 0 : (o.limit || 15);
     this.onChange = o.onChange || (() => {}); this.whereLabel = o.whereLabel || (j => 'аудио ' + (j + 1));
+    this.onHeard = o.onHeard || null;   // «Сохранить» в приборе: хозяин ряда сам решает, чьи слова слушать
     this.files = [null, null, null]; this.src = [null, null, null]; this.sel = [null, null, null]; this.dur = [null, null, null];
     this.pick = -1; this._slot = -1;
     this.el = document.createElement('div');
@@ -530,6 +531,7 @@ export class AudioRow {
           this.paint(); this.onChange(j2, this.files[j2]);
         },
         onState: tr => { const j3 = tr._slot; if (j3 >= 0 && tr.dur0 && !this.sel[j3]) this.dur[j3] = tr.dur0; },
+        onHeard: this.onHeard ? (tr => this.onHeard(tr._slot)) : null,
       });
     }
     if (!this.trim.hidden && this._tr._slot === j) {          // the second click closes: what was marked is applied
@@ -605,7 +607,7 @@ export class AudioTrimmer {
       '<button class="btn at-voc" type="button" disabled>Отделить голос</button>' +
       '<button class="btn at-und" type="button" disabled title="Вернуть аудио ровно таким, каким оно было загружено: все спуски, разрезы и чистки пауз отменятся">Откат</button>' +
       '<button class="btn at-back" type="button" disabled title="Вернуть последнее изменение аудио - один шаг, а не всё сразу">Шаг назад</button>' +
-      '<button class="btn at-ag" type="button" disabled title="Всё к сценаристу: всё, что вы выделили в этом аудио, уйдёт туда; он послушает слова и ответит с учётом них">🤖 Всё к сценаристу</button></div>' +
+      '<button class="btn at-save" type="button" disabled title="Сохранить: выделенный кусок фиксируется, и его слова дослушиваются один раз. Кнопки переслушивания на это время замолкают. Пока вы просто двигаете метки, ничего не распознаётся">💾 Сохранить</button></div>' +
       '<div class="at-pz" hidden><span>Паузы длиннее</span><input type="number" class="at-pm" value="0,6" step="0.1" min="0.2" max="5">' +
       '<span>с сократить до</span><input type="number" class="at-pk" value="0,25" step="0.05" min="0.05" max="2"><span>с</span>' +
       '<b class="at-pzi"></b><button class="btn mini pri at-pgo" type="button" disabled>Убрать</button></div>' +
@@ -731,7 +733,7 @@ export class AudioTrimmer {
       ? 'Убрать то, что между маркерами, и склеить остаток; маркеры встанут на место склейки'
       : 'Оставить то, что между маркерами, а остальное аудио убрать';
     this.q('.at-paus').disabled = this.q('.at-voc').disabled = !on;
-    this.q('.at-ag').disabled = !on;
+    this.q('.at-save').disabled = !on;
     this.q('.at-und').disabled = !(on && this.buf0 && this.buf !== this.buf0);   // live only while the sound differs from the original
     const back = this.q('.at-back'); if (back) back.disabled = !(on && this.undo.length);
     const pp = this.q('.at-pp');
@@ -1027,23 +1029,27 @@ export class AudioTrimmer {
       } catch (e) { this.say(e.message); }
       this.busy = false; this.q('.at-voc').textContent = 'Отделить голос'; this._sync();
     };
-    this.q('.at-ag').onclick = async () => {
+    /* «Сохранить» вместо прежней отправки в Сценарист: раньше любое движение меток
+       (и каждая обрезка) запускали распознавание, и несколько whisper-процессов
+       вставали параллельно - компьютер вставал намертво. Теперь слова слушаются
+       ровно один раз: по этой кнопке, над тем куском, который выделен сейчас. */
+    this.q('.at-save').onclick = async () => {
       if (!this.dur0) { this.say('Сначала загрузите аудио'); return; }
-      // the agent writes where its target says: choose our section first, the way the section itself
-      // does it - opening the agent alone left the previous target (for example Lipsync) in place
-      const tg = document.querySelector('#agTarget [data-t="' + (this.o.agentTarget || 'long') + '"]');
-      if (tg) tg.click();
-      agentGo();
-      // the agent refuses audio while it does not know whether recognition is ready: on the first press
-      // in a fresh session that status was not fetched yet, and the button looked dead
-      try { if (!agentState().status || !agentState().status.speech_ready) await agentStatus(); } catch (e) {}
-      if (!agentState().status || !agentState().status.speech_ready) { this.say('Сценарист ещё не может слушать аудио: распознавание речи не готово - строчка «Модель сценариста», кнопка «Докачать»'); return; }
-      if (this.len() < 1) { this.say('Кусок короче секунды: Сценарист и модель всё равно его не разберут - выделите полторы-две секунды'); return; }
-      try { await agentSetAudio(wavSlice(this.buf, this.start, this.end), (this.name || 'фрагмент').replace(/\.[^.]+$/, ''), this.len(),
-                              this.whereLabel ? this.whereLabel(this) : ''); }
-      catch (e) { this.say((e && e.message) || 'Не удалось передать аудио в Сценарист'); }
-      const box = document.querySelector('#agAudioBox');
-      if (box && box.hidden) this.say('Аудио не принято: Сценарист не смог его взять'); else this.say('Фрагмент отправлен в Сценарист: ' + this.len().toFixed(1).replace('.', ',') + ' с');
+      if (this.len() < .05) { this.say('Выделите кусок, который сохраняете'); return; }
+      if (this.start > .001 || this.end < this.dur0 - .001) {
+        const from = this.start;
+        this._commit(keepRanges(this.buf, [[from, this.end]]), x => x - from);
+        setZoom(1);
+        this.say('Кусок зафиксирован: ' + this.len().toFixed(1).replace('.', ',') + ' с');
+      } else {
+        this.say('Весь аудиокусок зафиксирован как есть');
+      }
+      if (this.o.onHeard) {
+        const b = this.q('.at-save');
+        b.disabled = true; b.textContent = 'Слушаю слова…';
+        try { await this.o.onHeard(this); } catch (e) { this.say((e && e.message) || 'Не удалось послушать кусок'); }
+        b.disabled = false; b.textContent = '💾 Сохранить';
+      }
     };
     this.q('.at-und').onclick = () => {
       if (!this.buf0 || this.buf === this.buf0) { this.say('Аудио и так целое - откатывать нечего'); return; }

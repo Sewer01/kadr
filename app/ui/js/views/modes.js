@@ -2338,11 +2338,11 @@ export function makeRefMode(cfg) {
               c._audSel[j2] = { start: c._trim.start, end: c._trim.end, of: src.name };
               c._paintAuds(); paintRefs();
               if (root._save) root._save();
-              /* кусок песни и её слова должны соответствовать друг другу: если слова в
-                 сцене были услышаны машиной (или их вовсе не было), слушаем новый кусок;
-                 написанные человеком слова не трогаем никогда */
-              if ((c._audWordsAuto || [])[j2] || !((c._audWords || [])[j2] || '').trim()) autoHeard(j2, c._auds[j2], true);
+              /* Слова слушает только кнопка «Сохранить» (и «переслушать» руками):
+                 раньше каждое применение обрезки запускало распознавание, и пока
+                 человек двигал метки, несколько whisper-процессов грузили машину. */
             },
+            onHeard: tr => { const j2 = tr._slot; return (j2 >= 0 && c._auds[j2] && c._heardNow) ? c._heardNow(j2) : null; },
             onState: tr2 => {
               const j3 = tr2._slot;
               if (j3 >= 0 && tr2.dur0 && !c._audSel[j3]) (c._audDur = c._audDur || [])[j3] = tr2.dur0;   // full length of an untouched file
@@ -2453,6 +2453,16 @@ export function makeRefMode(cfg) {
         } catch (e) { }
       };
       c._autoHeard = autoHeard;   // «Всё к сценаристу» слушает кусок здесь, а не заново в чате
+      /* «Сохранить» в приборе: слушаем зафиксированный кусок ровно один раз, а
+         кнопки «переслушать» на это время замолкают - второе распознавание поверх
+         первого только грузит компьютер. */
+      c._heardNow = async (j) => {
+        const host = c._trim ? c._trim.q('.at-words') : null;
+        const btns = host ? $$('button[data-again]', host).filter(b => b.dataset.again !== 'clear') : [];
+        btns.forEach(b => { b.disabled = true; b.textContent = 'слушаю…'; });
+        await autoHeard(j, c._auds[j], true);
+        btns.forEach(b => { b.disabled = false; b.textContent = b.dataset.again === 'ru' ? 'переслушать по-русски' : 'переслушать по-английски'; });
+      };
       ainp.onchange = () => {
         const f = ainp.files && ainp.files[0];
         let j = apick; apick = -1;
@@ -2464,8 +2474,7 @@ export function makeRefMode(cfg) {
         if (f && !f.__key) { f._dur = f._dur || (c._audDur || [])[j] || 0; window.audioKey(f); }   // своей подписью файл узнаётся с любого входа
         c._paintAuds(); paintRefs();
         if (root._save) root._save();
-        toast('Аудио <Audio ' + ((c._baseFixed || c._base || 10) + j) + '> в сцене: ' + f.name + ' - при желании обрежьте (до 15 с)');
-        autoHeard(j, f);
+        toast('Аудио <Audio ' + ((c._baseFixed || c._base || 10) + j) + '> в сцене: ' + f.name + ' - обрежьте и нажмите «Сохранить», тогда услышим слова');
       };
       if (!$('.sc-auds', c)) {
         ($('.field-btns', c) || $('textarea', c)).insertAdjacentHTML('afterend', '<div class="sc-auds" style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:6px"></div><div class="sc-trimhost" hidden style="margin-top:8px"></div>');
@@ -2953,7 +2962,7 @@ export function makeRefMode(cfg) {
             ,
             () => '<div class="hint" style="font-size:12.5px;line-height:1.55"><b>Аудио в Референсах, Актёре и Экшн-видео.</b> Здесь у звука своя карточка «Аудио». Файлы не выкладываются тремя пустыми плашками: нажимаете «Загрузить аудио» - и файл становится отдельной меткой с названием, длиной и тегом &lt;Audio 1&gt;, &lt;Audio 2&gt;, &lt;Audio 3&gt;. Нажатие на метку ставит тег в текст, «Обрезать» открывает тот же прибор, что и в Видеостудии: волна, перетаскивание, прослушивание, до 15 секунд. Второе нажатие закрывает окно и применяет выделенное, а открывается снова целый файл - резать можно сколько раз угодно, файл на диске при этом не портится. Больше трёх аудио нельзя: кнопка гаснет сама.</div>',
             () => '<div class="hint" style="font-size:12.5px;line-height:1.55"><b>Референс-видео.</b> В Референсах у видео своя карточка, а в «Замене персонажа» под окном видео стоит тот же верстак. Файлы добавляются по одному, каждый подписан &lt;Video 1&gt;, &lt;Video 2&gt;, &lt;Video 3&gt; - нажатие на метку ставит тег в текст. <b>Дальше 25 секунд модель не смотрит</b>, поэтому лишнее стоит отрезать. кнопка «Монтаж» открывает верстак: над лентой окно просмотра, на ленте - сами кадры, жёлтый маркер (в левом верхнем углу ленты всегда показаны его секунды), а прямо у маркера стрелки покадровой прокрутки (один кадр = 1/24 с) и ножницы: левые убирают всё до маркера, правые - всё после. Ползунок и кнопки «−» «+» меняют <b>ширину ленты</b> (сколько пикселей приходится на секунду), «По ширине» возвращает весь клип в окно. Клик по ленте слева от метки играет от начала куска до метки, справа - от метки до конца, а окно просмотра стоит на маркере и показывает его как стоп-кадр. Края выделенного участка тянутся мышью, двойной клик возвращает целый клип, убрать файл совсем можно крестиком на его метке в карточке, «Отменить» шагает назад. «Оставить выбранное» режет по-настоящему, настоящим декодером: в карточке останется кусок, а для новой резки всегда открывается целый файл. «🤖 К сценаристу» отправляет клип сценаристу - он посмотрит на него как на кадры.</div>',
-            () => '<div class="hint" style="font-size:12.5px;line-height:1.55"><b>«🤖 К сценаристу».</b> Отправляет выделенный кусок в раздел «Сценарист»: он распознаёт слова и пишет промпт уже зная, что говорится. Перед отправкой Сценарист сам переключается на Видеостудию, чтобы не писать в чужой раздел. Если распознавание речи ещё не скачано, кнопка об этом скажет - строчка «Модель сценариста», кнопка «Докачать».</div>',
+            () => '<div class="hint" style="font-size:12.5px;line-height:1.55"><b>«💾 Сохранить» в приборе аудио.</b> Фиксирует выделенный кусок и один раз слушает его слова. Пока вы просто двигаете метки и слушаете кусок - ничего не распознаётся: раньше каждое движение запускало распознавание, несколько процессов грузили процессор на сто процентов, и компьютер вставал. Переслушать в другом языке - кнопки под строкой слов.</div>',
             () => {
               const mp = root.querySelector('.mdl-pick'); if (!mp) return '';
               const cur = ($('.mp-cur', mp) || {}).textContent || '—';
@@ -3351,8 +3360,11 @@ export function makeRefMode(cfg) {
           mount: $('.mus-filmrow', fw), base: 1, limit: 0,
           whereLabel: j => (j === 0 ? 'фон всего ролика' : 'образец ролика номер ' + j) + ', аудио ' + (j + 1) + ', тег <Audio ' + (1 + j) + '>',
           onChange: j => { syncFilm(j); if (root._save) root._save(); $$('.sc', root).forEach(cc => { try { cc._paintRefs && cc._paintRefs(); } catch (e) { } });
-            try { root._paintFaudWords && root._paintFaudWords(); } catch (e) { }
-            try { if (j > 0 && frow.files[j] && !(root._faudWords || [])[j]) root._faudHeard && root._faudHeard(j); } catch (e) { } },
+            try { root._paintFaudWords && root._paintFaudWords(); } catch (e) { } },
+          /* Слова слушает только «Сохранить» в приборе: движение меток само по себе
+             ничего не распознаёт - иначе несколько процессов распознавания
+             встают параллельно и вешают компьютер. */
+          onHeard: j => (j > 0 && root._faudHeard) ? root._faudHeard(j) : null,
         });
         root._faudRow = frow;
         /* Слова общих образцов (<Audio 2>, <Audio 3>): слушаем один раз здесь,
@@ -3388,6 +3400,8 @@ export function makeRefMode(cfg) {
         root._faudHeard = async (j, lang) => {
           const f = frow.files[j];
           if (!f) return;
+          const bs = $$('button[data-fw]', wbox).filter(b => +b.dataset.j === j && b.dataset.fw !== 'clear');
+          bs.forEach(b => { b.disabled = true; b.textContent = 'слушаю…'; });
           try {
             const j2 = await transcribeWav(f, lang || 'auto');
             const words = String(j2.text || '').trim();
@@ -3396,6 +3410,7 @@ export function makeRefMode(cfg) {
             root._paintFaudWords();
             toast('Слова образца <Audio ' + (1 + j) + '> услышаны: ' + words.slice(0, 60));
           } catch (e) { toast('Не вышло распознать образец: ' + (e && e.message ? e.message : e)); }
+          finally { bs.forEach(b => { b.disabled = false; b.textContent = b.dataset.fw === 'ru' ? 'по-русски' : 'по-английски'; }); }
         };
         root._paintFaudWords();
         // the calculation still reads the old field: the first file of the row is written into it,
