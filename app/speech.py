@@ -157,24 +157,31 @@ def _seconds(wav_bytes):
         return 0.0
 
 
+# Одно распознавание за раз: два whisper рядом сажают весь компьютер
+# (человек жмёт «Сохранить», пока верстак молча слушает ту же песню).
+# Второй запрос спокойно ждёт своей очереди, а не стартует параллельно.
+_TLOCK = asyncio.Lock()
+
+
 async def transcribe(root, wav_bytes, lang="auto", custom_dir=None):
     """Returns (text, language_code, language_name_for_prompt)."""
-    text, code = await asyncio.to_thread(_run, root, wav_bytes, lang, custom_dir)
-    secs = _seconds(wav_bytes)
-    # Длинный звук и пара слов - это не «там петь нечего», а модель, которая на пении
-    # сдалась: на одной и той же песне большая модель выдавала «я бы», а маленькая
-    # слышала весь припев. Молча оставить человека с двумя словами нельзя, поэтому
-    # слушаем этим же звуком второй моделью, которая есть на диске, и берём ответ
-    # длиннее. Ничего не выдумываем: берём то, что одна из моделей правда услышала.
-    if secs >= 4 and len(text.split()) <= 3:
-        try:
-            found = locate(root, custom_dir)
-            best = Path(found["model"]) if found.get("model") else None
-            alt = next((p for p in _model_list(best.parent) if p != best), None) if best else None
-            if alt is not None:
-                t2, c2 = await asyncio.to_thread(_run, root, wav_bytes, lang, custom_dir, alt)
-                if len(t2.split()) > len(text.split()):
-                    text, code = t2, c2 or code
-        except Exception:
-            pass
-    return text, code, LANG_NAMES.get(code, code.upper() if code else "")
+    async with _TLOCK:
+        text, code = await asyncio.to_thread(_run, root, wav_bytes, lang, custom_dir)
+        secs = _seconds(wav_bytes)
+        # Длинный звук и пара слов - это не «там петь нечего», а модель, которая на пении
+        # сдалась: на одной и той же песне большая модель выдавала «я бы», а маленькая
+        # слышала весь припев. Молча оставить человека с двумя словами нельзя, поэтому
+        # слушаем этим же звуком второй моделью, которая есть на диске, и берём ответ
+        # длиннее. Ничего не выдумываем: берём то, что одна из моделей правда услышала.
+        if secs >= 4 and len(text.split()) <= 3:
+            try:
+                found = locate(root, custom_dir)
+                best = Path(found["model"]) if found.get("model") else None
+                alt = next((p for p in _model_list(best.parent) if p != best), None) if best else None
+                if alt is not None:
+                    t2, c2 = await asyncio.to_thread(_run, root, wav_bytes, lang, custom_dir, alt)
+                    if len(t2.split()) > len(text.split()):
+                        text, code = t2, c2 or code
+            except Exception:
+                pass
+        return text, code, LANG_NAMES.get(code, code.upper() if code else "")
