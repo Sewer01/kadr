@@ -554,6 +554,19 @@ def system_prompt(skills_text, target, ctx, editing=True):
             "- сцена считается за 8 шагов: не обещай мелкий текст в кадре, тонкие логотипы и читаемые надписи - они поплывут;\n"
             f"- {snd}\n"
             + (f"- {media_line}\n" if media_line else "") +
+            "РЕФЕРЕНСЫ И ОТЧЁТ О НИХ:\n"
+            "- <Picture 1..5> и <Audio 1..3> - ОБЩИЕ места: лежат вне сцен и доступны в тексте любой сцены "
+            "(<Audio 1> - фон всего ролика). Номера от 10 и выше - СВОИ файлы сцен: декада равна номеру сцены "
+            "(у сцены 2 это 20, 21, 22). Такой файл лежит в одной сцене, но называть его тег можно в любой.\n"
+            "- Если один и тот же файл из декад нужен тебе в ДВУХ и более сценах и в общих местах есть свободное - "
+            "положи его в общие: в тексте зови его тегом свободного общего места, а в отчёте дай строку "
+            "`<Picture 20> -> shared`. Свободного общего места нет - оставляй файл в сцене и зови его тегом "
+            "из чужой декады.\n"
+            "- ПОСЛЕДНИМ в блоке, после последней сцены, напиши строку `REFS:` и ниже ОТЧЁТ: по одной строке на "
+            "каждый референс из декад (10 и выше), который ты использовал, вида `<Picture 10> -> scene 3` "
+            "(файл должен лежать в сцене 3 - программа переложит его туда) или `<Audio 10> -> scene 1`, "
+            "или `<Picture 20> -> shared` (файл ушёл в общие). Общие места (Picture 1..5, Audio 1..3) в отчёт "
+            "не пиши. Если референсов из декад не использовал - напиши после `REFS:` слово `none`.\n"
             "ФОРМАТ ОТВЕТА: ровно ОДИН блок prompt. Сцены идут по порядку, каждая начинается отдельной строкой ровно вида "
             "`SCENE N | S`: номер, вертикальная черта и целое число секунд от 3 до 15 - без слов «с» и «сек», без точки и "
             "двоеточия, иначе строка перестанет быть началом сцены. У сцены, которая начинает НОВЫЙ ПЛАН, добавь в конце "
@@ -563,8 +576,8 @@ def system_prompt(skills_text, target, ctx, editing=True):
             "`non_diegetic_music: ...` - музыка за кадром, либо `N/A`, если тишина: приложение поднимет эти строки в поля промпта. "
             "Имена этих двух полей пиши ровно так, с подчёркиванием, без дефисов - движок понимает только написание с "
             "подчёркиванием. "
-            "Полей `integrated_multimodal_description`, `[Shot 1]` и таймкодов НЕ пиши - обёртку добавит приложение. После "
-            "последней сцены в блоке ничего не пиши. Пример:\n"
+            "Полей `integrated_multimodal_description`, `[Shot 1]` и таймкодов НЕ пиши - обёртку добавит приложение. "
+            "После последней сцены в блоке - только отчёт `REFS:` (правило выше), ничего больше. Пример:\n"
             "SCENE 1 | 10\n<Picture 1> is the character reference (keep this face exactly). <Picture 2> is the location reference. "
             "A knight <Picture 1> stands in the ruined throne room <Picture 2>, slowly raising a glowing guitar. "
             "Camera pushes in from wide to medium shot. Red glow, drifting ash.\n"
@@ -574,7 +587,8 @@ def system_prompt(skills_text, target, ctx, editing=True):
             "The knight <Picture 1>, still standing in the ruined throne room <Picture 2> where he raised the guitar, starts "
             "playing fiercely, head tilted back. Camera circles him at chest height. Flickering ghostly light on the walls.\n"
             "overall_soundscape: the guitar now loud, stones falling.\n"
-            "non_diegetic_music: slow dark strings under the playing.")
+            "non_diegetic_music: slow dark strings under the playing.\n"
+            "REFS:\nnone.")
     elif target == "swap":
         mode_rules = (
             "Режим приложения: ЗАМЕНА ПЕРСОНАЖА (MiniMax H3 Ref2V + LoRA замены). Пользователь загружает видео (<Video 1>), в котором "

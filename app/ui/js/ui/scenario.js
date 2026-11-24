@@ -483,6 +483,113 @@ export function sceneAudioPlan(c, film, bs, pool, room) {
   return { files: picked.map(t => byTag.get(t)), text: out, rewritten: out !== raw.trim(), dropped: dropped, lostPics: lostPics, borrow: borrow, borrowed: borrowed };
 }
 
+/* Отчёт сценариста о референсах: последним в блоке он пишет «REFS:» и строки
+   «<Picture 10> -> scene 3» или «<Picture 20> -> shared». Сначала блок снимается
+   с текста (в сцены ему нельзя), потом по нему раскладываются файлы. */
+export function parseRefReport(text) {
+  const out = [];
+  const m = String(text || '').match(/(?:^|\n)[ \t]*REFS\b[^\n]*\n?[\s\S]*$/i);
+  if (!m) return { entries: out, text: String(text || '') };
+  const re = /<\s*(Picture|Audio)\s*(\d+)\s*>\s*(?:->|→|=>)\s*(?:scene\s*(\d+)|shared|общ\w*)/gi;
+  let x;
+  while ((x = re.exec(m[0]))) {
+    const kind = x[1].toLowerCase() === 'audio' ? 'Audio' : 'Picture';
+    const n = +x[2];
+    if (n >= 10) out.push(x[3] ? { kind, n, to: +x[3] } : { kind, n, to: 'shared' });
+  }
+  return { entries: out, text: String(text).slice(0, m.index) };
+}
+
+/* Раскладка по отчёту: файл из декады переезжает в названную сцену или в общее
+   место, а теги во всех текстах переписываются на новые номера - карточки должны
+   говорить правду. Из сцены-источника файл уходит только если её текст больше не
+   зовёт старый тег. Повторы (карточки перестраиваются не сразу) ничего не
+   дублируют: применённая строка помечена, а файл узнаётся по имени. */
+export async function applyRefReport(root2, entries, final) {
+  const moved = [], gone = [];
+  if (!entries || !entries.length) return { moved, gone };
+  const cards = $$('.sc', root2);
+  if (!cards.length) return { moved, gone };
+  const same = (a, b) => !!a && !!b && a.name === b.name;
+  const taOf = c => c.querySelector('textarea:not(.sc-draft)') || c.querySelector('textarea');
+  const findIn = (kind, n) => {
+    for (const c of cards) {
+      const b = (c._baseFixed || c._base || 0), j = n - b;
+      if (j < 0 || j > 8) continue;
+      if (kind === 'Picture' && (c._files || [])[j]) return { f: c._files[j], from: c, j };
+      if (kind === 'Audio' && j < 3 && (c._auds || [])[j]) return { f: c._auds[j], from: c, j };
+    }
+    return null;
+  };
+  const reTag = (oldTag, newTag) => cards.forEach(c => {
+    const ta = taOf(c);
+    if (ta && ta.value.indexOf(oldTag) >= 0) { ta.value = ta.value.split(oldTag).join(newTag); ta.dispatchEvent(new Event('input', { bubbles: true })); }
+  });
+  const dropFrom = (e, hit, tagOld) => {
+    const txt = (taOf(hit.from) || {}).value || '';
+    if (txt.indexOf(tagOld) >= 0) return;   // текст сцены всё ещё зовёт этот тег - файл остаётся
+    if (e.kind === 'Picture') { if (hit.from._setOwn) hit.from._setOwn(hit.j, null); else { (hit.from._files || [])[hit.j] = null; hit.from._paint?.(); } }
+    else { hit.from._auds[hit.j] = null; hit.from._audSrc[hit.j] = null; hit.from._audSel[hit.j] = null; hit.from._paintAuds?.(); hit.from._paint?.(); }
+  };
+  for (const e of entries) {
+    if (e.done) continue;
+    const hit = findIn(e.kind, e.n);
+    if (!hit) continue;                     // файл ещё не долёг (deliver повторяется) - попробуем снова
+    const tagOld = '<' + e.kind + ' ' + e.n + '>';
+    if (e.to === 'shared') {
+      if (e.kind === 'Picture') {
+        const all = $$('label.ref:not(.own)', root2);
+        if (all.some(r => r._file && same(r._file, hit.f))) { e.done = true; continue; }
+        const freeIdx = all.findIndex(r => !r._file);
+        if (freeIdx < 0) { gone.push(tagOld + ' - общие фото заняты'); e.done = true; continue; }
+        await setDropFile($$('input', all[freeIdx])[0] || all[freeIdx].querySelector('input'), hit.f);
+        reTag(tagOld, '<Picture ' + (freeIdx + 1) + '>');
+        moved.push(tagOld + ' -> общие (Picture ' + (freeIdx + 1) + ')');
+      } else {
+        const row = root2._faudRow;
+        if (!row) { gone.push(tagOld + ' - ряда общего аудио нет'); e.done = true; continue; }
+        if ([1, 2].some(j => same(row.files[j], hit.f))) { e.done = true; continue; }
+        const j = [1, 2].find(k => !row.files[k]);   // фон ролика (Audio 1) не трогаем: его выбирает человек
+        if (j === undefined) { gone.push(tagOld + ' - общие аудио заняты'); e.done = true; continue; }
+        row.set(j, hit.f);
+        reTag(tagOld, '<Audio ' + (1 + j) + '>');
+        moved.push(tagOld + ' -> общие (Audio ' + (1 + j) + ')');
+      }
+      dropFrom(e, hit, tagOld);
+      e.done = true;
+      continue;
+    }
+    const t = cards[e.to - 1];
+    if (!t) { gone.push(tagOld + ' - сцены ' + e.to + ' в ленте нет'); e.done = true; continue; }
+    const tb = (t._baseFixed || t._base || 10 * e.to);
+    if (e.kind === 'Picture') {
+      t._files = t._files || new Array(9).fill(null);
+      if (t === hit.from || t._files.some(f => same(f, hit.f))) { e.done = true; continue; }
+      const j = t._files.findIndex(f => !f);
+      if (j < 0) { gone.push(tagOld + ' - в сцене ' + e.to + ' нет места'); e.done = true; continue; }
+      if (t._setOwn) t._setOwn(j, hit.f); else { t._files[j] = hit.f; t._paint?.(); }
+      reTag(tagOld, '<Picture ' + (tb + j) + '>');
+      moved.push(tagOld + ' -> сцена ' + e.to + ' (Picture ' + (tb + j) + ')');
+    } else {
+      t._auds = t._auds || []; t._audSrc = t._audSrc || []; t._audSel = t._audSel || []; t._audWords = t._audWords || [];
+      if (t === hit.from || t._auds.some(f => same(f, hit.f))) { e.done = true; continue; }
+      const j = [0, 1, 2].findIndex(k => !t._auds[k]);
+      if (j < 0) { gone.push(tagOld + ' - в сцене ' + e.to + ' нет места для песни'); e.done = true; continue; }
+      t._auds[j] = hit.f; t._audSrc[j] = hit.f; t._audSel[j] = null; if (!hit.f.__key) window.audioKey(hit.f);
+      const w = (hit.from._audWords || [])[hit.j]; if (w && !(t._audWords[j] || '').trim()) t._audWords[j] = w;
+      t._paintAuds?.(); t._paint?.();
+      reTag(tagOld, '<Audio ' + (tb + j) + '>');
+      moved.push(tagOld + ' -> сцена ' + e.to + ' (Audio ' + (tb + j) + ')');
+    }
+    if (hit.from !== t) dropFrom(e, hit, tagOld);
+    e.done = true;
+  }
+  if (final) entries.forEach(e => { if (!e.done) { gone.push('<' + e.kind + ' ' + e.n + '> - файла с таким тегом в ленте нет'); e.done = true; } });
+  if (moved.length) { root2._save?.(); toast('По отчёту сценариста разложено: ' + moved.join('; ')); }
+  if (gone.length) { warn('Отчёт сценариста не лёг на полки: ' + gone.join(', ')); warnSoon('Сценарист изменил ленту'); }
+  return { moved, gone };
+}
+
 export async function sendPrompt(blk, to) {
   const { AG, IMG, RM } = views;   // разделы к этому моменту объявили себя в реестре
   let prompt = $('pre', blk).textContent;
@@ -562,6 +669,10 @@ export async function sendPrompt(blk, to) {
     if (files[1]) await setDropFile($('#dLast input'), files[1]);
   } else if (studioCaps(to).scenes) {   // сценная лента общая: её собирает любой сценный режим
     const L2 = RM[to] || RM.long, list = []; let cur = null;   // the same sheet of scenes fits both studios
+    /* Отчёт о референсах снимаем с текста до разбора сцен и раскладываем файлы
+       после доставки: сначала файлы долетают до полок, потом переезжают по отчёту. */
+    const rr = parseRefReport(prompt);
+    const refEntries = rr.entries; prompt = rr.text;
     /* Лёгкая модель иногда прилепляет к ответу свою служебную шапку - имена движка и скиллов
        одним куском («hailuo-h3…sceny-studii»): заголовок «SCENE 1 | 10» от этого сидит не с
        начала строки, и студия перестает узнавать лист - тексты не возвращались вообще.
@@ -661,12 +772,13 @@ export async function sendPrompt(blk, to) {
       }
     };
     deliver();
+    applyRefReport(L2.root, refEntries).catch(() => { });
     /* Карточки раздела перестраиваются не в тот же миг: доставка, сделанная один раз,
        попадала в карточки, которые потом заменялись новыми, и фото сцены исчезало.
        Поэтому она повторяется, когда Студия уже на экране. Повтор ничего не
        дублирует: лежащий в сцене файл узнаётся по имени и размеру. */
-    setTimeout(deliver, 400);
-    setTimeout(deliver, 1400);
+    setTimeout(() => { deliver(); applyRefReport(L2.root, refEntries).catch(() => { }); }, 400);
+    setTimeout(() => { deliver(); applyRefReport(L2.root, refEntries, true).catch(() => { }); }, 1400);
     // the studio never receives the frames from the chat: a <Video N> in the text would point at nothing,
     // and the numbers would land on the person's photos. What the studio really has is the base frame.
     prompt = prompt.replace(/<\s*Video\s*\d+\s*>/g, '<Frame>');
