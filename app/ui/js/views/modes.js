@@ -221,15 +221,27 @@ export async function clipHeard(tr) {
   const nm = (tr && tr.name) || '';
   if (!nm || !tr.dur0 || !tr.buf || CL_HEARD.busy) return;
   if (CL_HEARD.name === nm && (CL_HEARD.text || !CL_HEARD.busy)) return;
+  const key = nm + '|' + Math.round(tr.dur0 * 10);
   CL_HEARD = { name: nm, text: '', lang: '', busy: true };
   refsChanged();
   try {
     const known = (typeof AG !== 'undefined' && ((AG.audios || []).find(a => a.name === nm && (a.text || '').trim()))) || null;
     if (known) { CL_HEARD = { name: nm, text: known.text.trim(), lang: known.langName || known.lang || '', busy: false }; refsChanged(); return; }
+    /* Та же песня уже была услышана в прошлый раз: помним её слова между
+       запусками. Без этой памяти каждый перезапуск программы поднимал
+       распознавание заново - несколько минут свинца в процессоре молча. */
+    try {
+      const cached = JSON.parse(localStorage.getItem('h3-cl-heard') || 'null');
+      if (cached && cached.key === key && (cached.text || '').trim()) {
+        CL_HEARD = { name: nm, text: cached.text.trim(), lang: cached.lang || '', busy: false };
+        refsChanged(); return;
+      }
+    } catch (e) { }
     if (!AG.status || !AG.status.speech_ready) await agStatus();
     if (!AG.status || !AG.status.speech_ready) { CL_HEARD = { name: nm, text: '', lang: '', busy: false }; refsChanged(); return; }
     const j = await transcribeWav(wavSlice(tr.buf, 0, tr.dur0), 'auto');
     CL_HEARD = { name: nm, text: String(j.text || '').trim(), lang: j.lang_name || j.lang || '', busy: false };
+    if (CL_HEARD.text) { try { localStorage.setItem('h3-cl-heard', JSON.stringify({ key, text: CL_HEARD.text, lang: CL_HEARD.lang })); } catch (e) { } }
   } catch (e) { CL_HEARD = { name: nm, text: '', lang: '', busy: false }; }
   refsChanged();
 }
