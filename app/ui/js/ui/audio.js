@@ -468,6 +468,7 @@ export class AudioRow {
     this.mount = o.mount; this.base = o.base || 1; this.limit = o.limit === 0 ? 0 : (o.limit || 15);
     this.onChange = o.onChange || (() => {}); this.whereLabel = o.whereLabel || (j => 'аудио ' + (j + 1));
     this.onHeard = o.onHeard || null;   // «Сохранить» в приборе: хозяин ряда сам решает, чьи слова слушать
+    this.noAdd = !!o.noAdd;   // ряд сам решает, какими кнопками кладут файлы (фон и образцы - разными)
     this.files = [null, null, null]; this.src = [null, null, null]; this.sel = [null, null, null]; this.dur = [null, null, null];
     this.pick = -1; this._slot = -1;
     this.el = document.createElement('div');
@@ -515,6 +516,15 @@ export class AudioRow {
     this.paint();
   }
   set(j, f) { this.files[j] = f; this.src[j] = f; this.sel[j] = null; this.dur[j] = null; this.paint(); this.onChange(j, f); }
+  pickSlot(j) {   // кнопка хозяина ряда: фон - всегда в своё место, образец - в первое свободное из двух
+    if (j === 0) this.pick = 0;
+    else {
+      const k = [1, 2].find(x => !this.files[x]);
+      if (k === undefined) { toast('Два образца уже лежат - уберите один, чтобы положить другой'); return; }
+      this.pick = k;
+    }
+    this.inp.click();
+  }
   used() { return this.files.filter(Boolean).length; }
   openTrim(j) {
     const src = this.src[j] || this.files[j];
@@ -554,8 +564,8 @@ export class AudioRow {
   paint() {
     const e2 = s => String(s).replace(/[<>&]/g, ch => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[ch]));
     const full = this.used() >= 3;
-    this.el.innerHTML = '<button class="btn mini" type="button" data-a="add"' + (full ? ' disabled' : '') +
-      ' title="До трёх файлов. Модель получает их как образцы и применяет там, где вы упомянули файл тегом в тексте">+ Загрузить аудио</button>' +
+    this.el.innerHTML = (this.noAdd ? '' : '<button class="btn mini" type="button" data-a="add"' + (full ? ' disabled' : '') +
+      ' title="До трёх файлов. Модель получает их как образцы и применяет там, где вы упомянули файл тегом в тексте">+ Загрузить аудио</button>') +
       '<span class="counter" title="Аудио здесь: не больше трёх">' + this.used() + ' / 3</span>' +
       this.files.map((f, j) => f ? '<span class="token" style="display:inline-flex;gap:6px;align-items:center">&lt;Audio ' +
         (this.base + j) + '&gt; ' + e2(f.name.slice(0, 18)) +

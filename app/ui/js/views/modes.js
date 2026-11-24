@@ -1990,6 +1990,7 @@ export function makeRefMode(cfg) {
         const proj = { run, t: Date.now(), sec: cfg.mode, mode: root._mode, qm: root._q, qBy: { ...(root._qBy || {}), [root._q]: S.q }, snd: root._snd, loop: root._loop !== false, start: $('.lm-start', root).value, vocals: $('.lm-vocals', root).checked,
           bed: $('.lm-beddb', root).value, bednorm: !!$('.lm-bednorm', root).checked,   // уровень музыки и выравнивание: их помним тоже
           aspect: S.aspect, q: S.q, cw: S.cw || 0, ch: S.ch || 0, src: root._src ? { id: root._src.id || '', name: root._src.name } : null,
+          fw: { 1: (root._faudWords || [])[1] || '', 2: (root._faudWords || [])[2] || '' },   // слова общих образцов: их тоже помним
           scenes: $$('.sc', root).map(c => ({ prompt: $('textarea', c).value, sec: +$('input[type=range]', c).value, lng: !!c._longSec, fresh: !!$('.sc-fresh', c)?.checked, nimg: 9, var: c._var || 0, tags: [...(c._tags || [])], words: (c._audWords || []).slice(), base: c._baseFixed || 0,
             done: c._dn.final ? { sig: c._dn.final.sig, url: c._dn.final.url, id: c._dn.final.id, text: c._dn.final.text } : null,
             draftDone: c._dn.draft ? { sig: c._dn.draft.sig, url: c._dn.draft.url, id: c._dn.draft.id, text: c._dn.draft.text } : null })) };
@@ -1998,7 +1999,9 @@ export function makeRefMode(cfg) {
         localStorage.setItem(PKEY, JSON.stringify(all)); localStorage.setItem(LASTKEY, run);
         fetch('/api/long/project', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ run, project: proj }) }).catch(() => {});
         $$('.ref', imgsEl).forEach((r, i) => putFile(`long/${run}/img${i}`, r._file));
-        putFile(`long/${run}/aud0`, slotA ? slotA._file : null);
+        putFile(`long/${run}/aud0`, (root._faudRow ? root._faudRow.files[0] : null) || (slotA ? slotA._file : null));
+        putFile(`long/${run}/faud1`, root._faudRow ? root._faudRow.files[1] : null);
+        putFile(`long/${run}/faud2`, root._faudRow ? root._faudRow.files[2] : null);
         putFile(`long/${run}/src`, root._src && root._src.file ? root._src.file : null);
         $$('.sc', root).forEach((c, i) => { for (let j = 0; j < 9; j++) putFile(`long/${run}/simg${i}_${j}`, c._files[j] || null); });
           $$('.sc', root).forEach((c, i) => { for (let j = 0; j < 3; j++) putFile(`long/${run}/saudio${i}_${j}`, (c._auds || [])[j] || null); });
@@ -2014,7 +2017,7 @@ export function makeRefMode(cfg) {
         const all = loadAll(); delete all[old];
         root._run = Math.random().toString(36).slice(2, 12);
         localStorage.setItem(PKEY, JSON.stringify(all)); localStorage.setItem(LASTKEY, root._run);
-        ['img0', 'img1', 'img2', 'img3', 'img4', 'aud0', 'src'].forEach(k => { delete fsig['long/' + old + '/' + k]; memFile('delete', `long/${old}/${k}`); });
+        ['img0', 'img1', 'img2', 'img3', 'img4', 'aud0', 'faud1', 'faud2', 'src'].forEach(k => { delete fsig['long/' + old + '/' + k]; memFile('delete', `long/${old}/${k}`); });
         for (let i = 0; i < 24; i++) {
           for (let j = 0; j < 9; j++) { delete fsig[`long/${old}/simg${i}_${j}`]; memFile('delete', `long/${old}/simg${i}_${j}`); }
           for (let j = 0; j < 3; j++) { delete fsig[`long/${old}/saudio${i}_${j}`]; memFile('delete', `long/${old}/saudio${i}_${j}`); }
@@ -2051,7 +2054,18 @@ export function makeRefMode(cfg) {
       $$('.ref .x', imgsEl).forEach(x => x.click());
       for (let i = 0; i < 5; i++) await putInto($$('.ref input', imgsEl)[i], await getRef('img' + i));
       const slotA = $('.rm-auds .slot', root); $('.x', slotA)?.click();
-      const aud = await getRef('aud0'); if (aud instanceof File) await putInto($('input', slotA), aud);
+      const aud = await getRef('aud0');
+      if (aud instanceof File) {
+        /* Фон кладём прямо в ряд: старый тайл асинхронный, и ряд мог собраться раньше,
+           чем тайл узнает файл, - тогда фон терялся до следующего перезапуска. */
+        if (root._faudRow) root._faudRow.set(0, aud); else await putInto($('input', slotA), aud);
+      }
+      const f1 = await getRef('faud1'), f2 = await getRef('faud2');
+      if (root._faudRow) { if (f1 instanceof File) root._faudRow.set(1, f1); if (f2 instanceof File) root._faudRow.set(2, f2); }
+      if (p.fw && root._faudWords) {
+        root._faudWords[1] = String(p.fw[1] || ''); root._faudWords[2] = String(p.fw[2] || '');
+        try { root._paintFaudWords && root._paintFaudWords(); } catch {}
+      }
       root._loop = p.loop !== false; setSnd(p.snd || 'none'); $('.lm-start', root).value = p.start || '0'; $('.lm-vocals', root).checked = !!p.vocals; setSndState(root._snd);   // подсказка про звук зависит от галочки, а её ставим только что
       // сохранённый уровень музыки ставим в границах ползунка: проект мог быть записан другой версией
       const bdb = Number.isFinite(+p.bed) ? Math.max(-30, Math.min(6, Math.round(+p.bed))) : -10;
@@ -3347,9 +3361,10 @@ export function makeRefMode(cfg) {
         fw.innerHTML = '<div class="sub-l"><span>Аудио на весь ролик</span></div>' +
           '<div class="mus-filmrow"></div>' +
           '<div class="mus-extra"></div>' +
-          '<small class="hint" style="display:block;margin-top:6px"><b>Первый файл - звук ролика</b> (тег &lt;Audio 1&gt;): модель перекладывает его в видео,' +
-          ' правило 15 секунд на него не действует. <b>Второй и третий - образцы</b> (теги &lt;Audio 2&gt; и &lt;Audio 3&gt;): голос, ритм, атмосфера,' +
-          ' которые можно сослать в тексте любой сцены. Обрезать и глушить лесенкой можно каждый. Кнопка «🎧 Всё к сценаристу» живёт в заголовке этой карточки - она видна, даже когда карточка свёрнута.</small>';
+          '<small class="hint" style="display:block;margin-top:6px"><b>Фон</b> (тег &lt;Audio 1&gt;): модель перекладывает его в видео,' +
+          ' правило 15 секунд на него не действует; все флаги под ним - уровень музыки, «музыка целиком», «по кругу» - про этот фон.' +
+          ' <b>Образцы</b> (теги &lt;Audio 2&gt; и &lt;Audio 3&gt;): голос, ритм, атмосфера, которые можно сослать в тексте любой сцены,' +
+          ' их кладут кнопкой под флагами. Обрезать и глушить лесенкой можно каждый. Кнопка «🎧 Всё к сценаристу» живёт в заголовке этой карточки - она видна, даже когда карточка свёрнута.</small>';
         $('.card-h', musCard).insertAdjacentElement('afterend', fw);
         // the old tile stays in the tree - the calculation reads its field - but it is not shown:
         // the row above is what the person sees and uses
@@ -3357,7 +3372,7 @@ export function makeRefMode(cfg) {
         if (media) { const cp = $('.sub-l', media), hn = $('.media-hint', media); if (cp) cp.hidden = true; if (hn) hn.hidden = true; }
         const audsRow = $('.rm-auds', root); if (audsRow) audsRow.hidden = true;
         const frow = new AudioRow({
-          mount: $('.mus-filmrow', fw), base: 1, limit: 0,
+          mount: $('.mus-filmrow', fw), base: 1, limit: 0, noAdd: true,
           whereLabel: j => (j === 0 ? 'фон всего ролика' : 'образец ролика номер ' + j) + ', аудио ' + (j + 1) + ', тег <Audio ' + (1 + j) + '>',
           onChange: j => { syncFilm(j); if (root._save) root._save(); $$('.sc', root).forEach(cc => { try { cc._paintRefs && cc._paintRefs(); } catch (e) { } });
             try { root._paintFaudWords && root._paintFaudWords(); } catch (e) { } },
@@ -3367,6 +3382,22 @@ export function makeRefMode(cfg) {
           onHeard: j => (j > 0 && root._faudHeard) ? root._faudHeard(j) : null,
         });
         root._faudRow = frow;
+        /* Две кнопки вместо одной: фон и образец - разные места. Блок флагов относится
+           к фону, поэтому кнопка образца стоит под флагами, а не рядом с фоном. */
+        const bBg = document.createElement('button');
+        bBg.type = 'button'; bBg.className = 'btn mini mus-add-bg';
+        bBg.textContent = '🎵 Фон ролика (Audio 1)';
+        bBg.style.margin = '0 0 6px';
+        bBg.title = 'Звук всего ролика: модель перекладывает его в видео, правило 15 секунд на него не действует. Все флаги ниже - уровень музыки, «музыка целиком», «по кругу» - про этот фон. Фон не нужен - не кладите его, а положите образец кнопкой под флагами';
+        const bSmp = document.createElement('button');
+        bSmp.type = 'button'; bSmp.className = 'btn mini mus-add-smp';
+        bSmp.textContent = '🎧 Образец: голос, ритм (Audio 2, Audio 3)';
+        bSmp.style.margin = '8px 0 0';
+        bSmp.title = 'Образец - на него ссылаются тегом в тексте сцены; флаги про фон его не касаются. До двух образцов. Их слова дослушиваются в приборе по «Сохранить»';
+        $('.sub-l', fw).after(bBg);
+        $('.mus-extra', fw).after(bSmp);
+        bBg.onclick = () => frow.pickSlot(0);
+        bSmp.onclick = () => frow.pickSlot(1);
         /* Слова общих образцов (<Audio 2>, <Audio 3>): слушаем один раз здесь,
            человек правит руками, сценарист берёт именно эти слова. */
         root._faudWords = root._faudWords || ['', '', ''];
@@ -3481,6 +3512,14 @@ export function makeRefMode(cfg) {
         root._filmFiles = () => frow.files.slice();
         const s0 = $('.rm-auds .slot', root);   // a restored project may already carry the film's sound
         if (s0 && s0._file) { frow.set(0, s0._file); } else { syncFilm(); }
+        /* Фон, вернувшийся в старый тайл без ведома ряда (память браузера раскладывается
+           позже сборки карточки), переезжает в ряд, как только появляется. */
+        let adoptN = 0;
+        const adoptT = setInterval(() => {
+          const s = $('.rm-auds .slot', root);
+          if (frow.files[0] || ++adoptN > 24) { clearInterval(adoptT); return; }
+          if (s && s._file) { clearInterval(adoptT); frow.set(0, s._file); }
+        }, 500);
       }
       if (!$('.mus-cap', musCard)) {   // how many pieces of audio this place allows, said once and in words
         const cap = document.createElement('div'); cap.className = 'hint mus-cap';
