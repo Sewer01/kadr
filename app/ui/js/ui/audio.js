@@ -470,6 +470,8 @@ export class AudioRow {
     this.onHeard = o.onHeard || null;   // «Сохранить» в приборе: хозяин ряда сам решает, чьи слова слушать
     this.noAdd = !!o.noAdd;   // ряд сам решает, какими кнопками кладут файлы (фон и образцы - разными)
     this.second = o.secondMount || null;   // второе место: чипы образцов стоят под своей кнопкой, а не вперемешку с фоном
+    this.trimAfter = o.trimAfter || null;  // прибор для образцов открывается под их рядом, а не под фоном
+    this.onTrim = o.onTrim || null;        // хозяин ряда рисует слова образца, когда прибор открыт
     this.files = [null, null, null]; this.src = [null, null, null]; this.sel = [null, null, null]; this.dur = [null, null, null];
     this.pick = -1; this._slot = -1;
     this.el = document.createElement('div');
@@ -499,7 +501,7 @@ export class AudioRow {
         this.inp.click();
       } else if (b.dataset.a === 'del') {
         this.set(j, null);
-        if (this._tr && this._tr._slot === j) { this._tr.clear(); this._tr._slot = -1; this.trim.hidden = true; }
+        if (this._tr && this._tr._slot === j) { this._tr.clear(); this._tr._slot = -1; this.trim.hidden = true; if (this.onTrim) this.onTrim(-1); }
       } else if (b.dataset.a === 'trim') this.openTrim(j);
     };
     this.el.onclick = rowClick;
@@ -551,8 +553,10 @@ export class AudioRow {
       const keep = this.sel[j] || this._tr._loaded || { start: 0, end: this._tr.dur0 };
       if (this._tr.dur0 && (Math.abs(this._tr.start - keep.start) > .05 || Math.abs(this._tr.end - keep.end) > .05)) this._tr.out();
       this.trim.hidden = true;
+      if (this.onTrim) this.onTrim(-1);
       return;
     }
+    if (this.trimAfter) { if (j > 0) this.trimAfter.after(this.trim); else this.el.after(this.trim); }   // прибор - под тем рядом, к которому относится аудио
     this.trim.hidden = false;
     if (this._tr._slot !== j || !this._tr.dur0) {
       this._tr._slot = j;
@@ -563,6 +567,7 @@ export class AudioRow {
         this._tr._loaded = { start: s.start, end: this._tr.end }; this._tr._sync();
       }
     }
+    if (this.onTrim) this.onTrim(j);
   }
   paint() {
     const e2 = s => String(s).replace(/[<>&]/g, ch => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[ch]));

@@ -3333,7 +3333,7 @@ export function makeRefMode(cfg) {
         $$('.sc', root).forEach((card, i) => {
           const list = $$('.sc-tokens button', card).filter(b => !b.hidden).filter(b => {
             const m = /<\s*(?:Picture|Audio)\s*(\d+)\s*>/i.exec((b.dataset && b.dataset.ins) || b.textContent || '');
-            if (m && +m[2] < 10) { if (!shared.has(m[2])) shared.set(m[2], b); return false; }
+            if (m && +m[1] < 10) { if (!shared.has(m[1])) shared.set(m[1], b); return false; }
             return true;
           });
           if (list.length) per.push([i, list]);
@@ -3390,6 +3390,8 @@ export function makeRefMode(cfg) {
              ничего не распознаёт - иначе несколько процессов распознавания
              встают параллельно и вешают компьютер. */
           onHeard: j => (j > 0 && root._faudHeard) ? root._faudHeard(j) : null,
+          trimAfter: srow,   // прибор образца открывается под рядом образцов, а не под фоном
+          onTrim: () => { try { root._paintFaudWords(); } catch (e) { } },
         });
         root._faudRow = frow;
         /* Две кнопки вместо одной: фон и образец - разные места. Блок флагов относится
@@ -3403,46 +3405,50 @@ export function makeRefMode(cfg) {
         bSmp.type = 'button'; bSmp.className = 'btn mini mus-add-smp';
         bSmp.textContent = '🎧 Образец: голос, ритм (Audio 2, Audio 3)';
         bSmp.style.margin = '8px 0 0';
-        bSmp.title = 'Образец - на него ссылаются тегом в тексте сцены; флаги про фон его не касаются. До двух образцов. Их слова дослушиваются в приборе по «Сохранить»';
+        bSmp.title = 'Образец - на него ссылаются тегом в тексте сцены; флаги про фон его не касаются. До двух образцов. Обрезка и слова - в приборе, он открывается под рядом образцов, как у сцен';
         $('.sub-l', fw).after(bBg);
         $('.mus-extra', fw).after(bSmp);   // сразу под флагами, а чипы образцов - под кнопкой
         bSmp.after(srow);
         bBg.onclick = () => frow.pickSlot(0);
         bSmp.onclick = () => frow.pickSlot(1);
-        /* Слова общих образцов (<Audio 2>, <Audio 3>): слушаем один раз здесь,
-           человек правит руками, сценарист берёт именно эти слова. */
+        /* Слова общих образцов (<Audio 2>, <Audio 3>): по тому же принципу, что и у
+           сцен - окно слов внутри прибора, который открывается под рядом образцов.
+           Отдельного окна слов в карточке больше нет: текст песни человек пишет
+           и в тексте сцены. */
         root._faudWords = root._faudWords || ['', '', ''];
-        const wbox = document.createElement('div');
-        wbox.className = 'mus-words';
-        fw.append(wbox);
         const escW = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;');
         root._paintFaudWords = () => {
-          wbox.innerHTML = '';
-          [1, 2].forEach(j => {
-            if (!frow.files[j]) { root._faudWords[j] = ''; return; }
-            const line = document.createElement('div');
-            line.style.cssText = 'display:flex;gap:8px;align-items:flex-start;margin-top:6px';
-            line.innerHTML = '<small class="hint" style="min-width:104px;padding-top:5px">&lt;Audio ' + (1 + j) + '&gt; слова:</small>'
-              + '<textarea class="lm-faudw" data-j="' + j + '" rows="2" style="flex:1" placeholder="Слова образца: послушайте или напишите сами">' + escW(root._faudWords[j] || '') + '</textarea>'
-              + '<div style="display:flex;flex-direction:column;gap:4px">'
-              + '<button class="btn mini" type="button" data-fw="ru" data-j="' + j + '">по-русски</button>'
-              + '<button class="btn mini" type="button" data-fw="en" data-j="' + j + '">по-английски</button>'
-              + '<button class="btn mini" type="button" data-fw="clear" data-j="' + j + '">стереть</button></div>';
-            wbox.append(line);
-          });
-          $$('.lm-faudw', wbox).forEach(t => { t.oninput = () => { root._faudWords[+t.dataset.j] = t.value; }; });
-          wbox.onclick = e => {
-            const b = e.target.closest && e.target.closest('button[data-fw]');
-            if (!b) return;
-            const j = +b.dataset.j;
-            if (b.dataset.fw === 'clear') { root._faudWords[j] = ''; const t = $('.lm-faudw[data-j="' + j + '"]', wbox); if (t) t.value = ''; return; }
-            root._faudHeard(j, b.dataset.fw);
-          };
+          const tr = frow._tr, host = tr ? tr.q('.at-words') : null;
+          if (!host) return;
+          const slot = tr._slot;
+          if (slot < 1 || !frow.files[slot] || frow.trim.hidden) { host.hidden = true; host.innerHTML = ''; host.dataset.fslot = ''; return; }
+          host.hidden = false;
+          if (host.dataset.fslot !== String(slot)) {
+            host.dataset.fslot = String(slot);
+            host.innerHTML = '<textarea data-fw="' + slot + '" rows="2" placeholder="Что поёт этот образец - сценарист возьмёт текст отсюда; можно поправить руками">' + escW(root._faudWords[slot] || '') + '</textarea>'
+              + '<div class="sc-wordbtns"><button class="btn mini" type="button" data-again="ru">переслушать по-русски</button>'
+              + '<button class="btn mini" type="button" data-again="en">переслушать по-английски</button>'
+              + '<button class="btn mini" type="button" data-again="clear">стереть слова</button></div>';
+            const ta0 = $('textarea', host);
+            ta0.oninput = () => { root._faudWords[+ta0.dataset.fw] = ta0.value; if (root._save) root._save(); };
+            $$('button[data-again]', host).forEach(b => {
+              b.onclick = () => {
+                const j = +host.dataset.fslot;
+                if (b.dataset.again === 'clear') { root._faudWords[j] = ''; const t2 = $('textarea', host); if (t2) t2.value = ''; if (root._save) root._save(); toast('Слова стёрты: сценарист будет петь на свой слух'); return; }
+                root._faudHeard(j, b.dataset.again);
+              };
+            });
+          }
+          const ta = $('textarea', host), now = root._faudWords[slot] || '';
+          if (ta && document.activeElement !== ta && ta.value !== now) ta.value = now;
         };
         root._faudHeard = async (j, lang) => {
           const f = frow.files[j];
           if (!f) return;
-          const bs = $$('button[data-fw]', wbox).filter(b => +b.dataset.j === j && b.dataset.fw !== 'clear');
+          if (!AG.status || !AG.status.speech_ready) { try { await agStatus(); } catch (e) { } }
+          if (!AG.status || !AG.status.speech_ready) { toast('Распознавание речи не готово: раздел «Сценарист», строчка «Модель сценариста»'); return; }
+          const host = frow._tr ? frow._tr.q('.at-words') : null;
+          const bs = host ? $$('button[data-again]', host).filter(b => b.dataset.again !== 'clear') : [];
           bs.forEach(b => { b.disabled = true; b.textContent = 'слушаю…'; });
           try {
             const j2 = await transcribeWav(f, lang || 'auto');
@@ -3452,7 +3458,7 @@ export function makeRefMode(cfg) {
             root._paintFaudWords();
             toast('Слова образца <Audio ' + (1 + j) + '> услышаны: ' + words.slice(0, 60));
           } catch (e) { toast('Не вышло распознать образец: ' + (e && e.message ? e.message : e)); }
-          finally { bs.forEach(b => { b.disabled = false; b.textContent = b.dataset.fw === 'ru' ? 'по-русски' : 'по-английски'; }); }
+          finally { bs.forEach(b => { b.disabled = false; b.textContent = b.dataset.again === 'ru' ? 'переслушать по-русски' : 'переслушать по-английски'; }); }
         };
         root._paintFaudWords();
         // the calculation still reads the old field: the first file of the row is written into it,
