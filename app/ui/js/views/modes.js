@@ -3156,10 +3156,11 @@ export function makeRefMode(cfg) {
          сцены, где текста ещё нет. Трек кладут в карточку «Музыка»: он один на клип. */
       root._scPlan = 0; root._scTrack = 0; root._fillOnly = 0; root._scSpan = 0;
       if (cfg.clipScenes) {
-        /* Отдельной карточки «Клип» больше нет: кнопка «Сцены по треку» встаёт рядом
-           с «Отделить голос от музыки» в карточке аудио, там же волна трека, а
-           «Дописать пустые сцены» - в шапке карточки «Сцены», как в Студии. */
-        const info = document.createElement('div'); info.className = 'hint'; info.style.marginBottom = '8px';
+        /* Отдельной карточки «Клип» больше нет: кнопка «Сцены по треку» относится
+           к фону и встаёт в блоке Audio 1 карточки «Аудио» под строкой «Начать с»,
+           там же волна трека, а «Дописать пустые сцены» - в шапке карточки «Сцены»,
+           как в Студии. */
+        const info = document.createElement('div'); info.className = 'hint cl-info'; info.style.marginBottom = '8px';
         const bPlan = document.createElement('button');
         bPlan.className = 'btn mini'; bPlan.type = 'button';
         bPlan.textContent = 'Сцены по треку';
@@ -3299,14 +3300,10 @@ export function makeRefMode(cfg) {
         root.addEventListener('change', e => {
           if (e.target && e.target.closest && e.target.closest('.mus-filmrow, .lm-snd')) clipPaint();
         });
-        /* Карточка «Аудио» к этому моменту уже собрана: сюда мы попадаем из отложенной
-           сборки страницы. Кнопка встаёт рядом с «Отделить голос от музыки», трек и
-           волна - тем же рядом под ним. */
-        const lv = $('#lmVoice', root);
-        if (lv) {
-          lv.after(bPlan);
-          (lv.closest('.lm-own') || root).append(info, cv, cvHint);
-        }
+        /* Карточка «Аудио» к этому моменту уже собрана, и ряд «Начать с» стоит
+           в блоке Audio 1: кнопка встаёт в тот же ряд, волна - сразу под ним. */
+        const stRow = $('.lm-start', root) && $('.lm-start', root).closest('div');
+        if (stRow) { stRow.append(bPlan); stRow.after(info, cv, cvHint); }
       }
       /* Ряд тегов собирается заново: он всегда повторяет то, что стоит в студии сейчас. */
       root._paintSrTags = () => {
@@ -3519,6 +3516,15 @@ export function makeRefMode(cfg) {
           + (root._fauds || []).filter((f, j) => f && j > 0).length
           + $$('.sc', root).reduce((z, cc) => z + ((cc._auds || []).filter(Boolean).length), 0);
         extra.append(lp);
+        /* «Начать с» - про фон: ряд уезжает из карточки «Звук» в блок Audio 1,
+           сразу под строку файла фона, к своим флагам. В Клип-студии за рядом
+           стоят инфо о треке и волна - едут вместе с ним. */
+        const stIn = $('.lm-start', root), stRow = stIn && stIn.closest('div');
+        if (stRow) {
+          const wave = $$('.cl-info, .cl-wave, .cl-wave-hint', root);
+          $('.mus-filmrow', root).after(stRow);
+          if (wave.length) stRow.after(...wave);
+        }
         const voc = $('.lm-vocals', root), vocRow = voc && voc.closest('label');
         if (vocRow) extra.append(vocRow);   // «музыка в готовом ролике целиком» - флаг остаётся на виду
         const bedRow = $('.lm-bed', root);
@@ -3755,8 +3761,7 @@ export function makeRefMode(cfg) {
       <div class="lm-own">
         <div class="mus-slot"></div>
         <div class="note warn lm-warn" hidden style="margin:8px 0"><span></span></div>
-        <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin-top:8px"><label>Начать с <input class="lm-start" inputmode="numeric" value="0" style="width:60px"> секунды</label>
-          <button class="btn" type="button" id="lmVoice" title="Оставить в аудио только голос, без музыки (как в «Клипе»)">Отделить голос от музыки</button><button class="btn" type="button" id="lmVoiceBack" hidden>Вернуть исходное аудио</button></div>
+        <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin-top:8px"><label>Начать с <input class="lm-start" inputmode="numeric" value="0" style="width:60px"> секунды</label></div>
         <label style="display:flex;gap:6px;align-items:center;margin-top:10px" title="Модель держит ваш голос: губы точные, голос в ролике ваш. Музыка из файла играет в ролике фоном тише"><input type="checkbox" class="lm-vocals"> Музыку в ролике оставить, но модель слушает только голос (точнее губы)</label>
         <div class="lm-bed" style="margin-top:10px">
           <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap">
@@ -3853,27 +3858,6 @@ export function makeRefMode(cfg) {
     new MutationObserver(() => {   // keep the real length of the chosen audio
       const f = slot._file; root._adur = f ? (slot._dur || 0) : 0; if (f && !slot._orig) { slot._orig = null; } recount();
     }).observe(slot, { attributes: true, subtree: true, childList: true, characterData: true });
-    $('#lmVoice', root).onclick = async () => {
-      if (!slot._file) { toast('Сначала загрузите аудио'); return; }
-      const b = $('#lmVoice', root), old = b.textContent; b.disabled = true; b.textContent = 'Отделяем голос…';
-      try {
-        const info = await (await fetch('/api/audio/info')).json();
-        if (!info.available) throw new Error('Недоступно: ' + info.reason);
-        const fd = new FormData(); fd.append('file', slot._file, slot._file.name);
-        const r = await fetch('/api/audio/separate', { method: 'POST', body: fd });
-        if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || 'Не удалось отделить голос');
-        const blob = await r.blob();
-        slot._orig = slot._orig || slot._file;
-        const nf = new File([blob], slot._orig.name.replace(/\.[^.]+$/, '') + '_голос.flac', { type: blob.type || 'audio/flac' });
-        slot._file = nf; $('span', slot).textContent = nf.name; $('#lmVoiceBack', root).hidden = false;
-        $('.lm-vocals', root).checked = false; setSndState(root._snd);   // галочку сняли программно: подсказку надо перекрасить
-        toast('Голос отделён: музыки в файле больше нет. С галочкой «модель слушает только голос» голос останется в ролике своим звуком, без неё ролик озвучит модель, а голос будет слышен тише. Вернуть исходное - кнопка рядом.');
-      } catch (err) { toast(err.message); }
-      b.textContent = old; b.disabled = false;
-    };
-    $('#lmVoiceBack', root).onclick = () => {
-      if (!slot._orig) return; slot._file = slot._orig; slot._orig = null; $('span', slot).textContent = slot._file.name; $('#lmVoiceBack', root).hidden = true; toast('Исходное аудио возвращено');
-    };
     queueMicrotask(() => setSnd('none'));
   }
   const files = sel => $$(sel, root).filter(x => x._file);
