@@ -155,6 +155,10 @@ export function previewPanel(el, st, opts) {
       + 'Прикрепите файлы или уберите эти номера из текста.\n\n' + (gaps || []).join('\n'),
       'Продолжить', async () => { await retry(); }, 'Прервать');
   }
+  /* Цепочка сцен спрашивает про предупреждения один раз: человек решил это,
+     когда запускал «Сделать все сцены», и на каждой следующей сцене окно
+     останавливало бы ночную сборку и требовало того же решения заново. */
+  let chainWarnOk = 0;
   async function realStart(force) {
     const meta = opts.meta();
     go.disabled = true; if (!run) status.textContent = 'Отправляем задание в ComfyUI…';
@@ -163,10 +167,12 @@ export function previewPanel(el, st, opts) {
     /* Предупреждения, которые собрала сборка задания, - не мигающая строчка, а окно:
        человек читает список и решает - запускать как есть или пойти поправить. */
     const warns = warnTake();
-    if (warns.length && !force) {
+    const live = !!(opts.chainLive && opts.chainLive());
+    if (!live) chainWarnOk = 0;
+    if (warns.length && !force && !(live && chainWarnOk)) {
       go.disabled = false;
       return confirmBox('Перед запуском: ' + warns.length + (warns.length > 4 ? ' предупреждений' : ' предупреждения'),
-        warns.join('\n'), 'Всё равно запустить', async () => { await realStart(true); }, 'Поправить');
+        warns.join('\n'), 'Всё равно запустить', async () => { if (live) chainWarnOk = 1; await realStart(true); }, 'Поправить');
     }
     let res;
     try {

@@ -3940,6 +3940,7 @@ export function makeRefMode(cfg) {
 
   const prev = previewPanel($('.rm-preview', root), S, {
     singleScene: () => cfg.scenes && root._mode === 'parts' && root._chainPart == null,
+    chainLive: () => cfg.scenes && root._chainPart != null,   // цепочка идёт: окно про предупреждения не ставит сборку на каждую сцену
     goLabel: () => !cfg.scenes ? 'Сгенерировать' : root._mode === 'parts'
       ? `Сделать сцену ${root._sel + 1}` : 'Сгенерировать видеоролик',   // the number follows the scene you picked
     extraLabel: cfg.stepsUI || cfg.swap || cfg.scenes ? 'Шаги' : 'Схема',
@@ -4005,7 +4006,13 @@ export function makeRefMode(cfg) {
           let k = root._target; root._target = null;
           const tst = root._test; root._test = null;
           if (k == null) k = root._ready();
-          if (k >= all.length) throw new Error('Все сцены уже сделаны. Чтобы переделать одну, нажмите «Переделать» в её карточке.');
+          if (k >= all.length) {
+            /* Кнопка названа «Сделать сцену N» - она ровно это и делает: когда всё
+               уже готово, большая кнопка переделывает выбранную сцену, как
+               «Переделать» в её карточке, а не отказывает. */
+            if (root._sel != null && root._sel < all.length) k = root._sel;
+            else throw new Error('Все сцены уже сделаны. Чтобы переделать одну, нажмите «Переделать» в её карточке.');
+          }
           if (!tst && !root._canGo(k)) throw new Error(`Сначала сделайте сцену ${k}: эта продолжает её конец. Или отметьте у сцены «Сменить план здесь».`);
           fd.append('part', k); fd.append('run', root._run); if (root._q === 'draft' && !tst) fd.append('draft', '1'); fd.append('variant', String(all[k]._var || 0));
           if (tst) { fd.set('quality', tst.q); fd.delete('width'); fd.delete('height'); fd.append('test', '1'); }   // a size test: the scene alone, in the chosen size
