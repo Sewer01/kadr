@@ -3105,7 +3105,7 @@ export function makeRefMode(cfg) {
       cap.className = 'hint sr-cnt-cap';
       cap.textContent = 'сцен не больше · максимум ' + SCENES_MAX;
       box.append(document.createTextNode('Сцена от '), sMin, document.createTextNode(' до '), sMax,
-        document.createTextNode(' секунд · '), sCnt, sNum, cap);
+        document.createTextNode(' секунд · Кол-во сцен '), sCnt, sNum, cap);
       const showNum = () => { sNum.hidden = cap.hidden = lim.how !== 'man'; };
       limRow.append(box);
       showNum();
