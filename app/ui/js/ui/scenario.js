@@ -573,8 +573,11 @@ export async function sendPrompt(blk, to) {
     const hasHead = /^\s*SCENE\s*\d+\s*\|/im.test(prompt);   // text before "SCENE 1" (a stray roles line) is not a scene
     for (const line of prompt.split('\n')) {
       if (hasHead && !cur && !/^\s*SCENE\s*\d+\s*\|/i.test(line)) continue;
-      const mm = line.match(/^\s*SCENE\s*(\d+)\s*\|\s*(\d+(?:\.\d+)?)\s*(\|\s*new)?\s*$/i);
-      if (mm) { cur = { sec: +mm[2], fresh: !!mm[3], text: [] }; list.push(cur); } else if (cur) cur.text.push(line); else if (line.trim()) { cur = { sec: 10, text: [line] }; list.push(cur); }
+      /* Лёгкая модель любит прилепить текст сцены к её заголовку в одну строку
+         («SCENE 2 | 12 | new As they pass…»): раньше такой лист не узнавался и весь
+         ответ ложился в первую сцену одним текстом. Хвост строки - первый текст сцены. */
+      const mm = line.match(/^\s*SCENE\s*(\d+)\s*\|\s*(\d+(?:\.\d+)?)(\s*\|\s*new)?\s*(.*)$/i);
+      if (mm) { cur = { sec: +mm[2], fresh: !!mm[3], text: [] }; list.push(cur); if (mm[4].trim()) cur.text.push(mm[4]); } else if (cur) cur.text.push(line); else if (line.trim()) { cur = { sec: 10, text: [line] }; list.push(cur); }
     }
     // строки про звук принадлежат сцене: раньше такая строка вырезалась вместе со всем текстом,
     // написанным на ней; снимаем только префикс поля описания, чтобы программа поставила выравнивание сама

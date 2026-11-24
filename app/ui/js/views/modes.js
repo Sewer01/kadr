@@ -1974,6 +1974,11 @@ export function makeRefMode(cfg) {
     const putFile = (key, f) => { const sg = f ? `${f.name}|${f.size}|${f.lastModified}` : ''; if (fsig[key] === sg) return; fsig[key] = sg; if (f) memFile('put', key, f); else memFile('delete', key); };
     let saveT = null;
     function saveNow() {
+      /* «Ничего не сохраняем, пока не лёг последний проект»: проверка жила только в местах вызова,
+         а сценарист зовёт сохранение сам. Пока лента ещё раскладывается, полка фонового трека
+         пуста, и такое сохранение стирало «аудио 1» из памяти программы - трек пропадал навсегда.
+         Не потеряем и само сохранение: оно дождётся конца раскладки. */
+      if (root._restoring) { root._save(); return; }
       try {
         const run = root._run, slotA = $('.rm-auds .slot', root);
         const proj = { run, t: Date.now(), sec: cfg.mode, mode: root._mode, qm: root._q, qBy: { ...(root._qBy || {}), [root._q]: S.q }, snd: root._snd, loop: root._loop !== false, start: $('.lm-start', root).value, vocals: $('.lm-vocals', root).checked,
