@@ -524,7 +524,10 @@ export function renderAssistant(el, m) {
   const parts = (m.content || '').split(/```(?:prompt|text)?\s*\n?/);
   parts.forEach((p, i) => {
     if (i % 2 === 0) { if (p.trim()) html += mdLite(p.trim()); return; }
-    const closed = i < parts.length - 1;
+    /* Ответ лёг целиком (статуса нет - работа кончилась), а закрывающих ``` нет:
+       модель уперлась в предел длины и молча оборвала блок. Такой блок - тоже
+       промпт: без этого весь лист сцен повисал в чате без кнопки возврата. */
+    const closed = i < parts.length - 1 || m.status == null;
     const text = m.edits?.[i] ?? p.replace(/\n$/, '');
     /* Режим, для которого делали текст, и есть ли у него окно «Сценарий». Если окно есть,
        кнопка не уводит человека с его фото и песнями: она кладёт текст в то окно, а

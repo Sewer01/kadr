@@ -1678,21 +1678,31 @@ export function makeRefMode(cfg) {
         list = list.slice(0, sl.cnt || list.length)
           .map(x => (x && Object.assign({}, x, { sec: Math.max(sl.min, Math.min(sl.max, Math.round(x.sec) || sl.min)) })) || x);
       }
-      /* Модель на длинных списках любит зациклиться: сцены 4..15 одним текстом - это её
-         повтор, а не замысел. Оставить их нельзя: человек получил бы ленту мусора.
-         Дубликаты (текст слово в слово совпадает с предыдущей такой же сценой)
-         убираются, первая остаётся; о том, что убрано, говорится прямо. */
+      /* Модель на длинных списках зацикливается: сцены 4..20 - один и тот же кадр
+         другими словами. Точное сравнение такое не ловит, поэтому сцены сравниваются
+         по набору слов: очень похожая на уже оставленную считается повтором и
+         убирается, первая остаётся; о том, что убрано, говорится прямо. */
       {
-        const seen = new Set(), kept = [], dup = [];
+        const norm = s => String((s && s.prompt) || '').toLowerCase().replace(/<[^>]+>/g, ' ').replace(/\W+/g, ' ').trim();
+        const words = k => new Set(k.split(' ').filter(w => w.length > 2));
+        const jac = (a, b) => { let inter = 0; a.forEach(w => { if (b.has(w)) inter++; }); return inter / (a.size + b.size - inter || 1); };
+        const kept = [], seen = [], dup = [];
         list.forEach((x, i) => {
-          const k = String((x && x.prompt) || '').trim().toLowerCase().replace(/\s+/g, ' ');
-          if (k && seen.has(k)) { dup.push(i + 1); return; }
-          if (k) seen.add(k);
-          kept.push(x);
+          const k = norm(x);
+          if (!k) { kept.push(Object.assign({}, x, { _no: i + 1 })); return; }
+          const ws = words(k);
+          let twin = -1;
+          for (let j = 0; j < seen.length; j++) {
+            const s = seen[j];
+            if (s.k === k || (s.ws.size >= 12 && ws.size >= 12 && jac(s.ws, ws) >= 0.75)) { twin = j; break; }
+          }
+          if (twin >= 0) { dup.push((i + 1) + ' как ' + kept[twin]._no); return; }
+          kept.push(Object.assign({}, x, { _no: i + 1 }));
+          seen.push({ k, ws });
         });
         if (dup.length) {
-          list = kept;
-          warn('Сценарист повторил сцены ' + dup.join(', ') + ' дословно: повторы убраны, первая такая сцена осталась');
+          list = kept.map(x => { const y = Object.assign({}, x); delete y._no; return y; });
+          warn('Сценарист повторил сцены ' + dup.join(', ') + ': текст почти как у уже стоящей сцены - повторы убраны, первая осталась');
           warnSoon('Сценарист повторился');
         }
       }
@@ -3096,7 +3106,7 @@ export function makeRefMode(cfg) {
               + root._scPlan + ' сцен, закрой этот кусок целиком'
             : ', всего ' + root._scPlan + ' сцен на трек длиной ' + root._scTrack + ' секунд - закрой трек целиком')
           : lim.how === 'man' ? ', всего не больше ' + root._scLimits().cnt + ' сцен'
-            : ', сколько сцен - реши сам по смыслу, но не меньше двух';
+            : ', сколько сцен - реши сам по смыслу: обычно хватает 2-8, больше 10 не пиши, если человек прямо не просил, и не меньше двух';
       /* Что Сценарист должен знать о метках сцен. Сам он их не ставит, но обязан писать
          так, чтобы они не врели: где поют - слова попадают в куплет или припев этого
          куска трека, где проигрыш - пения и речи быть не должно. */
