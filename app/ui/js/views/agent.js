@@ -3,7 +3,7 @@ import { $, $$, GB, UI_Z, confirmBox, copyText, esc, fileKind, fileToDataURL, fm
 import { LIB, abuf, audioName, byId, openId, openItem, registerViews, setupModes, setupProfile } from '../core/state.js';
 import { goTo, onNav } from '../core/tabs.js';
 import { wavSlice } from '../ui/audio.js';
-import { putScenario, putScenarioDraft, scenarioWindowOf, sendPrompt } from '../ui/scenario.js';
+import { putScenario, putScenarioDraft, scenarioWindowOf, scenarioSheetOf, sendPrompt } from '../ui/scenario.js';
 import { micToggle, transcribeWav } from '../ui/mic.js';
 import { dropBox } from '../ui/slots.js';
 import { MODE_NAME, studioCaps } from '../core/modes.js';
@@ -903,6 +903,7 @@ export async function agSend() {
   AG.msgs.push(reply); renderMsgs();
   const el = $('#agMsgs .msg:last-child');
   AG.busy = true; $('#agSend').textContent = 'Стоп'; AG.ctrl = new AbortController();
+  window._agNote = 'Сценарист: думаю…';   // метка программы пульсирует и за сценариста: режим работы видно из любого окна
   // «Правка картинки» делается и на Qwen, и на FLUX klein, а теги картинок у них разные: сценаристу нужен движок раздела
   const qwBtn = $('.qw-eng button.on', $('#view-qwen'));
   const ctx = { cont: studioCaps(AG.target).baseVideo && (AG.att.some(a => a.frame) || !!((RM[AG.target] || {}).root || {})._src) ? 1 : 0, model: AG.target === 'qwen' ? ((qwBtn && qwBtn.dataset.e) || 'qwen') : (AG.storyFrames && AG.storyModel === 'krea' ? 'flux' : AG.storyModel), frames: AG.target === 'story' && AG.storyFrames, duration: AG_IMG.includes(AG.target) ? null : AG.target === 'video' ? V.dur : AG.target === 'lipsync' ? (L.dur0 ? L.len() : null) : RM[AG.target].S.dur };
@@ -945,7 +946,7 @@ export async function agSend() {
         const line = buf.slice(0, k).trim(); buf = buf.slice(k + 2);
         if (!line.startsWith('data:')) continue;
         const ev = JSON.parse(line.slice(5));
-        if (ev.type === 'status') reply.status = ev.text;
+        if (ev.type === 'status') { reply.status = ev.text; window._agNote = 'Сценарист: ' + ev.text; }
         else if (ev.type === 'skills') reply.skills = ev.names;
         else if (ev.type === 'delta') reply.content += ev.text;
         else if (ev.type === 'error') reply.error = ev.message;
@@ -953,7 +954,7 @@ export async function agSend() {
       }
     }
   } catch (e) { if (e.name !== 'AbortError') reply.error = e.message; }
-  AG.busy = false; $('#agSend').textContent = 'Написать сценарий'; reply.status = null;
+  AG.busy = false; $('#agSend').textContent = 'Написать сценарий'; reply.status = null; window._agNote = '';
   try { if ((reply.content || '').trim()) sessionStorage.setItem('h3-last-scenario', reply.content); } catch (e) { }
   agReturnSync();
   if (!reply.content && !reply.error) reply.error = 'Остановлено';
@@ -970,7 +971,7 @@ export function agReturnText() {
 }
 export function agReturnTarget() {
   const t = AG.target;
-  return t && scenarioWindowOf(t) ? t : null;
+  return t && scenarioSheetOf(t) ? t : null;
 }
 export function agReturnSync() {
   const b = $('#agReturn'); if (!b) return;
@@ -1262,9 +1263,10 @@ $('#agMsgs').addEventListener('click', async e => {
   if (e.target.closest('[data-copy]')) { copyText($('pre', blk).textContent, 'Промпт скопирован'); return; }
   const to = e.target.closest('[data-send]')?.dataset.send;
   /* Режим, у которого есть окно «Сценарий», получает текст в это окно: человек остаётся
-     хозяином своих картинок и песен и привязывает их там же. Остальные цели идут прежним
-     путём, который заодно раскладывает по полкам файлы ответа. */
-  if (to) { if (scenarioWindowOf(to)) putScenario(to, $('pre', blk).textContent); else sendPrompt(blk, to); }
+     хозяином своих картинок и песен и привязывает их там же. Студии сцен - исключение:
+     их ответ это лист сцен, и ему путь через sendPrompt, который раскладывает лист по
+     карточкам; в окно одной сцены весь лист класть нельзя. */
+  if (to) { if (!studioCaps(to).scenes && scenarioWindowOf(to)) putScenario(to, $('pre', blk).textContent); else sendPrompt(blk, to); }
 });
 $('#agMsgs').addEventListener('change', e => {
   const s = e.target.closest('.pb-other'); if (s && s.value) { sendPrompt(s.closest('.pblock'), s.value); s.value = ''; }
@@ -1396,6 +1398,7 @@ export async function agStatus() {
   if (!API) return;
   const s = AG.status = await (await fetch('/api/agent/status')).json();
   const st = s.installing ? ['weak', 'скачивается'] : !s.installed ? ['unsupported', 'не скачана'] : s.running ? ['ok', 'в памяти'] : ['ok', 'готова'];
+  window._agMode = st[1];   // режим работы сценариста: он в подсказке метки программы
   $('#agState').className = 'verdict ' + st[0]; $('#agState').textContent = st[1];
   const big = $('#agBig'), curName = s.custom ? s.title : ((s.variants || []).find(o => o.current) || {}).title || s.title;
   big.className = 'agbig ' + (s.installing ? 'wait' : s.installed ? 'ok' : 'bad');

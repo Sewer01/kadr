@@ -161,7 +161,9 @@ function notifyDone() {
   } catch (e) { }
 }
 setInterval(() => {
-  const busy = QUEUE.some(j => j.state === 'running' || j.state === 'queued');
+  /* Метка пульсирует и за работу сценариста тоже: его «думаю…» человек должен
+     видеть из любого окна, а не только читая чат. */
+  const busy = QUEUE.some(j => j.state === 'running' || j.state === 'queued') || !!window._agNote;
   if (busy !== NOTIFY_BUSY) {
     NOTIFY_BUSY = busy;
     const mark = document.querySelector('.brand-mark');

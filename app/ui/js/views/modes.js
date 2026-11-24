@@ -6,7 +6,7 @@ import { goTo, onNav } from '../core/tabs.js';
 import { AudioRow, AudioTrimmer, VideoTrimmer, actx, wavSlice, setActx } from '../ui/audio.js';
 import { ASPECTS, QUALITY, QUALITY_ALL, loraForm, mountLoras, paramsCard, r32, resFor, seedForm, sizeForm, useSeed } from '../ui/params.js';
 import { previewPanel } from '../ui/preview.js';
-import { audioTokens, ownWords, scenarioResolvers, scenarioTagRow, scenarioWindow, sceneAudioPlan } from '../ui/scenario.js';
+import { audioTokens, ownWords, scenarioResolvers, scenarioSheetResolvers, scenarioTagRow, scenarioWindow, sceneAudioPlan } from '../ui/scenario.js';
 import { fitAspect, fitSlot, repeatRefs, resetSlot, wireDrop, wireSlotSwap } from '../ui/slots.js';
 import { AG, agAttachFile, agCarry, agCtx, agDraftOut, agGenerate, agGo, agMakeBtn, agPickTarget, agRefWarn, agScenesText, agStatus, agWords, agWordsFor, hGrip, hGripAfter, setChatAudio, showAudioBox, speechReady, wordsIntoPrompt } from './agent.js';
 import { transcribeWav } from '../ui/mic.js';
@@ -4396,6 +4396,7 @@ export function makeRefMode(cfg) {
       return (list.find(c => !c._win.value().trim()) || list[list.length - 1])._win;
     }
     : () => scWin);
+  if (cfg.scenes) scenarioSheetResolvers.set(cfg.mode, () => (root._srWin && root._srWin.sc && root._srWin.sc.isConnected ? root._srWin : null));
   return { root, S, upd, voice: () => files('.rm-auds .slot').length, prompt: () => promptEl(), imgSlots: () => $$('.ref input', imgsEl) };
 }
 export const RM = {

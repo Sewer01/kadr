@@ -170,7 +170,11 @@ export function shortCpu(name) {
     const wait = cap && /запуск|поднима|жд|не запущен|start/i.test(cap.textContent || '');
     mark.classList.toggle('eng-wait', !on);
     mark.classList.toggle('eng-on', !!on);
-    mark.title = on ? 'Движок работает - можно снимать' : (wait ? 'Движок поднимается: подождите пару минут' : 'Движок не запущен: нажмите «Движок» внизу');
+    /* Режим работы сценариста живёт в подсказке той же метки: во время работы
+       на первом месте его слово, в покое - чем сценарист сейчас готов быть. */
+    const agn = window._agNote || '', agm = window._agMode || '';
+    mark.title = (agn ? agn + ' · ' : '') + (on ? 'Движок работает - можно снимать' : (wait ? 'Движок поднимается: подождите пару минут' : 'Движок не запущен: нажмите «Движок» внизу'))
+      + (agn || !agm ? '' : ' · Сценарист: ' + agm);
   };
   st();
   const watch = document.querySelector('.side') || document.body;

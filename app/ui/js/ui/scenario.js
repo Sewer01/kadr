@@ -48,10 +48,22 @@ export function scenarioWindowOf(mode) {
   try { win = find ? find() : null; } catch (e) { win = null; }
   return win && win.ta && win.ta.isConnected ? win : null;
 }
+/* Окно «Сценарий» студии сцен - одно на всю студию: возвращаемый сценарий это
+   целый текст, и в карточку одной сцены его класть нельзя (так и рождался
+   «весь сценарий в сцене 7»). Раздел с сценами регистрирует сюда своё окно
+   сценария; без него работает прежний поиск по сцене. */
+export const scenarioSheetResolvers = new Map();
+export function scenarioSheetOf(mode) {
+  const find = scenarioSheetResolvers.get(mode);
+  let win = null;
+  try { win = find ? find() : null; } catch (e) { win = null; }
+  if (win && win.sc && win.sc.isConnected) return win;
+  return scenarioWindowOf(mode);
+}
 /* Кладёт текст в окно режима. Привязку фото и звука окно не делает: для этого человек
    остаётся в режиме, куда текст лёг, - там свои плашки картинок и песен. */
 export function putScenarioDraft(mode, text) {
-  const win = scenarioWindowOf(mode);
+  const win = scenarioSheetOf(mode);
   if (!win) { toast('В этом режиме нет окна сценария: откройте его и попробуйте снова'); return false; }
   goTo(mode);
   const el = win.sc || win.ta;

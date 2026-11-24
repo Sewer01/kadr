@@ -284,6 +284,56 @@ class AgentMixin:
             self.agent_installer.cancelled = True
         return web.json_response({"ok": True})
 
+    async def _compress(self, messages):
+        """Короткий пересказ прежнего разговора, когда он перестал влезать в контекст.
+
+        Старые реплики модель пересказывает сама в несколько абзацев, последние
+        реплики остаются дословно. Касается только запроса к модели: чат человека
+        не переписывается - там по-прежнему полный разговор."""
+        keep = 4   # последние реплики всегда при себе, пересказ - только про прежнее
+        if len(messages) <= keep + 2:
+            return None
+        head, tail = messages[:-keep], messages[-keep:]
+
+        def flat(ms):
+            out = []
+            for m in ms:
+                c = m.get("content")
+                if isinstance(c, list):
+                    c = " ".join(p.get("text", "") for p in c if isinstance(p, dict))
+                txt = (c or "").strip()
+                if txt:
+                    out.append(("Человек: " if m.get("role") == "user" else "Сценарист: ") + txt)
+            return "\n\n".join(out)
+
+        text = flat(head)
+        if not text:
+            return None
+        if len(text) > 26000:   # пересказываемое тоже должно влезть в один запрос
+            text = text[:9000] + "\n…\n" + text[-17000:]
+        payload = {"messages": [
+            {"role": "system", "content":
+                "Сделай короткий пересказ этого разговора человека с сценаристом видеоролика: до 1200 знаков, по-русски. "
+                "Обязательно сохрани: о чём ролик, согласованные решения и тексты (кратко), имена героев и теги файлов, "
+                "что осталось сделать. Это будет вся память о разговоре - не выдумывай ничего, чего в разговоре не было. "
+                "Ответ - только пересказ."},
+            {"role": "user", "content": text}],
+            "stream": False, "temperature": 0.2, "chat_template_kwargs": {"enable_thinking": False},
+            "thinking_budget_tokens": 0}
+        try:
+            async with self.session.post(self.llm.url + "/v1/chat/completions", json=payload,
+                                         timeout=aiohttp.ClientTimeout(total=300)) as r:
+                if r.status != 200:
+                    return None
+                j = await r.json()
+                summ = ((j.get("choices") or [{}])[0].get("message") or {}).get("content", "").strip()
+        except Exception:
+            return None
+        if not summ:
+            return None
+        return [{"role": "user", "content":
+                 "[Краткий пересказ прежнего разговора - целиком он не влез в контекст]\n" + summ}] + tail
+
     async def h_agent_chat(self, req):
         body = await req.json()
         messages = body.get("messages") or []
@@ -346,11 +396,20 @@ class AgentMixin:
             await send({"type": "status", "text": "Читаю скиллы и думаю…"})
 
             thinking = False
-            for attempt in (0, 1):   # the first try keeps frames; if the context still overflows, a second goes without them
+            for attempt in (0, 1, 2):   # 0: всё как есть; 1: без кадров; 2: прежний разговор ложится коротким пересказом
+                if attempt == 2:
+                    await send({"type": "status", "text": "Места в контексте не хватило: пересказываю прежний разговор коротко…"})
+                    cm = await self._compress(messages)
+                    if cm is None:
+                        raise RuntimeError("Разговор не влезает в контекст даже коротким пересказом. "
+                                           "Начните новый чат - он освободит место")
+                    messages = cm
+                    await send({"type": "status", "text": "Прежний разговор встал коротким пересказом (ваш чат не тронут), продолжаю"})
+                    thinking = False
                 conv, notes = ag.to_openai(messages, max_frames=(10 if attempt == 0 else 0))
-                if attempt:
+                if attempt == 1:
                     await send({"type": "status", "text": "В контексте не уместилось: убираю все кадры и пробую ещё раз"})
-                elif notes:
+                elif notes and not attempt:
                     await send({"type": "status", "text": "Места в контексте мало: " + ", ".join(notes)})
                 payload = {"messages": [{"role": "system", "content": system}] + conv,
                            "stream": True, "temperature": 0.6, "cache_prompt": True}
@@ -363,7 +422,7 @@ class AgentMixin:
                                              timeout=aiohttp.ClientTimeout(total=None, sock_read=600)) as r:
                     if r.status != 200:
                         why = (await r.text())[:300]
-                        if "exceed_context" in why and attempt == 0:
+                        if "exceed_context" in why and attempt < 2:
                             continue   # lighter payload on the next pass
                         if "exceed_context" in why:
                             why += (". Увеличьте длину контекста ползунком «Контекст» в разделе «Сценарист» "
