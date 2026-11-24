@@ -2338,6 +2338,10 @@ export function makeRefMode(cfg) {
               c._audSel[j2] = { start: c._trim.start, end: c._trim.end, of: src.name };
               c._paintAuds(); paintRefs();
               if (root._save) root._save();
+              /* кусок песни и её слова должны соответствовать друг другу: если слова в
+                 сцене были услышаны машиной (или их вовсе не было), слушаем новый кусок;
+                 написанные человеком слова не трогаем никогда */
+              if ((c._audWordsAuto || [])[j2] || !((c._audWords || [])[j2] || '').trim()) autoHeard(j2, c._auds[j2], true);
             },
             onState: tr2 => {
               const j3 = tr2._slot;
@@ -2392,7 +2396,7 @@ export function makeRefMode(cfg) {
             + '<button class="btn mini" type="button" data-again="en">переслушать по-английски</button>'
             + '<button class="btn mini" type="button" data-again="clear">стереть слова</button></div>';
           const ta0 = $('textarea', host);
-          ta0.oninput = () => { c._audWords = c._audWords || []; c._audWords[+ta0.dataset.w] = ta0.value; c._paintTags?.(); if (root._save) root._save(); };
+          ta0.oninput = () => { c._audWords = c._audWords || []; c._audWords[+ta0.dataset.w] = ta0.value; (c._audWordsAuto = c._audWordsAuto || [])[+ta0.dataset.w] = false; c._paintTags?.(); if (root._save) root._save(); };
           $$('button[data-again]', host).forEach(b => {
             b.onclick = async () => {
               const j = +host.dataset.slot, file = c._auds[j]; if (!file) return;
@@ -2433,15 +2437,16 @@ export function makeRefMode(cfg) {
       /* Песня легла в сцену - её слова нужно слышать сразу, а не после ручного
          «переслушать»: человек ждёт, что текст песни подставится сам. Молчим, если
          распознавание не готово или слова уже есть (из чата, из сохранения, руками). */
-      const autoHeard = async (j, f) => {
+      const autoHeard = async (j, f, force) => {
         try {
-          if (((c._audWords || [])[j] || '').trim()) return;
+          if (!force && ((c._audWords || [])[j] || '').trim()) return;
           if (!AG.status || !AG.status.speech_ready) { try { await agStatus(); } catch (e) { return; } }
           if (!AG.status || !AG.status.speech_ready) return;
           const j2 = await transcribeWav(f, 'auto');
           const words = String(j2.text || '').trim();
           if (!words || c._auds[j] !== f) return;   // файл уже сменился - эти слова не к нему
           (c._audWords = c._audWords || [])[j] = words;
+          (c._audWordsAuto = c._audWordsAuto || [])[j] = true;   // услышано машиной: обрезка переслушает
           c._paintWords?.(); c._paintTags?.();
           if (root._save && !root._restoring) root._save();
           toast('Слова песни услышаны и встанут в текст сцены: ' + words.slice(0, 60));

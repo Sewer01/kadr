@@ -9,9 +9,19 @@ import { wavSlice } from './audio.js';
 
 let live = null;   // { mr, btn, stop } - одна живая запись
 
-/* Слова из куска звука: тот же путь и для чата, и для режимов. */
+/* Слова из куска звука: тот же путь и для чата, и для режимов.
+   Распознавание читает WAV; mp3 или m4a, отданные как есть, оно слышит обрывками -
+   человек получал «начальное слово» вместо всей песни. Поэтому не-WAV сначала
+   раскладывается браузером в WAV, а уж потом едет на распознавание. */
 export async function transcribeWav(blob, lang = 'auto') {
-  const fd = new FormData(); fd.append('file', blob, 'a.wav'); fd.append('lang', lang);
+  let b = blob;
+  if (b && b.type !== 'audio/wav') {
+    try {
+      const buf = await sharedAudioCtx().decodeAudioData(await b.arrayBuffer());
+      b = wavSlice(buf, 0, buf.duration);
+    } catch (e) { /* что браузер не декодирует - уходит как есть: пусть распознавание пробует */ }
+  }
+  const fd = new FormData(); fd.append('file', b, 'a.wav'); fd.append('lang', lang);
   const r = await fetch('/api/speech/transcribe', { method: 'POST', body: fd });
   const j = await r.json(); if (!r.ok) throw new Error(j.error || 'Не удалось распознать');
   return j;

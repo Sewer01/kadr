@@ -63,20 +63,24 @@ def _find_exe(folder):
     return hits[0] if hits else None
 
 
-def _find_model(folder):
+def _model_list(folder):
+    """Все пригодные модельные файлы, лучшие первым (те же правила, что у _find_model)."""
     folder = Path(folder)
     if not folder.is_dir():
-        return None
+        return []
     files = [p for p in folder.rglob("ggml-*.bin") if len(p.relative_to(folder).parts) <= 4
              and ".en" not in p.name and "silero" not in p.name.lower() and "vad" not in p.name.lower()
              and not p.name.endswith(("-encoder.bin",))]
-    if not files:
-        return None
 
     def rank(p):
         n = p.name.lower()
         return next((i for i, k in enumerate(MODEL_PREFERENCE) if k in n), len(MODEL_PREFERENCE)), p.stat().st_size
-    return sorted(files, key=rank)[0]
+    return sorted(files, key=rank)
+
+
+def _find_model(folder):
+    files = _model_list(folder)
+    return files[0] if files else None
 
 
 def locate(root, custom_dir=None):
@@ -108,13 +112,14 @@ async def install(installer, root, custom_dir=None):
                                  f"распознавание речи: {MODEL_FILE}", MODEL_SIZE)
 
 
-def _run(root, wav_bytes, lang, custom_dir=None):
+def _run(root, wav_bytes, lang, custom_dir=None, model=None):
     found = locate(root, custom_dir)
     exe = found["exe"]
+    model = Path(model) if model else found["model"]
     with tempfile.TemporaryDirectory() as tmp:
         wav = Path(tmp) / "in.wav"
         wav.write_bytes(wav_bytes)
-        args = [str(exe), "-m", str(found["model"]), "-f", str(wav), "-l", lang or "auto", "-nt", "-t", "6"]
+        args = [str(exe), "-m", str(model), "-f", str(wav), "-l", lang or "auto", "-nt", "-t", "6"]
         r = subprocess.run(args, capture_output=True, text=True, encoding="utf-8", errors="replace",
                            timeout=300, creationflags=engine.CREATE_NO_WINDOW)
     if r.returncode != 0:
@@ -126,7 +131,50 @@ def _run(root, wav_bytes, lang, custom_dir=None):
     return text, code
 
 
+def _seconds(wav_bytes):
+    """Длительность присланного WAV из заголовка: нужна, чтобы понять, сколько слов
+    человек имел право услышать на этом звуке."""
+    try:
+        import struct
+        if wav_bytes[:4] != b"RIFF" or wav_bytes[8:12] != b"WAVE":
+            return 0.0
+        i, sr, bits, ch, data = 12, 0, 0, 0, 0
+        while i + 8 <= len(wav_bytes):
+            cid = wav_bytes[i:i + 4]
+            sz = struct.unpack("<I", wav_bytes[i + 4:i + 8])[0]
+            if cid == b"fmt " and sz >= 16:
+                ch = struct.unpack("<H", wav_bytes[i + 10:i + 12])[0]
+                sr = struct.unpack("<I", wav_bytes[i + 12:i + 16])[0]
+                bits = struct.unpack("<H", wav_bytes[i + 22:i + 24])[0]
+            elif cid == b"data":
+                data = sz
+                break
+            i += 8 + sz + (sz & 1)
+        if not sr or not ch or not bits:
+            return 0.0
+        return data / float(sr * ch * (bits // 8))
+    except Exception:
+        return 0.0
+
+
 async def transcribe(root, wav_bytes, lang="auto", custom_dir=None):
     """Returns (text, language_code, language_name_for_prompt)."""
     text, code = await asyncio.to_thread(_run, root, wav_bytes, lang, custom_dir)
+    secs = _seconds(wav_bytes)
+    # Длинный звук и пара слов - это не «там петь нечего», а модель, которая на пении
+    # сдалась: на одной и той же песне большая модель выдавала «я бы», а маленькая
+    # слышала весь припев. Молча оставить человека с двумя словами нельзя, поэтому
+    # слушаем этим же звуком второй моделью, которая есть на диске, и берём ответ
+    # длиннее. Ничего не выдумываем: берём то, что одна из моделей правда услышала.
+    if secs >= 4 and len(text.split()) <= 3:
+        try:
+            found = locate(root, custom_dir)
+            best = Path(found["model"]) if found.get("model") else None
+            alt = next((p for p in _model_list(best.parent) if p != best), None) if best else None
+            if alt is not None:
+                t2, c2 = await asyncio.to_thread(_run, root, wav_bytes, lang, custom_dir, alt)
+                if len(t2.split()) > len(text.split()):
+                    text, code = t2, c2 or code
+        except Exception:
+            pass
     return text, code, LANG_NAMES.get(code, code.upper() if code else "")
