@@ -1053,14 +1053,18 @@ def long_part_graph(m, scenes, k, width, height, seed, images, audio=None, start
         g[str(nid[0])] = {"class_type": cls, "inputs": inputs}
         return str(nid[0])
 
-    own = list(sc[2]) if len(sc) > 2 and sc[2] else []   # this scene's own references; none: the common ones are used
+    own = list(sc[2]) if len(sc) > 2 and sc[2] else []
+    # СВОИ фото сцены не отменяют общие: сцена с одним своим кадром теряла все фото
+    # основного блока, а текст продолжал считать номера от общих - модель брала чужие
+    # лица вместо названных. Узел получает общие и свои вместе, как весь фильм.
+    refs = [x for x in list(images) + own if x][:9]
     own_a = [x for x in (scene_audios[k] if k < len(scene_audios) else ()) if x][:3]
     # the text speaks in this scene's decade, the node gets a gapless list: move the numbers onto it,
     # exactly as the whole-film path does - otherwise one-by-one rendering ignored the tags
     ref = add("MiniMaxH3ReferenceToVideo", clip=["5", 0], vae=["6", 0], audio_vae=["7", 0],
               prompt=scene_prompt(sc[0], images, own, None, base=10 * (k + 1), auds=own_a),
               width=width, height=height, length=total, ref_image_size=ref_size)
-    _refs(g, ref, own or images, audios=own_a, base=100, abase=5000, atrim=15)
+    _refs(g, ref, refs, audios=own_a, base=100, abase=5000, atrim=15)
     new = add("LTXVSeparateAVLatent", av_latent=[ref, 1])
     a_lat = [new, 1]   # звук сочиняет модель: латент чистый, как когда общего файла нет
     if held:   # прижатие звукового латента - общее со всеми студиями (`_held_audio_latent`)
@@ -1311,7 +1315,8 @@ def action_part_graph(m, scenes, k, width, height, seed, images, loras, preview=
               prompt=scene_prompt(sc[0], images, own, None, base=10 * (k + 1)),
               width=lw, height=lh, length=total, ref_image_size="max")
     own_a = [x for x in (scene_audios[k] if k < len(scene_audios) else ()) if x][:3]
-    _refs(g, ref, own or images, audios=own_a, base=100, abase=5000, atrim=15)
+    # общие фото едут вместе со своими и здесь - те же правила, что у длинной студии
+    _refs(g, ref, [x for x in list(images) + own if x][:9], audios=own_a, base=100, abase=5000, atrim=15)
     new = add("LTXVSeparateAVLatent", av_latent=[ref, 1])
     # что слушает модель, фон фильма и галочка «модель слушает только голос» - той же общей
     # сборкой, что в Видеостудии (`_heard_audio`); здесь эти ноды занимают 14/15/16/17.

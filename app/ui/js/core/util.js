@@ -327,6 +327,7 @@ export const fileToDataURL = (file, max = 1024) => new Promise(res => {
 });
 export function fmtShort(iso) { return iso ? fmtDate(new Date(iso)) : ''; }
 export function confirmBox(title, text, ok, fn, cancel) {
+  const cn0 = $('#confirm [data-close]'); if (cn0) cn0.style.display = '';   // окно «Понятно» прячет отмену - вернём на место
   $('#cfTitle').textContent = title;
   const tx = $('#cfText'); tx.textContent = text;
   tx.style.whiteSpace = String(text).indexOf('\n') >= 0 ? 'pre-line' : '';   // a list of problems reads line by line, not one line
@@ -338,6 +339,36 @@ export function confirmBox(title, text, ok, fn, cancel) {
     if (cn) cn.textContent = 'Отмена';
     await fn();
   };
+}
+/* ---------- Окно предупреждений ----------
+   Тост не может показать «все предупреждения»: все они пишутся в одну строку, и каждое
+   новое затирает прежнее. Предупреждения, влияющие на результат, копятся в список и
+   показываются ОДНИМ окном списком - человек успевает прочитать и решить. */
+export const WARN = [];
+export function warn(msg) { const s = String(msg || '').trim(); if (s && !WARN.includes(s)) WARN.push(s); }
+export function warnTake() { return WARN.splice(0, WARN.length); }
+/* Два окна одновременно нельзя (в коде это признано уже: system.js ждёт освобождения) -
+   новое становится в очередь за открытым. */
+function boxWait(fn) {
+  const box = (typeof $ === 'function' ? $('#confirm') : null) || document.getElementById('confirm');
+  if (box && !box.hidden) { setTimeout(() => boxWait(fn), 400); return; }
+  fn();
+}
+/* Окно с одной кнопкой: отменять здесь нечего, факт уже случился - важно только,
+   чтобы человек его увидел. */
+export function warnBox(title, lines, ok = 'Понятно') {
+  const list = (Array.isArray(lines) ? lines : [lines]).filter(Boolean).map(String);
+  if (!list.length) return;
+  boxWait(() => {
+    confirmBox(title, list.length > 1 ? list.map((s, i) => (i + 1) + '. ' + s).join('\n') : list[0], ok, () => { });
+    const cn = $('#confirm [data-close]'); if (cn) cn.style.display = 'none';
+  });
+}
+/* Предупреждения, которые рождаются толпой за секунды (ответ сценариста, раскладка
+   по сценам), показываются одним окном, когда толпа закончится. */
+export function warnSoon(title, ms = 1800) {
+  clearTimeout(warnSoon._h);
+  warnSoon._h = setTimeout(() => { const l = warnTake(); if (l.length) warnBox(title, l); }, ms);
 }
 
 /* interface zoom and library card size (buttons and Ctrl + mouse wheel) */

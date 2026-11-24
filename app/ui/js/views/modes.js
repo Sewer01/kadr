@@ -1,5 +1,5 @@
 import { API, postJSON } from '../core/net.js';
-import { $, $$, GB, ICON_AUD, ICON_IMG, ICON_VID, confirmBox, copyText, foldSlots, isImage, normItem, noteMsg, paintRange, sceneReconcile, toast, watchSlots } from '../core/util.js';
+import { $, $$, GB, ICON_AUD, ICON_IMG, ICON_VID, confirmBox, copyText, foldSlots, isImage, normItem, noteMsg, paintRange, sceneReconcile, toast, warn, warnSoon, watchSlots } from '../core/util.js';
 import { REF_HINT, STUDIO_CAPS, studioCaps } from '../core/modes.js';
 import { LIB, MEM, QUEUE, abuf, audioName, byId, memFile, memSave, openId, openItem, registerViews, setClipAudio, setUpJob, views } from '../core/state.js';
 import { goTo, onNav } from '../core/tabs.js';
@@ -103,6 +103,7 @@ $('#vClear').onclick = () => {
     `Уберём${pics.length ? ' картинки (' + pics.length + ' шт.) и' : ''} промпт. Готовые видео в Библиотеке останутся.`, 'Очистить', () => {
       pics.forEach(s => $(s + ' .x').click());
       $('#vPrompt').value = ''; $('#vPrompt').oninput({ target: $('#vPrompt') });
+      const lp = $('#vLoop'); if (lp && lp.checked) { lp.checked = false; lp.dispatchEvent(new Event('change', { bubbles: true })); }   // «зациклить» - тоже поле раздела
       const prev = $('#vPreview'); if (prev && prev._reset) prev._reset();   // and the preview panel with the result
       toast('Раздел очищен');
     });
@@ -268,6 +269,7 @@ $('#lClear').onclick = () => {
     `Уберём${hasAudio ? ' аудио,' : ''}${pics.length ? ' картинки (' + pics.length + ' шт.) и' : ''} промпт. Готовые клипы в Библиотеке останутся.`,
     'Очистить', () => {
       if (hasAudio) removeClipAudio();   // one function, whatever the button is called today
+      CL_HEARD = { name: '', text: '', lang: '', busy: false }; refsChanged();   // плашка «вставить слова песни» - тоже часть аудио
       pics.forEach(x => x.click());
       $('#lPrompt').value = ''; $('#lPrompt').dispatchEvent(new Event('input', { bubbles: true }));
       const prev = $('#lPreview'); if (prev && prev._reset) prev._reset();
@@ -630,15 +632,20 @@ export function makeRefMode(cfg) {
     const ta = $('.rm-prompt', root) || root._ta;
     const files = $$('.ref.filled .x, .slot.filled .x, .drop.filled .x', root);
     const text = (ta ? ta.value : '').trim() || (root._hasText ? root._hasText() : '');
-    if (!files.length && !text) { toast('Здесь и так пусто'); return; }
+    // фон ролика живёт в своём ряду, а не на плите: без учёта него кнопка отвечала «пусто», хотя трек был
+    const extra = (root._filmFiles && root._filmFiles().some(Boolean)) || root._snd === 'own'
+      || (cfg.swap && $$('.rm-who', root).some(w => w.value.trim()));   // в «Замене» ещё и поля «кого меняем»
+    if (!files.length && !text && !extra) { toast('Здесь и так пусто'); return; }
     confirmBox(`Очистить «${cfg.title}»?`,
-      `Уберём загруженное (${files.length} шт.), текст${cfg.scenes ? ' и сцены' : ''}. Видео и картинки в Библиотеке останутся.`, 'Очистить', () => {
+      `Уберём загруженное (${files.length} шт.), текст${cfg.scenes ? ', сцены и фон ролика со всеми его полями' : ''}. Видео и картинки в Библиотеке останутся.`, 'Очистить', () => {
         files.forEach(x => x.click());
         // chips and thumbnails of the reference video and audio stand in cards of their own and are
         // redrawn only by their own painter: without this the files were gone but the chips stayed
         (root._mediaPaint || []).forEach(fn => { try { fn(); } catch (e) { } });
         if (ta) { ta.value = ''; ta.dispatchEvent(new Event('input', { bubbles: true })); }
         if (root._clearScenes) root._clearScenes();
+        if (root._clearExtra) { try { root._clearExtra(); } catch (e) { } }   // фон ролика, его поля, режим счёта, волна
+        if (cfg.swap) { $$('.rm-who', root).forEach(w => { w.value = ''; }); const cu = $('.sw-cuts', root); if (cu) cu.value = ''; }
         if (root._setSrc) root._setSrc(null);   // the "we continue a finished video" plate goes away with the rest
         root._target = null; root._chainPart = 0;
         const prev = $('.rm-preview', root); if (prev && prev._reset) prev._reset();   // the mini preview goes empty too
@@ -1462,8 +1469,7 @@ export function makeRefMode(cfg) {
       const num = root._chainPart + 1;
       root._chainPart = null; root._chainEnd = null;
       const txt = `Сцена ${num} из ${$$('.sc', root).length} не получилась: ${msg}`;
-      toast(txt);
-      try { noteMsg(txt + ' · цепочка остановлена: почините и нажмите «Сделать все сцены» - продолжится с этой сцены'); } catch (e) { }
+      warn(txt + ' - цепочка остановлена: почините и нажмите «Сделать все сцены» - продолжится с этой сцены'); warnSoon('Внимание', 900);
     };
     root._chainNext = chainNext;
     $('.lm-chain', root).onclick = () => {
@@ -1648,11 +1654,11 @@ export function makeRefMode(cfg) {
          Сценариста, и он обязан уложиться: иначе «не больше 4 сцен по 8 секунд»
          значит «сколько модель посчитала». Других путей сюда нет - загрузка
          проекта список сцен через эту функцию не проходит. */
-      if (list.length > SCENES_MAX) toast('Лента держит ' + SCENES_MAX + ' сцен: лишние убраны - это уже больше часа расчёта');
+      if (list.length > SCENES_MAX) { warn('Лента держит ' + SCENES_MAX + ' сцен: лишние убраны - это уже больше часа расчёта'); warnSoon('Сценарист изменил ленту'); }
       list = list.slice(0, SCENES_MAX);
       const sl = (root._scLimits && root._scLimits()) || null;
       if (sl) {
-        if (sl.cnt && list.length > sl.cnt) toast('Сценарист вернул ' + list.length + ' сцен, а вы просили не больше ' + sl.cnt + ': лишние убраны');
+        if (sl.cnt && list.length > sl.cnt) { warn('Сценарист вернул ' + list.length + ' сцен, а вы просили не больше ' + sl.cnt + ': лишние убраны'); warnSoon('Сценарист изменил ленту'); }
         list = list.slice(0, sl.cnt || list.length)
           .map(x => (x && Object.assign({}, x, { sec: Math.max(sl.min, Math.min(sl.max, Math.round(x.sec) || sl.min)) })) || x);
       }
@@ -1690,7 +1696,7 @@ export function makeRefMode(cfg) {
           c._paint?.();
         });
         renumber(); sceneReconcile(root); recount(); refreshStates(); renderTL(); showClip(); if (root._save) root._save();
-        if (back.length) toast('Возврат из чата дописал потерянные теги: ' + back.join(' · '));
+        if (back.length) { warn('Возврат из чата дописал потерянные теги: ' + back.join(' · ')); warnSoon('Сценарист изменил ленту'); }
         return same.length;
       }
       /* The person's own photos and songs hang on the scene cards. Rebuilding the list without
@@ -1791,7 +1797,7 @@ export function makeRefMode(cfg) {
       root._sel = 0;
       renumber(); sceneReconcile(root);   // номера мест не спорят друг с другом и согласуются с текстом
       root._run = Math.random().toString(36).slice(2, 12); recount(); refreshStates();
-      if (lostBack.length) toast('Возврат из чата дописал потерянные теги: ' + lostBack.join(' · '));
+      if (lostBack.length) { warn('Возврат из чата дописал потерянные теги: ' + lostBack.join(' · ')); warnSoon('Сценарист изменил ленту'); }
       return back;
     };
     /* Клип мог вернуться уже после того, как страница пересобралась: номер прогона живой, а карточки
@@ -1887,7 +1893,7 @@ export function makeRefMode(cfg) {
           const v = cleanScene(ta.value, pics, c);
           if (v !== ta.value) { ta.value = v; ta.dispatchEvent(new Event('input', { bubbles: true })); }
         });
-        toast('Тексты починены: осталось только то, что происходит в кадре');
+        warn('Тексты починены: осталось только то, что происходит в кадре'); warnSoon('Сценарист изменил ленту');
         junkPaint();
         if (typeof changed === 'function') changed();
       };
@@ -1999,6 +2005,25 @@ export function makeRefMode(cfg) {
       } catch {}
     }
     root._save = () => { clearTimeout(saveT); saveT = setTimeout(saveNow, 700); };
+    /* «Очистить всё» должно очищать по-настоящему: старый проект оставался в памяти браузера
+       и на сервере, а указатель на него - на месте, и после перезапуска стёртая лента
+       возвращалась целиком. Забываем старый проект везде и заводим новый пустой. */
+    root._forgetProject = () => {
+      const old = root._run;
+      try {
+        const all = loadAll(); delete all[old];
+        root._run = Math.random().toString(36).slice(2, 12);
+        localStorage.setItem(PKEY, JSON.stringify(all)); localStorage.setItem(LASTKEY, root._run);
+        ['img0', 'img1', 'img2', 'img3', 'img4', 'aud0', 'src'].forEach(k => { delete fsig['long/' + old + '/' + k]; memFile('delete', `long/${old}/${k}`); });
+        for (let i = 0; i < 24; i++) {
+          for (let j = 0; j < 9; j++) { delete fsig[`long/${old}/simg${i}_${j}`]; memFile('delete', `long/${old}/simg${i}_${j}`); }
+          for (let j = 0; j < 3; j++) { delete fsig[`long/${old}/saudio${i}_${j}`]; memFile('delete', `long/${old}/saudio${i}_${j}`); }
+        }
+        fetch('/api/long/project', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ run: old, project: { run: old, t: Date.now(), sec: cfg.mode, snd: 'none', scenes: [] } }) }).catch(() => { });
+      } catch { root._run = Math.random().toString(36).slice(2, 12); }
+      root._save();
+    };
     root._snap = () => { saveNow(); return JSON.parse(JSON.stringify(loadAll()[root._run] || null)); };   // a stage of the work: the whole project as it is now
     root._openStage = async (proj, sid) => {
       let r = {}; try { r = await (await fetch('/api/long/stage', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ run: proj.run, id: sid, action: 'restore' }) })).json(); } catch {}
@@ -2067,14 +2092,14 @@ export function makeRefMode(cfg) {
         root._setSrc(got, false);
       }
       else root._setSrc(null, false);
-      if (srcLost) toast(`Видео-основа «${p.src.name}» не сохранилось: берите видео заново кнопкой «Своё видео», иначе сцены пойдут как новые.`);
+      if (srcLost) { warn(`Видео-основа «${p.src.name}» не сохранилось: берите видео заново кнопкой «Своё видео», иначе сцены пойдут как новые.`); warnSoon('Внимание', 900); }
       const okDone = d => d && byId(d.id) ? { sig: d.sig, url: d.url, id: d.id, text: d.text } : null;
       p.scenes.forEach((x, i) => { cards[i]._dn = { final: okDone(x.done), draft: okDone(x.draftDone) }; });
       // the continuation point of the last finished scene must still be on the disk (for the finished row and for the draft row)
       let st = {}; try { st = await (await fetch('/api/long/state?run=' + run)).json(); } catch {}
       for (const mk of ['final', 'draft']) {
         root._q = mk; const ready = readyUpTo(), parts = (mk === 'draft' ? st.draft_parts : st.parts) || [];
-        if (ready && !parts.includes(ready - 1)) { cards.forEach(c => { c._dn[mk] = null; }); toast('Точка продолжения не найдена на диске: сцены нужно сделать заново.'); }
+        if (ready && !parts.includes(ready - 1)) { cards.forEach(c => { c._dn[mk] = null; }); warn('Точка продолжения не найдена на диске: сцены нужно сделать заново.'); warnSoon('Внимание', 900); }
       }
       { const tgt = p.qm === 'draft' && root._dmad !== false ? 'draft' : 'final'; root._qBy = { draft: S.q, final: S.q, ...(p.qBy || {}) }; root._qBy.draft = okQ(root._qBy.draft); root._qBy.final = okQ(root._qBy.final); S.q = root._qBy[tgt]; setQ(tgt, true); }
       setMode(p.mode || 'parts'); root._restoring = false; recount(); refreshStates(); RM[cfg.mode]?.upd?.(); root._adopt?.();   // clips that finished while the page was elsewhere come back to their tiles   // the section that owns this project refreshes its own summary
@@ -2405,6 +2430,23 @@ export function makeRefMode(cfg) {
           (full ? '<span class="hint" style="font-size:12px">три аудио в сцене - максимум</span>' : '');
         c._paintWords && c._paintWords();
       };
+      /* Песня легла в сцену - её слова нужно слышать сразу, а не после ручного
+         «переслушать»: человек ждёт, что текст песни подставится сам. Молчим, если
+         распознавание не готово или слова уже есть (из чата, из сохранения, руками). */
+      const autoHeard = async (j, f) => {
+        try {
+          if (((c._audWords || [])[j] || '').trim()) return;
+          if (!AG.status || !AG.status.speech_ready) { try { await agStatus(); } catch (e) { return; } }
+          if (!AG.status || !AG.status.speech_ready) return;
+          const j2 = await transcribeWav(f, 'auto');
+          const words = String(j2.text || '').trim();
+          if (!words || c._auds[j] !== f) return;   // файл уже сменился - эти слова не к нему
+          (c._audWords = c._audWords || [])[j] = words;
+          c._paintWords?.(); c._paintTags?.();
+          if (root._save && !root._restoring) root._save();
+          toast('Слова песни услышаны и встанут в текст сцены: ' + words.slice(0, 60));
+        } catch (e) { }
+      };
       ainp.onchange = () => {
         const f = ainp.files && ainp.files[0];
         let j = apick; apick = -1;
@@ -2417,6 +2459,7 @@ export function makeRefMode(cfg) {
         c._paintAuds(); paintRefs();
         if (root._save) root._save();
         toast('Аудио <Audio ' + ((c._baseFixed || c._base || 10) + j) + '> в сцене: ' + f.name + ' - при желании обрежьте (до 15 с)');
+        autoHeard(j, f);
       };
       if (!$('.sc-auds', c)) {
         ($('.field-btns', c) || $('textarea', c)).insertAdjacentHTML('afterend', '<div class="sc-auds" style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:6px"></div><div class="sc-trimhost" hidden style="margin-top:8px"></div>');
@@ -2745,7 +2788,7 @@ export function makeRefMode(cfg) {
       const q = root._q, cards = $$('.sc', root);
       const ids = cards.map(c => (c._dn[q] || {}).id).filter(id => id && byId(id) && !byId(id).missing);
       if (ids.length < 2) { toast(ids.length ? 'Готова только одна сцена: сохранить её можно из Библиотеки. Для ролика нужно хотя бы две готовые сцены.' : 'Пока нет готовых сцен'); return; }
-      if (ids.length < cards.length) toast(`Готово ${ids.length} из ${cards.length} сцен: в Монтаж отправлены только готовые`);
+      if (ids.length < cards.length) { warn(`Готово ${ids.length} из ${cards.length} сцен: в Монтаж отправлены только готовые`); warnSoon('Внимание', 900); }
       window.montageLoad(ids); goTo('montage');
     };
     $('.tl-all', root).onclick = () => {   // the finished fragments one after another
@@ -3549,10 +3592,26 @@ export function makeRefMode(cfg) {
     root._clearScenes = () => {
       $$('.sc', root).forEach(c => c.remove());
       addScene('', 10);
-      root._run = Math.random().toString(36).slice(2, 12);   // the new scenes continue nothing from the old ones
+      if (root._forgetProject) root._forgetProject(); else root._run = Math.random().toString(36).slice(2, 12);   // новый пустой проект; старый стирается везде, а не только с глаз
       // клип последней сцены жил в проигрывателе ленты: без этой пары он оставался на экране
       // и после того, как сцен уже нет, - человек читал это как «очистка не сработала»
       recount(); renderTL(); showClip(); refreshStates();
+    };
+    /* «Очистить всё» в сценных студиях должно убирать и фон ролика со всеми его полями:
+       трек живёт не на плите, а в своём ряду, и обычный клик по крестику до него не
+       дотягивался - файл оставался и при следующем сохранении возвращался в проект. */
+    root._clearExtra = () => {
+      try { if (root._faudRow) [0, 1, 2].forEach(j => root._faudRow.set(j, null)); } catch (e) { }
+      try { setSnd('none'); } catch (e) { }
+      const st0 = $('.lm-start', root); if (st0) st0.value = '0';
+      const voc = $('.lm-vocals', root); if (voc) voc.checked = false;
+      const bd = $('.lm-beddb', root); if (bd) { bd.value = '-10'; const bv = $('.lm-beddbv', root); if (bv) bv.textContent = '-10'; }
+      const bn = $('.lm-bednorm', root); if (bn) bn.checked = false;
+      root._loop = true; const lp = $('.lm-loop', root); if (lp) lp.checked = true;
+      root._clSel = null; root._clPeaks = null; root._scTrack = 0; root._scPlan = 0;
+      try { if (root._clipPaint) root._clipPaint(); } catch (e) { }
+      try { if (root._base === 'cont') setBase('own'); } catch (e) { }
+      try { if (root._paintSrTags) root._paintSrTags(); } catch (e) { }
     };
     const mus = document.createElement('div'); mus.className = 'card';
     root._snd = 'none';
@@ -3863,7 +3922,7 @@ export function makeRefMode(cfg) {
                 if (tags.length) pl.text = (pl.text || '').replace(/non_diegetic_music\s*:\s*(?:N\/A|[^\n]*)/i, 'non_diegetic_music: ' + tags.join(' ') + ' (the reference audio of this scene)');
                 if (add.length) pl.text = (String(pl.text || '').trim() ? String(pl.text).trim() + '\n' : '') + add.join('\n');
                 pl.text = pl.text.trim();
-                if (add.length) toast('Сцена ' + (i + 1) + ': в текст для модели добавлены слова её песни (' + add.join(' · ').slice(0, 70) + '…)');
+                if (add.length) warn('Сцена ' + (i + 1) + ': в текст для модели добавлены слова её песни (' + add.join(' · ').slice(0, 70) + '…)');
               }
             });
           } catch (e) { }
@@ -3877,10 +3936,10 @@ export function makeRefMode(cfg) {
             const plan = pl;
             plan.files.forEach((f, j) => { if (f) fd.append(`saudio${i}_${j}`, f); });
             if (plan.rewritten && root._sentText) root._sentText[i] = plan.text;   // the model gets the numbers of the places
-            if (plan.borrowed && plan.borrowed.length) toast('Сцена ' + (i + 1) + ': ' + plan.borrowed.map(b => '<Picture ' + b.tag + '> - фото сцены ' + b.n).join(', ') + ' - поедет в эту сцену, на полке оно не двигается');
-            if (plan.lostPics && plan.lostPics.length) toast('Сцена ' + (i + 1) + ': под тегами ' + plan.lostPics.map(t => '<Picture ' + t + '>').join(', ')
+            if (plan.borrowed && plan.borrowed.length) warn('Сцена ' + (i + 1) + ': ' + plan.borrowed.map(b => '<Picture ' + b.tag + '> - фото сцены ' + b.n).join(', ') + ' - поедет в эту сцену, на полке оно не двигается');
+            if (plan.lostPics && plan.lostPics.length) warn('Сцена ' + (i + 1) + ': под тегами ' + plan.lostPics.map(t => '<Picture ' + t + '>').join(', ')
               + ' нет фото ни в этой, ни в других сценах - они убраны из текста, чтобы модель не рисовала наугад');
-            if (plan.dropped && plan.dropped.length) toast('Сцена ' + (i + 1) + ': модель слушает три аудио, поэтому ' + plan.dropped.map(t => '<Audio ' + t + '>').join(', ') + ' в этот раз не пойдёт - уберите лишний тег или замените его');
+            if (plan.dropped && plan.dropped.length) warn('Сцена ' + (i + 1) + ': модель слушает три аудио, поэтому ' + plan.dropped.map(t => '<Audio ' + t + '>').join(', ') + ' в этот раз не пойдёт - уберите лишний тег или замените его');
           }); fd.append('start', $('.lm-start', root).value || '0'); if (root._loop !== false) fd.append('music_loop', '1'); if (root._adur) fd.append('audio_dur', String(Math.round(root._adur * 1000) / 1000)); fd.append('vocals', root._snd === 'own' && $('.lm-vocals', root).checked ? '1' : '0'); fd.append('bed_db', $('.lm-beddb', root).value); fd.append('bed_norm', $('.lm-bednorm', root).checked ? '1' : '0'); if (cfg.mode === 'actionsc') loraForm(S, fd); }
         else loraForm(S, fd);
         seedForm(S, fd);

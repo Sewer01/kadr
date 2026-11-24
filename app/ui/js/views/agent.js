@@ -1,5 +1,5 @@
 import { API, postJSON } from '../core/net.js';
-import { $, $$, GB, UI_Z, confirmBox, copyText, esc, fileKind, fileToDataURL, fmtShort, isImage, sharedAudioCtx, toast } from '../core/util.js';
+import { $, $$, GB, UI_Z, confirmBox, copyText, esc, fileKind, fileToDataURL, fmtShort, isImage, sharedAudioCtx, toast, warn, warnBox, warnSoon } from '../core/util.js';
 import { LIB, abuf, audioName, byId, openId, openItem, registerViews, setupModes, setupProfile } from '../core/state.js';
 import { goTo, onNav } from '../core/tabs.js';
 import { wavSlice } from '../ui/audio.js';
@@ -78,7 +78,7 @@ export function agRefWarn(mode, head) {
     if (r && r._restoring) return 0;   // the shelves are still filling from memory: nothing is missing yet
     const bad = agRefCheck(mode);
     if (!bad.length) return 0;
-    toast(head + bad.length + ': ' + bad.slice(0, 3).join(' · ') + (bad.length > 3 ? ' · и ещё ' + (bad.length - 3) : ''));
+    warn(head + bad.length + ': ' + bad.slice(0, 3).join(' · ') + (bad.length > 3 ? ' · и ещё ' + (bad.length - 3) : ''));
     return bad.length;
   } catch (e) { return 0; }
 }
@@ -168,7 +168,7 @@ export async function agGenerate(btn, gen) {
       if (r0 && gen.scenes) {
         const filled = [];
         $$('.sc', r0).forEach((c, i) => { if (c._carryWords && c._carryWords().length) filled.push(i + 1); });
-        if (filled.length) toast('Сцены ' + filled.join(', ') + ': слова песни вписаны обратно в текст - Сценарист их не перенёс');
+        if (filled.length) { warn('Сцены ' + filled.join(', ') + ': слова песни вписаны обратно в текст - Сценарист их не перенёс'); warnSoon('Сценарист изменил ленту'); }
       }
     } catch (e) { }
     agRefWarn(mode, 'После возврата: ');
@@ -786,7 +786,7 @@ export function wordsIntoPrompt(text, auds, extra) {
   });
   (extra || []).forEach(x => x && push(x.words || x.text, x.lang || x.langName));
   if (!add.length) return text;
-  toast('Слова песни добавлены в текст для модели: в промпте их не было');
+  warn('Слова песни добавлены в текст для модели: в промпте их не было'); warnSoon('Внимание', 900);
   return String(text).trim() + '\n' + add.join('\n');
 }
 
@@ -827,6 +827,10 @@ export function agWords(f, sceneNo) {
     if (!wh.trim() || !/сцен\w*\s*\d/.test(wh)) return true;
     return new RegExp('сцен\\w*\\s*' + sceneNo + '(?![0-9])').test(wh);
   };
+  /* Точная подпись байтов - это тот же самый звук: его слова подходят ему, в какой бы
+     сцене человек его ни поставил. Проверка сцены нужна только размытому совпадению
+     по имени и длине (два куска одной песни носят одно имя). Без этого перенос
+     песни между сценами «терял» слова: в чате запись стояла под старой сценой. */
   const hit = (f.__key ? list.find(a => a.key === f.__key && a.text) : null)
     || list.find(a => a.name === f.name && Math.abs((a.dur || 0) - (f._dur || 0)) < .2 && a.text && mine(a))
     || null;
@@ -1245,7 +1249,12 @@ export async function clipText() {
   try { const t = await navigator.clipboard.readText(); if (t) return t; } catch {}
   try { return (await (await fetch('/api/clipboard', { method: 'POST' })).json()).text || ''; } catch { return ''; }
 }
-$('#agClear').onclick = () => { const ta = $('#agIn'); ta.value = ''; ta.dispatchEvent(new Event('input', { bubbles: true })); ta.focus(); };
+$('#agClear').onclick = () => { const ta = $('#agIn'); ta.value = ''; ta.dispatchEvent(new Event('input', { bubbles: true }));
+  /* «Очистить всё» в Сценаристе чистит и вложения: человек ждёт пустого окна целиком,
+     а не окна, где под полем остались лежать его фото и песни */
+  const ax = $('#agAttX'); if (ax) ax.click();
+  const ax2 = $('#agAudioX'); if (ax2) ax2.click();
+  ta.focus(); };
   /* The context size is a choice between "everything fits" and "the card has room to breathe", so
      it is the person's dial, not a hidden constant. Changing it unloads the model: the next request
      pays the loading time once, and a long dialogue stops dying with a 400 error. */

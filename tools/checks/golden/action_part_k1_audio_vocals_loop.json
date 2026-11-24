@@ -22,10 +22,28 @@
   "100": {
    "class_type": "LoadImage",
    "inputs": {
-    "image": "h3studio/own-a.png"
+    "image": "h3studio/char-a.png"
    }
   },
   "101": {
+   "class_type": "LoadImage",
+   "inputs": {
+    "image": "h3studio/char-c.png"
+   }
+  },
+  "102": {
+   "class_type": "LoadImage",
+   "inputs": {
+    "image": "h3studio/place.png"
+   }
+  },
+  "103": {
+   "class_type": "LoadImage",
+   "inputs": {
+    "image": "h3studio/own-a.png"
+   }
+  },
+  "104": {
    "class_type": "LoadImage",
    "inputs": {
     "image": "h3studio/own-c.png"
@@ -114,6 +132,18 @@
     ],
     "ref_images.ref_image_1": [
      "101",
+     0
+    ],
+    "ref_images.ref_image_2": [
+     "102",
+     0
+    ],
+    "ref_images.ref_image_3": [
+     "103",
+     0
+    ],
+    "ref_images.ref_image_4": [
+     "104",
      0
     ],
     "vae": [

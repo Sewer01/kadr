@@ -1,4 +1,4 @@
-import { $, $$, copyText, toast } from '../core/util.js';
+import { $, $$, copyText, toast, warn, warnSoon } from '../core/util.js';
 import { postJSON } from '../core/net.js';
 import { goTo } from '../core/tabs.js';
 import { earlyEvents, views } from '../core/state.js';
@@ -588,7 +588,7 @@ export async function sendPrompt(blk, to) {
       const by = {};
       scenesMade.forEach((s, i) => { (by[key(s)] = by[key(s)] || []).push(i + 1); });
       const twins = Object.keys(by).filter(k => by[k].length > 1 && k.length > 40).map(k => by[k].join(', '));
-      if (twins.length) toast('Сценарист повторил сцены ' + twins.join(' · ') + ' одинаковым текстом: поправьте текст или попросите его продолжить дальше');
+      if (twins.length) { warn('Сценарист повторил сцены ' + twins.join(' · ') + ' одинаковым текстом: поправьте текст или попросите его продолжить дальше'); warnSoon('Сценарист изменил ленту'); }
     }
     /* Границы сцен (длительность и их количество) фильтрует сама вставка сцен:
        одна точка, куда приходит ответ Сценариста. */
@@ -604,6 +604,10 @@ export async function sendPrompt(blk, to) {
     };
     const home = { pics: 0, auds: 0, gone: [], where: [], said: -1 };
     const sameFile = (a, b) => !!a && !!b && a.name === b.name && a.size === b.size;
+    /* Файл, обрезанный человеком, носит имя оригинала, но весит иначе. Он и есть
+       подготовленный файл сцены: целая копия из чата не должна ложиться вторым
+       файлом - иначе в модель уходит не то, что человек готовил. */
+    const sameName = (a, b) => !!a && !!b && a.name === b.name;
     const deliver = () => {
       const cards = $$('.sc', L2.root);
       if (!cards.length) return;
@@ -617,7 +621,7 @@ export async function sendPrompt(blk, to) {
         const c = cards.filter(x => (x._baseFixed || x._base) === dec)[0] || cards[Math.floor(n / 10) - 1];
         if (!c) { if (!home.gone.some(s => s === '<Picture ' + n + '>')) home.gone.push('<Picture ' + n + '>'); continue; }
         c._files = c._files || new Array(9).fill(null);
-        if (c._files.some(f => sameFile(f, a.file))) continue;  // файл уже лежит в этой сцене - не дублируем
+        if (c._files.some(f => sameName(f, a.file))) continue;  // в сцене уже лежит файл с этим именем - человек подготовил свой
         let j = (n % 10 <= 8 && !c._files[n % 10]) ? n % 10 : c._files.findIndex(f => !f);
         if (j < 0) { home.gone.push('<Picture ' + n + '> - в сцене нет свободного места'); continue; }
         if (c._setOwn) c._setOwn(j, a.file); else { c._files[j] = a.file; c._paint?.(); }
@@ -633,7 +637,7 @@ export async function sendPrompt(blk, to) {
         const c = cards.filter(x => (x._baseFixed || x._base) === dec)[0] || cards[Math.floor(n / 10) - 1];
         if (!c) { if (!home.gone.some(s => s === '<Audio ' + n + '>')) home.gone.push('<Audio ' + n + '>'); continue; }
         c._auds = c._auds || []; c._audSrc = c._audSrc || []; c._audSel = c._audSel || [];
-        if ((c._auds || []).some(f => sameFile(f, a.file))) continue;
+        if ((c._auds || []).some(f => sameName(f, a.file))) continue;   // обрезанная версия этой же песни - уже подготовленный файл сцены
         let j = (n % 10 <= 2 && !c._auds[n % 10]) ? n % 10 : [0, 1, 2].findIndex(k => !c._auds[k]);
         if (j < 0) { home.gone.push('<Audio ' + n + '> - в сцене нет свободного места для песни'); continue; }
         c._auds[j] = a.file; c._audSrc[j] = a.file; c._audSel[j] = null; if (!a.file.__key) window.audioKey(a.file);
@@ -649,10 +653,10 @@ export async function sendPrompt(blk, to) {
         if (now) {
           L2.root._save?.();
           toast('В сцены вернулось из чата: ' + [home.pics ? 'фото ' + home.pics : '', home.auds ? 'песен ' + home.auds : ''].filter(Boolean).join(' · ')
-            + (home.where.length ? ' (' + home.where.join('; ') + ')' : '')
-            + (home.gone.length ? ' · а ' + home.gone.join(', ') + ' некуда положить' : ''));
+            + (home.where.length ? ' (' + home.where.join('; ') + ')' : ''));
+          if (home.gone.length) { warn('В чате есть ' + home.gone.join(', ') + ', но такой сцены в ответе нет - файл некуда положить'); warnSoon('Сценарист изменил ленту'); }
         } else if (home.gone.length) {
-          toast('В чате есть ' + home.gone.join(', ') + ', но такой сцены в ответе нет - файл некуда положить');
+          warn('В чате есть ' + home.gone.join(', ') + ', но такой сцены в ответе нет - файл некуда положить'); warnSoon('Сценарист изменил ленту');
         }
       }
     };
@@ -674,7 +678,9 @@ export async function sendPrompt(blk, to) {
         ? `${who} продолжит «${vidFiles[0].name}»: режим «продолжить своё видео» включён, его последний кадр встал перед вашими фото`
         : `${who} продолжит «${vidFiles[0].name}», но последний кадр взять не удалось (${got.why || 'не читается'}): ваших мест тогда 9`);
     }
-    if (fix && files.length) $$('label.ref.filled .x', L2.root).forEach(x => x.click());   // a fix replaces the pictures; a continuation keeps the old ones
+    /* Правка не имеет права выбрасывать фото основного блока: человек готовил их сам,
+       а чат может нести совсем другие (или старые) картинки - «файл не соответствовал
+       тому, что я подготовил». Чатные фото встают только в свободные места ниже. */
     for (const f of files) {   // existing references (e.g. the last frame of the video being continued) stay; new pictures take the free slots
       /* Плитки собственных фото сцен носят тот же класс ref: без оговорки ниже лишние
          картинки из чата заполняли места сцен и затирали то, что легло туда по номеру

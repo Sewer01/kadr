@@ -1,5 +1,5 @@
 import { API } from '../core/net.js';
-import { $, $$, confirmBox, drawCover, esc, fmtTime, noiseCv, normItem, offCv, toast } from '../core/util.js';
+import { $, $$, confirmBox, drawCover, esc, fmtTime, noiseCv, normItem, offCv, toast, warnTake } from '../core/util.js';
 import { LIB, QUEUE, byId, selected } from '../core/state.js';
 import { QUALITY_ALL, frames, resFor, useSeed } from './params.js';
 import { offPrompt, onPrompt, previewHandlers } from './scenario.js';
@@ -158,9 +158,19 @@ export function previewPanel(el, st, opts) {
   async function realStart(force) {
     const meta = opts.meta();
     go.disabled = true; if (!run) status.textContent = 'Отправляем задание в ComfyUI…';
+    let form;
+    try { form = opts.real.form(force); } catch (e) { go.disabled = false; if (run) toast('Ошибка: ' + e.message); else status.textContent = 'Ошибка: ' + e.message; return; }
+    /* Предупреждения, которые собрала сборка задания, - не мигающая строчка, а окно:
+       человек читает список и решает - запускать как есть или пойти поправить. */
+    const warns = warnTake();
+    if (warns.length && !force) {
+      go.disabled = false;
+      return confirmBox('Перед запуском: ' + warns.length + (warns.length > 4 ? ' предупреждений' : ' предупреждения'),
+        warns.join('\n'), 'Всё равно запустить', async () => { await realStart(true); }, 'Поправить');
+    }
     let res;
     try {
-      const r = await fetch(opts.real.url, { method: 'POST', body: opts.real.form(force) });
+      const r = await fetch(opts.real.url, { method: 'POST', body: form });
       const txt = await r.text();
       try { res = JSON.parse(txt); } catch { res = { error: txt }; }
       if (!r.ok) {

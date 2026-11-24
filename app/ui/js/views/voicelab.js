@@ -810,6 +810,12 @@ import { AC, acLoad } from './actors.js';
       confirmBox('Начать заново', 'Текст, настройки и выбранные образцы вернутся к начальным. Сделанные варианты останутся.', 'Начать заново', async () => {
         try { localStorage.removeItem(DKEY); } catch { /* ок */ }
         SM.forEach(st => st.audio.pause()); SM.clear();
+        /* обещание «образцы вернутся к начальным» раньше не выполнялось: поля выбора
+           голоса оставались с загруженными файлами - очищали же только настройки */
+        $$('[data-pk]', root).forEach(b => {
+          const s = $('[data-pks]', b); if (s) s.value = '';
+          const f = $('[data-pkf]', b); if (f) f.value = '';
+        });
         S.q = 'normal'; S.count = 3; S.sp = 2;
         await loadStatus(); paint();
       });

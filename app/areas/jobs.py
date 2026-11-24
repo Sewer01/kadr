@@ -6,7 +6,7 @@
 from aiohttp import web
 from datetime import datetime
 from graphrefs import _graph_refs
-from netutil import comfy_error_text
+from netutil import comfy_error_text, comfy_is_local
 from pathlib import Path
 from paths import CLIENT_ID, DATA_DIR, LONG_DIR, QUEUE_FILE, REF_DIR, TIMINGS
 import asyncio
@@ -91,14 +91,87 @@ class QueueMixin:
                                     free=job.get("free0"), reason=em[:120])
                 except Exception:
                     pass
+            oom = any(k in em.lower() for k in ("out of memory", "oom", "not enough memory"))
+            if (oom and not job.get("oom_retry") and self._can_free()
+                    and time.time() - getattr(self, "_oom_retry_at", 0) > 60):
+                # не хватило памяти: выгрузить модели и один раз запустить то же задание
+                # заново. Точка продолжения сцены уже на диске, поэтому цепочка не начнётся сызнова.
+                self._oom_retry_at = time.time()
+                self.jobs.pop(pid, None)
+                await self.broadcast({"type": "notice", "text": "Не хватило видеопамяти: выгружаю модели и запускаю задание заново (один раз)."})
+                task = asyncio.create_task(self.oom_retry(job))
+                self._bg.add(task)
+                task.add_done_callback(self._bg.discard)
+                return
             self.note_error(f'Ошибка генерации, узел {d.get("node_type", "")}: {d.get("exception_message", "").strip()}')
             hint = self.model_hint((job.get("meta") or {}).get("mode", ""), d.get("exception_message", ""))
             await self.broadcast({"type": "error", "prompt_id": pid,
                                   "message": f'{d.get("node_type", "")}: {d.get("exception_message", "").strip()}' + hint})
             self.jobs.pop(pid, None)
+            self.schedule_free()   # флаг «держать» снят - память после неудачи тоже должна освобождаться
         elif t == "execution_interrupted":
             await self.broadcast({"type": "interrupted", "prompt_id": pid})
             self.jobs.pop(pid, None)
+            self.schedule_free()
+
+    def _can_free(self):
+        """Можно ли просить ComfyUI выгрузить модели: только свой локальный движок,
+        и только если он однажды не отказал в /free (чужие движки его не знают)."""
+        try:
+            return not self.rh() and comfy_is_local(self.comfy) and not getattr(self, "_free_unsupported", False)
+        except Exception:
+            return False
+
+    async def free_models(self):
+        """Выгрузить модели и кэш в ComfyUI; если команда /free ему незнакома - больше не трогать."""
+        try:
+            st, _ = await self.comfy_json("POST", "/free", json={"unload_models": True, "free_memory": True})
+        except Exception:
+            return False
+        if st not in (200, 201, 204):
+            self._free_unsupported = True
+            return False
+        return True
+
+    async def free_after(self, secs):
+        """При снятом флаге «держать модели в памяти» память освобождается не только перед
+        следующим заданием, но и после текущего - но не сразу, чтобы не выгружать модель
+        человеку, который сейчас нажмёт «следующая сцена» в цепочке."""
+        try:
+            await asyncio.sleep(secs)
+            if not self.jobs and not self.config.get("keep_models") and self._can_free():
+                await self.free_models()
+        except Exception:
+            pass
+
+    def schedule_free(self, secs=60):
+        if self.config.get("keep_models") or self.jobs or not self._can_free():
+            return
+        task = asyncio.create_task(self.free_after(secs))
+        self._bg.add(task)
+        task.add_done_callback(self._bg.discard)
+
+    async def oom_retry(self, job):
+        """Один честный повтор после нехватки памяти: выгрузить всё, дождаться
+        освобождения и поставить то же задание снова."""
+        try:
+            await self.free_models()
+            need = max(4.0, job.get("free0") or 4.0)
+            for _ in range(8):   # ждём, пока память действительно освободится
+                await asyncio.sleep(1)
+                g = await asyncio.to_thread(self.monitor.gpu)
+                if g and g.get("vram_total_gb") is not None and \
+                        g["vram_total_gb"] - (g.get("vram_used_gb") or 0) >= need:
+                    break
+            self._gate_off = time.time() + 180   # собственный запрет режима не должен отрезать этот повтор
+            stages = dict(job.get("stages") or {})
+            if job.get("scenes"):
+                stages["__scenes__"] = job["scenes"]   # прогресс по сценам возвращается в stages
+            await self.queue(job["graph"], stages, job.get("meta"), job.get("last_output"), job.get("titles"))
+        except Exception as e:
+            self.note_error(f"Не удалось перезапустить после нехватки памяти: {e}")
+            await self.broadcast({"type": "error", "prompt_id": job.get("prompt_id"),
+                                  "message": "Не хватило видеопамяти, перезапустить не вышло: " + str(e)})
 
     async def send_stage(self, job, stage, step=None, total=None, node=None):
         job["stage"] = stage
@@ -114,6 +187,7 @@ class QueueMixin:
     async def finish_job(self, job):
         pid = job["prompt_id"]
         self.jobs.pop(pid, None)
+        self.schedule_free()   # снятый флаг «держать модели» теперь освобождает память и после задания, а не только перед следующим
         # ComfyUI writes the history a moment after the job ends; asking once made a finished render look like
         # "returned nothing", so a clip that took twenty minutes was reported lost while the file sat on disk
         hist = {}
@@ -426,16 +500,19 @@ class QueueMixin:
         # Not between pictures of the same mode: the same big models would just be loaded from disk again.
         # Not at all with «Держать модели в памяти» (Настройки): the person chose speed over free VRAM,
         # and unloads by hand with «Освободить память».
-        if not self.jobs and not same and not self.config.get("keep_models"):
+        if not self.jobs and not same and not self.config.get("keep_models") and self._can_free():
             try:
-                await self.comfy_json("POST", "/free", json={"unload_models": True, "free_memory": True})
-                await asyncio.sleep(1.5)
-                gpu = await asyncio.to_thread(self.monitor.gpu)
-                used = (gpu or {}).get("vram_used_gb")
-                if used is not None and used > 2.5:  # right after /free ComfyUI itself holds well under this
-                    await self.broadcast({"type": "notice", "text": (
-                        f"Перед заданием занято {used:g} ГБ видеопамяти. Скорее всего, её держат другие программы "
-                        "(браузер, Adobe, игры). Закройте их, иначе генерация может идти медленнее.")})
+                if await self.free_models():
+                    await asyncio.sleep(1.5)
+                    gpu = await asyncio.to_thread(self.monitor.gpu)
+                    used = (gpu or {}).get("vram_used_gb")
+                    # «другие программы держат память» имеет смысл говорить только тогда, когда
+                    # мы действительно выгрузили своё: чужой движок на /free отвечает 404, и
+                    # прежний текст в таком случае просто врал человеку.
+                    if used is not None and used > 2.5:  # right after /free ComfyUI itself holds well under this
+                        await self.broadcast({"type": "notice", "text": (
+                            f"Перед заданием занято {used:g} ГБ видеопамяти. Скорее всего, её держат другие программы "
+                            "(браузер, Adobe, игры). Закройте их, иначе генерация может идти медленнее.")})
             except Exception:
                 pass
         # Сколько видеопамяти свободно прямо сейчас и сколько такая работа обычно идёт на этой
