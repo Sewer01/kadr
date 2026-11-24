@@ -151,7 +151,7 @@ export async function agGenerate(btn, gen) {
       : gen.again
         // правка - реплика в тот же разговор: без этого вступления модель видит в поле
         // полный текст сценария с пометками и пишет его заново, а не правит свой ответ
-        ? 'Это правка сценария из твоего последнего ответа в этом разговоре. Не пиши новый сценарий и не переделывай то, о чём не просят: возьми свой последний ответ, внеси в него ровно то, о чём просят ниже, и верни ВЕСЬ сценарий целиком - с теми же заголовками SCENE N, той же длительностью и всеми тегами (<Picture N>, <Video N>, <Audio N>).\n\n'
+        ? 'Это правка сценария из твоего последнего ответа в этом разговоре. Не пиши новый сценарий и не переделывай то, о чём не просят: возьми свой последний ответ, внеси в него ровно то, о чём просят ниже, и верни ВЕСЬ сценарий целиком - с теми же заголовками SCENE N, той же длительностью и всеми тегами (<Picture N>, <Video N>, <Audio N>). Программа могла переложить файлы после твоего прошлого ответа: бери теги из списка РЕАЛЬНЫХ ТЕГОВ в правилах, а не из своей прошлой реплики, если они расходятся.\n\n'
         : gen.scenes
         // a scene sheet is one document: the answer has to come back with the same headings, or the
         // texts would not know which card they belong to
@@ -921,7 +921,12 @@ export async function agSend() {
         const pics = (c._files || []).map((f, j) => f ? '<Picture ' + (bs + j) + '>' : null).filter(Boolean);
         const auds = (c._auds || []).map((f, j) => f ? '<Audio ' + (bs + j) + '>' : null).filter(Boolean);
         return (pics.length || auds.length) ? { scene: i + 1, pictures: pics, audios: auds } : null;
-      }).filter(Boolean) }; }
+      }).filter(Boolean),
+      shared: {
+        // общие места называем честно: после раскладки по отчёту файл мог уехать из сцены в общие
+        pictures: $$('label.ref:not(.own)', lr).map((r, j) => r._file ? '<Picture ' + (j + 1) + '>' : null).filter(Boolean),
+        audios: [1, 2].map(j => ((((lr._faudRow || {}).files) || [])[j]) ? '<Audio ' + (1 + j) + '>' : null).filter(Boolean)
+      } }; }
   try {
     const r = await fetch('/api/agent/chat', {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: AG.ctrl.signal,
