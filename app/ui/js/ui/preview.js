@@ -147,16 +147,25 @@ export function previewPanel(el, st, opts) {
   };
   const goText = () => opts.goLabel ? opts.goLabel() : 'Сгенерировать';
   const setGo = busy => { go.lastChild.textContent = busy ? 'Поставить в очередь ещё одно' : goText(); };
-  async function realStart() {
+  /* Пустые места, на которые ссылается текст: не мигающее предупреждение, а окно, которое
+     человек читает сам: «Продолжить» - запускаем как есть, «Прервать» - стоим, правим. */
+  function gapsAsk(gaps, retry) {
+    confirmBox('Движок не увидит эти ссылки',
+      'Текст сцен ссылается на пустые места - файла там нет, и движок нарисует на их месте своё. '
+      + 'Прикрепите файлы или уберите эти номера из текста.\n\n' + (gaps || []).join('\n'),
+      'Продолжить', async () => { await retry(); }, 'Прервать');
+  }
+  async function realStart(force) {
     const meta = opts.meta();
     go.disabled = true; if (!run) status.textContent = 'Отправляем задание в ComfyUI…';
     let res;
     try {
-      const r = await fetch(opts.real.url, { method: 'POST', body: opts.real.form() });
+      const r = await fetch(opts.real.url, { method: 'POST', body: opts.real.form(force) });
       const txt = await r.text();
       try { res = JSON.parse(txt); } catch { res = { error: txt }; }
       if (!r.ok) {
         if (r.status === 409 && res.low_memory) { go.disabled = false; return lowMemoryAsk(res.error, () => realStart()); }
+        if (r.status === 409 && res.gaps) { go.disabled = false; return gapsAsk(res.gaps, () => realStart(true)); }
         throw new Error(res.error || r.statusText);
       }
     } catch (e) { go.disabled = false; if (run) toast('Ошибка: ' + e.message); else status.textContent = 'Ошибка: ' + e.message; return; }

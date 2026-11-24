@@ -2266,8 +2266,9 @@ export function makeRefMode(cfg) {
       };
       scWin.ta.value = txt;
       /* Ряд плашек этой сцены даёт окно «Сценарий», поэтому сюда добавляются только полки
-         аудио: раньше они вставлялись сразу за полем, теперь - сразу за рядом плашек. */
-      scWin.foot.insertAdjacentHTML('afterend', '<div class="sc-auds" style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:6px"></div><div class="sc-trimhost" hidden style="margin-top:8px"></div>');
+         аудио: сначала плашки тегов и ряд кнопок работы с текстом, а полки аудио - под ними. */
+      { const btnR = scWin.buttons || $('.field-btns', scWin.el) || scWin.foot;
+        btnR.insertAdjacentHTML('afterend', '<div class="sc-auds" style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:6px"></div><div class="sc-trimhost" hidden style="margin-top:8px"></div>'); }
       // - - - audio of THIS scene: up to three files, trimmed with the same instrument as the
       // shared track. They reach the model as references; the text decides where one is used.
       c._auds = c._auds || [null, null, null]; c._audWords = c._audWords || [null, null, null];
@@ -2413,7 +2414,7 @@ export function makeRefMode(cfg) {
         toast('Аудио <Audio ' + ((c._baseFixed || c._base || 10) + j) + '> в сцене: ' + f.name + ' - при желании обрежьте (до 15 с)');
       };
       if (!$('.sc-auds', c)) {
-        $('textarea', c).insertAdjacentHTML('afterend', '<div class="sc-auds" style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:6px"></div><div class="sc-trimhost" hidden style="margin-top:8px"></div>');
+        ($('.field-btns', c) || $('textarea', c)).insertAdjacentHTML('afterend', '<div class="sc-auds" style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:6px"></div><div class="sc-trimhost" hidden style="margin-top:8px"></div>');
       }
       if (!$('.sc-trimhost', c)) {
         $('.sc-auds', c).insertAdjacentHTML('afterend', '<div class="sc-trimhost" hidden style="margin-top:8px"></div>');
@@ -3771,8 +3772,9 @@ export function makeRefMode(cfg) {
       : cfg.scenes ? ((root._snd === 'own' && !files('.rm-auds .slot').length && (root._snd = 'none', toast('Аудиофайла нет - ролик будет без своего звука: модель озвучит его сама по описаниям сцен'), ($('.lm-sndstate', root) || {}).textContent = HINT.none())) ? '' : sceneList().some(x => !x.prompt) ? 'Заполните описание каждой сцены или уберите лишнюю' : '') : !promptEl().value.trim() ? 'Напишите промпт' : '',
     real: {
       url: '/api/generate/' + cfg.mode,
-      form: () => {
+      form: (force) => {
         const fd = new FormData();
+        if (force) fd.append('force', '1');   // человек уже подтвердил запуск с пустыми местами
         {
         const base = cfg.swap ? ($('.rm-who[data-i="0"]', root).value.trim() || 'замена персонажа') : promptEl().value.trim();
         fd.append('prompt', cfg.scenes ? base : wordsIntoPrompt(base, files('.rm-auds .slot').map(s => s && s._file)));

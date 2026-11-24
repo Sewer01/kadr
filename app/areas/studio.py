@@ -350,23 +350,22 @@ class StudioMixin:
         # the texts stay true - and len() of such a row said 9 while a single file was sent. The
         # model was told nine references exist, and it answered with invented faces and its own song.
         filled_common = [i + 1 for i, x in enumerate(images or []) if x]
+        part = form.get("part", "")
+        only = int(part) if part.isdigit() else -1   # по частям: спрашиваем только про ту сцену, что сейчас считается
         wrapped, gaps = [], []
         for idx, (p, sec, own) in enumerate(scenes):
             tags = (filled_common + [10 * (idx + 1) + j for j, x in enumerate(own or []) if x])[:9]
             # Номер в тексте без файла - самая частая причина «герои получились другие»: движок
-            # читает <Picture 20>, не находит под этим номером картинки и берёт свою. Предупреждаем,
-            # но не блокируем: человек мог приложить файл следующим шагом.
+            # читает <Picture 20>, не находит под этим номером картинки и берёт свою. Не мигаем
+            # предупреждением, а спрашиваем окном: «Продолжить» (force=1) или «Прервать».
             g = wf.scene_gaps(p, images, own, base=10 * (idx + 1),
                               auds=(sc_audios[idx] if idx < len(sc_audios) else ()), track=bool(audio))
-            if g:
-                gaps.append(f"сцена {idx + 1}: " + ", ".join(g))
+            if g and (only < 0 or only == idx):
+                gaps.append(f"Сцена {idx + 1}: " + ", ".join(g))
             wrapped.append((wf.lipsync_prompt(p, 0, ref_tags=tags), sec, own))
         scenes = wrapped
-        if gaps:
-            await self.broadcast({"type": "notice", "text":
-                "Текст ссылается на эти места, а файлов там нет - движок их не увидит и возьмёт своё: "
-                + "; ".join(gaps) + ". Прикрепите файлы или уберите эти номера из текста."})
-        part = form.get("part", "")
+        if gaps and form.get("force") != "1":
+            return web.json_response({"gaps": gaps, "error": "Текст ссылается на пустые места"}, status=409)
         if part.isdigit():  # one scene at a time: scene k continues from the saved tail of scene k-1
             k = int(part)
             run = re.sub(r"[^A-Za-z0-9]", "", form.get("run", ""))[:32]

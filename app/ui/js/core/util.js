@@ -326,10 +326,18 @@ export const fileToDataURL = (file, max = 1024) => new Promise(res => {
   img.src = URL.createObjectURL(file);
 });
 export function fmtShort(iso) { return iso ? fmtDate(new Date(iso)) : ''; }
-export function confirmBox(title, text, ok, fn) {
-  $('#cfTitle').textContent = title; $('#cfText').textContent = text; $('#cfOk').textContent = ok;
+export function confirmBox(title, text, ok, fn, cancel) {
+  $('#cfTitle').textContent = title;
+  const tx = $('#cfText'); tx.textContent = text;
+  tx.style.whiteSpace = String(text).indexOf('\n') >= 0 ? 'pre-line' : '';   // a list of problems reads line by line, not one line
+  $('#cfOk').textContent = ok;
+  const cn = $('#confirm [data-close]'); if (cn) cn.textContent = cancel || 'Отмена';
   $('#confirm').hidden = false;
-  $('#cfOk').onclick = async () => { $('#confirm').hidden = true; $('#cfOk').textContent = 'Удалить'; await fn(); };
+  $('#cfOk').onclick = async () => {
+    $('#confirm').hidden = true; $('#cfOk').textContent = 'Удалить';
+    if (cn) cn.textContent = 'Отмена';
+    await fn();
+  };
 }
 
 /* interface zoom and library card size (buttons and Ctrl + mouse wheel) */
