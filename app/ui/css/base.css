@@ -220,9 +220,10 @@ body.nosb-on #modeBar{padding-left:316px}
 
 
 /* sidebar */
-.side{overscroll-behavior:contain;background:rgba(var(--bg2-rgb),.7);border-right:1px solid var(--line);display:flex;flex-direction:column;padding:62px 14px 20px;gap:6px;backdrop-filter:blur(12px);overflow-y:auto;min-height:0}
+.side{overscroll-behavior:contain;background:rgba(var(--bg2-rgb),.7);border-right:1px solid var(--line);display:flex;flex-direction:column;padding:9px 14px 20px;gap:6px;backdrop-filter:blur(12px);overflow-y:auto;min-height:0;margin-top:54px;height:calc(100% - 54px)}
+.side > *:not(.brand){margin-top:0}
 
-.brand{position:fixed;left:0;top:0;z-index:37;display:flex;align-items:center;gap:9px;height:54px;padding:0 14px;background:var(--bg);border-right:1px solid var(--line);border-bottom:1px solid var(--line);box-sizing:border-box}
+.brand{position:fixed;left:0;top:0;z-index:37;display:flex;align-items:center;gap:9px;height:54px;margin-top:0;padding:0 14px;background:var(--bg);border-right:1px solid var(--line);border-bottom:1px solid var(--line);box-sizing:border-box}
 
 .brand>div:last-child{min-width:0}
 
@@ -275,7 +276,8 @@ body.nosb-on #modeBar{padding-left:316px}
 .side-foot .stat small{color:var(--dim);font-size:11px}
 
 @media (max-height:1000px){
-  .side{padding:62px 12px 16px;gap:4px}
+  .side{padding:12px 12px;gap:4px}
+  .brand{padding:2px 6px 14px}
   .brand-mark{flex:0 0 34px;width:34px;height:34px}
   .nav-label{margin:6px 0 2px}
 }
