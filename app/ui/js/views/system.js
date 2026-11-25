@@ -5,6 +5,7 @@ import { goTo, groupOf, NAV_GROUP_TITLES, partOfGroup } from '../core/tabs.js';
 import { CLOUD, mdStart, renderModels } from './models.js';
 import { qAdd } from './queue.js';
 import { resetProgress, setStep, setupInfo, showSetupPane, setSetupInfo } from './setup.js';
+import { fitTopBar } from './presets.js';
 
 export let ENGINE_ON = true;
 export let WAIT_CORE = 0;
@@ -116,7 +117,7 @@ export function setEngine(on) {
       }).join('');
       if (part) html += (html ? '<i class="mb-sep"></i>' : '') + part;
     });
-    if (tabs.innerHTML !== html) tabs.innerHTML = html;
+    if (tabs.innerHTML !== html) { tabs.innerHTML = html; fitTopBar(); }   // свежие кнопки без сжатия: пересчитать сразу, иначе в покое имена вернутся и влезут не все
     const on = tabs.querySelector('.on'); if (on && on.offsetLeft + on.offsetWidth > tabs.scrollLeft + tabs.clientWidth) tabs.scrollLeft = on.offsetLeft - 20;
   }
   // кнопка группы открывает тот её режим, на котором человек останавливался

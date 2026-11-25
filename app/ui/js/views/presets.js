@@ -76,43 +76,53 @@ new ResizeObserver(() => prRows()).observe($('#view-presets'));
    buttons begin, otherwise the last tab hides under them */
 export function fitTopBar() {
   const mb = $('#modeBar'); if (!mb) return;
-  const act = document.querySelector('.view.active');
-  if (act && window.__stBars) {   // a view that rebuilt its markup gets its buttons back
-    const b = window.__stBars[act.id.replace('view-', '')], h = $('.head', act);
-    if (b && h && b.parentElement !== h) h.appendChild(b);
-  }
-  const bar = document.querySelector('.view.active .st-bar');
-  let w = 0;
-  if (bar && bar.offsetParent && !bar.closest('.head')) {   // only a bar that still sits on the tabs line takes room from it
-    const kids = [...bar.children].filter(el => el.offsetParent);
-    w = kids.reduce((s, el) => s + el.getBoundingClientRect().width, 0) + Math.max(0, kids.length - 1) * 8;
-    w = Math.min(Math.ceil(w), Math.floor(innerWidth * 0.42));   // tabs always keep most of the line
-  }
-  mb.style.right = (w ? w + 18 : 24) + 'px';
-  /* a tab that is not visible is worse than a tab without a word under it: names go away
-     one by one from the right edge, so the window narrows softly; what still does not fit
-     stays behind the edge that fades out */
-  const tabsBox = mb.querySelector('.mb-tabs') || mb;
-  tabsBox.querySelectorAll('.mb.min').forEach(el => el.classList.remove('min'));
-  const mins = [...tabsBox.querySelectorAll('.mb')].reverse();   // справа налево
-  let guard = mins.length;
-  while (tabsBox.scrollWidth > tabsBox.clientWidth + 26 && guard-- > 0) {
-    const wide = mins.find(el => !el.classList.contains('min'));
-    if (!wide) break;
-    wide.classList.add('min');
-  }
-  tabsBox.classList.toggle('can-right', tabsBox.scrollWidth > tabsBox.clientWidth + 4);
-  const on = mb.querySelector('.mb.on');
-  if (on && tabsBox.scrollWidth > tabsBox.clientWidth) {
-    const l = on.offsetLeft, r = l + on.offsetWidth;
-    if (l < tabsBox.scrollLeft || r > tabsBox.scrollLeft + tabsBox.clientWidth) tabsBox.scrollTo({ left: l - (tabsBox.clientWidth - on.offsetWidth) / 2, behavior: 'smooth' });
-  }
+  const once = () => {
+    const act = document.querySelector('.view.active');
+    if (act && window.__stBars) {   // a view that rebuilt its markup gets its buttons back
+      const b = window.__stBars[act.id.replace('view-', '')], h = $('.head', act);
+      if (b && h && b.parentElement !== h) h.appendChild(b);
+    }
+    const bar = document.querySelector('.view.active .st-bar');
+    let w = 0;
+    if (bar && bar.offsetParent && !bar.closest('.head')) {   // only a bar that still sits on the tabs line takes room from it
+      const kids = [...bar.children].filter(el => el.offsetParent);
+      w = kids.reduce((s, el) => s + el.getBoundingClientRect().width, 0) + Math.max(0, kids.length - 1) * 8;
+      w = Math.min(Math.ceil(w), Math.floor(innerWidth * 0.42));   // tabs always keep most of the line
+    }
+    mb.style.right = (w ? w + 18 : 24) + 'px';
+    /* a tab that is not visible is worse than a tab without a word under it: names go away
+       one by one from the right edge, so the window narrows softly; what still does not fit
+       stays behind the edge that fades out */
+    const tabsBox = mb.querySelector('.mb-tabs') || mb;
+    tabsBox.querySelectorAll('.mb.min').forEach(el => el.classList.remove('min'));
+    const mins = [...tabsBox.querySelectorAll('.mb')].reverse();   // справа налево
+    let guard = mins.length;
+    while (tabsBox.scrollWidth > tabsBox.clientWidth + 4 && guard-- > 0) {
+      const wide = mins.find(el => !el.classList.contains('min'));
+      if (!wide) break;
+      wide.classList.add('min');
+    }
+    tabsBox.classList.toggle('can-right', tabsBox.scrollWidth > tabsBox.clientWidth + 4);
+    if (tabsBox.scrollWidth <= tabsBox.clientWidth + 4) tabsBox.scrollLeft = 0;   // всё влезло - полосу возвращаем к началу, иначе остаётся сдвинутой от прежней узкой ширины
+    const on = mb.querySelector('.mb.on');
+    if (on && tabsBox.scrollWidth > tabsBox.clientWidth) {
+      const l = on.offsetLeft, r = l + on.offsetWidth;
+      if (l < tabsBox.scrollLeft || r > tabsBox.scrollLeft + tabsBox.clientWidth) tabsBox.scrollTo({ left: l - (tabsBox.clientWidth - on.offsetWidth) / 2, behavior: 'smooth' });
+    }
+  };
+  once();
+  /* while a person drags the window or the sidebar, sizes land only after the frame:
+     measure once more on the next frame, otherwise the names snap back to full at rest */
+  requestAnimationFrame(() => requestAnimationFrame(once));
 }
 document.addEventListener('wheel', e => {           // a wheel over the strip moves it sideways
-  const mb = e.target.closest && e.target.closest('#modeBar');
+  const mb = e.target.closest && e.target.closest('#modeBar .mb-tabs');
   if (mb && mb.scrollWidth > mb.clientWidth) { e.preventDefault(); mb.scrollLeft += (e.deltaY || e.deltaX); }
 }, { passive: false });
 addEventListener('resize', fitTopBar);
+/* тянут край левого столбца - окно не меняется, а места у вкладок убавилось:
+   следим за самой полосой и пересчитываем на каждом её изменении */
+try { new ResizeObserver(() => fitTopBar()).observe(document.getElementById('modeBar')); } catch {}
 document.addEventListener('click', e => { if (e.target.closest('.nav')) setTimeout(fitTopBar, 30); }, true);
 setTimeout(fitTopBar, 60);
 
