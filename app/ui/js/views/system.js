@@ -79,6 +79,12 @@ export function setEngine(on) {
 /* pinned top bar with every video and image section */
 (function () {
   const bar = document.createElement('div'); bar.id = 'modeBar'; document.body.appendChild(bar);
+  /* значок программы - прямо в верхний бар, левее кнопки «Меню»: он признак
+     работы, и вся его логика (ожидание, готовность, пульс от нагрузки)
+     работает по классу .brand-mark - здесь она видит его так же */
+  const bm = document.createElement('div'); bm.className = 'brand';
+  bm.innerHTML = '<div class="brand-mark"><svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><defs><mask id="kadrFrame"><rect width="24" height="24" rx="5" fill="#fff"/><rect x="1.70" y="1.60" width="3.1" height="3.68" rx=".9" fill="#000"/><rect x="19.20" y="1.60" width="3.1" height="3.68" rx=".9" fill="#000"/><rect x="1.70" y="7.30" width="3.1" height="3.68" rx=".9" fill="#000"/><rect x="19.20" y="7.30" width="3.1" height="3.68" rx=".9" fill="#000"/><rect x="1.70" y="13.00" width="3.1" height="3.68" rx=".9" fill="#000"/><rect x="19.20" y="13.00" width="3.1" height="3.68" rx=".9" fill="#000"/><rect x="1.70" y="18.70" width="3.1" height="3.68" rx=".9" fill="#000"/><rect x="19.20" y="18.70" width="3.1" height="3.68" rx=".9" fill="#000"/><path d="M10 6.8 L10 17.2 L17.4 12 Z" fill="#000"/></mask></defs><rect width="24" height="24" rx="5" fill="currentColor" mask="url(#kadrFrame)"/></svg></div><div><div class="brand-name">Kadr</div><div class="brand-sub">локальная видеостудия</div></div>';
+  bar.appendChild(bm);
   // the names people read all day; the side menu keeps its own, longer ones for now
   const SHORT = { video: 'Видео', lipsync: 'Клип', refs: 'Видеостудия', actor: 'Актёр', swap: 'Замена', voicelab: 'Озвучка',
     reflab: 'Референсы', imgedit: 'Редактирование',
@@ -95,6 +101,7 @@ export function setEngine(on) {
   // and the actor; pictures and the retouching stay in their own groups, the separators as they were
   const GROUPS = [['video', 'refs', 'long', 'action', 'actionsc', 'clipsc', 'lipsync', 'actor', 'swap'],
                   ['reflab'], ['krea', 'imgedit', 'qwen'], ['voicelab'], ['upfile']];
+  const tabs = document.createElement('div'); tabs.className = 'mb-tabs'; bar.appendChild(tabs);
   function paint() {
     const cur = ($('.view.active')?.id || '').replace('view-', '');
     let html = '';
@@ -109,8 +116,8 @@ export function setEngine(on) {
       }).join('');
       if (part) html += (html ? '<i class="mb-sep"></i>' : '') + part;
     });
-    if (bar.innerHTML !== html) bar.innerHTML = html;
-    const on = bar.querySelector('.on'); if (on && on.offsetLeft + on.offsetWidth > bar.scrollLeft + bar.clientWidth) bar.scrollLeft = on.offsetLeft - 20;
+    if (tabs.innerHTML !== html) tabs.innerHTML = html;
+    const on = tabs.querySelector('.on'); if (on && on.offsetLeft + on.offsetWidth > tabs.scrollLeft + tabs.clientWidth) tabs.scrollLeft = on.offsetLeft - 20;
   }
   // кнопка группы открывает тот её режим, на котором человек останавливался
   bar.addEventListener('click', e => { const b = e.target.closest('[data-go]'); if (b) goTo(partOfGroup(b.dataset.go)); });
