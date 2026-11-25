@@ -180,6 +180,17 @@ export function shortCpu(name) {
   const watch = document.querySelector('.side') || document.body;
   new MutationObserver(st).observe(watch, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ['class'] });
   setInterval(st, 3000);
+  /* Ядро трудится - значок тихо краснеет: когда видеокарта или процессор
+     грузятся выше 70 %, зелёный кадр плавно наливается бледно-красным.
+     Это честный признак работы: видно из любого окна и не зависит от того,
+     из какого раздела что запущено. Порог один на видеокарту и процессор. */
+  const load = { gpu: 0, cpu: 0 };
+  let hot = false;
+  window._chipLoad = (id, pct) => {
+    if (id === '#gpuLoad') load.gpu = pct || 0; else load.cpu = pct || 0;
+    const now = load.gpu > 70 || load.cpu > 70;
+    if (now !== hot) { hot = now; mark.classList.toggle('hot', hot); }
+  };
 })();
 
 /* the about page speaks in values, not in promises: it reads the same answers the rest of the
@@ -230,6 +241,9 @@ export function meter(valId, barId, pct, text) {
   $(valId).textContent = text;
   const bar = $(barId); bar.style.width = Math.min(100, Math.max(0, pct || 0)) + '%';
   bar.className = pct > 90 ? 'hi' : pct > 75 ? 'mid' : '';
+  /* Ядро работает - значит, живой значок должен это показывать: окно нагрузки
+     знает правду раньше всех, отсюда и зовём метку. */
+  if (valId === '#gpuLoad' || valId === '#cpuTxt') window._chipLoad(valId, pct);
 }
 export const g1 = n => (+n).toFixed(n >= 100 ? 0 : 1).replace(/\.0$/, '');
 export const normItem = it => ({ ...it, date: new Date(it.date) });

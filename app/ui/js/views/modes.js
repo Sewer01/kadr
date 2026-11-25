@@ -4134,6 +4134,12 @@ export function makeRefMode(cfg) {
         if (cfg.scenes && root._srcFrameFile) fd.append('srcframe', root._srcFrameFile);   // the frame of the continued video: a picture of its own
         if (vidsEl) files('.rm-vids .slot').forEach((s, i) => fd.append('vid' + i, s._file));
         (cfg.scenes && root._snd !== 'own' ? [] : files('.rm-auds .slot')).forEach((s, i) => fd.append('aud' + i, s._file));
+        if (cfg.scenes && root._snd === 'own' && !files('.rm-auds .slot').length && root._faudRow && root._faudRow.files[0]) {
+          /* Фон живёт в своём ряду, а зеркало в старый тайл не легло: без этого
+             файл ушёл бы в расчёт пустым, и сервер честно сказал бы «<Audio 1>
+             нет», хотя трек лежит на месте. Отправляем прямо из ряда. */
+          fd.append('aud0', root._faudRow.files[0]);
+        }
         return fd;
       },
     },

@@ -499,12 +499,13 @@ body.sys-folded .sys-body{display:none}
 
 .brand-icon{border-radius:14px;display:block}
 
-/* «Замечать работу программы» (Настройки): пока идёт расчёт или Сценарист
-   думает, вокруг зелёного значка мигает красная рамка; по окончании -
-   короткая вспышка и звуковой сигнал. Человек может это выключить. */
-.brand-mark.work{color:#3fb950;animation:kadrwork 1s ease-in-out infinite}
+/* Ядро трудится: зелёный кадр значка плавно наливается бледно-красным,
+   когда видеокарта или процессор грузятся выше 70 %. Тихий пульс цветом,
+   без рамок; по окончании работы - короткая вспышка и звуковой сигнал.
+   Всё это гасится переключателем «Замечать работу программы» в Настройках. */
+.brand-mark.hot{animation:kadrhot 1.4s ease-in-out infinite}
 .brand-mark.work-done{animation:kadrflash .9s ease-out 2}
-@keyframes kadrwork{0%,100%{box-shadow:0 0 0 0 rgba(232,38,79,0)}50%{box-shadow:0 0 0 3px rgba(232,38,79,.95)}}
+@keyframes kadrhot{0%,100%{color:#3fb950}50%{color:#e89aa8}}
 @keyframes kadrflash{0%,100%{filter:none}40%{filter:drop-shadow(0 0 10px rgba(var(--accent-rgb),.9))}}
 body.no-notify .brand-mark{animation:none!important}
 

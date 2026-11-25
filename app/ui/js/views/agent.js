@@ -906,7 +906,7 @@ export async function agSend() {
   AG.msgs.push(reply); renderMsgs();
   const el = $('#agMsgs .msg:last-child');
   AG.busy = true; $('#agSend').textContent = 'Стоп'; AG.ctrl = new AbortController();
-  window._agNote = 'Сценарист: думаю…';   // метка программы пульсирует и за сценариста: режим работы видно из любого окна
+  window._agNote = 'Сценарист: думаю…';   // по этой метке программа даёт сигнал по окончании и подсказку на значке: работа видна из любого окна
   // «Правка картинки» делается и на Qwen, и на FLUX klein, а теги картинок у них разные: сценаристу нужен движок раздела
   const qwBtn = $('.qw-eng button.on', $('#view-qwen'));
   const ctx = { cont: studioCaps(AG.target).baseVideo && (AG.att.some(a => a.frame) || !!((RM[AG.target] || {}).root || {})._src) ? 1 : 0, model: AG.target === 'qwen' ? ((qwBtn && qwBtn.dataset.e) || 'qwen') : (AG.storyFrames && AG.storyModel === 'krea' ? 'flux' : AG.storyModel), frames: AG.target === 'story' && AG.storyFrames, duration: AG_IMG.includes(AG.target) ? null : AG.target === 'video' ? V.dur : AG.target === 'lipsync' ? (L.dur0 ? L.len() : null) : RM[AG.target].S.dur };

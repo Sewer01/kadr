@@ -194,7 +194,7 @@ $('#wzRestore').onclick = async () => {
     catch (err) { toast(err.message); rb.disabled = false; }
   };
 })();
-(() => {   // «Замечать работу программы»: мигающая метка и сигнал по окончании (queue.js спрашивает notifyOn)
+(() => {   // «Замечать работу программы»: пульс значка от нагрузки ядра и сигнал по окончании (queue.js спрашивает notifyOn)
   const cb = $('#mdNotifyCb'); if (!cb) return;
   let on = true; try { on = localStorage.getItem('kadr-notify') !== 'off'; } catch {}
   cb.checked = on;
@@ -204,7 +204,7 @@ $('#wzRestore').onclick = async () => {
     on = cb.checked;
     try { localStorage.setItem('kadr-notify', on ? 'on' : 'off'); } catch {}
     document.body.classList.toggle('no-notify', !on);
-    toast(on ? 'Замечаем: во время расчёта вокруг значка мигает красная рамка, в конце - сигнал' : 'Тихо: рамка не мигает и сигнала не будет');
+    toast(on ? 'Замечаем: когда видеокарта или процессор гружены, значок тихо краснеет, в конце работы - сигнал' : 'Тихо: значок не краснеет и сигнала не будет');
   };
 })();
 (() => {   // «Держать модели в памяти»: общий флаг (jobs.queue его читает, как и озвучка)

@@ -139,9 +139,10 @@ $('#qList').addEventListener('click', e => {
   fetch('/api/interrupt', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt_id: b.dataset.id }) });
 });
 $('#qClear').onclick = () => { for (let i = QUEUE.length - 1; i >= 0; i--) if (!['queued', 'running'].includes(QUEUE[i].state)) QUEUE.splice(i, 1); qRender(); };
-/* Метка программы отвечает за расчёт: пульсирует, пока в очереди что-то есть,
-   и в конце одна вспышка плюс короткий сигнал - человек уходит в другое окно и
-   возвращается по звуку. Всё это гасится переключателем в «Настройках». */
+/* Метка программы отвечает за расчёт: короткая вспышка плюс короткий сигнал,
+   когда всё готово, - человек уходит в другое окно и возвращается по звуку.
+   Само присутствие работы показывает пульс значка от нагрузки ядра (util.js).
+   Всё это гасится переключателем в «Настройках». */
 let NOTIFY_BUSY = false;
 function notifyDone() {
   const mark = document.querySelector('.brand-mark');
@@ -161,13 +162,12 @@ function notifyDone() {
   } catch (e) { }
 }
 setInterval(() => {
-  /* Метка пульсирует и за работу сценариста тоже: его «думаю…» человек должен
-     видеть из любого окна, а не только читая чат. */
+  /* Окончание работы - по звуку; мигание во время работы живёт от нагрузки
+     ядра (util.js), а не от очереди: очередь не видит ни Сценариста, ни
+     чужой ComfyUI, и раньше метка «мигала и замолкала». */
   const busy = QUEUE.some(j => j.state === 'running' || j.state === 'queued') || !!window._agNote;
   if (busy !== NOTIFY_BUSY) {
     NOTIFY_BUSY = busy;
-    const mark = document.querySelector('.brand-mark');
-    if (mark) mark.classList.toggle('work', busy);
     if (!busy && window.notifyOn && window.notifyOn()) notifyDone();
   }
   if (QUEUE.some(j => j.state === 'running' || j.state === 'queued')) qRender(); else dockRender();

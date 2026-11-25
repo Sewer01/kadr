@@ -153,12 +153,14 @@ export function previewPanel(el, st, opts) {
     confirmBox('Движок не увидит эти ссылки',
       'Текст сцен ссылается на пустые места - файла там нет, и движок нарисует на их месте своё. '
       + 'Прикрепите файлы или уберите эти номера из текста.\n\n' + (gaps || []).join('\n'),
-      'Продолжить', async () => { await retry(); }, 'Прервать');
+      'Продолжить', async () => { if (opts.chainLive && opts.chainLive()) chainWarnOk = true; await retry(); }, 'Прервать');
   }
-  /* Цепочка сцен спрашивает про предупреждения один раз: человек решил это,
-     когда запускал «Сделать все сцены», и на каждой следующей сцене окно
-     останавливало бы ночную сборку и требовало того же решения заново. */
-  let chainWarnOk = 0;
+  /* Цепочка сцен спрашивает про предупреждения один раз на весь запуск
+     «Сделать все сцены»: человек решил это один раз, и на каждой следующей
+     сцене окно останавливало бы ночную сборку и требовало того же решения
+     заново. Решение живёт, пока цепочка идёт; цепочка кончилась - окно
+     снова спрашивает. */
+  let chainWarnOk = false;
   async function realStart(force) {
     const meta = opts.meta();
     go.disabled = true; if (!run) status.textContent = 'Отправляем задание в ComfyUI…';
@@ -166,13 +168,13 @@ export function previewPanel(el, st, opts) {
     try { form = opts.real.form(force); } catch (e) { go.disabled = false; if (run) toast('Ошибка: ' + e.message); else status.textContent = 'Ошибка: ' + e.message; return; }
     /* Предупреждения, которые собрала сборка задания, - не мигающая строчка, а окно:
        человек читает список и решает - запускать как есть или пойти поправить. */
-    const warns = warnTake();
     const live = !!(opts.chainLive && opts.chainLive());
-    if (!live) chainWarnOk = 0;
+    if (!live) chainWarnOk = false;
+    const warns = warnTake();
     if (warns.length && !force && !(live && chainWarnOk)) {
       go.disabled = false;
       return confirmBox('Перед запуском: ' + warns.length + (warns.length > 4 ? ' предупреждений' : ' предупреждения'),
-        warns.join('\n'), 'Всё равно запустить', async () => { if (live) chainWarnOk = 1; await realStart(true); }, 'Поправить');
+        warns.join('\n'), 'Всё равно запустить', async () => { if (live) chainWarnOk = true; await realStart(true); }, 'Поправить');
     }
     let res;
     try {

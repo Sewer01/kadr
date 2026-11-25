@@ -22,6 +22,17 @@ LLAMA_URL = f"https://github.com/ggml-org/llama.cpp/releases/download/{LLAMA_BUI
 
 HF = "https://huggingface.co/{repo}/resolve/main/{path}"
 LLM_VARIANTS = {
+    # Qwen3.5 (2026): vision встроен в модель, русский держит крепко, формат не рвёт;
+    # контекст у модели 262k, но мы ставим 49k - столько же, сколько сейчас, чтобы
+    # память делилась с видеомоделью
+    "qwen35-9b": {"title": "Qwen3.5 9B", "min_vram": 8,
+                  "repo": "unsloth/Qwen3.5-9B-GGUF", "model": "Qwen3.5-9B-Q4_K_M.gguf", "model_size": 5.68e9,
+                  "mmproj": "mmproj-F16.gguf", "mmproj_size": 0.92e9, "ctx": 49152},
+    "qwen35-9b-unc": {"title": "Qwen3.5 9B без цензуры", "uncensored": True, "min_vram": 8,
+                      "repo": "mradermacher/Huihui-Qwen3.5-9B-abliterated-GGUF",
+                      "model": "Huihui-Qwen3.5-9B-abliterated.Q4_K_M.gguf", "model_size": 5.63e9,
+                      "mmproj": "Huihui-Qwen3.5-9B-abliterated.mmproj-f16.gguf", "mmproj_as": "mmproj-qwen35-9b-unc-f16.gguf",
+                      "mmproj_size": 0.92e9, "ctx": 49152},
     "gemma4-12b": {"title": "Gemma 4 12B", "repo": "ggml-org/gemma-4-12B-it-GGUF",
                    "model": "gemma-4-12B-it-Q4_0.gguf", "model_size": 7.22e9,
                    "mmproj": "mmproj-gemma-4-12B-it-Q8_0.gguf", "mmproj_size": 0.16e9, "ctx": 49152},
