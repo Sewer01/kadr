@@ -126,7 +126,10 @@ try { new ResizeObserver(() => fitTopBar()).observe(document.getElementById('mod
 document.addEventListener('click', e => { if (e.target.closest('.nav')) setTimeout(fitTopBar, 30); }, true);
 setTimeout(fitTopBar, 60);
 
-/* settings: every block folds (the state is remembered); the long rarely needed ones start folded */
+/* settings: every block folds (the state is remembered); the long rarely needed ones start folded.
+   «Скиллы сценариста» не складывается вместе с остальными: у неё внутри своя стрелка, и два
+   обработчика на одном заголовке спорили - карточка складывалась, список нет, и человек видел
+   пустую карточку (общий скан вешал на неё сворачивание по ключу «view-models:?») */
 export const FOLD_ON_OPEN = ['mdEngineCard', 'mdRentCard', 'mdOwnCard', 'clCard', 'mdNodesCard', 'mdServiceCard'];
 /* «Настройки» - справочная страница: она открывается короткой, а что раскрывать, решает человек.
    Его клики работают, пока он здесь; при следующем открытии список снова свёрнут */
@@ -136,7 +139,7 @@ export function foldOnOpen() { FOLD_ON_OPEN.forEach(id => document.getElementByI
   const KEY = 'h3-fold', def = { mdEngineCard: 1, mdRentCard: 1, mdOwnCard: 1, clCard: 1, mdNodesCard: 1 }; let st = {};
   try { st = JSON.parse(localStorage.getItem(KEY) || '{}'); } catch {}
   $$('#mdStatus > .card').forEach((c, i) => {
-    if (c.id === 'mdDl') return;
+    if (c.id === 'mdDl' || c.id === 'mdSkillsCard') return;   // у скиллов своя стрелка внутри заголовка
     const id = c.id || ('c' + i), h = c.querySelector('.card-h'); if (!h) return;
     c.classList.add('fold'); if (id in st ? st[id] : def[id]) c.classList.add('collapsed');
     h.addEventListener('click', e => {
