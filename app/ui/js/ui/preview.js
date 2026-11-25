@@ -299,7 +299,11 @@ export function previewPanel(el, st, opts) {
   }
 
   go.onclick = () => {
-    const err = opts.validate(); if (err) { status.textContent = err; return; }
+    /* Ошибка в проверке не имеет права гасить запуск молча: человек жмёт кнопку,
+       а программа стоит и делает вид, что думает. Пусть скажет, что сломалось. */
+    let err = '';
+    try { err = opts.validate(); } catch (e) { err = 'Не могу начать: ' + ((e && e.message) || e); }
+    if (err) { status.textContent = err; return; }
     if (API) {
       if (!opts.real) { status.textContent = 'Этот режим ещё не подключён к ComfyUI — пока работает «Видео»'; return; }
       return realStart();

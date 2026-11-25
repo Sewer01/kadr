@@ -70,7 +70,7 @@ import { qAdd } from './queue.js';
   { const fb = $('.mt-fade', root); if (fb) fb.innerHTML = FD + ' Затухание аудио'; }   // once: the caption never changes later
   const hidden = () => { try { return JSON.parse(localStorage.getItem('h3-mt-hide') || '[]'); } catch { return []; } };
   const hideSet = a => { try { localStorage.setItem('h3-mt-hide', JSON.stringify(a)); } catch {} };
-  const fullOf = i => get(MT.ids[i]).len || 5;
+  const fullOf = i => (get(MT.ids[i]) || {}).len || 5;   // клип мог уйти из Библиотеки: лента не должна падать на пустом месте
   // what is kept of a clip: from inOf(i) to endOf(i) seconds of the original; cuts[i] went on
   // meaning "where it ends", so the old saved states keep working
   const endOf = i => MT.cuts[i] != null ? Math.min(MT.cuts[i], fullOf(i)) : fullOf(i);

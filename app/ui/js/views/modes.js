@@ -3879,6 +3879,7 @@ export function makeRefMode(cfg) {
         + ' Уровень музыки задаётся ползунком, а «Выровнять громкость трека» приводит файл к общей громкости; если трек короче фильма, музыка кончится там, где кончился файл, а звук ролика продолжится.'
     };
     const setSndState = v => { const el = $('.lm-sndstate', root), voc = $('.lm-vocals', root); if (el && HINT[v]) el.textContent = HINT[v](!!(voc && voc.checked)); };
+    root._setSndState = setSndState;   // проверка запуска лежит вне этой области видимости - пусть красит подсказку через корень
     // галочка меняет не только расчёт, но и то, что написано над ней: подсказка должна говорить правду
     const vocBox = $('.lm-vocals', root);
     if (vocBox) vocBox.onchange = () => setSndState(root._snd);
@@ -4000,7 +4001,7 @@ export function makeRefMode(cfg) {
          проекта, и кнопка требовала аудио, которое включить негде, - тупик. Здесь флаг
          догоняет файлы: нет файла - ролик без своего звука, модель озвучит его сама по
          описаниям сцен, и запуск проходит дальше. */
-      : cfg.scenes ? ((root._snd === 'own' && !files('.rm-auds .slot').length && (root._snd = 'none', toast('Аудиофайла нет - ролик будет без своего звука: модель озвучит его сама по описаниям сцен'), ($('.lm-sndstate', root) || {}).textContent = HINT.none())) ? '' : sceneList().some(x => !x.prompt) ? 'Заполните описание каждой сцены или уберите лишнюю' : '') : !promptEl().value.trim() ? 'Напишите промпт' : '',
+      : cfg.scenes ? ((root._snd === 'own' && !files('.rm-auds .slot').length && (root._snd = 'none', toast('Аудиофайла нет - ролик будет без своего звука: модель озвучит его сама по описаниям сцен'), root._setSndState && root._setSndState('none'))) ? '' : sceneList().some(x => !x.prompt) ? 'Заполните описание каждой сцены или уберите лишнюю' : '') : !promptEl().value.trim() ? 'Напишите промпт' : '',
     real: {
       url: '/api/generate/' + cfg.mode,
       form: (force) => {
