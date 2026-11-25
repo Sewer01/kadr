@@ -5,11 +5,11 @@ variants; `choose_models` picks one per role from the detected hardware.
 """
 import re
 
-COMFY_VERSION = "0.45.0"  # the first build with RelayVSR (fast video upscale) and the newer MiniMax H3 nodes
+COMFY_VERSION = "0.46.0"  # RelayVSR + newer MiniMax H3 nodes (0.45), H3 Image node and frontend 1.59 (0.46); checked: all classes the workflows use are here
 MIN_DRIVER = 580  # the bundled PyTorch is built for CUDA 13
 COMFY_URL = ("https://github.com/Comfy-Org/ComfyUI/releases/download/"
              f"v{COMFY_VERSION}/ComfyUI_windows_portable_nvidia.7z")
-COMFY_SIZE = 2_071_479_423  # the real size of the asset (read from GitHub), so the bar and the estimate do not lie
+COMFY_SIZE = 2_085_169_944  # the real size of the asset (read from GitHub), so the bar and the estimate do not lie
 # GitHub publishes no digest for this asset, and the value that stood here belonged to 0.44.0: keeping it
 # would reject a perfectly good 0.45.0 file. The download is https from GitHub, and the archive is unpacked
 # into its own folder; put a digest here once we have computed and trusted one, and it will be enforced.
@@ -26,16 +26,16 @@ NODE_PACKS = [
     {"name": "ComfyUI-H3-NativeAudioLock", "repo": "SveSop/ComfyUI-H3-NativeAudioLock",
      "commit": "699e58e51b1c8e12b8c0f0dd55da603d870d20e6"},
     {"name": "Comfyui_Minimax_h3_latent_Upscaler", "repo": "LBH-123-AI/Comfyui_Minimax_h3_latent_Upscaler",
-     "commit": "40316cf008b2fd8663263270669eb4da23f89d2c"},
+     "commit": "f34cadb19f10fee7e36091b690cac39b4eb40573"},
     # separates the voice from music in the lipsync audio editor
     {"name": "ComfyUI-MelBandRoFormer", "repo": "kijai/ComfyUI-MelBandRoFormer",
      "commit": "92c86854e6654f4aacc97484471af95c98ea16d4"},
     # loads reference videos at 24 fps for the references mode
     {"name": "ComfyUI-VideoHelperSuite", "repo": "Kosinkadink/ComfyUI-VideoHelperSuite",
-     "commit": "4d907bee61e92c2e65af3bd6383a4e4d356126d1"},
+     "commit": "775ae691ecbab6a6d09a2c186f95d130cf8a10d3"},
     # memory savers (MiniMaxChunkFeedForward, MiniMaxLowVRAMAttention) used by the long video graphs
     {"name": "ComfyUI-KJNodes", "repo": "kijai/ComfyUI-KJNodes",
-     "commit": "ab72eda7ffad6280422d71ab7d54d3fb87c0ba18"},
+     "commit": "187868f53a7d9df007dbfe85891dab41453f7933"},
     # the exact scheme of the action workflow (Prompt Mastery): a SelfLift sampler and a finishing step.
     # Both repos were read before adding: no network, no shell, no exec, no extra pip packages; commits pinned.
     {"name": "comfyui-SelfLift", "repo": "facok/comfyui-SelfLift",
