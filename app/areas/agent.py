@@ -9,6 +9,7 @@ from paths import DATA_DIR, ROOT
 import agent as ag
 import aiohttp
 import asyncio
+import re
 import engine
 import json
 import speech
@@ -422,6 +423,10 @@ class AgentMixin:
             await send({"type": "status", "text": "Читаю скиллы и думаю…"})
 
             thinking = False
+            # локальная Qwen иногда срывается в иероглифы; один раз появившись, китайский
+            # оседает в истории чата и копируется дальше. поэтому: ответ собираем, иероглифы
+            # ловим, один раз молча перезапрашиваем, а плохой текст в чат не отдаём
+            cjk = re.compile(r"[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]")
             for attempt in (0, 1, 2):   # 0: всё как есть; 1: без кадров; 2: прежний разговор ложится коротким пересказом
                 if attempt == 2:
                     await send({"type": "status", "text": "Места в контексте не хватило: пересказываю прежний разговор коротко…"})
@@ -438,7 +443,7 @@ class AgentMixin:
                 elif notes and not attempt:
                     await send({"type": "status", "text": "Места в контексте мало: " + ", ".join(notes)})
                 payload = {"messages": [{"role": "system", "content": system}] + conv,
-                           "stream": True, "temperature": 0.6, "cache_prompt": True}
+                           "stream": True, "temperature": 0.35, "cache_prompt": True}
                 if body.get("think") != "deep":
                     # "fast" (default): no hidden reasoning before the answer. On the user's machine a light request took 17 s with it
                     # (about 2000 characters of thoughts) and 1.5 s without; the long-video rules took minutes with it
@@ -454,16 +459,28 @@ class AgentMixin:
                             why += (". Увеличьте длину контекста ползунком «Контекст» в разделе «Сценарист» "
                                     "или начните новый чат - старый диалог занимает место")
                         raise RuntimeError(f"Модель ответила ошибкой {r.status}: {why}")
+                    got = []                     # ответ собираем целиком: по нему решаем, отдавать ли его в чат
                     async for raw in r.content:
                         line = raw.decode("utf-8", errors="replace").strip()
                         if not line.startswith("data:") or line == "data: [DONE]":
                             continue
                         delta = (json.loads(line[5:]).get("choices") or [{}])[0].get("delta", {})
                         if delta.get("content"):
-                            await send({"type": "delta", "text": delta["content"]})
+                            got.append(delta["content"])
                         elif delta.get("reasoning_content") and not thinking:
                             thinking = True
                             await send({"type": "status", "text": "Думаю над сценой…"})
+                    text = "".join(got)
+                    if cjk.search(text) and attempt == 0:
+                        # иероглифы в ответе: в чат это не идёт, просим переписать один раз
+                        await send({"type": "status", "text": "В ответе попались иероглифы - переписываю по-русски…"})
+                        messages = messages + [{"role": "assistant", "content": text},
+                                               {"role": "user", "content": "В ответе иероглифы. Перепиши ВЕСЬ ответ заново: реплики только [Russian] кириллицей, без иероглифов и пиньиня."}]
+                        continue
+                    if cjk.search(text):
+                        raise RuntimeError("Модель упорно пишет иероглифы. Попробуйте ещё раз или смените модель сценариста.")
+                    for i in range(0, len(text), 240):
+                        await send({"type": "delta", "text": text[i:i + 240]})
                 await send({"type": "done"})
                 break
         except (ConnectionResetError, asyncio.CancelledError):
