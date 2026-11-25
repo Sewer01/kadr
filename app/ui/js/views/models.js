@@ -34,7 +34,7 @@ export function renderModels(s) {
   /* список был сплошной простынёй: непонятно, к какому разделу какой файл, теперь группы
      по режимам - файл показан один раз под тем режимом, который раньше всех в нём участвует,
      а остальные режимы перечислены в самой строке */
-  const MNAME = { video: 'Видео', lipsync: 'Клип', refs: 'Видеостудия', actor: 'Актёр', swap: 'Замена', action: 'Экшн-видео', actionsc: 'Экшн-студия', h3img: 'Изображения MiniMax H3 Image', long: 'Студия', krea: 'Изображение по тексту', kreareal: 'Изображение по тексту: реализм', qwen: 'Изменение изображения', flux: 'Изменение изображения: FLUX.2 (в коммерцию)', upscale: 'Апскейлинг видео и изображений', relayvsr: 'Апскейлинг видео · быстро (RelayVSR)' };
+  const MNAME = { video: 'Видео', lipsync: 'Клип', refs: 'Видеостудия', actor: 'Актёр', swap: 'Замена', action: 'Экшн-видео', actionsc: 'Экшн фильм', h3img: 'Изображения MiniMax H3 Image', long: 'Киностудия', krea: 'Изображение по тексту', kreareal: 'Изображение по тексту: реализм', qwen: 'Изменение изображения', flux: 'Изменение изображения: FLUX.2 (в коммерцию)', upscale: 'Апскейлинг видео и изображений', relayvsr: 'Апскейлинг видео · быстро (RelayVSR)' };
   const mRow = m => {
     const optional = !m.modes.length;
     const st = m.have ? '<span class="st ok">, загружено</span>' : optional ? '<span class="st opt" title="Без этого файла разделы работают; он добавляет возможность. Нажмите «Скачать», чтобы взять его.">по желанию</span>' : '<span class="st miss" title="Этот файл нужен выбранным разделам. Нажмите «Докачать недостающие» или «Скачать».">нет файла</span>';
@@ -65,7 +65,7 @@ export function renderModels(s) {
   if (need.length) $('#mdModelsCard').classList.remove('collapsed');   // a missing file has to be seen, not hidden behind a folded card
   fitTopBar();
   $('#mdFixExt').textContent = `Скачать недостающие (${need.length}, ${GB(need.reduce((a, m) => a + m.size, 0))})`;
-  const MN = { video: 'Видео', lipsync: 'Клип', refs: 'Видеостудия', actor: 'Актёр', swap: 'Замена', action: 'Экшн-видео', actionsc: 'Экшн-студия', h3img: 'Изображения MiniMax H3 Image', long: 'Студия', krea: 'Изображение по тексту', kreareal: 'Изображение по тексту: реализм', qwen: 'Изменение изображения', flux: 'Изменение изображения: FLUX.2 (в коммерцию)', upscale: 'Апскейлинг видео и изображений', relayvsr: 'Апскейлинг видео · быстро (RelayVSR)' };
+  const MN = { video: 'Видео', lipsync: 'Клип', refs: 'Видеостудия', actor: 'Актёр', swap: 'Замена', action: 'Экшн-видео', actionsc: 'Экшн фильм', h3img: 'Изображения MiniMax H3 Image', long: 'Киностудия', krea: 'Изображение по тексту', kreareal: 'Изображение по тексту: реализм', qwen: 'Изменение изображения', flux: 'Изменение изображения: FLUX.2 (в коммерцию)', upscale: 'Апскейлинг видео и изображений', relayvsr: 'Апскейлинг видео · быстро (RelayVSR)' };
   $('#mdAdd').innerHTML = s.engine === 'managed' || s.engine === 'external' ? Object.entries(s.add_modes || {}).map(([m, gb]) =>
     /* «(+0 ГБ)» читается как ошибка: когда всё уже лежит на диске, кнопка ничего не качает,
          она только включает режим - так и пишем */
@@ -204,7 +204,7 @@ $('#wzRestore').onclick = async () => {
     on = cb.checked;
     try { localStorage.setItem('kadr-notify', on ? 'on' : 'off'); } catch {}
     document.body.classList.toggle('no-notify', !on);
-    toast(on ? 'Замечаем: метка пульсирует во время расчёта, в конце - сигнал' : 'Тихо: метка не пульсирует и сигнала не будет');
+    toast(on ? 'Замечаем: во время расчёта вокруг значка мигает красная рамка, в конце - сигнал' : 'Тихо: рамка не мигает и сигнала не будет');
   };
 })();
 (() => {   // «Держать модели в памяти»: общий флаг (jobs.queue его читает, как и озвучка)

@@ -496,27 +496,37 @@ export function sceneAudioPlan(c, film, bs, pool, room) {
 }
 
 /* Отчёт сценариста о референсах: последним в блоке он пишет «REFS:» и строки
-   «<Picture 10> -> scene 3» или «<Picture 20> -> shared». Сначала блок снимается
-   с текста (в сцены ему нельзя), потом по нему раскладываются файлы. */
+   вида «<Picture 20> -> <Picture 31>» (файл переезжает на полку сцены 3, слот 1;
+   в текстах сценарист сам зовёт его уже новым тегом, и программа тексты не
+   трогает), «<Picture 10> -> scene 3» (старая форма: программа сама ищет
+   свободное место и переписывает теги) или «<Picture 20> -> shared».
+   Сначала блок снимается с текста (в сцены ему нельзя), потом по нему
+   раскладываются файлы. */
 export function parseRefReport(text) {
   const out = [];
   const m = String(text || '').match(/(?:^|\n)[ \t]*REFS\b[^\n]*\n?[\s\S]*$/i);
   if (!m) return { entries: out, text: String(text || '') };
-  const re = /<\s*(Picture|Audio)\s*(\d+)\s*>\s*(?:->|→|=>)\s*(?:scene\s*(\d+)|shared|общ\w*)/gi;
+  const re = /<\s*(Picture|Audio)\s*(\d+)\s*>\s*(?:->|→|=>)\s*(?:scene\s*(\d+)|shared|общ\w*|<\s*(?:Picture|Audio)\s*(\d+)\s*>)/gi;
   let x;
   while ((x = re.exec(m[0]))) {
     const kind = x[1].toLowerCase() === 'audio' ? 'Audio' : 'Picture';
     const n = +x[2];
-    if (n >= 10) out.push(x[3] ? { kind, n, to: +x[3] } : { kind, n, to: 'shared' });
+    if (n < 10) continue;
+    if (x[3]) out.push({ kind, n, to: +x[3] });
+    else if (x[4] && +x[4] >= 1 && +x[4] <= 98) out.push({ kind, n, dest: +x[4] });
+    else out.push({ kind, n, to: 'shared' });
   }
   return { entries: out, text: String(text).slice(0, m.index) };
 }
 
 /* Раскладка по отчёту: файл из декады переезжает в названную сцену или в общее
-   место, а теги во всех текстах переписываются на новые номера - карточки должны
-   говорить правду. Из сцены-источника файл уходит только если её текст больше не
-   зовёт старый тег. Повторы (карточки перестраиваются не сразу) ничего не
-   дублируют: применённая строка помечена, а файл узнаётся по имени. */
+   место. По новому формату («<Picture 20> -> <Picture 31>») тексты не трогаются
+   вовсе: сценарист сам зовёт файл новым тегом, и программа лишь кладёт файл на
+   полку - так теги не сбиваются. По старой форме («-> scene 3») программа сама
+    ищет свободное место и переписывает теги во всех текстах. Из сцены-источника
+    файл уходит только если её текст больше не зовёт старый тег. Повторы
+    (карточки перестраиваются не сразу) ничего не дублируют: применённая строка
+    помечена, а файл узнаётся по имени. */
 export async function applyRefReport(root2, entries, final) {
   const moved = [], gone = [];
   if (!entries || !entries.length) return { moved, gone };
@@ -548,6 +558,56 @@ export async function applyRefReport(root2, entries, final) {
     const hit = findIn(e.kind, e.n);
     if (!hit) continue;                     // файл ещё не долёг (deliver повторяется) - попробуем снова
     const tagOld = '<' + e.kind + ' ' + e.n + '>';
+    if (e.dest != null) {
+      /* Переезд по новому формату отчёта: сценарист сам переименовал тег в
+         текстах, программа только кладёт файл на названное место и ни одного
+         слова в текстах не меняет - отсюда и нет конфликтов тегов. */
+      const d = e.dest;
+      if (e.kind === 'Picture' && d >= 1 && d <= 5) {
+        const slot = $$('label.ref:not(.own)', root2)[d - 1];
+        if (!slot) { gone.push(tagOld + ' - общего места Picture ' + d + ' нет'); e.done = true; continue; }
+        if (same(slot._file, hit.f)) { e.done = true; continue; }
+        if (slot._file) { gone.push(tagOld + ' - общее Picture ' + d + ' занято'); e.done = true; continue; }
+        await setDropFile($$('input', slot)[0] || slot.querySelector('input'), hit.f);
+        moved.push(tagOld + ' -> общие (Picture ' + d + ')');
+      } else if (e.kind === 'Audio' && d >= 2 && d <= 3) {
+        const row = root2._faudRow;
+        if (!row) { gone.push(tagOld + ' - ряда общего аудио нет'); e.done = true; continue; }
+        if (same(row.files[d - 1], hit.f)) { e.done = true; continue; }
+        if (row.files[d - 1]) { gone.push(tagOld + ' - общее Audio ' + d + ' занято'); e.done = true; continue; }
+        row.set(d - 1, hit.f);
+        moved.push(tagOld + ' -> общие (Audio ' + d + ')');
+      } else if (d >= 10) {
+        const t = cards.find(c => { const b = (c._baseFixed || c._base || 0); return d >= b && d < b + (e.kind === 'Picture' ? 9 : 3); });
+        if (!t) { gone.push(tagOld + ' - сцены для полки ' + e.kind + ' ' + d + ' в ленте нет'); e.done = true; continue; }
+        const j = d - (t._baseFixed || t._base || 0);
+        if (e.kind === 'Picture') {
+          t._files = t._files || new Array(9).fill(null);
+          if (t._files[j]) {
+            if (same(t._files[j], hit.f)) { e.done = true; continue; }
+            gone.push(tagOld + ' - полка <' + e.kind + ' ' + d + '> занята'); e.done = true; continue;
+          }
+          if (t._setOwn) t._setOwn(j, hit.f); else { t._files[j] = hit.f; t._paint?.(); }
+        } else {
+          t._auds = t._auds || []; t._audSrc = t._audSrc || []; t._audSel = t._audSel || []; t._audWords = t._audWords || [];
+          if (t._auds[j]) {
+            if (same(t._auds[j], hit.f)) { e.done = true; continue; }
+            gone.push(tagOld + ' - полка <' + e.kind + ' ' + d + '> занята'); e.done = true; continue;
+          }
+          t._auds[j] = hit.f; t._audSrc[j] = hit.f; t._audSel[j] = null; if (!hit.f.__key) window.audioKey(hit.f);
+          const w = (hit.from._audWords || [])[hit.j]; if (w && !(t._audWords[j] || '').trim()) t._audWords[j] = w;
+          t._paintAuds?.(); t._paint?.();
+        }
+        moved.push(tagOld + ' -> <' + e.kind + ' ' + d + '>');
+        if (cards.some(c => ((taOf(c) || {}).value || '').indexOf(tagOld) >= 0))
+          gone.push(tagOld + ' - сценарист зовёт старый тег в тексте, а файл уже на новой полке');
+      } else {
+        gone.push(tagOld + ' - названного места нет на полках'); e.done = true; continue;
+      }
+      dropFrom(e, hit, tagOld);
+      e.done = true;
+      continue;
+    }
     if (e.to === 'shared') {
       if (e.kind === 'Picture') {
         const all = $$('label.ref:not(.own)', root2);
@@ -787,7 +847,7 @@ export async function sendPrompt(blk, to) {
     applyRefReport(L2.root, refEntries).catch(() => { });
     /* Карточки раздела перестраиваются не в тот же миг: доставка, сделанная один раз,
        попадала в карточки, которые потом заменялись новыми, и фото сцены исчезало.
-       Поэтому она повторяется, когда Студия уже на экране. Повтор ничего не
+       Поэтому она повторяется, когда Киностудия уже на экране. Повтор ничего не
        дублирует: лежащий в сцене файл узнаётся по имени и размеру. */
     setTimeout(() => { deliver(); applyRefReport(L2.root, refEntries).catch(() => { }); }, 400);
     setTimeout(() => { deliver(); applyRefReport(L2.root, refEntries, true).catch(() => { }); }, 1400);
@@ -797,7 +857,7 @@ export async function sendPrompt(blk, to) {
     if (studioCaps(to).baseVideo && vidFiles.length) {   // видео продолжает только тот режим, у которого есть база
       const got = await L2.root._takeVideo(vidFiles[0]);
       vUsed = 1; vAll = 1;
-      const who = MODE_NAME[to] || 'Студия';
+      const who = MODE_NAME[to] || 'Киностудия';
       toast(got.frame
         ? `${who} продолжит «${vidFiles[0].name}»: режим «продолжить своё видео» включён, его последний кадр встал перед вашими фото`
         : `${who} продолжит «${vidFiles[0].name}», но последний кадр взять не удалось (${got.why || 'не читается'}): ваших мест тогда 9`);
@@ -829,7 +889,7 @@ export async function sendPrompt(blk, to) {
   if (to === 'lipsync' && au && !back) await setDropFile($('#aFile'), au);   // a returned draft keeps its own song
   if (to === 'swap' || to === 'refs') { const r = await handVids(RM[to].root); vUsed = r.used; vAll = r.all; }
   goTo(to);
-  const name = { video: '«Видео»', lipsync: '«Клип»', refs: '«Видеостудия»', actor: '«Актёр»', swap: '«Замена»', action: '«Экшн-видео»', actionsc: '«Экшн-студия»', long: '«Студия»', krea: '«Изображение по тексту»', qwen: '«Изображения»' }[to];
+  const name = { video: '«Видео»', lipsync: '«Клип»', refs: '«Видеостудия»', actor: '«Актёр»', swap: '«Замена»', action: '«Экшн-видео»', actionsc: '«Экшн фильм»', long: '«Киностудия»', krea: '«Изображение по тексту»', qwen: '«Изображения»' }[to];
   toast(`${back ? 'Черновик вернулся в' : 'Промпт перенесён в режим'} ${name}` + (back ? ', ваши файлы остались на местах' : '') + (files.length && to !== 'video' && to !== 'krea' ? ' вместе с изображениями' : '')
     + (vUsed ? ` и видео: ${vUsed}` : '') + (vidFiles.length > vUsed ? ` (видео в чате ${vidFiles.length}, раздел принимает ${vAll || 1}: лишние не перенесены)` : '') + (to === 'lipsync' && !back ? (au ? ' и аудио — выделите нужный фрагмент' : ' — добавьте аудио') : ''));
 }

@@ -316,7 +316,7 @@
 .token:hover{border-color:var(--accent)}
 
 /* кнопки в ряду звука - той же высоты, что в окне «Сценарий», и не тянутся на всю
-   строку: рядом с ними теперь стоит «Сцены по треку» из Клип-студии */
+   строку: рядом с ними теперь стоит «Сцены по треку» из Большого музыкального клипа */
 .lm-own .btn{padding:4px 12px;font-size:12px;align-self:center}
 
     /* the audio row of a scene: one box for every element in it, and the loading button is filled,

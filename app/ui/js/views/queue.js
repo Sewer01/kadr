@@ -28,7 +28,7 @@ export function qHandle(m) {
   } else if (m.type === 'done') {
     j.state = 'done'; j.took = j.t0 ? (performance.now() - j.t0) / 1000 : 0; j.itemId = (m.item || (m.items || [])[0] || {}).id;
     (m.items || [m.item]).forEach(it => { if (!LIB.some(x => x.id === it.id)) addToLib(normItem(it), new Date(it.date)); /* ready clip belongs to the section that made it: Экшн-видеостудия тоже ходит в эту рассылку,
-     раньше здесь была прописана только Видеостудия, и клип Экшн-студии не доходил до ленты сцен */
+     раньше здесь была прописана только Видеостудия, и клип Экшн фильма не доходил до ленты сцен */
     if (it.long && typeof RM !== 'undefined') { const rm = RM[it.mode] || RM.long; if (rm && rm.root && rm.root._partDone) rm.root._partDone(normItem(it) || it); } });
     if (j.mode === 'upscale' && j.itemId && $('#view-queue').classList.contains('active') && $('#viewer').hidden) setTimeout(() => openViewer(j.itemId), 400);  // show before/after at once
     /* The card's line used to be closed only when the job had failed: a good retouch left

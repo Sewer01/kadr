@@ -375,7 +375,7 @@ function applyW() {
 }
 function paintAll() {
   root.innerHTML = `<div class="head"><div><h1>Студия референсов</h1><p>Листы референсов героя, предмета или места одним рендером: короткое видео, кадры по ракурсам, один лист. Кадры и лист уходят в «Карточки» и в Библиотеку.</p></div>
-    <div class="rl-chips"><button class="btn mini" data-a="editlay" type="button">${S.editLay ? 'Готово' : 'Порядок кадров…'}</button><button class="btn" data-a="reset" type="button">Сбросить форму</button></div></div>
+    <div class="rl-chips"><button class="btn mini" data-a="editlay" type="button">${S.editLay ? 'Готово' : 'Порядок кадров…'}</button><button class="btn mini" data-a="reset" type="button">Сбросить форму</button></div></div>
     <div class="rl-layout"><div class="rl-left" id="rlLeft"></div><div class="rl-split" id="rlSplit" title="Потяните, чтобы изменить ширину. Двойной щелчок: вернуть как было"></div><div class="rl-rcol"><div id="rlRight"></div></div></div>`;
   applyW(); paintLeft(); paintRight();
 }

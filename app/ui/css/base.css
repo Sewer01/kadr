@@ -491,24 +491,20 @@ body.sys-folded .sys-body{display:none}
 
 .sys-sep{height:1px;background:var(--line);margin:7px 0;opacity:.7}
 
-/* the mark of the program is the state of the engine */
-.brand-mark.eng-wait{color:#e8264f;animation:kadrbreathe 1.05s ease-in-out infinite}
+/* the mark of the program is the state of the engine:
+   red = the engine is not loaded, green = the engine is loaded */
+.brand-mark.eng-wait{color:#e8264f}
 
-.brand-mark.eng-on{color:var(--accent);animation:none}
-
-@keyframes kadrbreathe{0%,100%{color:#e8264f;filter:none}50%{color:#ff7a94;filter:drop-shadow(0 0 6px rgba(232,38,79,.55))}}
+.brand-mark.eng-on{color:#3fb950}
 
 .brand-icon{border-radius:14px;display:block}
 
-@media (prefers-reduced-motion:reduce){.brand-mark.eng-wait{animation:none}}
-
-/* «Замечать работу программы» (Настройки): метка пульсирует, пока идёт расчёт,
-   и коротко вспыхивает, когда всё готово; человек может это выключить.
-   Пульс - не только цветом: вокруг метки расходится световое кольцо, чтобы
-   работа была заметна и боковым зрением, и из другого конца комнаты. */
-.brand-mark.work{animation:kadrwork 1.05s ease-in-out infinite}
+/* «Замечать работу программы» (Настройки): пока идёт расчёт или Сценарист
+   думает, вокруг зелёного значка мигает красная рамка; по окончании -
+   короткая вспышка и звуковой сигнал. Человек может это выключить. */
+.brand-mark.work{color:#3fb950;animation:kadrwork 1s ease-in-out infinite}
 .brand-mark.work-done{animation:kadrflash .9s ease-out 2}
-@keyframes kadrwork{0%,100%{color:#e8264f;box-shadow:0 0 0 0 rgba(232,38,79,.45),0 8px 24px rgba(232,38,79,.35)}50%{color:#ff7a94;box-shadow:0 0 0 7px rgba(232,38,79,.16),0 8px 24px rgba(232,38,79,.6)}}
+@keyframes kadrwork{0%,100%{box-shadow:0 0 0 0 rgba(232,38,79,0)}50%{box-shadow:0 0 0 3px rgba(232,38,79,.95)}}
 @keyframes kadrflash{0%,100%{filter:none}40%{filter:drop-shadow(0 0 10px rgba(var(--accent-rgb),.9))}}
 body.no-notify .brand-mark{animation:none!important}
 
@@ -1109,7 +1105,7 @@ body.dropping::after{content:'Отпустите — программа разл
 .rs-frame .hint{font-size:12px}
 
 /* Переключатель режимов под заголовком страницы: в меню одна кнопка, а режимов
-   под ней несколько (Киностудия, Экшн-студия, Клип-студия; Видеостудия и Экшн-видео). */
+   под ней несколько (Киностудия, Экшн фильм, Большой музыкальный клип; Видеостудия и Экшн-видео). */
 .nav-sw{display:inline-flex;gap:4px;padding:3px;margin-top:10px;background:var(--surface-2);border:1px solid var(--line);border-radius:10px}
 .nav-sw[hidden]{display:none}
 .nav-sw button{border:0;background:none;color:var(--dim);font-weight:700;font-size:12.5px;padding:5px 12px;border-radius:8px;cursor:pointer}

@@ -366,8 +366,8 @@
               <button data-t="swap" title="Замена: заменить героя в вашем видео по картинке">Замена</button>
               <button data-t="action" title="Экшн-видео — бой, погоня, бег">Экшн-видео</button>
               <button data-t="long" title="Студия — фильм по сценам, каждая до 15 с">Студия</button>
-              <button data-t="actionsc" title="Экшн-студия — экшн по сценам подряд">Экшн-студия</button>
-      <button data-t="clipsc" title="Клип-студия — клип по вашей музыке">Клип-студия</button>
+              <button data-t="actionsc" title="Экшн фильм — экшн по сценам подряд">Экшн фильм</button>
+      <button data-t="clipsc" title="Большой музыкальный клип — клип по вашей музыке">Большой музыкальный клип</button>
             </div>
             <div class="hint" style="margin:12px 0 6px">Изображения</div>
             <div class="seg" id="agTarget2" style="grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-auto-rows:auto">
@@ -507,8 +507,8 @@
           <button class="chip" data-f="actor">Актёр</button>
           <button class="chip" data-f="action">Экшн-видео</button>
           <button class="chip" data-f="long">Студия</button>
-              <button class="chip" data-f="actionsc">Экшн-студия</button>
-        <button class="chip" data-f="clipsc">Клип-студия</button>
+              <button class="chip" data-f="actionsc">Экшн фильм</button>
+        <button class="chip" data-f="clipsc">Большой музыкальный клип</button>
           <button class="chip" data-f="custom">Свои</button>
           <button class="chip" data-f="fav"> Избранное</button>
         </div>
@@ -561,7 +561,7 @@
             <input type="checkbox" id="mdGpuUiCb">
             <span>Рисовать окно программы без видеокарты<small style="display:block;opacity:.7">окно тратит меньше видеопамяти; на генерацию не влияет, применится после перезапуска</small></span>
           </label>
-          <button class="btn" type="button" id="mdRestart" title="Закрыть и снова открыть программу: нужно после переключателей, которые читаются при запуске">Перезапустить программу</button>
+          <button class="btn mini" type="button" id="mdRestart" title="Закрыть и снова открыть программу: нужно после переключателей, которые читаются при запуске">Перезапустить программу</button>
         </div>
         <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:12px">
           <label class="hint" style="display:flex;gap:8px;align-items:center;cursor:pointer;margin:0">
@@ -572,7 +572,7 @@
         <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:12px">
           <label class="hint" style="display:flex;gap:8px;align-items:center;cursor:pointer;margin:0">
             <input type="checkbox" id="mdNotifyCb">
-            <span>Замечать работу программы<small style="display:block;opacity:.7">пока идёт расчёт, значок в левом верхнем углу тихо пульсирует, а когда всё готово - короткий звуковой сигнал. Выключите, если мешает</small></span>
+            <span>Замечать работу программы<small style="display:block;opacity:.7">пока идёт расчёт, вокруг зелёного значка мигает красная рамка, а когда всё готово - короткий звуковой сигнал. Выключите, если мешает</small></span>
           </label>
         </div>
       </div>
@@ -640,7 +640,7 @@
               <button class="mcard" data-m="actor" title="Диалог и эмоции: лицо, голос по образцу, до 14 секунд."><i></i><b>Актёр</b><span>Диалоги и крупные планы: эмоции, голос по образцу</span><small></small></button>
               <button class="mcard" data-m="action" title="Одно динамичное видео: драка, погоня, бег. Быстрый и точный проход уже встроен."><i></i><b>Экшн-видео</b><span>Бой, погоня, бег, прыжки</span><small></small></button>
               <button class="mcard" data-m="long" title="Студия: фильм по сценам, каждая до 15 секунд, следующая продолжает предыдущую."><i></i><b>Студия</b><span>Клипы и ролики по сценам: до 15 с на сцену, сцены продолжают друг друга</span><small></small></button>
-        <button class="mcard" data-m="actionsc" title="Динамичные сцены подряд: длинный экшн из нескольких сцен."><i></i><b>Экшн-студия</b><span>Длинный экшн по сценам: 8 + 4 шага, файлы ускорения, звук делает модель</span><small></small></button>
+        <button class="mcard" data-m="actionsc" title="Динамичные сцены подряд: длинный экшн из нескольких сцен."><i></i><b>Экшн фильм</b><span>Длинный экшн по сценам: 8 + 4 шага, файлы ускорения, звук делает модель</span><small></small></button>
               <button class="mcard" data-m="krea" title="Картинка по описанию. Можно в коммерцию."><i></i><b>Изображение · Krea 2</b><span>Krea 2: красивые изображения по описанию (можно в коммерцию)</span><small></small></button>
               <button class="mcard" data-m="kreareal" title="Картинка по описанию в реализме: люди и фото как с камеры, два прохода."><i></i><b>Изображение · реализм</b><span>Krea 2 для реалистичных людей и фото (лежит в «Изображении», +15 ГБ)</span><small></small></button>
               <button class="mcard" data-m="qwen" title="Правка готового изображения: нужен файл, который меняем."><i></i><b>Изменение · Qwen</b><span>Qwen: изменить своё изображение, лист персонажа</span><small></small></button>

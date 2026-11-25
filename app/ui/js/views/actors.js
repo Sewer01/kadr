@@ -13,7 +13,7 @@ const TYPES = [['character', 'Персонаж'], ['vehicle', 'Транспор�
 const MAX_IMAGES = 9;
 /* Режимы, куда приходят плашки карточек: те же, у которых есть окно «Сценарий». */
 export const SCENARIO_TABS = ['video', 'lipsync', 'refs', 'actor', 'swap', 'action', 'long', 'actionsc', 'clipsc'];
-const TITLES = { video: 'Видео', lipsync: 'Клип', refs: 'Видеостудия', actor: 'Актёр', swap: 'Замена', action: 'Экшн-видео', long: 'Студия', actionsc: 'Экшн-студия' };
+const TITLES = { video: 'Видео', lipsync: 'Клип', refs: 'Видеостудия', actor: 'Актёр', swap: 'Замена', action: 'Экшн-видео', long: 'Киностудия', actionsc: 'Экшн фильм' };
 
 export const AC = { cards: [], loaded: false };
 let pickedImages = [], pickedVoice = null;

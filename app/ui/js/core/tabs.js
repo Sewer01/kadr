@@ -13,10 +13,10 @@ export const TABS = [
   {order: 6, section: "Создать", key: "refs", caption: "Видеостудия", sub: true, active: false, hidden: false},
   {order: 7, section: "Создать", key: "actor", caption: "Актёр", sub: true, active: false, hidden: false, group: "refs"},
   {order: 8, section: "Создать", key: "swap", caption: "Замена", sub: true, active: false, hidden: false},
-  {order: 9, section: "Создать", key: "long", caption: "Студия", sub: true, active: false, hidden: false},
+  {order: 9, section: "Создать", key: "long", caption: "Киностудия", sub: true, active: false, hidden: false},
   {order: 10, section: "Создать", key: "action", caption: "Экшн-видео", sub: true, active: false, hidden: false, group: "refs"},
-  {order: 11, section: "Создать", key: "actionsc", caption: "Экшн-студия", sub: true, active: false, hidden: false, group: "long"},
-  {order: 12, section: "Создать", key: "clipsc", caption: "Клип-студия", sub: true, active: false, hidden: false, group: "long"},
+  {order: 11, section: "Создать", key: "actionsc", caption: "Экшн фильм", sub: true, active: false, hidden: false, group: "long"},
+  {order: 12, section: "Создать", key: "clipsc", caption: "Большой музыкальный клип", sub: true, active: false, hidden: false, group: "long"},
   {order: 13, section: "Создать", key: "voicelab", caption: "Озвучка", sub: true, active: false, hidden: false},
   {order: 14, section: "Создать", key: "reflab", caption: "Студия референсов", sub: true, active: false, hidden: false},
   {order: 16, section: "Создать", key: "krea", caption: "Изображение по тексту", sub: true, active: false, hidden: true},
@@ -39,7 +39,7 @@ export const NAV_GROUPS = [
   { nav: "refs", store: "h3-grp-video", parts: ["video", "refs", "action", "lipsync", "actor"] },
 ];
 export const NAV_GROUP_TITLES = {
-  long: "Киностудия", actionsc: "Экшн-студия", clipsc: "Клип-студия",
+  long: "Киностудия", actionsc: "Экшн фильм", clipsc: "Большой музыкальный клип",
   video: "Видео из картинки", refs: "Видеостудия", action: "Экшн-видео", lipsync: "Музыкальный клип", actor: "Актерская игра",
 };
 export const groupOf = key => NAV_GROUPS.find(g => g.parts.includes(key)) || null;
@@ -90,7 +90,7 @@ const TAB_TAIL = {
   swap: "\n      Замена\n    ",
   long: "\n      Киностудия\n    ",
   action: "\n      Экшн-видео\n    ",
-  actionsc: "\n      Экшн-студия\n    ",
+  actionsc: "\n      Экшн фильм\n    ",
   voicelab: "\n      Озвучка\n    ",
   reflab: "\n      Студия референсов\n    ",
   krea: "\n      Изображение по тексту\n    ",

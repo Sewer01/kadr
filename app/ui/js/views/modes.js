@@ -588,7 +588,7 @@ $('#lib').addEventListener('mouseout', e => { const v = e.target.closest('.li-th
 
 export function makeRefMode(cfg) {
   /* Способности режима объявлены в cfg и записаны в общую таблицу: отсюда их читают
-     и этот раздел, и окно сценария, и сценарист. Проверок вида «это Экшн-студия» в
+     и этот раздел, и окно сценария, и сценарист. Проверок вида «это Экшн фильм» в
      коде больше нет - студии различаются настройками, а не своим именем.
      Значения по умолчанию подставляются здесь же: ветки читают cfg напрямую, и
      пропущенное свойство должно означать обычное поведение, а не режим без черновика. */
@@ -959,7 +959,7 @@ export function makeRefMode(cfg) {
     card.addEventListener('dragover', e => { if (e.dataTransfer.types.includes('text/h3lib')) { e.preventDefault(); card.style.outline = '2px dashed var(--accent)'; } });
     card.addEventListener('dragleave', () => { card.style.outline = ''; });
     card.addEventListener('drop', () => { card.style.outline = ''; });
-    const MODE_NAME = { refs: 'Видеостудия', actor: 'Актёр', action: 'Экшн-видео', long: 'Студия', actionsc: 'Экшн-студия', clipsc: 'Клип-студия' }[cfg.mode] || cfg.mode;
+    const MODE_NAME = { refs: 'Видеостудия', actor: 'Актёр', action: 'Экшн-видео', long: 'Киностудия', actionsc: 'Экшн фильм', clipsc: 'Большой музыкальный клип' }[cfg.mode] || cfg.mode;
     let turls = [];
     const paintThumbs = () => {
       turls.forEach(u2 => { try { URL.revokeObjectURL(u2); } catch (e) { } }); turls = [];
@@ -1190,7 +1190,7 @@ export function makeRefMode(cfg) {
         return;
       }
       host.hidden = false;
-      const MODE_NAME = { refs: 'Видеостудия', actor: 'Актёр', action: 'Экшн-видео', long: 'Студия', actionsc: 'Экшн-студия', clipsc: 'Клип-студия' }[cfg.mode] || cfg.mode;
+      const MODE_NAME = { refs: 'Видеостудия', actor: 'Актёр', action: 'Экшн-видео', long: 'Киностудия', actionsc: 'Экшн фильм', clipsc: 'Большой музыкальный клип' }[cfg.mode] || cfg.mode;
       if (!tr) tr = root._raTrim = new AudioTrimmer({ mount: host, limit: 15, agentTarget: cfg.mode, onFile,
         whereLabel: q => 'раздел «' + MODE_NAME + '», аудио ' + (q._slot + 1) + ', тег <Audio ' + (q._slot + 1) + '>, ' + slots.length + ' места в разделе' });
       const src = s._src || s._file;
@@ -1706,7 +1706,7 @@ export function makeRefMode(cfg) {
           warnSoon('Сценарист повторился');
         }
       }
-      /* Клип-студия режет клип из куска трека, и ответ Сценариста обязан закрыть этот
+      /* Большой музыкальный клип режет клип из куска трека, и ответ Сценариста обязан закрыть этот
          кусок: иначе клип окажется короче музыки или длиннее её. Тут длины сцен
          подтягиваются друг к другу до длины куска, а выбранные границы длин и число
          сцен остаются нетронутыми: выше верхней границы ни одна сцена не растёт и новых
@@ -1867,7 +1867,7 @@ export function makeRefMode(cfg) {
         return took;
       } catch (e) { return 0; }
     };
-    /* Экшн-студия понимает только живое описание того, что происходит в кадре. Тексты, которые
+    /* Экшн фильм понимает только живое описание того, что происходит в кадре. Тексты, которые
      раньше писал помощник для другого раздела, тащат за собой поля вида overall_soundscape:,
      non_diegetic_music:, integrated_multimodal_description:, служебные фразы «For the target video,
      at 0.00 seconds ...» и метки [Shot 1]; модель читает их как содержимое кадра и начинает
@@ -3191,7 +3191,7 @@ export function makeRefMode(cfg) {
         field.dispatchEvent(new Event('input', { bubbles: true }));
         root._paintSrTags?.();
       };
-      /* Клип-студия: здесь герой - трек. Карточка «Клип» говорит, что программа видит в
+      /* Большой музыкальный клип: здесь герой - трек. Карточка «Клип» говорит, что программа видит в
          музыке, и даёт две кнопки Сценаристу: разложить трек на сцены и дописать те
          сцены, где текста ещё нет. Трек кладут в карточку «Музыка»: он один на клип. */
       root._scPlan = 0; root._scTrack = 0; root._fillOnly = 0; root._scSpan = 0;
@@ -3557,7 +3557,7 @@ export function makeRefMode(cfg) {
           + $$('.sc', root).reduce((z, cc) => z + ((cc._auds || []).filter(Boolean).length), 0);
         extra.append(lp);
         /* «Начать с» - про фон: ряд уезжает из карточки «Звук» в блок Audio 1,
-           сразу под строку файла фона, к своим флагам. В Клип-студии за рядом
+           сразу под строку файла фона, к своим флагам. В Большого музыкального клипа за рядом
            стоят инфо о треке и волна - едут вместе с ним. */
         const stIn = $('.lm-start', root), stRow = stIn && stIn.closest('div');
         if (stRow) {
@@ -3681,7 +3681,7 @@ export function makeRefMode(cfg) {
         const hb = clr0 ? clr0.parentElement : ((srWin && (srWin.buttons || $('.field-btns', srCard))) || null);
         if (hb) { hb.insertBefore(bUndo, clr0 || null); hb.insertBefore(bRedo, clr0 || null); } else (scCard.querySelector('.card-h') || scCard).append(bUndo, bRedo); }
       /* «Дописать пустые сцены» стоит в шапке карточки «Сцены» во всех студиях,
-         включая Клип-студию: ленту чинят по одной сцене, а Сценарист умеет вернуть
+         включая Большой музыкальный клип: ленту чинят по одной сцене, а Сценарист умеет вернуть
          весь список сразу. */
       root._askFillEmpty = () => {
         const all = $$('.sc', root);
@@ -4445,7 +4445,7 @@ export const RM = {
     placeholder: '@image1 - character reference. Девушка с @image1 убегает по ночному рынку, опрокидывает корзины…',
   }),
   actionsc: makeRefMode({
-    mode: 'actionsc', title: 'Экшн-студия', pill: 'Гибрид · 8 + 4 шага · сцены подряд', dur: 10, maxImages: 5, videos: false, scenes: true,
+    mode: 'actionsc', title: 'Экшн фильм', pill: 'Гибрид · 8 + 4 шага · сцены подряд', dur: 10, maxImages: 5, videos: false, scenes: true,
     graph: 'hybrid', draftPass: false,   // черновика нет: сцена сразу считается 8 + 4 шага
     baseVideo: false, partsOnly: true,   // готового видео не продолжает; режим «весь ролик» не нужен
     sub: 'Длинный экшн по сценам: каждая следующая продолжает прошлую, готовые клипы склеиваются в один ролик',
@@ -4453,7 +4453,7 @@ export const RM = {
     placeholder: '',
   }),
   clipsc: makeRefMode({
-    mode: 'clipsc', title: 'Клип-студия', pill: 'Клип по треку · Pika', dur: 10, maxImages: 5, videos: false,
+    mode: 'clipsc', title: 'Большой музыкальный клип', pill: 'Клип по треку · Pika', dur: 10, maxImages: 5, videos: false,
     scenes: true, graph: 'pika', clipScenes: true,   // сцены по треку; считает та же модель, что Студия
     sub: 'Клип по вашей музыке: сцены рождаются из трека, готовые клипы склеиваются в один ролик',
     refHint: 'До 5 изображений: герой, место, предмет, стиль - они подаются в каждую сцену, поэтому лицо и место не «плывут». В тексте сцены ссылайтесь на них как &lt;Picture 1&gt;, &lt;Picture 2&gt;… В карточке «Аудио» кладите трек на весь ролик: от его длины зависят количество и длительность сцен.',
