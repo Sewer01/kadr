@@ -161,10 +161,13 @@ export function shortCpu(name) {
    yet and settles on green when it is, so the answer to "can I press Start" is visible from
    the far side of the room, without reading the small print */
 (function () {
-  const mark = document.querySelector('.brand-mark');
-  if (!mark) return;
+  /* значок живёт в верхнем баре и появляется позже этого файла: искать его при каждой
+     проверке, а не один раз на старте - иначе приёмник нагрузки не создаётся вовсе,
+     а панель нагрузки спотыкается о него на первой строке и замирает */
+  const getMark = () => document.querySelector('.brand-mark');
   const cap = document.getElementById('engTxt');
   const st = () => {
+    const mark = getMark(); if (!mark) return;
     const dot = document.getElementById('engDot');
     const on = dot && !dot.classList.contains('off');
     const wait = cap && /запуск|поднима|жд|не запущен|start/i.test(cap.textContent || '');
@@ -177,8 +180,7 @@ export function shortCpu(name) {
       + (agn || !agm ? '' : ' · Сценарист: ' + agm);
   };
   st();
-  const watch = document.querySelector('.side') || document.body;
-  new MutationObserver(st).observe(watch, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ['class'] });
+  new MutationObserver(st).observe(document.body, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ['class'] });
   setInterval(st, 3000);
   /* Ядро трудится - значок тихо краснеет: когда видеокарта или процессор
      грузятся выше 70 %, зелёный кадр плавно наливается бледно-красным.
@@ -189,7 +191,7 @@ export function shortCpu(name) {
   window._chipLoad = (id, pct) => {
     if (id === '#gpuLoad') load.gpu = pct || 0; else load.cpu = pct || 0;
     const now = load.gpu > 70 || load.cpu > 70;
-    if (now !== hot) { hot = now; mark.classList.toggle('hot', hot); }
+    if (now !== hot) { hot = now; const m = getMark(); if (m) m.classList.toggle('hot', hot); }
   };
 })();
 
