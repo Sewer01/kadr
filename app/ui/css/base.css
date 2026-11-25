@@ -217,10 +217,10 @@ body.nosb-on #modeBar .mb-tabs{margin-left:316px}
 
 #modeBar .mb i{font-style:normal}
 
-#modeBar.tight .mb{padding:0 8px;gap:0}
-#modeBar.tight .mb i{display:none}
+#modeBar .mb.min{padding:0 8px;gap:0}
+#modeBar .mb.min i{display:none}
 
-#modeBar.can-right{-webkit-mask-image:linear-gradient(90deg,#000 calc(100% - 30px),transparent);mask-image:linear-gradient(90deg,#000 calc(100% - 30px),transparent)}
+#modeBar .mb-tabs.can-right{-webkit-mask-image:linear-gradient(90deg,#000 calc(100% - 30px),transparent);mask-image:linear-gradient(90deg,#000 calc(100% - 30px),transparent)}
 
 
 /* sidebar */

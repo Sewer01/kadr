@@ -89,15 +89,23 @@ export function fitTopBar() {
     w = Math.min(Math.ceil(w), Math.floor(innerWidth * 0.42));   // tabs always keep most of the line
   }
   mb.style.right = (w ? w + 18 : 24) + 'px';
-  /* a tab that is not visible is worse than a tab without a word under it: names go away first,
-     and only what still does not fit stays behind the edge that fades out */
-  mb.classList.remove('tight');
-  if (mb.scrollWidth > mb.clientWidth + 26) mb.classList.add('tight');   // a finger's width of slack: names stay until it really does not fit   // узкое окно - полоса сжимается в иконки
-  mb.classList.toggle('can-right', mb.scrollWidth > mb.clientWidth + 4);
+  /* a tab that is not visible is worse than a tab without a word under it: names go away
+     one by one from the right edge, so the window narrows softly; what still does not fit
+     stays behind the edge that fades out */
+  const tabsBox = mb.querySelector('.mb-tabs') || mb;
+  tabsBox.querySelectorAll('.mb.min').forEach(el => el.classList.remove('min'));
+  const mins = [...tabsBox.querySelectorAll('.mb')].reverse();   // справа налево
+  let guard = mins.length;
+  while (tabsBox.scrollWidth > tabsBox.clientWidth + 26 && guard-- > 0) {
+    const wide = mins.find(el => !el.classList.contains('min'));
+    if (!wide) break;
+    wide.classList.add('min');
+  }
+  tabsBox.classList.toggle('can-right', tabsBox.scrollWidth > tabsBox.clientWidth + 4);
   const on = mb.querySelector('.mb.on');
-  if (on && mb.scrollWidth > mb.clientWidth) {
+  if (on && tabsBox.scrollWidth > tabsBox.clientWidth) {
     const l = on.offsetLeft, r = l + on.offsetWidth;
-    if (l < mb.scrollLeft || r > mb.scrollLeft + mb.clientWidth) mb.scrollTo({ left: l - (mb.clientWidth - on.offsetWidth) / 2, behavior: 'smooth' });
+    if (l < tabsBox.scrollLeft || r > tabsBox.scrollLeft + tabsBox.clientWidth) tabsBox.scrollTo({ left: l - (tabsBox.clientWidth - on.offsetWidth) / 2, behavior: 'smooth' });
   }
 }
 document.addEventListener('wheel', e => {           // a wheel over the strip moves it sideways

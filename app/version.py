@@ -5,6 +5,6 @@ number is higher. 2.0.0 is the first release of the independent repository: the 
 follows the fork it grew from, and UPDATE_REPO below names the releases it looks at now.
 """
 
-APP_VERSION = "2.2.98"
+APP_VERSION = "2.2.99"
 UPDATE_REPO = "Sewer01/kadr"   # whose releases this program follows
 # 2.0.13: the joined film's own copy fades too, and the attempt is written to the log.
