@@ -165,22 +165,20 @@ button{cursor:pointer;border:0;background:none}
 .app{display:grid;grid-template-columns:var(--sbw) 1fr;height:calc(var(--vh,1vh)*100)}
 
 .app.nosb{grid-template-columns:1fr}
-/* Значок программы живёт в левом углу верхней полосы, над левым столбцом:
-   он признак работы и обязан быть виден всегда - и при спрятанном меню.
-   Левый столбец кончается под этой полосой и уходит под неё при прокрутке,
-   а не за значок. */
+/* Значок программы живёт в верхнем баре, левее кнопки «Меню»: он признак
+   работы и обязан быть виден всегда - и при спрятанном меню. Левый столбец
+   кончается под баром и прячется под него при прокрутке, а не за значок. */
 .app.nosb .brand{border-right:none}
 .app.nosb .brand > div{display:none}
 /* прячут меню - столбец уходит целиком, а значок с кнопкой «Меню»
    остаются в своей полосе: ничего не прыгает */
 .app.nosb .side{display:none}
 
-.main .view{padding-top:126px}
+.main .view{padding-top:72px}
    /* the page starts under the fixed tabs, not behind them */
-#sbToggle{position:fixed;left:16px;top:65px;z-index:38;height:34px;min-width:34px;padding:0 10px;border-radius:10px;border:1px solid var(--line-2);background:var(--surface);color:var(--text);font-weight:700;font-size:13px;cursor:pointer;opacity:.85}
+#sbToggle{position:fixed;left:232px;top:11px;z-index:38;height:34px;min-width:34px;padding:0 10px;border-radius:10px;border:1px solid var(--line-2);background:var(--surface);color:var(--text);font-weight:700;font-size:13px;cursor:pointer;opacity:.85}
 
 #sbRs{position:fixed;top:54px;bottom:0;left:calc(var(--sbw,248px) - 4px);width:9px;z-index:34;cursor:col-resize}
-
 #sbRs::after{content:'';position:absolute;left:4px;top:0;bottom:0;width:2px;background:transparent;transition:.15s}
 
 #sbRs:hover::after,body.sb-drag #sbRs::after{background:var(--accent,#c0405a)}
@@ -197,11 +195,11 @@ body.nosb-on #sbRs{display:none}
 body.cloud-on #mdCloudBox{display:block!important}
 
 /* pinned bar of all sections (video, images): switch without going back to «Главная» */
-#modeBar{position:fixed;top:54px;left:0;right:0;z-index:34;height:54px;display:flex;align-items:center;gap:4px;overflow-x:auto;white-space:nowrap;scrollbar-width:none;padding:0 16px 0 100px;box-sizing:border-box;background:var(--bg);border-bottom:1px solid var(--line);}
+#modeBar{position:fixed;top:0;left:0;right:0;z-index:34;height:54px;display:flex;align-items:center;gap:4px;overflow-x:auto;white-space:nowrap;scrollbar-width:none;padding:0 16px 0 316px;box-sizing:border-box;background:var(--bg);border-bottom:1px solid var(--line);}
 
 #modeBar::-webkit-scrollbar{display:none}
 
-body.nosb-on #modeBar{padding-left:100px}
+body.nosb-on #modeBar{padding-left:316px}
 
 #modeBar .mb{flex:none;display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 10px;border-radius:9px;border:1px solid var(--line-2);background:var(--surface);color:var(--text);font-size:12.5px;font-weight:600;cursor:pointer;opacity:.85}
 
