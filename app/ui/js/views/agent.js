@@ -1561,7 +1561,7 @@ export function renderSkills(list) {
       ${s.refs.length ? `<small class="hint">+ справочники: ${s.refs.length}</small>` : ''}</div></div>`).join('');
 }
 export function skShow(on) { $('#skList').hidden = !on; $('#skArr').textContent = on ? '▾' : '▸'; try { localStorage.setItem('h3-sk-open', on ? '1' : ''); } catch {} }
-$('#skToggle').onclick = () => skShow($('#skList').hidden);
+$('#skToggle').onclick = () => { skShow($('#skList').hidden); if (!$('#skList').hidden && !(AG.status && AG.status.skills)) agStatus(); };
 try { skShow(localStorage.getItem('h3-sk-open') === '1'); } catch {}
 $('#skList').addEventListener('change', async e => {
   const card = e.target.closest('.sk'); if (!card) return;
@@ -1583,6 +1583,10 @@ $('#skUp').onchange = async e => {
   catch (err) { toast(err.message); }
 };
 onNav('agent', () => { agStatus(); agCtx(); loadChats(); });
+/* «Скиллы сценариста» живут в Настройках, а список приходил только вместе с
+   разделом «Сценарист»: зашёл в Настройки сразу - и окно пустое. Пусть
+   Настройки сами позовут статус, если его ещё нет. */
+onNav('models', () => { if (!AG.status || !AG.status.skills) agStatus(); });
 
 /* A grip under a row of pictures: drag it down to look at a face closely, double-click to put the row
    back. It used to exist only under the frames of «Видео», although the same rows in the studios, in

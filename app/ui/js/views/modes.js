@@ -2110,7 +2110,12 @@ export function makeRefMode(cfg) {
         root._faudWords[1] = String(p.fw[1] || ''); root._faudWords[2] = String(p.fw[2] || '');
         try { root._paintFaudWords && root._paintFaudWords(); } catch {}
       }
-      root._loop = p.loop !== false; setSnd(p.snd || 'none'); $('.lm-start', root).value = p.start || '0'; $('.lm-vocals', root).checked = !!p.vocals; setSndState(root._snd);   // подсказка про звук зависит от галочки, а её ставим только что
+      root._loop = p.loop !== false; setSnd(p.snd || 'none'); $('.lm-start', root).value = p.start || '0'; $('.lm-vocals', root).checked = !!p.vocals;
+      /* Фон вернулся в ряд напрямую, а зеркало в старый тайл за ним не успело:
+          ряд зовёт syncFilm только когда его собирают заново. Зеркалим сами -
+          иначе сервер не увидит трек и честно скажет «<Audio 1> нет». */
+      if (aud instanceof File && root._faudsSync) { try { root._faudsSync(); } catch (e) { } }
+      setSndState(root._snd);   // подсказка про звук зависит от галочки, а её ставим только что
       // сохранённый уровень музыки ставим в границах ползунка: проект мог быть записан другой версией
       const bdb = Number.isFinite(+p.bed) ? Math.max(-30, Math.min(6, Math.round(+p.bed))) : -10;
       $('.lm-beddb', root).value = bdb; $('.lm-beddbv', root).textContent = String(bdb); $('.lm-bednorm', root).checked = p.bednorm === true;
@@ -4134,11 +4139,13 @@ export function makeRefMode(cfg) {
         if (cfg.scenes && root._srcFrameFile) fd.append('srcframe', root._srcFrameFile);   // the frame of the continued video: a picture of its own
         if (vidsEl) files('.rm-vids .slot').forEach((s, i) => fd.append('vid' + i, s._file));
         (cfg.scenes && root._snd !== 'own' ? [] : files('.rm-auds .slot')).forEach((s, i) => fd.append('aud' + i, s._file));
-        if (cfg.scenes && root._snd === 'own' && !files('.rm-auds .slot').length && root._faudRow && root._faudRow.files[0]) {
+        if (cfg.scenes && !files('.rm-auds .slot').length && root._faudRow && root._faudRow.files[0]) {
           /* Фон живёт в своём ряду, а зеркало в старый тайл не легло: без этого
              файл ушёл бы в расчёт пустым, и сервер честно сказал бы «<Audio 1>
-             нет», хотя трек лежит на месте. Отправляем прямо из ряда. */
+             нет», хотя трек лежит на месте. Отправляем прямо из ряда - и заодно
+             включаем флаг своего звука, чтобы сервер не счёл фон отсутствующим. */
           fd.append('aud0', root._faudRow.files[0]);
+          if (root._snd !== 'own') { root._snd = 'own'; root._setSndState && root._setSndState('own'); }
         }
         return fd;
       },
