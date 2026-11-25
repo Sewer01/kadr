@@ -721,6 +721,7 @@
   "/api/agent/status",
   "/api/agent/translate",
   "/api/agent/variant",
+  "/api/agent/variant_delete",
   "/api/audio/info",
   "/api/audio/separate",
   "/api/clipboard",

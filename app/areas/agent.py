@@ -254,6 +254,32 @@ class AgentMixin:
         await self.stop_llm()
         return await self.h_agent_status(req)
 
+    async def h_agent_variant_delete(self, req):
+        """Сбросить скачанные файлы одной из моделей приложения: человек скачал
+        лишнее и хочет вернуть место на диске. Выбранную модель не даём:
+        сценарист должен остаться рабочим."""
+        key = (await req.json()).get("variant")
+        v = ag.LLM_VARIANTS.get(key)
+        if not v:
+            return web.json_response({"error": "Неизвестная модель"}, status=400)
+        if self.agent_installer:
+            return web.json_response({"error": "Скачивание идёт: дождитесь его или отмените."}, status=409)
+        if key == await self.llm_variant() and not self.config.get("llm_custom"):
+            return web.json_response({"error": "Нельзя удалять выбранную модель: сначала выберите другую."}, status=409)
+        await self.stop_llm()   # файлы могут лежать в памяти запущенной модели
+        m, p = ag.variant_files(self.llm.root, v)
+        gone = 0
+        for f in (m, p):
+            try:
+                if f and f.exists():
+                    f.unlink()
+                    gone += 1
+            except OSError as e:
+                return web.json_response({"error": f"Не вышло удалить файл: {e}"}, status=500)
+        if not gone:
+            return web.json_response({"error": "Файлов этой модели на диске нет."}, status=404)
+        return await self.h_agent_status(req)
+
     async def h_agent_model(self, req):
         """Use a GGUF model the user already has (or go back to the app's own Gemma)."""
         body = await req.json()

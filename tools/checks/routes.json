@@ -502,6 +502,11 @@
   ],
   [
    "post",
+   "/api/agent/variant_delete",
+   "state.h_agent_variant_delete"
+  ],
+  [
+   "post",
    "/api/agent/ctx",
    "state.h_agent_ctx"
   ],
@@ -841,6 +846,7 @@
   "h_agent_status",
   "h_agent_translate",
   "h_agent_variant",
+  "h_agent_variant_delete",
   "h_audio_info",
   "h_audio_separate",
   "h_chat_delete",

@@ -238,6 +238,7 @@ def build_app(comfy_override=None):
         web.post("/api/agent/install/cancel", state.h_agent_install_cancel),
         web.post("/api/agent/model", state.h_agent_model),
         web.post("/api/agent/variant", state.h_agent_variant),
+        web.post("/api/agent/variant_delete", state.h_agent_variant_delete),
         web.post("/api/agent/ctx", state.h_agent_ctx),
         web.post("/api/agent/spell", state.h_agent_spell),
         web.post("/api/mp4tag", state.h_mp4tag),

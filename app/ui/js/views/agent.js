@@ -1424,6 +1424,7 @@ export async function agStatus() {
   $('#agVariants').innerHTML = (s.my_model ? `<button class="agv${s.my_model.current ? ' on' : ''}" type="button" data-my="1"><b>Моя модель: ${esc(s.my_model.title)}</b><span class="tg">ваша</span><span class="rd ok">, скачано${s.my_model.current ? ' · выбрана' : ''}</span></button>` : '')
     + (s.variants || []).map(o => `<button class="agv${o.current ? ' on' : ''}" type="button" data-v="${o.key}"><b>${esc(o.title)}</b>`
       + `<span class="tg${o.uncensored ? ' unc' : ''}">${o.uncensored ? 'без цензуры' : 'обычная'}</span>`
+      + (o.have && !o.current ? `<span class="agvdel" data-del="${o.key}" title="Удалить файлы этой модели с диска">Удалить</span>` : '')
       + `<span class="rd ${o.have ? 'ok' : 'no'}">${o.have ? ', скачано' : `Нужно скачать · ${(o.size / 1e9).toFixed(1)} ГБ`}${o.current ? ' · ВЫБРАНА' : ''}</span>`
       + (o.min_vram && !o.fits ? `<small>Важно: нужно от ${o.min_vram} ГБ видеопамяти: у вас может быть медленно</small>` : '') + `</button>`).join('')
     + ((s.variants || []).some(o => o.current && o.uncensored) ? `<div class="hint" style="margin-top:8px">Эта модель не отказывается писать любые описания. Вы отвечаете за содержание: не используйте её для запрещённого и для людей без их согласия. Сам MiniMax H3 часть запросов всё равно может отклонить.</div>` : '');
@@ -1501,6 +1502,15 @@ export async function agStatus() {
   renderSkills(s.skills);
 }
 $('#agVariants').onclick = async e => {
+  /* Скачанное можно и убрать: кнопка «Удалить» под тегом возвращает место
+     на диске; выбранную модель сервер не отдаёт, сценарист остаётся рабочим. */
+  const d = e.target.closest('.agvdel');
+  if (d) {
+    const key = d.dataset.del, o = (AG.status.variants || []).find(x => x.key === key) || {};
+    return confirmBox('Удалить модель?', `Файлы модели «${o.title || key}» (~${GB(o.size || 0)}) удалятся с диска. Скачать её снова можно будет в любой момент.`, 'Удалить', async () => {
+      try { await postJSON('/api/agent/variant_delete', { variant: key }); toast('Модель удалена с диска'); agStatus(); } catch (err) { toast(err.message); }
+    }, 'Отмена');
+  }
   const b = e.target.closest('.agv'); if (!b || b.classList.contains('on')) return;
   if (b.dataset.my) { try { await postJSON('/api/agent/model', { restore: true }); agStatus(); } catch (err) { toast(err.message); } return; }
   try { await postJSON('/api/agent/variant', { variant: b.dataset.v }); agStatus(); } catch (err) { toast(err.message); }

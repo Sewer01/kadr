@@ -68,6 +68,9 @@
 
 .agv .tg.unc{border-color:#b8742a;color:#e6a45c}
 
+.agv .agvdel{grid-column:2;justify-self:end;align-self:center;font-size:11px;padding:1px 8px;border-radius:99px;border:1px solid var(--line-2);color:var(--mut,#9a8d93);cursor:pointer}
+.agv .agvdel:hover{color:#e8264f;border-color:#e8264f}
+
 .ag-grid{position:relative;display:grid;grid-template-columns:230px minmax(0,1fr) var(--aw);gap:16px;align-items:start}
 
 .ag-grid .gresize{right:calc(var(--aw) - 3px)}
