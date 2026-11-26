@@ -217,7 +217,10 @@ export async function loadStatus() {
 }
 
 export async function pollSystem() {
-  if (!API || document.hidden) return;
+  /* окно свёрнуто - опрос всё равно идёт: значок обязан pulsировать, когда ядро пашет,
+     даже если человек ушёл в другое окно; без этого метка замерала в последнем состоянии.
+     Один местный запрос раз в две секунды - копейки по сравнению с обещанием «видно из любого окна» */
+  if (!API) return;
   try {
     const s = await (await fetch('/api/system')).json();
     const gpu = s.gpu;
