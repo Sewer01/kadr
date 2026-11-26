@@ -419,7 +419,10 @@ $('#agIn').addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftK
 export const AG_NAMES = { plist: '«Изображение по тексту» · список кадров', h3t: '«Изображение по тексту» · H3 Image', h3e: '«Изменение по референсам» · H3 Image', actionsc: '«Экшн фильм»', long: '«Киностудия»', video: '«Видео»', lipsync: '«Клип»', refs: '«Видеостудия»', actor: '«Актёр»', swap: '«Замена»', action: '«Экшн-видео»', krea: '«Изображение по тексту» · Krea 2', qwen: '«Изображения»', sheet: '«Изображения» · лист персонажа', sheet6: '«Изображения» · лист ×6', fluxt: '«Изображение по тексту» · FLUX klein', qwent: '«Изображение по тексту» · Qwen 2.1', story: '«Изображения» · раскадровка' };
 export const AG_IMG = ['plist', 'krea', 'qwen', 'sheet', 'sheet6', 'fluxt', 'qwent', 'h3t', 'h3e', 'story'];
 AG.storyModel = 'krea'; AG.storyFrames = true;
-AG.think = (() => { try { return localStorage.getItem('h3-ag-think') === 'deep' ? 'deep' : 'fast'; } catch { return 'fast'; } })();
+  /* Глубокое обдумывание теперь по умолчанию: Qwen3.5 через раз игнорирует просьбы
+     о диалогах и тащит запрещённые поля, с обдумыванием держит правила заметно
+     крепче. Кто хочет быстрее - переключает на «Быстро», выбор запоминается */
+AG.think = (() => { try { return localStorage.getItem('h3-ag-think') === 'fast' ? 'fast' : 'deep'; } catch { return 'deep'; } })();
 export function agThinkPaint() {
   $$('#agThink button').forEach(b => b.classList.toggle('on', b.dataset.k === AG.think));
   $('#agThinkHint').textContent = AG.think === 'fast' ? 'Сценарист отвечает сразу. Для обычных сцен и промптов этого хватает.' : 'Сценарист сначала долго рассуждает, потом отвечает: на одну сцену может уйти пара минут. Включайте для сложных историй.';
