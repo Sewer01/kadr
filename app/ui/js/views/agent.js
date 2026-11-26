@@ -909,6 +909,10 @@ export async function agSend() {
   AG.msgs.push(reply); renderMsgs();
   const el = $('#agMsgs .msg:last-child');
   AG.busy = true; $('#agSend').textContent = 'Стоп'; AG.ctrl = new AbortController();
+  /* пульс значка привязан к той же кнопке, что и переключение «Написать/Стоп»:
+     где надёжно переключается, там и работа; счётчик в try/finally не выживал
+     после перезагрузки страницы посреди запроса, а этот - всегда правдив */
+  window._chipBusy?.(1);
   window._agNote = 'Сценарист: думаю…';   // по этой метке программа даёт сигнал по окончании и подсказку на значке: работа видна из любого окна
   // «Правка картинки» делается и на Qwen, и на FLUX klein, а теги картинок у них разные: сценаристу нужен движок раздела
   const qwBtn = $('.qw-eng button.on', $('#view-qwen'));
@@ -939,9 +943,6 @@ export async function agSend() {
         audios: [1, 2].map(j => ((((lr._faudRow || {}).files) || [])[j]) ? '<Audio ' + (1 + j) + '>' : null).filter(Boolean)
       } }; }
   try {
-    window._chipBusy?.(1);   // значок пульсирует всё время, пока сценарист думает: генерация
-                             // гибридной модели не поднимает карту до 70 %, а молчаливый значок
-                             // человек читает как «программа встала»
     const r = await fetch('/api/agent/chat', {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: AG.ctrl.signal,
       body: JSON.stringify({ target: AG.target, ctx, think: AG.think, editing: AG.edit, messages: AG.msgs.slice(0, -1).map(m => ({ role: m.role, content: m.content, images: m.images, frames: m.nframes || 0 })) }),
@@ -963,8 +964,8 @@ export async function agSend() {
       }
     }
   } catch (e) { if (e.name !== 'AbortError') reply.error = e.message; }
-  finally { window._chipBusy?.(-1); }
   AG.busy = false; $('#agSend').textContent = 'Написать сценарий'; reply.status = null; window._agNote = '';
+  window._chipBusy?.(-1);   // та же точка, что возвращает кнопку: конец работы - конец пульса
   try { if ((reply.content || '').trim()) sessionStorage.setItem('h3-last-scenario', reply.content); } catch (e) { }
   agReturnSync();
   if (!reply.content && !reply.error) reply.error = 'Остановлено';

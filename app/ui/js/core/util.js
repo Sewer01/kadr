@@ -201,6 +201,14 @@ export function shortCpu(name) {
     upd();
   };
   window._chipBusy = (delta) => { busy = Math.max(0, busy + delta); upd(); };
+  /* страховка от рассинхрона: если страница пережила запрос (перезагрузка, ошибка),
+     счётчик мог залипнуть - а правда вот где: кнопка сценариста либо «Стоп», либо нет.
+     Раз в три секунду сверяем пульс с кнопкой; кнопка переключается надёжно */
+  setInterval(() => {
+    const s = document.querySelector('#agSend');
+    if (s && s.textContent.trim() === 'Стоп') { if (!busy) { busy = 1; upd(); } }
+    else if (busy) { busy = 0; upd(); }
+  }, 3000);
 })();
 
 /* the about page speaks in values, not in promises: it reads the same answers the rest of the
