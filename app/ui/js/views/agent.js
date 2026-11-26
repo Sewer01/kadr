@@ -936,6 +936,9 @@ export async function agSend() {
         audios: [1, 2].map(j => ((((lr._faudRow || {}).files) || [])[j]) ? '<Audio ' + (1 + j) + '>' : null).filter(Boolean)
       } }; }
   try {
+    window._chipBusy?.(1);   // значок пульсирует всё время, пока сценарист думает: генерация
+                             // гибридной модели не поднимает карту до 70 %, а молчаливый значок
+                             // человек читает как «программа встала»
     const r = await fetch('/api/agent/chat', {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: AG.ctrl.signal,
       body: JSON.stringify({ target: AG.target, ctx, think: AG.think, editing: AG.edit, messages: AG.msgs.slice(0, -1).map(m => ({ role: m.role, content: m.content, images: m.images, frames: m.nframes || 0 })) }),
@@ -957,6 +960,7 @@ export async function agSend() {
       }
     }
   } catch (e) { if (e.name !== 'AbortError') reply.error = e.message; }
+  finally { window._chipBusy?.(-1); }
   AG.busy = false; $('#agSend').textContent = 'Написать сценарий'; reply.status = null; window._agNote = '';
   try { if ((reply.content || '').trim()) sessionStorage.setItem('h3-last-scenario', reply.content); } catch (e) { }
   agReturnSync();

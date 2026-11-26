@@ -185,14 +185,22 @@ export function shortCpu(name) {
   /* Ядро трудится - значок тихо краснеет: когда видеокарта или процессор
      грузятся выше 70 %, зелёный кадр плавно наливается бледно-красным.
      Это честный признак работы: видно из любого окна и не зависит от того,
-     из какого раздела что запущено. Порог один на видеокарту и процессор. */
+     из какого раздела что запущено. Порог один на видеокарту и процессор.
+     Второй источник - сама работа: сценарист на гибридной модели генерит
+     короткими всплесками, карта ниже порога, а человек без пульса решает,
+     что программа зависла. Пока запрос сценариста жив (_chipBusy > 0),
+     значок пульсирует независимо от процентов загрузки. */
   const load = { gpu: 0, cpu: 0 };
-  let hot = false;
-  window._chipLoad = (id, pct) => {
-    if (id === '#gpuLoad') load.gpu = pct || 0; else load.cpu = pct || 0;
-    const now = load.gpu > 70 || load.cpu > 70;
+  let busy = 0, hot = false;
+  const upd = () => {
+    const now = load.gpu > 70 || load.cpu > 70 || busy > 0;
     if (now !== hot) { hot = now; const m = getMark(); if (m) m.classList.toggle('hot', hot); }
   };
+  window._chipLoad = (id, pct) => {
+    if (id === '#gpuLoad') load.gpu = pct || 0; else load.cpu = pct || 0;
+    upd();
+  };
+  window._chipBusy = (delta) => { busy = Math.max(0, busy + delta); upd(); };
 })();
 
 /* the about page speaks in values, not in promises: it reads the same answers the rest of the
