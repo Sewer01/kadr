@@ -486,6 +486,40 @@ class AgentMixin:
                         continue
                     if cjk.search(text):
                         raise RuntimeError("Модель упорно пишет иероглифы. Попробуйте ещё раз или смените модель сценариста.")
+                    if attempt == 0 and target == "long" and "<d>" not in text.lower() and re.search(
+                            r"диалог|реплик|разговор",
+                            " ".join(m.get("content", "") for m in messages if m.get("role") == "user").lower()):
+                        # человек просил диалоги, а модель описала разговор словами ("the man asks...") -
+                        # тот же самопочин, что и для иероглифов. Qwen3.5 так грешит устойчиво, Gemma
+                        # на том же запросе пишет реплики сразу. Кадры при дописке остаются на месте
+                        await send({"type": "status", "text": "Сцены вышли без реплик - переписываю с диалогами…"})
+                        fix = {"messages": [{"role": "system", "content": system}] + conv +
+                               [{"role": "assistant", "content": text},
+                                {"role": "user", "content": "В сценах нет ни одной реплики: разговор описан словами. "
+                                                            "Перепиши ВЕСЬ ответ заново, теми же сценами, но где по смыслу "
+                                                            "герои говорят - вставь реплики строкой <d>[Русский] текст</d>. "
+                                                            "Остальное не меняй."}],
+                               "stream": True, "temperature": 0.35, "cache_prompt": False,
+                               "chat_template_kwargs": {"enable_thinking": False}, "thinking_budget_tokens": 0}
+                        try:
+                            async with self.session.post(self.llm.url + "/v1/chat/completions", json=fix,
+                                                         timeout=aiohttp.ClientTimeout(total=None, sock_read=600)) as r2:
+                                if r2.status == 200:
+                                    got2 = []
+                                    async for raw in r2.content:
+                                        line = raw.decode("utf-8", errors="replace").strip()
+                                        if not line.startswith("data:") or line == "data: [DONE]":
+                                            continue
+                                        delta = (json.loads(line[5:]).get("choices") or [{}])[0].get("delta", {})
+                                        if delta.get("content"):
+                                            got2.append(delta["content"])
+                                    t2 = "".join(got2)
+                                    if "<d>" in t2.lower() and not cjk.search(t2):
+                                        text = t2   # дописка получилась - в чат идёт она; нет - остаётся первый ответ
+                        except (ConnectionResetError, asyncio.CancelledError):
+                            raise
+                        except Exception:
+                            pass   # дописка не удалась - отдаём первый ответ, человек поправит сам
                     for i in range(0, len(text), 240):
                         await send({"type": "delta", "text": text[i:i + 240]})
                 await send({"type": "done"})
