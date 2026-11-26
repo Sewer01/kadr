@@ -443,7 +443,14 @@ class AgentMixin:
                 elif notes and not attempt:
                     await send({"type": "status", "text": "Места в контексте мало: " + ", ".join(notes)})
                 payload = {"messages": [{"role": "system", "content": system}] + conv,
-                           "stream": True, "temperature": 0.35, "cache_prompt": True}
+                           "stream": True, "temperature": 0.35,
+                           # the cache must not be reused between requests: the program itself rewrites
+                           # the old messages (frames taken out, the talk compressed into a retelling),
+                           # and llama.cpp then went on from a stale cache - llama.log filled with
+                           # "non-consecutive token position" and the model began to answer as if it
+                           # had been replaced: hieroglyphs, no lines, junk tags. Re-prompting costs a
+                           # couple of seconds; a spoiled session costs the whole video
+                           "cache_prompt": False}
                 if body.get("think") != "deep":
                     # "fast" (default): no hidden reasoning before the answer. On the user's machine a light request took 17 s with it
                     # (about 2000 characters of thoughts) and 1.5 s without; the long-video rules took minutes with it
