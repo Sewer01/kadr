@@ -310,6 +310,15 @@ def build_app(comfy_override=None):
         web.get("/api/events", state.h_events),
         web.static("/ui", UI_DIR),
     ])
+    # файлы интерфейса обязаны проверять свежесть у сервера: без этого браузер
+    # держит в кэше старый код неделями, и починки до человека просто не доходят
+    @web.middleware
+    async def _ui_no_cache(request, handler):
+        response = await handler(request)
+        if request.path.startswith("/ui/"):
+            response.headers["Cache-Control"] = "no-cache"
+        return response
+    app.middlewares.append(_ui_no_cache)
     return app
 
 
